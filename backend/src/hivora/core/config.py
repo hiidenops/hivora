@@ -15,6 +15,19 @@ class Settings(BaseSettings):
     data_dir: Path = Path("/opt/hivora/data")
     volumes_root: Path = Path("/srv/hivora")
 
+    # Official templates shipped with Hivora (the repo's templates/ in development).
+    catalog_dir: Path = Path("/app/templates")
+
+    # Host facts used by templates (`host.*`) and port bindings.
+    host_public_ip: str | None = None
+    host_lan_ip: str | None = None
+    host_vpn_ip: str | None = None
+    timezone: str = "UTC"
+    puid: int = 1000
+    pgid: int = 1000
+
+    job_workers: int = 2
+
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_format: Literal["json", "text"] = "json"
 

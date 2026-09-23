@@ -12,8 +12,8 @@ from hivora.compose_runner import (
     ProgressStatus,
 )
 from hivora.compose_runner.progress import parse_progress_line
-from hivora.compose_runner.redact import MASK, Redactor
 from hivora.core.errors import ValidationError
+from hivora.core.redact import MASK, Redactor
 
 FAKE = [sys.executable, str(Path(__file__).parent / "fake_compose.py")]
 

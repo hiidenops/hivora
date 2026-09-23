@@ -17,12 +17,13 @@ from pathlib import Path
 from typing import Any
 
 from hivora.compose_runner.progress import ProgressEvent, ProgressStatus, parse_progress_line
-from hivora.compose_runner.redact import Redactor
 from hivora.core.errors import ConflictError, HivoraError, ValidationError
+from hivora.core.redact import Redactor
 
 logger = logging.getLogger(__name__)
 
 COMPOSE_FILE = "compose.yaml"
+ENV_FILE = ".env"
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 
 ProgressCallback = Callable[[ProgressEvent], Awaitable[None]]
@@ -46,6 +47,15 @@ class ComposeResult:
     def error(self) -> str | None:
         messages = [e.details or e.text for e in self.events if e.status is ProgressStatus.ERROR]
         return messages[-1] if messages else None
+
+
+def _atomic_write(path: Path, content: str, *, mode: int) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(content)
+    os.chmod(tmp, mode)  # O_CREAT mode is filtered by umask
+    os.replace(tmp, path)
 
 
 def validate_slug(slug: str) -> str:
@@ -74,13 +84,22 @@ class ComposeRunner:
     def compose_path(self, slug: str) -> Path:
         return self.project_dir(slug) / COMPOSE_FILE
 
-    def write(self, slug: str, compose_yaml: str) -> Path:
-        """Atomically replace the app's compose file."""
+    def write(self, slug: str, compose_yaml: str, env: dict[str, str] | None = None) -> Path:
+        """Atomically replace the app's compose file and, if given, its ``.env``.
+
+        ``.env`` holds secret values (mode 0600); Compose reads it for
+        interpolation, so the stack also works without Hivora.
+        """
         path = self.compose_path(slug)
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".yaml.tmp")
-        tmp.write_text(compose_yaml, encoding="utf-8")
-        os.replace(tmp, path)
+        if env is not None:
+            lines = []
+            for key, value in sorted(env.items()):
+                if "'" in value or "\n" in value:
+                    raise ValidationError("unsupported character in secret", key=key)
+                lines.append(f"{key}='{value}'\n")
+            _atomic_write(path.parent / ENV_FILE, "".join(lines), mode=0o600)
+        _atomic_write(path, compose_yaml, mode=0o644)
         return path
 
     # --- locking ----------------------------------------------------------

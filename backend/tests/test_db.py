@@ -4,7 +4,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import select, text
 
-import hivora.db.models  # noqa: F401
+import hivora.db.all_models  # noqa: F401
 from hivora.db.base import Base
 from hivora.db.engine import make_engine, make_sessionmaker, make_sync_engine
 from hivora.db.migrate import upgrade_to_head

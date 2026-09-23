@@ -1,0 +1,121 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: minecraft
+  name: Minecraft Java
+  version: 1.0.0
+  category: games
+  tags: [minecraft, java, sandbox]
+  icon: minecraft.svg
+  description: Serveur Minecraft Java Edition (vanilla par défaut), basé sur l'image itzg/minecraft-server.
+  links:
+    site: https://www.minecraft.net
+    doc: https://docker-minecraft-server.readthedocs.io
+  maintainer: hivora
+  license: Minecraft EULA
+  source: https://hub.docker.com/r/itzg/minecraft-server
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 2Gi, recommended: 4Gi }
+  disk: { min: 5Gi }
+form:
+  basic:
+    - id: eula
+      label: J'accepte le contrat de licence Minecraft (https://aka.ms/MinecraftEULA)
+      type: boolean
+      required: true
+    - id: motd
+      label: Message affiché dans la liste des serveurs
+      type: string
+      default: "Serveur {{ app.name }}"
+    - id: max_players
+      label: Joueurs max
+      type: integer
+      default: 10
+      range: [1, 100]
+    - id: difficulty
+      label: Difficulté
+      type: select
+      default: normal
+      options:
+        - { value: peaceful, label: Paisible }
+        - { value: easy, label: Facile }
+        - { value: normal, label: Normale }
+        - { value: hard, label: Difficile }
+    - id: mode
+      label: Mode de jeu
+      type: select
+      default: survival
+      options:
+        - { value: survival, label: Survie }
+        - { value: creative, label: Créatif }
+        - { value: adventure, label: Aventure }
+  advanced:
+    - id: version
+      label: Version de Minecraft
+      type: string
+      default: LATEST
+      pattern: "LATEST|SNAPSHOT|[0-9]+\\.[0-9]+(\\.[0-9]+)?"
+    - id: memory
+      label: Mémoire allouée à Java
+      type: select
+      default: 2G
+      options:
+        - { value: 1G, label: 1 Go }
+        - { value: 2G, label: 2 Go }
+        - { value: 4G, label: 4 Go }
+        - { value: 6G, label: 6 Go }
+        - { value: 8G, label: 8 Go }
+    - id: online_mode
+      label: Vérifier les comptes Mojang (online-mode)
+      type: boolean
+      default: true
+    - id: game_port
+      label: Port de jeu (TCP)
+      type: port
+      default: 25565
+    - id: rcon_password
+      label: Mot de passe RCON
+      type: secret
+      generate: { length: 24 }
+services:
+  server:
+    role: main
+    image: itzg/minecraft-server
+    tag: "2026.9.1-java21@sha256:21b3d6bad32cc49ca15c8ceefcaffe94ac7fb6a53939fc7a5da066ec5dd0bc1d"
+    env:
+      EULA: "{{ form.eula | upper }}"
+      MOTD: "{{ form.motd }}"
+      MAX_PLAYERS: "{{ form.max_players }}"
+      DIFFICULTY: "{{ form.difficulty }}"
+      MODE: "{{ form.mode }}"
+      VERSION: "{{ form.version }}"
+      MEMORY: "{{ form.memory }}"
+      ONLINE_MODE: "{{ form.online_mode | upper }}"
+      ENABLE_RCON: "TRUE"
+      RCON_PASSWORD: "{{ secret.rcon_password }}"
+      TZ: "{{ host.timezone }}"
+      UID: "{{ host.puid }}"
+      GID: "{{ host.pgid }}"
+    ports:
+      - { container: 25565, host: "{{ form.game_port }}", purpose: game, exposure: public }
+      - { container: 25575, purpose: rcon, exposure: internal }
+    volumes:
+      - { name: data, target: /data, backup: true }
+    stdin_open: true  # server console (attach)
+    tty: true
+access:
+  game: "{{ host.public_ip }}:{{ form.game_port }}"
+backup:
+  volumes: [data]
+  pause: true
+update:
+  strategy: manual
+game:
+  query: minecraft
+  rcon_port: 25575
+  max_players: "{{ form.max_players }}"
+  stop_command: stop
+defaults:
+  zone: gaming
+  restart: unless-stopped

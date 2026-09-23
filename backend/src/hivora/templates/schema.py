@@ -1,0 +1,217 @@
+"""Pydantic model of the ``hivora/v1`` template format (docs section 8).
+
+Unknown keys are rejected so that typos fail loudly at load time, and every
+``{{ }}`` expression is checked against the declared form and services.
+"""
+
+import re
+from collections.abc import Iterator
+from typing import Annotated, Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from hivora.templates.expressions import find_expressions
+
+SLUG = r"^[a-z0-9][a-z0-9-]{0,62}$"
+FIELD_ID = r"^[a-z][a-z0-9_]{0,62}$"
+SEMVER = r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$"
+DIGEST = re.compile(r"@sha256:[0-9a-f]{64}$")
+
+FieldType = Literal[
+    "string", "text", "integer", "number", "boolean", "select", "secret",
+    "port", "path", "email", "url", "domain",
+]  # fmt: skip
+Exposure = Literal["public", "lan", "vpn", "internal"]
+
+
+def iter_strings(value: Any) -> Iterator[str]:
+    """Every string nested in dicts/lists (keys excluded)."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from iter_strings(v)
+    elif isinstance(value, (list, tuple)):
+        for v in value:
+            yield from iter_strings(v)
+
+
+class _Strict(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
+
+
+class Metadata(_Strict):
+    slug: Annotated[str, Field(pattern=SLUG)]
+    name: str
+    version: Annotated[str, Field(pattern=SEMVER)]
+    category: Literal["games", "media", "productivity", "services", "network", "development"]
+    tags: list[str] = []
+    icon: str | None = None
+    description: str = ""
+    links: dict[str, str] = {}
+    maintainer: str | None = None
+    license: str | None = None
+    source: str | None = None
+
+
+class ResourceReq(_Strict):
+    min: str | None = None
+    recommended: str | None = None
+
+
+class Requirements(_Strict):
+    arch: list[Literal["amd64", "arm64"]]
+    memory: ResourceReq | None = None
+    cpu: ResourceReq | None = None
+    disk: ResourceReq | None = None
+
+
+class SelectOption(_Strict):
+    value: str | int
+    label: str
+
+
+class Generate(_Strict):
+    length: Annotated[int, Field(ge=12, le=128)] = 24
+
+
+class FormField(_Strict):
+    id: Annotated[str, Field(pattern=FIELD_ID)]
+    label: str
+    type: FieldType
+    required: bool = False  # for booleans: the box must be checked (e.g. EULA)
+    default: Any = None
+    pattern: str | None = None
+    help: str | None = None
+    show_if: dict[str, Any] | None = Field(default=None, alias="showIf")
+    range: tuple[float, float] | None = None
+    options: list[SelectOption] | None = None
+    generate: Generate | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> "FormField":
+        if self.type == "select" and not self.options:
+            raise ValueError(f"select field {self.id!r} needs options")
+        if self.generate and self.type != "secret":
+            raise ValueError(f"only secret fields can be generated ({self.id!r})")
+        if self.type == "secret" and self.default is not None:
+            raise ValueError(f"secret field {self.id!r} cannot have a default")
+        return self
+
+
+class Form(_Strict):
+    basic: list[FormField] = []
+    advanced: list[FormField] = []
+
+    @property
+    def fields(self) -> list[FormField]:
+        return [*self.basic, *self.advanced]
+
+
+class PortSpec(_Strict):
+    container: Annotated[int, Field(ge=1, le=65535)]
+    host: int | str | None = None  # None: same as container; may be an expression
+    protocol: Literal["tcp", "udp"] = "tcp"
+    purpose: Literal["web", "game", "rcon", "query", "other"] = "other"
+    exposure: Exposure = "lan"
+
+
+class VolumeSpec(_Strict):
+    name: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")]
+    target: str
+    backup: bool = False
+    read_only: bool = False
+
+
+class ServiceSpec(_Strict):
+    role: Literal["main", "database", "cache", "sidecar"] = "main"
+    image: str
+    tag: str
+    env: dict[str, str | int | bool] = {}
+    ports: list[PortSpec] = []
+    volumes: list[VolumeSpec] = []
+    command: str | list[str] | None = None
+    healthcheck: dict[str, Any] | None = None
+    depends_on: list[str] = []
+    user: str | None = None
+    stdin_open: bool = False  # needed by the game server console (attach)
+    tty: bool = False
+
+    @property
+    def image_ref(self) -> str:
+        return f"{self.image}:{self.tag}"
+
+
+class Access(_Strict):
+    web: str | None = None
+    game: str | None = None
+    credentials: dict[str, str] = {}
+
+
+class Backup(_Strict):
+    volumes: list[str] = []
+    pause: bool = False
+
+
+class Update(_Strict):
+    strategy: Literal["manual", "auto-patch", "auto-minor"] = "manual"
+
+
+class Game(_Strict):
+    query: Literal["a2s", "minecraft"] | None = None
+    rcon_port: int | None = None
+    max_players: int | str | None = None
+    stop_command: str | None = None
+
+
+class Defaults(_Strict):
+    zone: str | None = None
+    restart: Literal["no", "always", "unless-stopped", "on-failure"] = "unless-stopped"
+
+
+class Template(_Strict):
+    api_version: Literal["hivora/v1"] = Field(alias="apiVersion")
+    kind: Literal["Template"]
+    metadata: Metadata
+    requirements: Requirements
+    form: Form = Form()
+    services: Annotated[dict[str, ServiceSpec], Field(min_length=1)]
+    access: Access | None = None
+    backup: Backup | None = None
+    update: Update | None = None
+    game: Game | None = None
+    defaults: Defaults = Defaults()
+
+    @property
+    def main_service(self) -> str:
+        return next(
+            (n for n, s in self.services.items() if s.role == "main"), next(iter(self.services))
+        )
+
+    @model_validator(mode="after")
+    def _check_references(self) -> "Template":
+        fields = {f.id: f for f in self.form.fields}
+        if len(fields) != len(self.form.fields):
+            raise ValueError("duplicate form field ids")
+        names = set(self.services)
+        for name, svc in self.services.items():
+            if unknown := set(svc.depends_on) - names:
+                raise ValueError(f"service {name!r} depends on unknown {sorted(unknown)}")
+        exprs = (e for text in iter_strings(self.model_dump()) for e in find_expressions(text))
+        for expr in exprs:
+            ns, rest = expr.namespace, expr.path[1:]
+            if ns in ("form", "secret"):
+                field = fields.get(rest[0])
+                if field is None or len(rest) != 1:
+                    raise ValueError(f"{expr.source!r}: unknown form field")
+                if (ns == "secret") != (field.type == "secret"):
+                    raise ValueError(f"{expr.source!r}: use secret.* for secret fields only")
+            elif ns == "service" and (rest[0] not in names or rest[1:] != ("host",)):
+                raise ValueError(f"{expr.source!r}: expected service.<name>.host")
+        return self
+
+    def check_pinned(self) -> None:
+        """Official templates must pin every image by digest."""
+        for name, svc in self.services.items():
+            if not DIGEST.search(svc.tag):
+                raise ValueError(f"service {name!r}: tag must be pinned by digest")

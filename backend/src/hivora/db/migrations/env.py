@@ -4,7 +4,7 @@ from pathlib import Path
 
 from alembic import context
 
-import hivora.db.models  # noqa: F401  (register tables on the metadata)
+import hivora.db.all_models  # noqa: F401  (register every table on the metadata)
 from hivora.core.config import Settings
 from hivora.db.base import Base
 from hivora.db.engine import make_sync_engine

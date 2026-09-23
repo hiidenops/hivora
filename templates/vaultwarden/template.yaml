@@ -1,0 +1,68 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: vaultwarden
+  name: Vaultwarden
+  version: 1.0.0
+  category: productivity
+  tags: [passwords, bitwarden, security]
+  icon: vaultwarden.svg
+  description: Serveur de mots de passe compatible avec les applications Bitwarden, léger et auto-hébergé.
+  links:
+    site: https://github.com/dani-garcia/vaultwarden
+    doc: https://github.com/dani-garcia/vaultwarden/wiki
+  maintainer: hivora
+  license: AGPL-3.0
+  source: https://hub.docker.com/r/vaultwarden/server
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 64Mi, recommended: 256Mi }
+  disk: { min: 1Gi }
+form:
+  basic:
+    - id: domain
+      label: Adresse d'accès (URL complète)
+      type: url
+      required: true
+      default: 'http://{{ host.lan_ip | default("localhost") }}:8080'
+      help: Les clients Bitwarden exigent HTTPS, sauf sur localhost. Utilisez l'URL finale derrière votre proxy.
+    - id: signups_allowed
+      label: Autoriser les inscriptions
+      type: boolean
+      default: true
+      help: Désactivez-les une fois vos comptes créés.
+    - id: admin_token
+      label: Jeton de la page d'administration (/admin)
+      type: secret
+      generate: { length: 48 }
+  advanced:
+    - id: web_port
+      label: Port web
+      type: port
+      default: 8080
+services:
+  server:
+    role: main
+    image: vaultwarden/server
+    tag: "1.37.3@sha256:1587c45feaa479f1f5e8af3b00eded36bff77bcf1880cf8dbf0541706dd470e0"
+    env:
+      DOMAIN: "{{ form.domain }}"
+      SIGNUPS_ALLOWED: "{{ form.signups_allowed }}"
+      ADMIN_TOKEN: "{{ secret.admin_token }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: data, target: /data, backup: true }
+    healthcheck:
+      # Keep the image's check, poll it faster than its 60 s default.
+      interval: 10s
+      start_period: 5s
+access:
+  web: "{{ form.domain }}"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped
