@@ -8,3 +8,18 @@ id_*
 
 # OS
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Frontend
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
