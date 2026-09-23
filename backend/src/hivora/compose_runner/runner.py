@@ -1,0 +1,208 @@
+"""Writes compose files and drives the ``docker compose`` CLI.
+
+The compose project name is the app slug, which is also the directory name,
+so ``cd /opt/hivora/data/apps/<slug> && docker compose up -d`` works
+without Hivora.
+"""
+
+import asyncio
+import json
+import logging
+import os
+import re
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from hivora.compose_runner.progress import ProgressEvent, ProgressStatus, parse_progress_line
+from hivora.compose_runner.redact import Redactor
+from hivora.core.errors import ConflictError, HivoraError, ValidationError
+
+logger = logging.getLogger(__name__)
+
+COMPOSE_FILE = "compose.yaml"
+_SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
+
+ProgressCallback = Callable[[ProgressEvent], Awaitable[None]]
+
+
+class ComposeError(HivoraError):
+    code = "compose_failed"
+
+
+class AppBusyError(ConflictError):
+    code = "app_busy"
+
+
+@dataclass(frozen=True, slots=True)
+class ComposeResult:
+    returncode: int
+    events: tuple[ProgressEvent, ...]
+    stdout: str
+
+    @property
+    def error(self) -> str | None:
+        messages = [e.details or e.text for e in self.events if e.status is ProgressStatus.ERROR]
+        return messages[-1] if messages else None
+
+
+def validate_slug(slug: str) -> str:
+    if not _SLUG.match(slug):
+        raise ValidationError("invalid app slug", slug=slug)
+    return slug
+
+
+class ComposeRunner:
+    def __init__(
+        self,
+        apps_dir: Path,
+        *,
+        compose_cmd: Sequence[str] = ("docker", "compose"),
+        env: dict[str, str] | None = None,
+    ) -> None:
+        self.apps_dir = apps_dir
+        self._cmd = tuple(compose_cmd)
+        self._env = {**os.environ, **(env or {})}
+        self._locks: dict[str, asyncio.Lock] = {}
+
+    # --- files ------------------------------------------------------------
+    def project_dir(self, slug: str) -> Path:
+        return self.apps_dir / validate_slug(slug)
+
+    def compose_path(self, slug: str) -> Path:
+        return self.project_dir(slug) / COMPOSE_FILE
+
+    def write(self, slug: str, compose_yaml: str) -> Path:
+        """Atomically replace the app's compose file."""
+        path = self.compose_path(slug)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".yaml.tmp")
+        tmp.write_text(compose_yaml, encoding="utf-8")
+        os.replace(tmp, path)
+        return path
+
+    # --- locking ----------------------------------------------------------
+    @asynccontextmanager
+    async def lock(self, slug: str) -> AsyncIterator[None]:
+        """Exclusive access to one app's stack; fails fast instead of queueing."""
+        lock = self._locks.setdefault(validate_slug(slug), asyncio.Lock())
+        if lock.locked():
+            raise AppBusyError("another operation is running on this app", slug=slug)
+        async with lock:
+            yield
+
+    def is_locked(self, slug: str) -> bool:
+        lock = self._locks.get(slug)
+        return lock is not None and lock.locked()
+
+    # --- commands ---------------------------------------------------------
+    async def config(self, slug: str, *, redact: Iterable[str] = ()) -> dict[str, Any]:
+        """Validated, fully resolved model of the compose file."""
+        result = await self._run(slug, ["config", "--format", "json"], Redactor(redact))
+        if result.returncode != 0:
+            raise ComposeError(result.error or "invalid compose file", slug=slug)
+        parsed: dict[str, Any] = json.loads(result.stdout)
+        return parsed
+
+    async def up(
+        self,
+        slug: str,
+        *,
+        on_progress: ProgressCallback | None = None,
+        redact: Iterable[str] = (),
+        wait: bool = True,
+    ) -> ComposeResult:
+        """``wait`` blocks until services are running/healthy (fails if one exits)."""
+        args = ["up", "--detach", "--remove-orphans"] + (["--wait"] if wait else [])
+        return await self._checked(slug, args, on_progress, redact)
+
+    async def pull(
+        self,
+        slug: str,
+        *,
+        on_progress: ProgressCallback | None = None,
+        redact: Iterable[str] = (),
+    ) -> ComposeResult:
+        return await self._checked(slug, ["pull"], on_progress, redact)
+
+    async def stop(
+        self, slug: str, *, on_progress: ProgressCallback | None = None
+    ) -> ComposeResult:
+        return await self._checked(slug, ["stop"], on_progress, ())
+
+    async def start(
+        self, slug: str, *, on_progress: ProgressCallback | None = None
+    ) -> ComposeResult:
+        return await self._checked(slug, ["start", "--wait"], on_progress, ())
+
+    async def restart(
+        self, slug: str, *, on_progress: ProgressCallback | None = None
+    ) -> ComposeResult:
+        return await self._checked(slug, ["restart"], on_progress, ())
+
+    async def down(
+        self,
+        slug: str,
+        *,
+        remove_volumes: bool = False,
+        on_progress: ProgressCallback | None = None,
+    ) -> ComposeResult:
+        args = ["down", "--remove-orphans"] + (["--volumes"] if remove_volumes else [])
+        return await self._checked(slug, args, on_progress, ())
+
+    async def _checked(
+        self,
+        slug: str,
+        args: list[str],
+        on_progress: ProgressCallback | None,
+        redact: Iterable[str],
+    ) -> ComposeResult:
+        result = await self._run(slug, args, Redactor(redact), on_progress)
+        if result.returncode != 0:
+            raise ComposeError(result.error or f"docker compose {args[0]} failed", slug=slug)
+        return result
+
+    async def _run(
+        self,
+        slug: str,
+        args: list[str],
+        redactor: Redactor,
+        on_progress: ProgressCallback | None = None,
+    ) -> ComposeResult:
+        project_dir = self.project_dir(slug)
+        argv = [
+            *self._cmd,
+            "--progress",
+            "json",
+            "--project-name",
+            slug,
+            "--file",
+            str(project_dir / COMPOSE_FILE),
+            *args,
+        ]
+        logger.info("compose", extra={"app": slug, "argv": argv[len(self._cmd) :]})
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            cwd=project_dir,
+            env=self._env,
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        assert proc.stdout and proc.stderr
+        events: list[ProgressEvent] = []
+
+        async def read_progress(stream: asyncio.StreamReader) -> None:
+            async for raw in stream:
+                event = parse_progress_line(redactor(raw.decode(errors="replace")))
+                if event is None:
+                    continue
+                events.append(event)
+                if on_progress:
+                    await on_progress(event)
+
+        stdout, _ = await asyncio.gather(proc.stdout.read(), read_progress(proc.stderr))
+        returncode = await proc.wait()
+        return ComposeResult(returncode, tuple(events), redactor(stdout.decode(errors="replace")))

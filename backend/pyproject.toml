@@ -11,6 +11,7 @@ dependencies = [
     "sqlalchemy>=2.0",
     "alembic>=1.14",
     "aiodocker>=0.24",
+    "aiohttp>=3.10",
     "aiosqlite>=0.20",
     "argon2-cffi>=23.1",
     "cryptography>=43",
@@ -44,7 +45,7 @@ select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "S", "RUF"]
 ignore = ["S101"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106", "S108"]
+"tests/**" = ["S104", "S105", "S106", "S108"]
 
 [tool.mypy]
 strict = true
@@ -54,3 +55,4 @@ mypy_path = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = ["docker: needs a reachable Docker Engine with Compose v2 (skipped otherwise)"]
