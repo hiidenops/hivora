@@ -171,6 +171,13 @@ class ComposeRunner:
         args = ["down", "--remove-orphans"] + (["--volumes"] if remove_volumes else [])
         return await self._checked(slug, args, on_progress, ())
 
+    async def logs(self, slug: str, *, tail: int = 40, redact: Iterable[str] = ()) -> list[str]:
+        """Last lines of every service, to explain a failure (best effort)."""
+        result = await self._run(
+            slug, ["logs", "--no-color", "--tail", str(tail)], Redactor(redact)
+        )
+        return result.stdout.splitlines()
+
     async def _checked(
         self,
         slug: str,

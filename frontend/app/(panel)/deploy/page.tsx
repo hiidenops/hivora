@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 
+import { AppIcon } from "@/components/app-icon";
 import { PageHeader, useSession } from "@/components/app-shell";
 import { CodeView } from "@/components/code-view";
 import { JobProgress } from "@/components/job-progress";
@@ -11,6 +12,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Select } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { GeneratedForm, initialValues, type FieldDef, type Values } from "@/features/deploy/generated-form";
 import { ApiError, type Plan } from "@/lib/api/client";
 import { useDeploy, usePlan, useTemplate, useZones } from "@/lib/api/hooks";
@@ -60,11 +62,25 @@ function Deploy() {
     });
 
   if (loadError) return <Alert tone="danger">{errorMessage(loadError)}</Alert>;
-  if (!template) return <p className="text-muted-foreground">{t("common.loading")}</p>;
+  if (!template) {
+    return (
+      <div role="status" aria-label={t("common.loading")} className="grid max-w-2xl gap-4">
+        <Skeleton className="h-9 w-1/2" />
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
 
   return (
     <>
-      <PageHeader title={t("deploy.title", { name: template.name })} />
+      <PageHeader
+        title={
+          <span className="flex items-center gap-3">
+            <AppIcon src={template.icon_url} name={template.name} />
+            {t("deploy.title", { name: template.name })}
+          </span>
+        }
+      />
       {step === "form" && (
         <Card className="max-w-2xl">
           <CardContent className="grid gap-6 pt-5">
@@ -109,7 +125,7 @@ function Deploy() {
       )}
 
       {step === "review" && plan && (
-        <div className="grid max-w-3xl gap-4">
+        <div className="animate-enter grid max-w-4xl gap-4">
           <Card>
             <CardHeader>
               <CardTitle>{t("deploy.previewTitle")}</CardTitle>
@@ -188,7 +204,7 @@ function Deploy() {
       )}
 
       {step === "progress" && result && (
-        <Card className="max-w-2xl">
+        <Card className="animate-enter w-full">
           <CardHeader>
             <CardTitle>
               {finished === "succeeded"

@@ -7,7 +7,7 @@ from sqlalchemy import update
 from hivora.apps.files import ensure_dir, remove_tree
 from hivora.apps.models import Application, AppRevision, RevisionStatus
 from hivora.apps.service import AppService
-from hivora.compose_runner import ProgressEvent, ProgressStatus
+from hivora.compose_runner import ComposeError, ProgressEvent, ProgressStatus
 from hivora.jobs import JobContext, JobKind
 from hivora.templates.expressions import secret_env_name
 
@@ -69,9 +69,7 @@ class AppJobHandlers:
                     app.slug, on_progress=_PullProgress(ctx, 5, 80), redact=secrets.values()
                 )
                 await ctx.progress(80, "Starting containers")
-                await s.runner.up(
-                    app.slug, redact=secrets.values(), on_progress=lambda e: self._log_event(ctx, e)
-                )
+                await self._up(ctx, app.slug, list(secrets.values()))
         except Exception:
             await self._set_revision(revision.id, RevisionStatus.FAILED)
             raise
@@ -90,9 +88,7 @@ class AppJobHandlers:
         # `up` rather than `start`: recreates containers removed behind our back.
         slug, secrets = await self._slug_and_secrets(ctx)
         async with self.s.runner.lock(slug):
-            await self.s.runner.up(
-                slug, redact=secrets, on_progress=lambda e: self._log_event(ctx, e)
-            )
+            await self._up(ctx, slug, secrets)
 
     async def stop(self, ctx: JobContext) -> None:
         slug, _ = await self._slug_and_secrets(ctx)
@@ -120,6 +116,25 @@ class AppJobHandlers:
         async with s.sessions() as session, session.begin():
             await session.delete(await s.get(session, _app_id(ctx)))
         s.bus.publish("app.removed", app=slug, data_removed=remove_data)
+
+    async def _up(self, ctx: JobContext, slug: str, secrets: list[str]) -> None:
+        """`compose up --wait`; on failure, append the containers' own logs to the job."""
+        try:
+            await self.s.runner.up(
+                slug, redact=secrets, on_progress=lambda e: self._log_event(ctx, e)
+            )
+        except ComposeError as exc:
+            try:
+                lines = await self.s.runner.logs(slug, tail=40, redact=secrets)
+            except Exception:
+                lines = []
+            if lines:
+                await ctx.log("--- container logs (last 40 lines) ---")
+                for line in lines:
+                    await ctx.log(line)
+            raise ComposeError(
+                f"{exc}; see the container logs at the end of the job log", slug=slug
+            ) from exc
 
     async def _slug_and_secrets(self, ctx: JobContext) -> tuple[str, list[str]]:
         async with self.s.sessions() as session:

@@ -22,7 +22,7 @@
             "title": "Drift",
             "type": "boolean"
           },
-          "icon": {
+          "icon_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -31,7 +31,7 @@
                 "type": "null"
               }
             ],
-            "title": "Icon"
+            "title": "Icon Url"
           },
           "id": {
             "title": "Id",
@@ -70,6 +70,17 @@
           "status": {
             "$ref": "#/components/schemas/AppStatus"
           },
+          "template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template"
+          },
           "volumes": {
             "items": {
               "type": "string"
@@ -93,7 +104,8 @@
           "id",
           "slug",
           "name",
-          "icon",
+          "template",
+          "icon_url",
           "zone_id",
           "origin",
           "desired_state",
@@ -122,7 +134,7 @@
             "title": "Drift",
             "type": "boolean"
           },
-          "icon": {
+          "icon_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -131,7 +143,7 @@
                 "type": "null"
               }
             ],
-            "title": "Icon"
+            "title": "Icon Url"
           },
           "id": {
             "title": "Id",
@@ -152,6 +164,17 @@
           "status": {
             "$ref": "#/components/schemas/AppStatus"
           },
+          "template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template"
+          },
           "zone_id": {
             "anyOf": [
               {
@@ -168,7 +191,8 @@
           "id",
           "slug",
           "name",
-          "icon",
+          "template",
+          "icon_url",
           "zone_id",
           "origin",
           "desired_state",
@@ -1216,7 +1240,7 @@
             "title": "Form",
             "type": "object"
           },
-          "icon": {
+          "icon_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -1225,7 +1249,7 @@
                 "type": "null"
               }
             ],
-            "title": "Icon"
+            "title": "Icon Url"
           },
           "links": {
             "additionalProperties": {
@@ -1276,7 +1300,7 @@
           "version",
           "category",
           "tags",
-          "icon",
+          "icon_url",
           "description",
           "compatible",
           "links",
@@ -1318,7 +1342,7 @@
             ],
             "title": "Description"
           },
-          "icon": {
+          "icon_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -1327,7 +1351,7 @@
                 "type": "null"
               }
             ],
-            "title": "Icon"
+            "title": "Icon Url"
           },
           "name": {
             "title": "Name",
@@ -1355,7 +1379,7 @@
           "version",
           "category",
           "tags",
-          "icon",
+          "icon_url",
           "description",
           "compatible"
         ],
@@ -2642,6 +2666,46 @@
           }
         },
         "summary": "Get Template",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/api/v1/templates/{slug}/icon": {
+      "get": {
+        "operationId": "get_icon_api_v1_templates__slug__icon_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Icon",
         "tags": [
           "templates"
         ]

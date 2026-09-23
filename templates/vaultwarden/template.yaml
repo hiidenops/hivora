@@ -3,10 +3,11 @@ kind: Template
 metadata:
   slug: vaultwarden
   name: Vaultwarden
-  version: 1.1.0
+  version: 1.2.0
   category: productivity
   tags: [passwords, bitwarden, security]
-  icon: vaultwarden.svg
+  icon:
+    url: https://raw.githubusercontent.com/dani-garcia/vaultwarden/main/resources/vaultwarden-icon.svg
   description:
     fr: Serveur de mots de passe compatible avec les applications Bitwarden, léger et auto-hébergé.
     en: Lightweight, self-hosted password server compatible with the Bitwarden apps.

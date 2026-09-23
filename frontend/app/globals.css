@@ -76,3 +76,74 @@ body {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/* ---- Motion: short, purposeful, and off when the user asks for less. ---- */
+@keyframes hv-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hv-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hv-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes hv-pop-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes hv-pop-out {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+}
+@keyframes hv-menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hv-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes hv-stripes {
+  from { background-position: 0 0; }
+  to { background-position: 28px 0; }
+}
+
+@utility animate-enter { animation: hv-enter 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@utility animate-overlay {
+  &[data-state="open"] { animation: hv-fade-in 180ms ease-out; }
+  &[data-state="closed"] { animation: hv-fade-out 140ms ease-in; }
+}
+@utility animate-dialog {
+  &[data-state="open"] { animation: hv-pop-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  &[data-state="closed"] { animation: hv-pop-out 140ms ease-in; }
+}
+@utility animate-menu {
+  &[data-state="open"] { animation: hv-menu-in 140ms ease-out; }
+}
+@utility skeleton {
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, var(--muted) 25%, color-mix(in oklch, var(--muted), var(--foreground) 6%) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: hv-shimmer 1.4s ease-in-out infinite;
+}
+/* Running progress bar: moving stripes show that work is still happening. */
+@utility progress-active {
+  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.28) 25%, transparent 25%, transparent 50%,
+    rgb(255 255 255 / 0.28) 50%, rgb(255 255 255 / 0.28) 75%, transparent 75%, transparent);
+  background-size: 28px 28px;
+  animation: hv-stripes 0.8s linear infinite;
+}
+/* Interactive cards lift slightly on hover. */
+@utility card-interactive {
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  &:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in oklch, var(--primary), transparent 45%);
+    box-shadow: 0 8px 24px -12px color-mix(in oklch, var(--foreground), transparent 75%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

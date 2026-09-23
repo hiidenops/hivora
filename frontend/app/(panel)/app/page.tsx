@@ -3,12 +3,14 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
+import { AppIcon } from "@/components/app-icon";
 import { PageHeader, useSession } from "@/components/app-shell";
 import { CodeView } from "@/components/code-view";
 import { JobProgress } from "@/components/job-progress";
 import { StatusBadge } from "@/components/status-badge";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AppActions } from "@/features/apps/app-actions";
 import { JobList } from "@/features/apps/job-list";
 import { RemoveDialog } from "@/features/apps/remove-dialog";
@@ -33,13 +35,24 @@ function AppDetail() {
   if (error) {
     return <Alert tone="danger">{error instanceof ApiError && error.status === 404 ? t("app.notFound") : errorMessage(error)}</Alert>;
   }
-  if (!app) return <p className="text-muted-foreground">{t("common.loading")}</p>;
+  if (!app) {
+    return (
+      <div role="status" aria-label={t("common.loading")} className="grid gap-4">
+        <Skeleton className="h-10 w-1/3" />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       <PageHeader
         title={
           <span className="flex flex-wrap items-center gap-3">
+            <AppIcon src={app.icon_url} name={app.name} />
             {app.name}
             <StatusBadge status={status} drift={app.drift} />
           </span>

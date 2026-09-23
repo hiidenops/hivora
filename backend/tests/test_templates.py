@@ -160,6 +160,15 @@ def test_compile_minecraft(catalog: Catalog) -> None:
     assert compiled.env == {"HV_SECRET_RCON_PASSWORD": form.secrets["rcon_password"]}
     assert form.secrets["rcon_password"] not in compiled.compose_yaml
     assert compiled.access == {"game": "203.0.113.7:25565"}
+    lan_only = compile_template(
+        template, AppContext(slug="cube", name="C", revision=1), HostInfo(lan_ip="192.168.1.10"),
+        form, Path("/srv/hivora"),
+    )  # fmt: skip
+    assert lan_only.access == {"game": "192.168.1.10:25565"}
+    unknown = compile_template(
+        template, AppContext(slug="cube", name="C", revision=1), HostInfo(), form, Path("/srv")
+    )
+    assert unknown.access == {}
     assert yaml.safe_load(compiled.compose_yaml) == compiled.compose
 
 

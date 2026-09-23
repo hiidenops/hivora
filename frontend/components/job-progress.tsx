@@ -42,7 +42,7 @@ export function JobProgress({ jobId, onFinished }: { jobId: number; onFinished?:
   }, [lines.length]);
 
   return (
-    <div className="grid gap-3">
+    <div className="grid min-w-0 gap-3">
       <div className="flex items-center justify-between text-sm">
         <span className="font-medium">{t(`job.status.${status}` as never)}</span>
         <span className="font-mono text-xs text-muted-foreground">{progress}%</span>
@@ -55,7 +55,13 @@ export function JobProgress({ jobId, onFinished }: { jobId: number; onFinished?:
         aria-valuemax={100}
       >
         <div
-          className={status === "failed" ? "h-full bg-danger" : "h-full bg-primary transition-all"}
+          className={
+            status === "failed"
+              ? "h-full bg-danger"
+              : done
+                ? "h-full bg-ok transition-all duration-500"
+                : "progress-active h-full bg-primary transition-all duration-500"
+          }
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -63,7 +69,10 @@ export function JobProgress({ jobId, onFinished }: { jobId: number; onFinished?:
       {(job?.error ?? live?.error) && <Alert tone="danger">{job?.error ?? live?.error}</Alert>}
       <details open={status === "failed"}>
         <summary className="cursor-pointer text-sm text-muted-foreground">{t("job.log")}</summary>
-        <pre ref={logRef} className="mt-2 max-h-64 overflow-auto rounded-md bg-muted p-3 font-mono text-xs">
+        <pre
+          ref={logRef}
+          className="mt-2 h-72 overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-muted p-3 font-mono text-xs"
+        >
           {lines.join("\n")}
         </pre>
       </details>

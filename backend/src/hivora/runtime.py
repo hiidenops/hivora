@@ -1,8 +1,9 @@
 """Assembles every service of a running Hivora and manages their lifecycle."""
 
+import asyncio
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -20,6 +21,7 @@ from hivora.docker_gateway import DockerGateway
 from hivora.jobs import JobQueue
 from hivora.state import StateService
 from hivora.templates import Catalog
+from hivora.templates.icons import IconCache
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,8 @@ class Runtime:
     apps: AppService
     auth: AuthService
     audit: AuditRecorder
+    icons: IconCache
+    _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
 
     @classmethod
     def build(
@@ -84,16 +88,27 @@ class Runtime:
         AppJobHandlers(apps).register()
         auth = AuthService(settings=settings, sessions=sessions, box=box, bus=bus, clock=clock)
         audit = AuditRecorder(sessions, bus)
+        icons = IconCache(settings.data_dir / "icons")
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
-                   jobs, apps, auth, audit)  # fmt: skip
+                   jobs, apps, auth, audit, icons)  # fmt: skip
 
     async def start(self) -> None:
+        # Icons download in the background: startup never waits for the network.
+        self._icons_task = asyncio.create_task(self._warm_icons())
         await self.audit.start()
         await self.auth.ensure_initial_admin()
         await self.state.start()
         await self.jobs.start()
 
+    async def _warm_icons(self) -> None:
+        try:
+            await self.icons.warm(self.catalog.entries())
+        except Exception:
+            logger.exception("icon cache warm-up failed")
+
     async def stop(self) -> None:
+        if self._icons_task:
+            self._icons_task.cancel()
         await self.jobs.stop()
         await self.state.stop()
         await self.audit.stop()

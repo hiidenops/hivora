@@ -3,10 +3,11 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.1.0
+  version: 1.2.0
   category: games
   tags: [minecraft, java, sandbox]
-  icon: minecraft.svg
+  icon:
+    url: https://minecraft.wiki/images/Grass_Block_JE7_BE6.png
   description:
     fr: Serveur Minecraft Java Edition (vanilla par défaut), basé sur l'image itzg/minecraft-server.
     en: Minecraft Java Edition server (vanilla by default), based on the itzg/minecraft-server image.
@@ -86,7 +87,8 @@ services:
   server:
     role: main
     image: itzg/minecraft-server
-    tag: "2026.9.1-java21@sha256:21b3d6bad32cc49ca15c8ceefcaffe94ac7fb6a53939fc7a5da066ec5dd0bc1d"
+    # Java 25: required by Minecraft 26.x ("LATEST"); java21 fails with UnsupportedClassVersionError.
+    tag: "2026.9.1-java25@sha256:e8640538dac5d54c2838d57fa9641e735ad0cf2b71fb0e8a68da3b542a315749"
     env:
       EULA: "{{ form.eula | upper }}"
       MOTD: "{{ form.motd }}"

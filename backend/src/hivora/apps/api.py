@@ -12,6 +12,7 @@ from hivora.apps.service import DeployPlan, DeployRequest
 from hivora.core.errors import NotFoundError
 from hivora.jobs import Job
 from hivora.state import AppStatus
+from hivora.templates.models import TemplateVersion
 from hivora.web.deps import Operator, RuntimeDep, Viewer
 
 router = APIRouter(tags=["apps"])
@@ -74,7 +75,8 @@ class AppOut(BaseModel):
     id: int
     slug: str
     name: str
-    icon: str | None
+    template: str | None
+    icon_url: str | None
     zone_id: int | None
     origin: str
     desired_state: DesiredState
@@ -121,13 +123,15 @@ def has_drift(desired: DesiredState, status: AppStatus) -> bool:
     return status in _RUNNING
 
 
-def app_out(rt: RuntimeDep, app: Application) -> AppOut:
+def app_out(rt: RuntimeDep, app: Application, template: str | None) -> AppOut:
     status = rt.state.store.app(app.slug).status
+    icon = f"/api/v1/templates/{template}/icon" if template and rt.icons.path(template) else None
     return AppOut(
         id=app.id,
         slug=app.slug,
         name=app.name,
-        icon=app.icon,
+        template=template,
+        icon_url=icon,
         zone_id=app.zone_id,
         origin=app.origin.value,
         desired_state=app.desired_state,
@@ -162,8 +166,12 @@ def to_request(body: DeployIn) -> DeployRequest:
 @router.get("")
 async def list_apps(_: Viewer, rt: RuntimeDep) -> list[AppOut]:
     async with rt.sessions() as session:
-        apps = await session.scalars(select(Application).order_by(Application.name))
-        return [app_out(rt, a) for a in apps]
+        rows = await session.execute(
+            select(Application, TemplateVersion.slug)
+            .outerjoin(TemplateVersion, Application.template_version_id == TemplateVersion.id)
+            .order_by(Application.name)
+        )
+        return [app_out(rt, app, template) for app, template in rows]
 
 
 @router.post("/plan")
@@ -176,18 +184,21 @@ async def plan(body: DeployIn, _: Operator, rt: RuntimeDep) -> PlanOut:
 @router.post("", status_code=202)
 async def deploy(body: DeployIn, _: Operator, rt: RuntimeDep) -> DeployOut:
     app, job = await rt.apps.deploy(to_request(body))
-    return DeployOut(app=app_out(rt, app), job=job_ref(job))
+    return DeployOut(app=app_out(rt, app, body.template), job=job_ref(job))
 
 
 @router.get("/{app_id}")
 async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
     async with rt.sessions() as session:
         app = await rt.apps.get(session, app_id)
+        template = await session.scalar(
+            select(TemplateVersion.slug).where(TemplateVersion.id == app.template_version_id)
+        )
         revision = (await session.get(AppRevision, app.current_revision_id)
                     if app.current_revision_id else None)  # fmt: skip
         state = rt.state.store.app(app.slug)
         return AppDetailOut(
-            **app_out(rt, app).model_dump(),
+            **app_out(rt, app, template).model_dump(),
             revision=revision.number if revision else None,
             containers=[ContainerOut(id=c.id[:12], name=c.name, image=c.image,
                                      state=c.state.value, health=c.health.value)

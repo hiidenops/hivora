@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { AppIcon } from "@/components/app-icon";
 import { PageHeader, useSession } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { TileSkeletons } from "@/components/ui/skeleton";
 import { useTemplates } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -46,7 +48,7 @@ export default function CatalogPage() {
             key={c}
             onClick={() => setCategory(c)}
             className={cn(
-              "rounded-full border px-3 py-1 text-sm",
+              "rounded-full border px-3 py-1 text-sm transition-colors",
               category === c ? "border-primary bg-primary/15 font-medium" : "text-muted-foreground hover:bg-muted",
             )}
           >
@@ -54,12 +56,18 @@ export default function CatalogPage() {
           </button>
         ))}
       </div>
-      {isPending && <p className="text-muted-foreground">{t("common.loading")}</p>}
+      {isPending && <TileSkeletons label={t("common.loading")} count={4} />}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-4">
-        {visible.map((tp) => (
-          <Card key={tp.slug} role="article" aria-label={tp.name} className="flex flex-col gap-3 p-5">
+        {visible.map((tp, i) => (
+          <Card
+            key={tp.slug}
+            role="article"
+            aria-label={tp.name}
+            className="card-interactive animate-enter flex flex-col gap-3 p-5"
+            style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+          >
             <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-lg bg-muted font-semibold">{tp.name[0]}</span>
+              <AppIcon src={tp.icon_url} name={tp.name} className="size-12" />
               <div>
                 <div className="font-medium">{tp.name}</div>
                 <div className="font-mono text-xs text-muted-foreground">v{tp.version}</div>

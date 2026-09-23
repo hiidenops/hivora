@@ -20,7 +20,7 @@ export function CodeView({ code, className }: { code: string; className?: string
     }
   };
   return (
-    <div className={cn("relative rounded-md border bg-muted", className)}>
+    <div className={cn("relative min-w-0 rounded-md border bg-muted", className)}>
       <Button variant="ghost" size="sm" className="absolute right-1 top-1" onClick={copy}>
         {copied ? <Check /> : <Copy />} {copied ? t("common.copied") : t("common.copy")}
       </Button>

@@ -460,6 +460,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/templates/{slug}/icon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Icon */
+        get: operations["get_icon_api_v1_templates__slug__icon_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -581,8 +598,8 @@ export interface components {
             desired_state: components["schemas"]["DesiredState"];
             /** Drift */
             drift: boolean;
-            /** Icon */
-            icon: string | null;
+            /** Icon Url */
+            icon_url: string | null;
             /** Id */
             id: number;
             /** Name */
@@ -596,6 +613,8 @@ export interface components {
             /** Slug */
             slug: string;
             status: components["schemas"]["AppStatus"];
+            /** Template */
+            template: string | null;
             /** Volumes */
             volumes: string[];
             /** Zone Id */
@@ -611,8 +630,8 @@ export interface components {
             desired_state: components["schemas"]["DesiredState"];
             /** Drift */
             drift: boolean;
-            /** Icon */
-            icon: string | null;
+            /** Icon Url */
+            icon_url: string | null;
             /** Id */
             id: number;
             /** Name */
@@ -622,6 +641,8 @@ export interface components {
             /** Slug */
             slug: string;
             status: components["schemas"]["AppStatus"];
+            /** Template */
+            template: string | null;
             /** Zone Id */
             zone_id: number | null;
         };
@@ -972,8 +993,8 @@ export interface components {
             form: {
                 [key: string]: unknown;
             };
-            /** Icon */
-            icon: string | null;
+            /** Icon Url */
+            icon_url: string | null;
             /** Links */
             links: {
                 [key: string]: string;
@@ -1005,8 +1026,8 @@ export interface components {
             description: string | {
                 [key: string]: string;
             };
-            /** Icon */
-            icon: string | null;
+            /** Icon Url */
+            icon_url: string | null;
             /** Name */
             name: string;
             /** Slug */
@@ -1881,6 +1902,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TemplateDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_icon_api_v1_templates__slug__icon_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

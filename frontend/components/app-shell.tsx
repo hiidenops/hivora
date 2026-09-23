@@ -65,7 +65,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [error, me, router]);
 
   if (isPending || !me || me.must_change_password) {
-    return <div className="grid min-h-screen place-items-center text-muted-foreground">{t("common.loading")}</div>;
+    return (
+      <div className="grid min-h-screen place-items-center">
+        <div role="status" aria-label={t("common.loading")} className="size-10 animate-spin rounded-full border-4 border-muted border-t-primary" />
+      </div>
+    );
   }
 
   const session: Session = {
@@ -82,7 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <SessionContext.Provider value={session}>
       <RealtimeProvider enabled>
         <div className="flex min-h-screen flex-col md:flex-row">
-          <aside className="flex shrink-0 flex-col gap-1 border-b bg-card p-3 md:w-56 md:border-b-0 md:border-r">
+          <aside className="flex shrink-0 flex-col gap-1 border-b bg-card p-3 md:sticky md:top-0 md:h-screen md:w-56 md:overflow-y-auto md:border-b-0 md:border-r">
             <Link href="/" className="mb-3 flex items-center gap-2 px-2 text-lg font-semibold">
               <span className="grid size-7 place-items-center rounded-md bg-primary font-mono text-sm text-primary-foreground">
                 H
@@ -97,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     key={n.href}
                     href={n.href}
                     className={cn(
-                      "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm",
+                      "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-colors",
                       active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted",
                     )}
                   >
@@ -125,7 +129,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
             </div>
           </aside>
-          <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
+          <main key={pathname} className="animate-enter min-w-0 flex-1 p-4 md:p-8">
+            {children}
+          </main>
         </div>
       </RealtimeProvider>
     </SessionContext.Provider>

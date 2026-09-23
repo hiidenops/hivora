@@ -1,6 +1,6 @@
 """Stand-in for `docker compose` used by compose_runner unit tests.
 
-Behaviour is driven by FAKE_COMPOSE_MODE: ok | fail | secret | leak.
+Behaviour is driven by FAKE_COMPOSE_MODE: ok | fail | up_fail | secret | leak.
 "leak" echoes every value of the project's .env, to test redaction.
 """
 
@@ -11,6 +11,10 @@ import sys
 args = sys.argv[1:]
 mode = os.environ.get("FAKE_COMPOSE_MODE", "ok")
 command = args[args.index("--file") + 2]
+
+if command == "logs":
+    print("server-1  | boom: the application crashed")
+    sys.exit(0)
 
 if command == "config":
     print(json.dumps({"name": args[args.index("--project-name") + 1], "argv": args}))
@@ -39,4 +43,10 @@ for line in progress:
 print("not json at all", file=sys.stderr)
 if mode == "fail":
     print(json.dumps({"error": True, "message": "pull access denied"}), file=sys.stderr)
+    sys.exit(1)
+if mode == "up_fail" and command == "up":
+    print(
+        json.dumps({"error": True, "message": "container vw-server-1 is unhealthy"}),
+        file=sys.stderr,
+    )
     sys.exit(1)

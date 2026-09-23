@@ -43,13 +43,35 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
 
 
+class IconSource(_Strict):
+    """Where Hivora downloads the icon from (once, then served from its cache)."""
+
+    url: Annotated[str, Field(pattern=r"^https://")] | None = None
+    steam_appid: Annotated[int, Field(gt=0)] | None = None
+
+    @model_validator(mode="after")
+    def _one_source(self) -> "IconSource":
+        if (self.url is None) == (self.steam_appid is None):
+            raise ValueError("icon needs exactly one of url or steam_appid")
+        return self
+
+    @property
+    def download_url(self) -> str:
+        if self.steam_appid is not None:
+            return (
+                f"https://cdn.cloudflare.steamstatic.com/steam/apps/{self.steam_appid}/header.jpg"
+            )
+        assert self.url is not None
+        return self.url
+
+
 class Metadata(_Strict):
     slug: Annotated[str, Field(pattern=SLUG)]
     name: str
     version: Annotated[str, Field(pattern=SEMVER)]
     category: Literal["games", "media", "productivity", "services", "network", "development"]
     tags: list[str] = []
-    icon: str | None = None
+    icon: IconSource | None = None
     description: Localized = ""
     links: dict[str, str] = {}
     maintainer: str | None = None

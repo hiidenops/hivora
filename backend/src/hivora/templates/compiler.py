@@ -208,9 +208,16 @@ def compile_template(
     body = yaml.safe_dump(compose, sort_keys=False, allow_unicode=True, default_flow_style=False)
     access: dict[str, str] = {}
     if template.access:
+        # Shown to the user: without a known public IP, the LAN address is the
+        # best guess; with no address at all, show nothing rather than ":25565".
+        display_host = {**ctx["host"], "public_ip": host.public_ip or host.lan_ip}
+        display_ctx = {**ctx, "host": display_host}
         for key in ("web", "game"):
-            if (value := getattr(template.access, key)) is not None:
-                access[key] = _render_str(value, ctx).replace("$$", "$")
+            if (value := getattr(template.access, key)) is None:
+                continue
+            rendered = _render_str(value, display_ctx).replace("$$", "$")
+            if rendered and not rendered.startswith(":"):
+                access[key] = rendered
     return CompiledApp(
         compose=compose,
         compose_yaml=header + body,

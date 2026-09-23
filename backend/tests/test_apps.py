@@ -184,3 +184,40 @@ async def test_remove(env: Env, remove_data: bool) -> None:
     async with env.sessions() as session:
         assert (await session.scalars(select(Application))).all() == []
         assert (await session.scalars(select(AppSecret))).all() == []
+
+
+async def test_failed_start_attaches_container_logs(
+    tmp_path: Path, sessions: async_sessionmaker[AsyncSession], catalog: Catalog
+) -> None:
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        volumes_root=tmp_path / "srv",
+        puid=os.getuid(),
+        pgid=os.getgid(),
+    )
+    bus = EventBus()
+    jobs = JobQueue(sessions, bus)
+    runner = ComposeRunner(
+        settings.apps_dir, compose_cmd=FAKE, env={"FAKE_COMPOSE_MODE": "up_fail"}
+    )
+    service = AppService(
+        settings=settings,
+        sessions=sessions,
+        catalog=catalog,
+        runner=runner,
+        state=StateStore(),
+        jobs=jobs,
+        box=SecretBox(os.urandom(32)),
+        bus=bus,
+    )
+    AppJobHandlers(service).register()
+    await jobs.start()
+    try:
+        _, job = await service.deploy(DeployRequest("vaultwarden", "vw"))
+        done = await run(Env(service, settings, StateStore(), sessions), job)
+    finally:
+        await jobs.stop()
+    assert done.status is JobStatus.FAILED
+    assert done.error and "container logs" in done.error
+    assert "--- container logs (last 40 lines) ---" in done.log
+    assert "boom: the application crashed" in done.log
