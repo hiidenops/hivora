@@ -1,0 +1,151 @@
+"use client";
+
+import { useQueryClient } from "@tanstack/react-query";
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+
+import { keys } from "@/lib/api/hooks";
+import type { AppStatus } from "@/lib/api/client";
+
+export interface LiveJob {
+  status: string;
+  progress: number;
+  message: string | null;
+  error: string | null;
+  lines: string[];
+}
+
+type Message = Record<string, unknown> & { channel?: string; type?: string };
+const MAX_LINES = 2000;
+
+/** One WebSocket per tab; the UI subscribes to slices of this store. */
+class RealtimeStore {
+  private ws: WebSocket | null = null;
+  private listeners = new Set<() => void>();
+  private watchedJobs = new Set<number>();
+  private retry = 0;
+  private closed = false;
+  onJobFinished: ((msg: Message) => void) | null = null;
+  onAppChanged: (() => void) | null = null;
+  connected = false;
+  statuses: Record<string, AppStatus> = {};
+  jobs: Record<number, LiveJob> = {};
+
+  connect() {
+    this.closed = false;
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${proto}://${location.host}/ws`);
+    this.ws = ws;
+    ws.onopen = () => {
+      this.retry = 0;
+      this.connected = true;
+      this.send({ op: "subscribe", channel: "state" });
+      this.send({ op: "subscribe", channel: "jobs" });
+      this.watchedJobs.forEach((id) => this.send({ op: "subscribe", channel: "job", id }));
+      this.emit();
+    };
+    ws.onmessage = (e) => this.handle(JSON.parse(e.data) as Message);
+    ws.onclose = (e) => {
+      this.connected = false;
+      this.emit();
+      // 4401/4403: session gone or password change pending; the app shell redirects.
+      if (this.closed || e.code === 4401 || e.code === 4403) return;
+      const delay = Math.min(30_000, 500 * 2 ** this.retry++);
+      setTimeout(() => !this.closed && this.connect(), delay);
+    };
+  }
+
+  disconnect() {
+    this.closed = true;
+    this.ws?.close();
+  }
+
+  watchJob(id: number) {
+    if (this.watchedJobs.has(id)) return;
+    this.watchedJobs.add(id);
+    this.jobs[id] ??= { status: "queued", progress: 0, message: null, error: null, lines: [] };
+    this.send({ op: "subscribe", channel: "job", id });
+  }
+
+  subscribe = (fn: () => void) => {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  };
+
+  private send(msg: object) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
+  }
+
+  private emit() {
+    this.listeners.forEach((fn) => fn());
+  }
+
+  private updateJob(id: number, patch: Partial<LiveJob>) {
+    const current = this.jobs[id] ?? { status: "queued", progress: 0, message: null, error: null, lines: [] };
+    this.jobs = { ...this.jobs, [id]: { ...current, ...patch } };
+  }
+
+  private handle(msg: Message) {
+    if (msg.channel === "state") {
+      if (msg.type === "snapshot") this.statuses = msg.apps as Record<string, AppStatus>;
+      else this.statuses = { ...this.statuses, [msg.app as string]: msg.status as AppStatus };
+      this.onAppChanged?.();
+    } else if (msg.channel === "jobs" && typeof msg.id === "number" && this.watchedJobs.has(msg.id)) {
+      if (msg.type === "started") this.updateJob(msg.id, { status: "running" });
+      if (msg.type === "progress")
+        this.updateJob(msg.id, { progress: msg.progress as number, message: (msg.message as string) ?? null });
+      if (msg.type === "finished")
+        this.updateJob(msg.id, { status: msg.status as string, error: (msg.error as string) ?? null, progress: 100 });
+    } else if (msg.channel === "job" && typeof msg.id === "number") {
+      const lines = [...(this.jobs[msg.id]?.lines ?? []), msg.line as string].slice(-MAX_LINES);
+      this.updateJob(msg.id, { lines });
+    }
+    if (msg.channel === "jobs" && msg.type === "finished") this.onJobFinished?.(msg);
+    this.emit();
+  }
+}
+
+const RealtimeContext = createContext<RealtimeStore | null>(null);
+
+export function RealtimeProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
+  const store = useRef<RealtimeStore>(null);
+  store.current ??= new RealtimeStore();
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    const s = store.current!;
+    if (!enabled) return;
+    s.onJobFinished = () => {
+      void qc.invalidateQueries({ queryKey: keys.apps });
+      void qc.invalidateQueries({ queryKey: keys.jobs });
+    };
+    s.onAppChanged = () => void qc.invalidateQueries({ queryKey: keys.apps });
+    s.connect();
+    return () => s.disconnect();
+  }, [enabled, qc]);
+
+  return <RealtimeContext.Provider value={store.current}>{children}</RealtimeContext.Provider>;
+}
+
+function useStore(): RealtimeStore {
+  const s = useContext(RealtimeContext);
+  if (!s) throw new Error("useRealtime outside RealtimeProvider");
+  return s;
+}
+
+export function useConnected(): boolean {
+  const s = useStore();
+  return useSyncExternalStore(s.subscribe, () => s.connected, () => false);
+}
+
+export function useLiveStatus(slug: string, fallback: AppStatus): AppStatus {
+  const s = useStore();
+  return useSyncExternalStore(s.subscribe, () => s.statuses[slug] ?? fallback, () => fallback);
+}
+
+export function useLiveJob(id: number | null): LiveJob | null {
+  const s = useStore();
+  useEffect(() => {
+    if (id) s.watchJob(id);
+  }, [id, s]);
+  return useSyncExternalStore(s.subscribe, () => (id ? (s.jobs[id] ?? null) : null), () => null);
+}

@@ -3,11 +3,13 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.0.0
+  version: 1.1.0
   category: games
   tags: [minecraft, java, sandbox]
   icon: minecraft.svg
-  description: Serveur Minecraft Java Edition (vanilla par défaut), basé sur l'image itzg/minecraft-server.
+  description:
+    fr: Serveur Minecraft Java Edition (vanilla par défaut), basé sur l'image itzg/minecraft-server.
+    en: Minecraft Java Edition server (vanilla by default), based on the itzg/minecraft-server image.
   links:
     site: https://www.minecraft.net
     doc: https://docker-minecraft-server.readthedocs.io
@@ -21,61 +23,63 @@ requirements:
 form:
   basic:
     - id: eula
-      label: J'accepte le contrat de licence Minecraft (https://aka.ms/MinecraftEULA)
+      label:
+        fr: J'accepte le contrat de licence Minecraft (https://aka.ms/MinecraftEULA)
+        en: I accept the Minecraft EULA (https://aka.ms/MinecraftEULA)
       type: boolean
       required: true
     - id: motd
-      label: Message affiché dans la liste des serveurs
+      label: { fr: Message affiché dans la liste des serveurs, en: Message shown in the server list }
       type: string
       default: "Serveur {{ app.name }}"
     - id: max_players
-      label: Joueurs max
+      label: { fr: Joueurs max, en: Max players }
       type: integer
       default: 10
       range: [1, 100]
     - id: difficulty
-      label: Difficulté
+      label: { fr: Difficulté, en: Difficulty }
       type: select
       default: normal
       options:
-        - { value: peaceful, label: Paisible }
-        - { value: easy, label: Facile }
-        - { value: normal, label: Normale }
-        - { value: hard, label: Difficile }
+        - { value: peaceful, label: { fr: Paisible, en: Peaceful } }
+        - { value: easy, label: { fr: Facile, en: Easy } }
+        - { value: normal, label: { fr: Normale, en: Normal } }
+        - { value: hard, label: { fr: Difficile, en: Hard } }
     - id: mode
-      label: Mode de jeu
+      label: { fr: Mode de jeu, en: Game mode }
       type: select
       default: survival
       options:
-        - { value: survival, label: Survie }
-        - { value: creative, label: Créatif }
-        - { value: adventure, label: Aventure }
+        - { value: survival, label: { fr: Survie, en: Survival } }
+        - { value: creative, label: { fr: Créatif, en: Creative } }
+        - { value: adventure, label: { fr: Aventure, en: Adventure } }
   advanced:
     - id: version
-      label: Version de Minecraft
+      label: { fr: Version de Minecraft, en: Minecraft version }
       type: string
       default: LATEST
       pattern: "LATEST|SNAPSHOT|[0-9]+\\.[0-9]+(\\.[0-9]+)?"
     - id: memory
-      label: Mémoire allouée à Java
+      label: { fr: Mémoire allouée à Java, en: Java memory }
       type: select
       default: 2G
       options:
-        - { value: 1G, label: 1 Go }
-        - { value: 2G, label: 2 Go }
-        - { value: 4G, label: 4 Go }
-        - { value: 6G, label: 6 Go }
-        - { value: 8G, label: 8 Go }
+        - { value: 1G, label: { fr: 1 Go, en: 1 GB } }
+        - { value: 2G, label: { fr: 2 Go, en: 2 GB } }
+        - { value: 4G, label: { fr: 4 Go, en: 4 GB } }
+        - { value: 6G, label: { fr: 6 Go, en: 6 GB } }
+        - { value: 8G, label: { fr: 8 Go, en: 8 GB } }
     - id: online_mode
-      label: Vérifier les comptes Mojang (online-mode)
+      label: { fr: Vérifier les comptes Mojang (online-mode), en: Verify Mojang accounts (online-mode) }
       type: boolean
       default: true
     - id: game_port
-      label: Port de jeu (TCP)
+      label: { fr: Port de jeu (TCP), en: Game port (TCP) }
       type: port
       default: 25565
     - id: rcon_password
-      label: Mot de passe RCON
+      label: { fr: Mot de passe RCON, en: RCON password }
       type: secret
       generate: { length: 24 }
 services:

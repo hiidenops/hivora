@@ -1,0 +1,78 @@
+@import "tailwindcss";
+@import "@fontsource-variable/outfit";
+@import "@fontsource-variable/jetbrains-mono";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Light palette; the dark one only redefines tokens. Honey accent (hive). */
+:root {
+  --background: oklch(0.985 0.004 85);
+  --foreground: oklch(0.21 0.02 60);
+  --card: oklch(1 0 0);
+  --muted: oklch(0.955 0.008 85);
+  --muted-foreground: oklch(0.5 0.02 60);
+  --border: oklch(0.9 0.012 85);
+  --input: oklch(0.88 0.012 85);
+  --primary: oklch(0.72 0.15 70);
+  --primary-foreground: oklch(0.2 0.03 60);
+  --destructive: oklch(0.58 0.2 27);
+  --ring: oklch(0.72 0.15 70);
+  --ok: oklch(0.62 0.15 150);
+  --info: oklch(0.6 0.13 240);
+  --warn: oklch(0.72 0.15 70);
+  --danger: oklch(0.58 0.2 27);
+  --idle: oklch(0.62 0.01 60);
+}
+
+.dark {
+  --background: oklch(0.17 0.01 60);
+  --foreground: oklch(0.94 0.01 85);
+  --card: oklch(0.21 0.012 60);
+  --muted: oklch(0.25 0.012 60);
+  --muted-foreground: oklch(0.7 0.015 70);
+  --border: oklch(0.3 0.012 60);
+  --input: oklch(0.34 0.012 60);
+  --primary: oklch(0.78 0.15 75);
+  --primary-foreground: oklch(0.18 0.02 60);
+  --ok: oklch(0.72 0.15 150);
+  --info: oklch(0.7 0.12 240);
+  --idle: oklch(0.6 0.01 60);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-ring: var(--ring);
+  --color-ok: var(--ok);
+  --color-info: var(--info);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-idle: var(--idle);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  border-color: var(--border);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

@@ -22,6 +22,9 @@ FieldType = Literal[
     "port", "path", "email", "url", "domain",
 ]  # fmt: skip
 Exposure = Literal["public", "lan", "vpn", "internal"]
+Language = Literal["fr", "en"]
+# User-facing text: a plain string, or one per language (the UI falls back to "en").
+Localized = str | dict[Language, str]
 
 
 def iter_strings(value: Any) -> Iterator[str]:
@@ -47,7 +50,7 @@ class Metadata(_Strict):
     category: Literal["games", "media", "productivity", "services", "network", "development"]
     tags: list[str] = []
     icon: str | None = None
-    description: str = ""
+    description: Localized = ""
     links: dict[str, str] = {}
     maintainer: str | None = None
     license: str | None = None
@@ -68,7 +71,7 @@ class Requirements(_Strict):
 
 class SelectOption(_Strict):
     value: str | int
-    label: str
+    label: Localized
 
 
 class Generate(_Strict):
@@ -77,12 +80,12 @@ class Generate(_Strict):
 
 class FormField(_Strict):
     id: Annotated[str, Field(pattern=FIELD_ID)]
-    label: str
+    label: Localized
     type: FieldType
     required: bool = False  # for booleans: the box must be checked (e.g. EULA)
     default: Any = None
     pattern: str | None = None
-    help: str | None = None
+    help: Localized | None = None
     show_if: dict[str, Any] | None = Field(default=None, alias="showIf")
     range: tuple[float, float] | None = None
     options: list[SelectOption] | None = None

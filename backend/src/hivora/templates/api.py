@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from hivora.templates.catalog import CatalogEntry, host_arch
+from hivora.templates.schema import Localized
 from hivora.web.deps import RuntimeDep, Viewer
 
 router = APIRouter(tags=["templates"])
@@ -18,7 +19,7 @@ class TemplateSummary(BaseModel):
     category: str
     tags: list[str]
     icon: str | None
-    description: str
+    description: Localized
     compatible: bool  # supports this host's CPU architecture
 
 
