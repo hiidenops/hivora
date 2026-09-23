@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     data_dir: Path = Path("/opt/hivora/data")
     volumes_root: Path = Path("/srv/hivora")
 
+    # Static frontend build (Next.js export), served when present.
+    frontend_dir: Path = Path("/app/frontend")
+
     # Official templates shipped with Hivora (the repo's templates/ in development).
     catalog_dir: Path = Path("/app/templates")
 
@@ -27,6 +30,11 @@ class Settings(BaseSettings):
     pgid: int = 1000
 
     job_workers: int = 2
+
+    session_idle_hours: int = 12
+    session_max_days: int = 30
+    # Development over plain HTTP only: drops the Secure cookie flag.
+    dev_insecure_cookies: bool = False
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_format: Literal["json", "text"] = "json"

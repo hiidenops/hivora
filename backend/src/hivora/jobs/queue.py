@@ -17,6 +17,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.core.clock import Clock, SystemClock
+from hivora.core.context import Actor, current_actor
 from hivora.core.errors import HivoraError, NotFoundError
 from hivora.core.events import EventBus
 from hivora.core.redact import Redactor
@@ -230,6 +231,8 @@ class JobQueue:
         return None
 
     async def _run(self, job: Job) -> None:
+        # Events published by the handler are attributed to the job's creator.
+        current_actor.set(Actor(user_id=job.created_by) if job.created_by else None)
         ctx = JobContext(self, job)
         self.bus.publish("job.started", id=job.id, kind=job.kind.value, app=job.app_slug)
         status, error = JobStatus.SUCCEEDED, None

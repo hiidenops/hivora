@@ -43,6 +43,7 @@ class Job(Base):
         ForeignKey("application.id", ondelete="SET NULL"), index=True
     )
     app_slug: Mapped[str | None] = mapped_column(String(63))  # kept after app removal
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"))
     params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     status: Mapped[JobStatus] = mapped_column(str_enum(JobStatus), default=JobStatus.QUEUED)
     progress: Mapped[int] = mapped_column(default=0)

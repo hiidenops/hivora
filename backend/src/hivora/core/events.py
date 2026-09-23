@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+from hivora.core.context import Actor, current_actor
+
 
 @dataclass(frozen=True, slots=True)
 class Event:
@@ -14,6 +16,8 @@ class Event:
     topic: str
     payload: dict[str, Any] = field(default_factory=dict)
     ts: datetime = field(default_factory=lambda: datetime.now(UTC))
+    # Captured at publish time from the request or job being processed.
+    actor: Actor | None = field(default_factory=current_actor.get)
 
 
 def _matches(pattern: str, topic: str) -> bool:

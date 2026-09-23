@@ -5,6 +5,8 @@ of the db module on the others.
 """
 
 import hivora.apps.models
+import hivora.audit.models
+import hivora.auth.models
 import hivora.db.models
 import hivora.jobs.models
 import hivora.templates.models
