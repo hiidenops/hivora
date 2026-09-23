@@ -44,15 +44,17 @@ Conséquences : pas de streams `stats` permanents (échantillonnage one-shot tou
 - Pas de shell sur l'hôte, seulement `exec` dans les conteneurs.
 - **Les secrets n'apparaissent jamais** dans `inputs`, les logs de job, l'audit ou les logs applicatifs : ils sont référencés par clé et chiffrés en AES-GCM (clé maître `/opt/hivora/data/secret.key`, 0600).
 - Auth : Argon2id, cookies `Secure`/`HttpOnly`/`SameSite=Strict`, CSRF, TOTP RFC 6238, rate limiting (5 échecs → délai exponentiel).
+- Compte initial `admin` / `admin` créé au premier démarrage : tant que son mot de passe n'est pas changé, la session n'autorise que `me`, `password` et `logout` (403 partout ailleurs).
+- Rôles : `admin` (tout, dont comptes et configuration), `operator` (apps, déploiements, jobs), `viewer` (lecture). Chaque route déclare son rôle minimal. Jamais zéro admin actif.
 - Console : ouverture journalisée (sans les frappes), 8 sessions max, fermeture après 30 min d'inactivité.
 - Docker contourne UFW : ne jamais présenter UFW comme une protection. Toute exposition `public` génère une alerte.
 
 ## Données sur disque
 
 - `/opt/hivora/data/hivora.db`, `/opt/hivora/data/secret.key`
-- `/opt/hivora/data/apps/<app_slug>/compose.yaml` (utilisable sans Hivora) et `hivora.yaml` (valeurs saisies, hors secrets)
+- `/opt/hivora/data/apps/<app_slug>/compose.yaml` (utilisable sans Hivora, secrets référencés en `${HV_SECRET_*}`), `.env` (valeurs des secrets, 0600) et `hivora.yaml` (valeurs saisies, hors secrets)
 - `/opt/hivora/data/templates/<source>/` (cache des dépôts)
-- `/srv/hivora/<app_slug>/` sur l'hôte : volumes bind des apps
+- `/srv/hivora/<app_slug>/<volume>/` sur l'hôte : volumes bind des apps (créés avec PUID/PGID)
 
 ## Produit
 
@@ -66,7 +68,7 @@ Conséquences : pas de streams `stats` permanents (échantillonnage one-shot tou
 
 ## Hors périmètre V1 (ne pas implémenter sans demande explicite)
 
-Multi-hôtes, multi-utilisateurs, sauvegardes planifiées, reverse proxy managé, import compose, gestion du pare-feu, marketplace communautaire. Jamais : VM, LXC, Kubernetes, Swarm.
+Multi-hôtes, droits par zone, sauvegardes planifiées, reverse proxy managé, import compose, gestion du pare-feu, marketplace communautaire. Jamais : VM, LXC, Kubernetes, Swarm.
 
 ## Conventions de travail
 

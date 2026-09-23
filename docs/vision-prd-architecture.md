@@ -74,17 +74,18 @@ La V1 couvre le cycle complet d'une application sur un hôte unique : installer,
 
 ### Périmètre V1
 
-**Dans le périmètre** : installation en une commande, compte admin unique + TOTP, catalogue de templates officiels, déploiement d'image libre, stacks multi-conteneurs, zones, modes simple/avancé, logs, console, compose généré, topologie en lecture, métriques de base, journal d'audit.
+**Dans le périmètre** : installation en une commande, comptes utilisateurs avec rôles simples (admin, opérateur, lecture) + TOTP, catalogue de templates officiels, déploiement d'image libre, stacks multi-conteneurs, zones, modes simple/avancé, logs, console, compose généré, topologie en lecture, métriques de base, journal d'audit.
 
-**Hors périmètre V1** : multi-hôtes, multi-utilisateurs, sauvegardes planifiées, reverse proxy managé, import compose, gestion du pare-feu, marketplace communautaire.
+**Hors périmètre V1** : multi-hôtes, sauvegardes planifiées, reverse proxy managé, import compose, gestion du pare-feu, marketplace communautaire.
 
 ### Exigences fonctionnelles
 
 | ID | Domaine | Exigence | Priorité |
 |---|---|---|---|
-| F-01 | Installation | Script `get.hivora.io` : détecte l'OS, installe Docker si absent, lance Hivora, affiche l'URL et un lien d'initialisation à usage unique | Must |
-| F-02 | Installation | Assistant de premier lancement : mot de passe admin, TOTP (recommandé, skippable), fuseau, dossier de données | Must |
+| F-01 | Installation | Script `get.hivora.io` : détecte l'OS, installe Docker si absent, lance Hivora, affiche l'URL et rappelle les identifiants initiaux à changer | Must |
+| F-02 | Installation | Premier lancement : compte `admin` / `admin` créé automatiquement, changement de mot de passe **obligatoire** à la première connexion (aucune autre action possible avant), puis TOTP (recommandé, skippable), fuseau, dossier de données | Must |
 | F-03 | Auth | Argon2id (sel par utilisateur), sessions en cookie HttpOnly, TOTP RFC 6238, 10 codes de récupération | Must |
+| F-25 | Utilisateurs | Gestion des comptes depuis l'interface (admin) : créer, modifier, désactiver, supprimer, réinitialiser mot de passe et TOTP, révoquer les sessions. Rôles : admin (tout), opérateur (piloter et déployer les apps, pas les comptes ni la configuration), lecture seule. Impossible de supprimer, désactiver ou rétrograder le dernier admin actif | Must |
 | F-04 | Auth | Limitation des tentatives (5 échecs → délai exponentiel), journalisation des connexions | Must |
 | F-05 | Catalogue | Parcourir, filtrer par catégorie (Jeux, Médias, Productivité…), voir la fiche d'un template | Must |
 | F-06 | Déploiement | Déployer un template via un formulaire généré, avec valeurs par défaut sûres | Must |
@@ -92,7 +93,7 @@ La V1 couvre le cycle complet d'une application sur un hôte unique : installer,
 | F-08 | Déploiement | Aperçu du compose généré avant validation, modifiable en mode avancé | Must |
 | F-09 | Déploiement | Détection des conflits de ports avant déploiement, avec suggestion de port libre | Must |
 | F-10 | Applications | Démarrer, arrêter, redémarrer, supprimer (avec choix : garder ou supprimer les données) | Must |
-| F-11 | Applications | État agrégé d'une stack (Sain, Dégradé, Arrêté, En erreur) à partir de l'état de chaque conteneur et des healthchecks | Must |
+| F-11 | Applications | État agrégé d'une stack (Sain, Démarrage, Dégradé, Arrêté, En erreur, Absent) à partir de l'état de chaque conteneur et des healthchecks | Must |
 | F-12 | Avancé | Éditer variables, ports, volumes, réseaux, labels, politique de redémarrage, limites CPU/RAM | Must |
 | F-13 | Avancé | Logs en temps réel par conteneur et agrégés par application, recherche, téléchargement | Must |
 | F-14 | Avancé | Console web (exec `sh` / `bash`) dans un conteneur | Must |
@@ -180,7 +181,7 @@ Le navigateur ne parle qu'à Hivora ; Hivora écrit l'intention en SQLite, gén�
 | Tâches de fond | File de jobs persistée en SQLite + workers asyncio in-process | Pas de Redis ; jobs reprenables après redémarrage |
 | Temps réel | Un WebSocket multiplexé (événements, logs, progression, console) | Une seule connexion par onglet |
 | Métriques | Échantillonnage stats toutes les 10 s (one-shot, pas de streams permanents), agrégats 1 min / 5 min en SQLite, rétention 24 h puis 7 j | Les streams stats permanents coûtent cher avec 50 conteneurs |
-| Secrets | Chiffrement AES-GCM, clé dérivée d'une clé maître dans `/opt/hivora/data/secret.key` (0600) | Mots de passe d'apps et identifiants de registre jamais en clair en base |
+| Secrets | Chiffrement AES-GCM, sous-clé HKDF par usage, dérivée d'une clé maître dans `/opt/hivora/data/secret.key` (0600). Le compose généré référence `${HV_SECRET_*}` ; les valeurs sont écrites dans `apps/<slug>/.env` (0600), lu nativement par Compose | Mots de passe d'apps et identifiants de registre jamais en clair en base ni dans le compose ; la stack reste utilisable sans Hivora |
 
 ### Arborescence des données
 
@@ -191,7 +192,8 @@ Le navigateur ne parle qu'à Hivora ; Hivora écrit l'intention en SQLite, gén�
 | `/opt/hivora/data/apps/<app_slug>/compose.yaml` | Compose généré, lisible et utilisable sans Hivora |
 | `/opt/hivora/data/apps/<app_slug>/hivora.yaml` | Instance de template + valeurs saisies (hors secrets) |
 | `/opt/hivora/data/templates/<source>/` | Cache des dépôts de templates |
-| `/srv/hivora/<app_slug>/` (hôte, configurable) | Volumes bind des applications, séparés des données Hivora ; monté à l'identique dans le conteneur Hivora |
+| `/opt/hivora/data/apps/<app_slug>/.env` | Valeurs des secrets de l'app (0600), jamais versionnées ni journalisées |
+| `/srv/hivora/<app_slug>/<volume>/` (hôte, configurable) | Volumes des templates, montés en bind (créés avec PUID/PGID), séparés des données Hivora ; monté à l'identique dans le conteneur Hivora |
 
 ### Montages du conteneur Hivora
 
@@ -240,7 +242,7 @@ Toute modification produit une nouvelle révision : on peut comparer deux révis
 2. Installe Docker via les dépôts officiels si absent.
 3. Crée `/opt/hivora` et `/srv/hivora`, lance le conteneur `hivora` avec `restart: unless-stopped`.
 4. Option `--wireguard` : déploie l'app système WireGuard et restreint le panel à cette interface.
-5. Affiche l'URL et un lien de configuration à usage unique valable 30 min.
+5. Affiche l'URL et les identifiants initiaux `admin` / `admin`, à changer obligatoirement à la première connexion.
 
 Le script est court, versionné dans le dépôt, signé, avec une somme SHA-256 publiée pour ceux qui refusent `curl | bash`.
 
@@ -256,7 +258,7 @@ Chaque version ajoute une couche sans alourdir la précédente : V1 déploie, V2
 | V1 | Déployer et comprendre | Tout le périmètre Must/Should du PRD, 20 templates officiels (10 jeux, 10 services), zones, topologie en lecture, adoption de conteneurs existants | Budget RAM tenu, 3 parcours clés < 5 min, zéro perte de données en tests de suppression |
 | V2 | Vivre avec ses apps | Sauvegardes (volumes + base, locales et S3/SFTP), restauration, mises à jour planifiées avec rollback, import docker-compose, reverse proxy managé (Caddy, HTTPS Let's Encrypt), notifications (e-mail, Discord, ntfy, webhook), outils jeux (RCON, joueurs connectés, planning de redémarrage) | Un utilisateur restaure une app sur un hôte vierge |
 | V3 | Maîtriser le réseau | Topologie éditable (créer réseaux, attacher, déclarer des passerelles), règles d'exposition via `DOCKER-USER`, politiques d'isolation entre zones, WireGuard managé (pairs, QR codes), audit de sécurité (ports ouverts, images obsolètes, conteneurs root) | La topologie reflète 100 % des flux réellement ouverts |
-| V4 | Plusieurs serveurs | Agent Hivora léger (Python ou Go, < 30 Mo) sur chaque hôte, connexion sortante vers le panel, zones multi-hôtes, déplacement d'app entre hôtes via sauvegarde/restauration, multi-utilisateurs et rôles simples (admin, opérateur, lecture) | 5 hôtes pilotés depuis un panel sur un Raspberry Pi |
+| V4 | Plusieurs serveurs | Agent Hivora léger (Python ou Go, < 30 Mo) sur chaque hôte, connexion sortante vers le panel, zones multi-hôtes, déplacement d'app entre hôtes via sauvegarde/restauration, droits par zone (les rôles simples existent dès la V1) | 5 hôtes pilotés depuis un panel sur un Raspberry Pi |
 | V5 | Écosystème | Catalogues communautaires signés, SDK de templates + validateur CLI, API publique stable et jetons, OIDC/SSO, plugins UI (onglets additionnels), mode « infra as code » (export/import de tout l'état Hivora en YAML) | Premier catalogue tiers avec > 100 templates |
 
 ### Ce qui ne sera pas fait
@@ -288,8 +290,8 @@ Une zone contient des applications ; une application naît d'une version de temp
 
 | Table | Colonnes clés | Rôle |
 |---|---|---|
-| `user` | id, username, password_hash (argon2id, sel inclus), totp_secret (chiffré), totp_enabled, recovery_codes (hachés), created_at | Compte admin (table prête pour le multi-utilisateur V4) |
-| `session` | id, user_id, token_hash, ip, user_agent, created_at, last_seen_at, expires_at | Sessions révocables |
+| `user` | id, username, password_hash (argon2id, sel inclus), role (admin, operator, viewer), must_change_password, disabled, totp_secret (chiffré), totp_enabled, recovery_codes (hachés), created_at, last_login_at | Comptes et rôles |
+| `session` | id, user_id, token_hash, csrf_token, ip, user_agent, created_at, last_seen_at, expires_at | Sessions révocables |
 | `setting` | key, value (JSON) | Paramètres globaux (ports, domaine, dossier de volumes, langue) |
 | `zone` | id, slug, name, color, icon, description, network_mode (none, shared, isolated, custom), docker_network_id, sort_order, is_system | Zones logiques |
 | `template_source` | id, name, url, kind (official, git, https), trust_key, last_sync_at, enabled | Dépôts de templates |
@@ -309,7 +311,7 @@ Une zone contient des applications ; une application naît d'une version de temp
 | `topology_edge` | id, source_ref, target_ref, label, kind (declared) | Liens déclarés |
 | `topology_layout` | ref (zone:x, app:y, node:z), x, y, collapsed | Positions mémorisées sur le canevas |
 | `metric_sample` | ts, scope (host, app), ref, cpu, mem, net_rx, net_tx, disk | Agrégats 1 min / 5 min, purge automatique |
-| `audit_log` | id, ts, user_id, ip, action, target, payload (résumé), result | Traçabilité |
+| `audit_log` | id, ts, user_id, username, ip, action, target, payload (résumé), result | Traçabilité |
 | `backup_policy` / `backup_run` | (V2) planning, destination, rétention / statut, taille, emplacement | Sauvegardes |
 
 ### Règles
@@ -331,7 +333,7 @@ Le backend est un monolithe modulaire : 16 modules V1 à frontières nettes, dé
 | `core` | Config, logging structuré, erreurs, bus d'événements interne (pub/sub asyncio), horloge | — | V1 |
 | `db` | Moteur SQLite (WAL), sessions SQLAlchemy, migrations Alembic, purge périodique | core | V1 |
 | `crypto` | Argon2id, TOTP, chiffrement AES-GCM des secrets, gestion de la clé maître | core | V1 |
-| `auth` | Setup initial, login, TOTP, codes de récupération, sessions, rate limiting, CSRF | db, crypto | V1 |
+| `auth` | Compte initial, login, TOTP, codes de récupération, sessions, rate limiting, CSRF, utilisateurs et rôles | db, crypto | V1 |
 | `docker_gateway` | Unique point d'accès au socket : conteneurs, images, réseaux, volumes, exec, logs, stats, événements. Seule exception : le CLI `docker compose` lancé par `compose_runner` | core | V1 |
 | `compose_runner` | Écrit les fichiers, appelle `docker compose` (up, down, pull, config), parse la progression, verrou par app. Seul module autorisé à lancer `docker compose`, qui accède au socket | docker_gateway | V1 |
 | `state` | État réel en mémoire (conteneurs, santé, ports), abonnement aux événements Docker, calcul de l'état agrégé des apps et de la dérive | docker_gateway, db | V1 |
@@ -355,7 +357,8 @@ Le backend est un monolithe modulaire : 16 modules V1 à frontières nettes, dé
 
 | Préfixe | Exemples de ressources |
 |---|---|
-| `/api/v1/auth` | setup, login, logout, totp/enroll, totp/verify, sessions |
+| `/api/v1/auth` | login, logout, me, password, totp/enroll, totp/verify, totp/disable, sessions |
+| `/api/v1/users` | CRUD comptes (admin), rôle, désactivation, réinitialisation mot de passe / TOTP, sessions |
 | `/api/v1/apps` | liste, détail, déploiement, actions (start, stop, restart), revisions, rollback, adopt, compose, zone (`PUT /apps/{id}/zone`) |
 | `/api/v1/apps/{id}/services` | variables, ports, volumes, réseaux, logs (téléchargement) |
 | `/api/v1/zones` | CRUD, réseau |
@@ -678,7 +681,7 @@ Le risque produit principal est la dispersion : vouloir être CasaOS, Portainer 
 | Complexité qui déborde sur le mode simple | Règle de revue : toute nouvelle option naît dans le mode avancé et n'en sort que sur preuve d'usage ; tests utilisateurs avec des profils débutants à chaque version |
 | Topologie gadget : jolie, peu utilisée | La rendre utile : alertes d'exposition, porte d'entrée vers les apps, export documentation. Mesurer son usage (télémétrie opt-in) |
 | Confiance : un outil jeune qui demande l'accès root via le socket | Code ouvert, script d'installation lisible, audit de sécurité externe avant la 1.0, documentation « ce que fait Hivora sur votre machine » |
-| Attentes multi-utilisateurs précoces (familles, groupes d'amis gamers) | Annoncer clairement la V4 ; en attendant, permettre de partager l'adresse d'un serveur de jeu sans donner accès au panel |
+| Attentes multi-utilisateurs précoces (familles, groupes d'amis gamers) | Rôles simples dès la V1 (opérateur, lecture seule) ; droits par zone en V4 ; partager l'adresse d'un serveur de jeu sans donner accès au panel |
 | Nom et domaine : hivora.io et la marque doivent être disponibles | Vérifier le dépôt de marque et les réseaux avant la communication publique |
 | Soutenabilité du projet open source | Licence claire (AGPL-3.0 pour protéger contre la revente en SaaS fermé, ou Apache-2.0 pour maximiser l'adoption), gouvernance simple, sponsoring ; décider avant la première release |
 | Dépendance perçue à OVH | Présenter les images OVH comme une source parmi d'autres ; le format de template reste neutre |
