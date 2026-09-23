@@ -11,6 +11,7 @@ dependencies = [
     "sqlalchemy>=2.0",
     "alembic>=1.14",
     "aiodocker>=0.24",
+    "aiosqlite>=0.20",
     "argon2-cffi>=23.1",
     "cryptography>=43",
     "pyotp>=2.9",
@@ -41,6 +42,9 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "S", "RUF"]
 ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S108"]
 
 [tool.mypy]
 strict = true
