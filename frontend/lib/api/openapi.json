@@ -35,6 +35,18 @@
         "title": "AccessOut",
         "type": "object"
       },
+      "AddressIn": {
+        "properties": {
+          "address": {
+            "default": "",
+            "maxLength": 253,
+            "title": "Address",
+            "type": "string"
+          }
+        },
+        "title": "AddressIn",
+        "type": "object"
+      },
       "AppDetailOut": {
         "properties": {
           "access": {
@@ -699,10 +711,34 @@
           "curseforge_api_key_set": {
             "title": "Curseforge Api Key Set",
             "type": "boolean"
+          },
+          "detected_public_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detected Public Ip"
+          },
+          "public_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Address"
           }
         },
         "required": [
-          "curseforge_api_key_set"
+          "curseforge_api_key_set",
+          "public_address",
+          "detected_public_ip"
         ],
         "title": "IntegrationsOut",
         "type": "object"
@@ -4018,6 +4054,40 @@
           }
         },
         "summary": "Set Curseforge Key",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/integrations/public-address": {
+      "put": {
+        "operationId": "set_public_address_api_v1_system_integrations_public_address_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Public Address",
         "tags": [
           "system"
         ]

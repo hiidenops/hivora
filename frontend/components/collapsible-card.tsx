@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { readPref, writePref } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
 
-/** Card whose body folds away; the open/closed choice is remembered per `storageKey`. */
+/** Card whose body folds away (folded by default); the choice is remembered per `storageKey`. */
 export function CollapsibleCard({
   title,
   aside,
@@ -21,9 +21,9 @@ export function CollapsibleCard({
   className?: string;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const bodyId = useId();
-  useEffect(() => setOpen(readPref(`fold.${storageKey}`) !== "0"), [storageKey]);
+  useEffect(() => setOpen(readPref(`fold.${storageKey}`) === "1"), [storageKey]);
   const toggle = () => {
     writePref(`fold.${storageKey}`, open ? "0" : "1");
     setOpen(!open);

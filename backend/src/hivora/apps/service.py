@@ -3,6 +3,7 @@
 import difflib
 import re
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -116,6 +117,10 @@ def slugify(text: str) -> str:
     return slug[:50].strip("-") or "app"
 
 
+def vars_of_host(host: HostInfo) -> dict[str, Any]:
+    return {f: getattr(host, f) for f in host.__slots__}  # slots dataclass: no __dict__
+
+
 def secret_context(app_id: int, key: str) -> str:
     return f"app:{app_id}:{key}"
 
@@ -134,6 +139,7 @@ class AppService:
         bus: EventBus,
         clock: Clock | None = None,
         secret_settings: SecretSettings | None = None,
+        public_address: Callable[[], str | None] | None = None,
     ) -> None:
         self.settings = settings
         self.sessions = sessions
@@ -145,12 +151,13 @@ class AppService:
         self.bus = bus
         self.clock = clock or SystemClock()
         self.secret_settings = secret_settings
+        self.public_address = public_address
 
     @property
     def host(self) -> HostInfo:
         s = self.settings
         return HostInfo(
-            public_ip=s.host_public_ip,
+            public_ip=self.public_address() if self.public_address else s.host_public_ip,
             lan_ip=s.host_lan_ip,
             vpn_ip=s.host_vpn_ip,
             timezone=s.timezone,
@@ -255,9 +262,20 @@ class AppService:
         if latest is None:
             return {}
         ctx = AppContext(slug=app.slug, name=app.name, revision=latest.number)
-        compiled = compile_template(entry.template, ctx, self.host, FormValues(dict(latest.inputs)),
-                                    self.settings.volumes_root)  # fmt: skip
-        return compiled.access
+        form = FormValues(dict(latest.inputs))
+        host = self.host
+        access = compile_template(
+            entry.template, ctx, host, form, self.settings.volumes_root
+        ).access
+        # Same addresses on the local network, when they differ (e.g. public IP vs LAN).
+        lan_host = HostInfo(**{**vars_of_host(host), "public_ip": None})
+        local = compile_template(
+            entry.template, ctx, lan_host, form, self.settings.volumes_root
+        ).access
+        for key, value in local.items():
+            if access.get(key) != value:
+                access[f"{key}_lan"] = value
+        return access
 
     # --- settings (new revision) --------------------------------------------
     async def current_settings(self, session: AsyncSession, app_id: int) -> AppSettings:

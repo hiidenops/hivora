@@ -11,7 +11,7 @@ from fastapi import FastAPI
 
 from hivora.core.config import Settings
 from hivora.core.events import Event
-from hivora.docker_gateway import ContainerInfo, ContainerState
+from hivora.docker_gateway import ContainerInfo, ContainerState, StatsSample
 from hivora.docker_gateway.fake import FakeDockerGateway
 from hivora.main import create_app
 from hivora.runtime import Runtime
@@ -39,6 +39,7 @@ def app() -> FastAPI:
                 state=ContainerState.RUNNING,
                 labels={"io.hivora.app": str(slug), "com.docker.compose.service": "server"},
             ), "start")  # fmt: skip
+            gateway.stats[f"ctr-{slug}"] = StatsSample(25.0, 300 * 1024**2, 2 * 1024**3, 0, 0)
         elif topic == "app.removed" and f"ctr-{slug}" in gateway.containers:
             gateway.remove(f"ctr-{slug}")
         return publish(topic, **payload)

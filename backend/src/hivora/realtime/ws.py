@@ -2,6 +2,7 @@
 
 Client -> server:  {"op": "subscribe" | "unsubscribe", "channel": "state" | "jobs" | "metrics"}
                    {"op": "subscribe" | "unsubscribe", "channel": "job", "id": <job id>}
+                   {"op": "subscribe" | "unsubscribe", "channel": "app_metrics", "app": slug}
                    {"op": "console.open", "id": cid, "app": app_id, "kind": "server" | "shell",
                     "rows": n, "cols": n, "totp_code"?: "123456"}
                    {"op": "console.input", "id": cid, "data": "..."}
@@ -12,6 +13,7 @@ Server -> client:  {"channel": "state", "type": "snapshot", "apps": {slug: statu
                    {"channel": "jobs", "type": "started" | "progress" | "finished", ...}
                    {"channel": "job", "id": n, "type": "log", "line": ...}
                    {"channel": "metrics", "type": "host", ...sample}
+                   {"channel": "app_metrics", "app": slug, "type": "snapshot" | "sample", ...}
                    {"channel": "console", "id": cid,
                     "type": "opened" | "data" | "closed" | "error", ...}
 
@@ -58,6 +60,7 @@ class Connection:
         self.session_id = session_id
         self.channels: set[str] = set()
         self.jobs: set[int] = set()
+        self.app_metrics: set[str] = set()  # slugs this tab watches
         self.consoles: dict[str, Console] = {}
         self._send_lock = asyncio.Lock()  # several tasks write to one socket
 
@@ -78,7 +81,9 @@ class Connection:
                 await self.send({"type": "error", "code": "bad_message"})
                 continue
             subscribe = op == "subscribe"
-            if channel == "job" and isinstance(msg.get("id"), int):
+            if channel == "app_metrics" and isinstance(msg.get("app"), str):
+                await self.watch_app(msg["app"][:63], subscribe)
+            elif channel == "job" and isinstance(msg.get("id"), int):
                 (self.jobs.add if subscribe else self.jobs.discard)(msg["id"])
             elif channel in ("state", "jobs", "metrics"):
                 (self.channels.add if subscribe else self.channels.discard)(channel)
@@ -142,9 +147,21 @@ class Connection:
         if console:
             await self.rt.consoles.close(console)
 
+    async def watch_app(self, slug: str, on: bool) -> None:
+        if on and slug not in self.app_metrics:
+            self.app_metrics.add(slug)
+            history = self.rt.app_metrics.watch(slug)
+            await self.send({"channel": "app_metrics", "app": slug, "type": "snapshot",
+                             "samples": history})  # fmt: skip
+        elif not on and slug in self.app_metrics:
+            self.app_metrics.discard(slug)
+            self.rt.app_metrics.unwatch(slug)
+
     async def close_all(self) -> None:
         for cid in list(self.consoles):
             await self.close_console(cid)
+        for slug in list(self.app_metrics):
+            await self.watch_app(slug, False)
 
     async def forward(self, event: Event) -> None:
         p = event.payload
@@ -155,6 +172,8 @@ class Connection:
         elif event.topic.startswith("job.") and event.topic != "job.log":
             if "jobs" in self.channels:
                 await self.send({"channel": "jobs", "type": event.topic[4:], **p})
+        elif event.topic == "metrics.app" and p.get("app") in self.app_metrics:
+            await self.send({"channel": "app_metrics", "type": "sample", **p})
         elif event.topic == "metrics.host" and "metrics" in self.channels:
             await self.send({"channel": "metrics", "type": "host", **p})
         elif event.topic == "job.log" and p.get("id") in self.jobs:

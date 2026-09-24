@@ -47,6 +47,8 @@ async def info(_: Viewer, rt: RuntimeDep) -> SystemInfo:
 
 class IntegrationsOut(BaseModel):
     curseforge_api_key_set: bool  # the key itself is never sent back
+    public_address: str | None  # set by an admin (IP or domain)
+    detected_public_ip: str | None  # auto-detected
 
 
 class KeyIn(BaseModel):
@@ -56,10 +58,22 @@ class KeyIn(BaseModel):
 @router.get("/integrations")
 async def integrations(_: Admin, rt: RuntimeDep) -> IntegrationsOut:
     return IntegrationsOut(
-        curseforge_api_key_set=await rt.secrets.is_set(SecretSetting.CURSEFORGE_API_KEY)
+        curseforge_api_key_set=await rt.secrets.is_set(SecretSetting.CURSEFORGE_API_KEY),
+        public_address=rt.public_address.manual,
+        detected_public_ip=rt.public_address.detected,
     )
 
 
 @router.put("/integrations/curseforge", status_code=204)
 async def set_curseforge_key(body: KeyIn, _: Admin, rt: RuntimeDep) -> None:
     await rt.secrets.set(SecretSetting.CURSEFORGE_API_KEY, body.key.strip() or None)
+
+
+class AddressIn(BaseModel):
+    address: str = Field("", max_length=253)  # empty: back to auto-detection
+
+
+@router.put("/integrations/public-address", status_code=204)
+async def set_public_address(body: AddressIn, _: Admin, rt: RuntimeDep) -> None:
+    await rt.public_address.set_manual(body.address.strip() or None)
+    rt.bus.publish("settings.public_address_updated", target=body.address.strip() or "auto")

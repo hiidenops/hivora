@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppActions } from "@/features/apps/app-actions";
+import { AppUsage } from "@/features/apps/app-usage";
 import { StatusHero } from "@/features/apps/status-hero";
 import { ConsolePanel } from "@/features/console/console-panel";
 import { MinecraftPanel } from "@/features/games/minecraft-panel";
@@ -96,6 +97,7 @@ function AppDetail() {
           </Card>
         )}
         <StatusHero app={app} status={status} />
+        {["healthy", "starting", "degraded"].includes(status) && <AppUsage slug={app.slug} />}
         {app.game === "minecraft" && (
           <MinecraftPanel
             appId={app.id}

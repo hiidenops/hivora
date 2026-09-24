@@ -11,7 +11,7 @@ import { useLiveHost } from "@/lib/realtime";
 
 const W = 600;
 const H = 140;
-const WINDOW_S = 300; // live view: the last five minutes
+export const WINDOW_S = 300; // live view: the last five minutes
 
 interface Series {
   label: string;
@@ -32,7 +32,7 @@ function useHostHistory(): HostSample[] {
   }, [data, live]);
 }
 
-function units(lang: string) {
+export function units(lang: string) {
   const num = (v: number, digits = 1) =>
     new Intl.NumberFormat(lang, { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(v);
   const gb = (bytes: number) => `${num(bytes / 1024 ** 3)} ${lang === "fr" ? "Go" : "GB"}`;
@@ -42,7 +42,11 @@ function units(lang: string) {
     return `${num(bps / div)} ${unit}`;
   };
   const time = (ts: number) => new Date(ts * 1000).toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit" });
-  return { num, gb, rate, time };
+  const clock = (ts: number, seconds = false) =>
+    new Date(ts * 1000).toLocaleTimeString(lang, {
+      hour: "2-digit", minute: "2-digit", ...(seconds ? { second: "2-digit" } : {}),
+    });  // prettier-ignore
+  return { num, gb, rate, time, clock };
 }
 
 /**
@@ -50,7 +54,7 @@ function units(lang: string) {
  * sample (not the browser clock, which may be skewed) and ticked every frame so
  * the chart scrolls continuously; one step per sample with reduced motion.
  */
-function useScrollingNow(lastTs: number | undefined): number {
+export function useScrollingNow(lastTs: number | undefined): number {
   const anchor = useRef({ ts: 0, at: 0 });
   const [now, setNow] = useState(0);
   useEffect(() => {
@@ -74,7 +78,7 @@ function useScrollingNow(lastTs: number | undefined): number {
 }
 
 /** Scrolling time series: one y axis, recessive grid, crosshair + tooltip on hover. */
-function TimeChart({
+export function TimeChart({
   series,
   times,
   now,
@@ -185,7 +189,7 @@ function TimeChart({
   );
 }
 
-function ChartCard({ title, value, children }: { title: string; value: React.ReactNode; children: React.ReactNode }) {
+export function ChartCard({ title, value, children }: { title: string; value: React.ReactNode; children: React.ReactNode }) {
   return (
     <Card>
       <CardHeader className="pb-1">
@@ -205,10 +209,7 @@ export function HostCharts() {
   // Keep one sample beyond the left edge so the line enters from outside.
   const firstVisible = history.findIndex((s) => s.ts >= now - WINDOW_S);
   const samples = firstVisible < 0 ? history.slice(-1) : history.slice(Math.max(0, firstVisible - 1));
-  const clock = (ts: number, seconds = false) =>
-    new Date(ts * 1000).toLocaleTimeString(lang, {
-      hour: "2-digit", minute: "2-digit", ...(seconds ? { second: "2-digit" } : {}),
-    });  // prettier-ignore
+  const clock = u.clock;
 
   if (history.length === 0) {
     return (

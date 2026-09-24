@@ -21,8 +21,10 @@ from hivora.db.migrate import upgrade_to_head
 from hivora.docker_gateway import DockerGateway
 from hivora.games.modpacks import ModpackCatalog
 from hivora.jobs import JobQueue
+from hivora.metrics.apps import AppMetrics
 from hivora.metrics.host import HostMetrics
 from hivora.state import StateService
+from hivora.system.public_address import PublicAddress
 from hivora.system.secrets import SecretSettings
 from hivora.templates import Catalog
 from hivora.templates.icons import IconCache
@@ -53,6 +55,8 @@ class Runtime:
     metrics: HostMetrics
     secrets: SecretSettings
     modpacks: ModpackCatalog
+    public_address: PublicAddress
+    app_metrics: AppMetrics
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     consoles: "ConsoleManager" = field(init=False)
 
@@ -91,6 +95,7 @@ class Runtime:
         runner = ComposeRunner(settings.apps_dir, compose_cmd=compose_cmd, env=compose_env)
         jobs = JobQueue(sessions, bus, clock=clock, workers=settings.job_workers)
         secrets = SecretSettings(sessions, box, bus)
+        public_address = PublicAddress(sessions, settings.host_public_ip)
         apps = AppService(
             settings=settings,
             sessions=sessions,
@@ -102,6 +107,7 @@ class Runtime:
             bus=bus,
             clock=clock,
             secret_settings=secrets,
+            public_address=public_address.current,
         )
         AppJobHandlers(apps).register()
         auth = AuthService(settings=settings, sessions=sessions, box=box, bus=bus, clock=clock)
@@ -109,13 +115,16 @@ class Runtime:
         icons = IconCache(settings.data_dir / "icons")
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
-                   ModpackCatalog(settings.data_dir / "icons" / "modpacks"))  # fmt: skip
+                   ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
+                   public_address, AppMetrics(gateway, state.store, bus))  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
         self._icons_task = asyncio.create_task(self._warm_icons())
         await self.audit.start()
         await self.metrics.start()
+        await self.public_address.start()
+        await self.app_metrics.start()
         await self.auth.ensure_initial_admin()
         await self.state.start()
         await self.jobs.start()
@@ -131,6 +140,8 @@ class Runtime:
             self._icons_task.cancel()
         await self.jobs.stop()
         await self.metrics.stop()
+        await self.public_address.stop()
+        await self.app_metrics.stop()
         await self.state.stop()
         await self.audit.stop()
         await self.gateway.close()

@@ -137,6 +137,7 @@ def stats_from_raw(raw: dict[str, Any]) -> StatsSample:
         mem_limit=mem.get("limit", 0),
         net_rx=sum(n.get("rx_bytes", 0) for n in nets),
         net_tx=sum(n.get("tx_bytes", 0) for n in nets),
+        online_cpus=int(online),
     )
 
 

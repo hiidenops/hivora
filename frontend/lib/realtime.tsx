@@ -14,6 +14,16 @@ export interface LiveJob {
   lines: string[];
 }
 
+/** One per-app usage sample (every 5 s while someone watches the app). */
+export interface AppSample {
+  ts: number;
+  cpu_percent: number; // % of the whole machine
+  mem_bytes: number;
+  mem_limit: number;
+  net_rx_bps: number;
+  net_tx_bps: number;
+}
+
 export type Message = Record<string, unknown> & { channel?: string; type?: string };
 const MAX_LINES = 2000;
 
@@ -22,6 +32,7 @@ class RealtimeStore {
   private ws: WebSocket | null = null;
   private listeners = new Set<() => void>();
   private watchedJobs = new Set<number>();
+  private watchedApps = new Map<string, number>(); // slug -> watching components
   private consoles = new Map<string, (msg: Message) => void>();
   private retry = 0;
   private closed = false;
@@ -31,6 +42,7 @@ class RealtimeStore {
   statuses: Record<string, AppStatus> = {};
   jobs: Record<number, LiveJob> = {};
   host: HostSample[] = [];
+  appMetrics: Record<string, AppSample[]> = {};
 
   connect() {
     this.closed = false;
@@ -44,6 +56,7 @@ class RealtimeStore {
       this.send({ op: "subscribe", channel: "jobs" });
       this.send({ op: "subscribe", channel: "metrics" });
       this.watchedJobs.forEach((id) => this.send({ op: "subscribe", channel: "job", id }));
+      this.watchedApps.forEach((_, app) => this.send({ op: "subscribe", channel: "app_metrics", app }));
       this.emit();
     };
     ws.onmessage = (e) => this.handle(JSON.parse(e.data) as Message);
@@ -67,6 +80,21 @@ class RealtimeStore {
     this.watchedJobs.add(id);
     this.jobs[id] ??= { status: "queued", progress: 0, message: null, error: null, lines: [] };
     this.send({ op: "subscribe", channel: "job", id });
+  }
+
+  /** Streams an app's usage while at least one component watches it. */
+  watchApp(app: string) {
+    const count = this.watchedApps.get(app) ?? 0;
+    this.watchedApps.set(app, count + 1);
+    if (!count) this.send({ op: "subscribe", channel: "app_metrics", app });
+    return () => {
+      const left = (this.watchedApps.get(app) ?? 1) - 1;
+      if (left) return void this.watchedApps.set(app, left);
+      this.watchedApps.delete(app);
+      this.send({ op: "unsubscribe", channel: "app_metrics", app });
+      const { [app]: _dropped, ...rest } = this.appMetrics;
+      this.appMetrics = rest;
+    };
   }
 
   /** Opens a console on the shared socket; `onMessage` gets opened/data/closed/error. */
@@ -107,7 +135,14 @@ class RealtimeStore {
       this.consoles.get(String(msg.id))?.(msg);
       return;
     }
-    if (msg.channel === "metrics") {
+    if (msg.channel === "app_metrics") {
+      const app = msg.app as string;
+      const samples =
+        msg.type === "snapshot"
+          ? (msg.samples as AppSample[])
+          : [...(this.appMetrics[app] ?? []), msg as unknown as AppSample].slice(-60);
+      this.appMetrics = { ...this.appMetrics, [app]: samples };
+    } else if (msg.channel === "metrics") {
       this.host = [...this.host, msg as unknown as HostSample].slice(-1800);
     } else if (msg.channel === "state") {
       if (msg.type === "snapshot") this.statuses = msg.apps as Record<string, AppStatus>;
@@ -180,6 +215,14 @@ export function useLiveHost(): HostSample[] {
   return useSyncExternalStore(s.subscribe, () => s.host, () => EMPTY);
 }
 const EMPTY: HostSample[] = [];
+
+/** Live usage of one app; sampling runs server-side only while this is mounted. */
+export function useAppMetrics(slug: string, enabled: boolean): AppSample[] {
+  const s = useStore();
+  useEffect(() => (enabled ? s.watchApp(slug) : undefined), [slug, enabled, s]);
+  return useSyncExternalStore(s.subscribe, () => s.appMetrics[slug] ?? NO_SAMPLES, () => NO_SAMPLES);
+}
+const NO_SAMPLES: AppSample[] = [];
 
 export function useRealtime(): RealtimeStore {
   return useStore();

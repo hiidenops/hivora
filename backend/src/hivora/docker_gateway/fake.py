@@ -45,6 +45,7 @@ class FakeDockerGateway(DockerGateway):
         # exec_run answers: command (joined by spaces) -> (exit code, output)
         self.exec_results: dict[str, tuple[int, str]] = {}
         self.exec_calls: list[list[str]] = []
+        self.stats: dict[str, StatsSample] = {}  # stats_once answers, zeros by default
         self._subscribers: list[asyncio.Queue[DockerEvent | None]] = []
 
     # --- test helpers -----------------------------------------------------
@@ -95,7 +96,7 @@ class FakeDockerGateway(DockerGateway):
 
     async def stats_once(self, container_id: str) -> StatsSample:
         await self.get_container(container_id)
-        return StatsSample(cpu_percent=0.0, mem_bytes=0, mem_limit=0, net_rx=0, net_tx=0)
+        return self.stats.get(container_id) or StatsSample(0.0, 0, 0, 0, 0)
 
     async def logs(
         self, container_id: str, *, follow: bool = False, tail: int = 200

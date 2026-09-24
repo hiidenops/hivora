@@ -30,6 +30,7 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
         puid=os.getuid(),
         pgid=os.getgid(),
         host_lan_ip="192.168.1.10",
+        host_public_ip="203.0.113.7",
     )
     runtime = Runtime.build(
         settings,
@@ -174,6 +175,10 @@ def test_deploy_flow_websocket_and_audit(client: TestClient) -> None:
     with client.websocket_connect("/ws") as ws:
         ws.send_json({"op": "subscribe", "channel": "state"})
         assert ws.receive_json() == {"channel": "state", "type": "snapshot", "apps": {}}
+        ws.send_json({"op": "subscribe", "channel": "app_metrics", "app": "coffre"})
+        assert ws.receive_json() == {
+            "channel": "app_metrics", "app": "coffre", "type": "snapshot", "samples": []
+        }  # fmt: skip
         ws.send_json({"op": "subscribe", "channel": "jobs"})
         deployed = client.post(f"{API}/apps", json=body)
         assert deployed.status_code == 202
@@ -294,7 +299,7 @@ def test_console_over_websocket(client: TestClient) -> None:
 
 def test_curseforge_key_setting_and_fallback(client: TestClient) -> None:
     admin(client)
-    assert client.get(f"{API}/system/integrations").json() == {"curseforge_api_key_set": False}
+    assert client.get(f"{API}/system/integrations").json()["curseforge_api_key_set"] is False
     body = {
         "template": "minecraft",
         "name": "atm",
@@ -307,7 +312,7 @@ def test_curseforge_key_setting_and_fallback(client: TestClient) -> None:
         client.put(f"{API}/system/integrations/curseforge", json={"key": "$2a$10$abc"}).status_code
         == 204
     )
-    assert client.get(f"{API}/system/integrations").json() == {"curseforge_api_key_set": True}
+    assert client.get(f"{API}/system/integrations").json()["curseforge_api_key_set"] is True
     plan = client.post(f"{API}/apps/plan", json=body)
     assert plan.status_code == 200 and "$2a$10$abc" not in plan.text  # used, never shown
     time.sleep(0.8)
@@ -332,7 +337,7 @@ def test_minecraft_players_whitelist_and_ops(client: TestClient) -> None:
     assert detail["game"] == "minecraft" and detail["started_at"] is None  # not running
     assert detail["summary"][0] == {"label": {"fr": "Type de serveur", "en": "Server type"},
                                     "value": "Vanilla"}  # fmt: skip
-    assert detail["access"] == {"game": "192.168.1.10:25565"}  # LAN IP when no public one
+    assert detail["access"] == {"game": "203.0.113.7:25565", "game_lan": "192.168.1.10:25565"}
 
     runtime = client.app.state.runtime  # type: ignore[attr-defined]
     gw = runtime.gateway
@@ -377,3 +382,17 @@ def test_minecraft_players_whitelist_and_ops(client: TestClient) -> None:
     assert client.get(f"{API}/apps/{app_id}/minecraft/access").json()["whitelist_enabled"] is True
     compose = client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"]
     assert "ENABLE_WHITELIST: 'true'" in compose
+
+
+def test_public_address_override(client: TestClient) -> None:
+    admin(client)
+    bad = client.put(f"{API}/system/integrations/public-address", json={"address": "not a host!"})
+    assert bad.status_code == 422
+    ok = client.put(f"{API}/system/integrations/public-address", json={"address": "MC.Example.org"})
+    assert ok.status_code == 204
+    info = client.get(f"{API}/system/integrations").json()
+    assert info["public_address"] == "mc.example.org"
+    runtime = client.app.state.runtime  # type: ignore[attr-defined]
+    assert runtime.public_address.current() == "mc.example.org"  # manual wins over the env IP
+    client.put(f"{API}/system/integrations/public-address", json={"address": ""})
+    assert runtime.public_address.current() == "203.0.113.7"

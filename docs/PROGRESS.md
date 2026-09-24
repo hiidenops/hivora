@@ -70,6 +70,13 @@ Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
 5. **Propriétés disponibles** : panneau filtrable de 30 propriétés `server.properties` (défaut + description FR/EN) ; un clic ajoute ou remplace la ligne. Format de template : `suggestions`.
 - Vérifié en réel : serveur déployé en 1.21.1 choisie dans la liste, `player-idle-timeout=0` ajouté via le panneau présent dans `server.properties`.
 
+## IP publique, cartes repliées, consommation (fait, 24/09)
+
+1. **Adresse publique** : IP publique détectée par le backend (`api.ipify.org`, toutes les 6 h ; ignorée si `HIVORA_HOST_PUBLIC_IP` est fixée), ou IP / domaine saisi dans Paramètres → Intégrations (admin ; vide = détection auto). La carte d'état affiche l'adresse publique à copier, « en local : … » en second, et le rappel « ouvrez le port … sur votre box » pour les ports `public`. Les apps `lan` (Vaultwarden) gardent l'adresse locale.
+2. **Cartes Joueurs et Accès repliées par défaut** (ouvertes seulement si l'utilisateur les a ouvertes).
+3. **Consommation en temps réel** par app : CPU (% de la machine), mémoire, réseau entrant/sortant, trois courbes défilantes. `stats` one-shot toutes les 5 s, **seulement tant qu'une fiche est ouverte** (canal WS `app_metrics`, compteur d'observateurs) ; historique de 5 min en mémoire, effacé quand plus personne ne regarde.
+- Vérifié en réel : IP publique détectée ; serveur Minecraft au repos ≈ 0,14 % CPU, 1,3 Go de RAM.
+
 ▶ **Prochaine étape** : Minecraft, partie C (mondes), puis M6.
 
 ## Minecraft, partie C (proposée, à valider)
@@ -124,6 +131,7 @@ Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
 - **États d'une app** : Sain, Démarrage, Dégradé, Arrêté, En erreur, Absent. Un arrêt demandé (événements `kill`/`stop`) n'est pas compté comme un crash.
 - **Templates officiels** figés par digest ; libellés FR/EN (`label: {fr, en}`).
 - **Icônes** : le navigateur ne contacte jamais de tiers ; SVG servi avec une CSP `sandbox`.
+- **Métriques par app** : échantillonnées toutes les 5 s (et non 10 s) mais uniquement pendant qu'une fiche est ouverte ; jamais de stream `stats` permanent.
 - **Licence** du projet (AGPL-3.0 ou Apache-2.0) : **non tranchée**, aucune licence déclarée pour l'instant.
 
 ## Limites connues

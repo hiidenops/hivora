@@ -9,7 +9,7 @@ import { applyTheme } from "@/components/providers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch, Label, Select } from "@/components/ui/input";
-import { IntegrationsCard } from "@/features/account/integrations-card";
+import { IntegrationsCard, PublicAddressCard } from "@/features/account/integrations-card";
 import { PasswordForm } from "@/features/account/password-form";
 import { TotpCard } from "@/features/account/totp-card";
 import { api } from "@/lib/api/client";
@@ -126,6 +126,8 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <IntegrationsCard />
+              <hr className="my-5" />
+              <PublicAddressCard />
             </CardContent>
           </Card>
         )}

@@ -63,6 +63,7 @@ class StatsSample:
     mem_limit: int
     net_rx: int
     net_tx: int
+    online_cpus: int = 1  # cpu_percent is per core, like `docker stats`
 
 
 @dataclass(frozen=True, slots=True)

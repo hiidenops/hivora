@@ -77,6 +77,9 @@ export function StatusHero({ app, status }: { app: AppDetail; status: AppStatus 
     uptime = d ? t("duration.dh", { d, h }) : h ? t("duration.hm", { h, m: String(m).padStart(2, "0") }) : t("duration.m", { m });
   }
   const address = app.access.game ?? app.access.web;
+  const lan = app.access.game ? app.access.game_lan : app.access.web_lan;
+  // Reaching a public port from the Internet needs a port forward on the router.
+  const forwarded = app.ports.filter((p) => p.exposure === "public" && p.host_port).map((p) => p.host_port);
 
   return (
     <Card className="animate-enter overflow-hidden lg:col-span-2">
@@ -100,6 +103,7 @@ export function StatusHero({ app, status }: { app: AppDetail; status: AppStatus 
               ) : (
                 <CopyAddress value={address} />
               )}
+              {lan && <span className="text-sm text-muted-foreground">{t("app.lanAddress", { address: lan })}</span>}
               {players.data?.running && players.data.online !== null && (
                 <span className="inline-flex items-center gap-1.5 text-sm">
                   <Users className="size-4 text-muted-foreground" />
@@ -107,6 +111,9 @@ export function StatusHero({ app, status }: { app: AppDetail; status: AppStatus 
                 </span>
               )}
             </div>
+          )}
+          {forwarded.length > 0 && (
+            <p className="text-xs text-muted-foreground">{t("app.forwardHint", { ports: forwarded.join(", ") })}</p>
           )}
         </div>
       </div>

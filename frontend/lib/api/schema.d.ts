@@ -702,6 +702,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/integrations/public-address": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Public Address */
+        put: operations["set_public_address_api_v1_system_integrations_public_address_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/templates": {
         parameters: {
             query?: never;
@@ -872,6 +889,14 @@ export interface components {
             whitelist: string[];
             /** Whitelist Enabled */
             whitelist_enabled: boolean;
+        };
+        /** AddressIn */
+        AddressIn: {
+            /**
+             * Address
+             * @default
+             */
+            address: string;
         };
         /** AppDetailOut */
         AppDetailOut: {
@@ -1094,6 +1119,10 @@ export interface components {
         IntegrationsOut: {
             /** Curseforge Api Key Set */
             curseforge_api_key_set: boolean;
+            /** Detected Public Ip */
+            detected_public_ip: string | null;
+            /** Public Address */
+            public_address: string | null;
         };
         /** JobDetailOut */
         JobDetailOut: {
@@ -2868,6 +2897,37 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["KeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_public_address_api_v1_system_integrations_public_address_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressIn"];
             };
         };
         responses: {
