@@ -161,6 +161,8 @@ export const en: Record<MessageKey, string> = {
   "metrics.network": "Network",
   "metrics.in": "In",
   "metrics.out": "Out",
+  "metrics.ago": "5 min ago",
+  "metrics.now": "now",
   "activity.clearJobsConfirm": "Delete the history of finished tasks and their logs?",
   "activity.clearAuditConfirm": "Clear the audit log? One entry will record who cleared it and when.",
 
@@ -228,8 +230,8 @@ export const en: Record<MessageKey, string> = {
   "console.title": "Console",
   "console.server": "Server console",
   "console.shell": "Shell",
-  "console.open": "Open console",
   "console.close": "Close",
+  "console.reconnect": "Reconnect",
   "console.guide": "Commands",
   "console.guideHint": "Click to insert, fill in, then Enter.",
   "console.notRunning": "The application must be running to open a console.",

@@ -1,4 +1,4 @@
-"""Host metrics: one sample every 10 s, last hour kept in memory, pushed on the bus."""
+"""Host metrics: one sample every 2 s, last hour kept in memory, pushed on the bus."""
 
 import asyncio
 import time
@@ -10,8 +10,10 @@ import psutil
 
 from hivora.core.events import EventBus
 
-INTERVAL_S = 10.0
-HISTORY = 360  # one hour
+# Host counters via psutil are cheap (unlike per-container Docker stats, kept at
+# 10 s by the budget): 2 s makes the live charts feel continuous.
+INTERVAL_S = 2.0
+HISTORY = 1800  # one hour
 
 
 # Loopback counts every byte both ways; Docker's bridges and veth pairs count

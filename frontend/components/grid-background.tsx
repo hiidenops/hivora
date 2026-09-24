@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 const CELL = 44;
-const TRAIL = 10; // cells kept lit while they fade out
+const TRAIL = 10; // brush positions kept lit while they fade out
+// Soft brush: the cell under the pointer, then its sides, then its corners.
+const BRUSH = [-1, 0, 1].flatMap((dy) =>
+  [-1, 0, 1].map((dx) => ({ dx, dy, level: dx === 0 && dy === 0 ? 1 : dx === 0 || dy === 0 ? 0.45 : 0.2 })),
+);
 
 /** Flat grid behind the whole UI; the cell under the pointer lights up and fades. */
 export function GridBackground() {
@@ -37,16 +41,19 @@ export function GridBackground() {
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#hv-grid)" />
-      {cells.map((c) => (
-        <rect
-          key={c.id}
-          x={c.x * CELL + 1}
-          y={c.y * CELL + 1}
-          width={CELL - 1}
-          height={CELL - 1}
-          className="grid-cell"
-        />
-      ))}
+      {cells.flatMap((c) =>
+        BRUSH.map(({ dx, dy, level }) => (
+          <rect
+            key={`${c.id}:${dx}:${dy}`}
+            x={(c.x + dx) * CELL + 1}
+            y={(c.y + dy) * CELL + 1}
+            width={CELL - 1}
+            height={CELL - 1}
+            className="grid-cell"
+            style={{ "--level": level } as CSSProperties}
+          />
+        )),
+      )}
     </svg>
   );
 }

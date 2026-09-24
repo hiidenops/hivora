@@ -108,7 +108,7 @@ class RealtimeStore {
       return;
     }
     if (msg.channel === "metrics") {
-      this.host = [...this.host, msg as unknown as HostSample].slice(-360);
+      this.host = [...this.host, msg as unknown as HostSample].slice(-1800);
     } else if (msg.channel === "state") {
       if (msg.type === "snapshot") this.statuses = msg.apps as Record<string, AppStatus>;
       else this.statuses = { ...this.statuses, [msg.app as string]: msg.status as AppStatus };

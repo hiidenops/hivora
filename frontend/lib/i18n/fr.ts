@@ -160,6 +160,8 @@ export const fr = {
   "metrics.network": "Réseau",
   "metrics.in": "Entrant",
   "metrics.out": "Sortant",
+  "metrics.ago": "il y a 5 min",
+  "metrics.now": "maintenant",
   "activity.clearJobsConfirm": "Supprimer l'historique des tâches terminées et leurs journaux ?",
   "activity.clearAuditConfirm": "Vider le journal d'audit ? Une entrée indiquera qui l'a vidé et quand.",
 
@@ -227,8 +229,8 @@ export const fr = {
   "console.title": "Console",
   "console.server": "Console serveur",
   "console.shell": "Shell",
-  "console.open": "Ouvrir la console",
   "console.close": "Fermer",
+  "console.reconnect": "Reconnecter",
   "console.guide": "Commandes",
   "console.guideHint": "Cliquez pour insérer, complétez puis Entrée.",
   "console.notRunning": "L'application doit être démarrée pour ouvrir une console.",

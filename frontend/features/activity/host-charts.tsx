@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,6 +11,7 @@ import { useLiveHost } from "@/lib/realtime";
 
 const W = 600;
 const H = 140;
+const WINDOW_S = 300; // live view: the last five minutes
 
 interface Series {
   label: string;
@@ -27,7 +28,7 @@ function useHostHistory(): HostSample[] {
   const live = useLiveHost();
   return useMemo(() => {
     const last = data?.at(-1)?.ts ?? 0;
-    return [...(data ?? []), ...live.filter((s) => s.ts > last)].slice(-360);
+    return [...(data ?? []), ...live.filter((s) => s.ts > last)].slice(-1800);
   }, [data, live]);
 }
 
@@ -44,32 +45,64 @@ function units(lang: string) {
   return { num, gb, rate, time };
 }
 
-/** Line/area time series: one y axis, recessive grid, crosshair + tooltip on hover. */
+/**
+ * Server time "now", advancing smoothly between samples. Anchored on the last
+ * sample (not the browser clock, which may be skewed) and ticked every frame so
+ * the chart scrolls continuously; one step per sample with reduced motion.
+ */
+function useScrollingNow(lastTs: number | undefined): number {
+  const anchor = useRef({ ts: 0, at: 0 });
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    if (lastTs === undefined) return;
+    anchor.current = { ts: lastTs, at: performance.now() };
+    setNow(lastTs);
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    let last = 0;
+    const loop = (t: number) => {
+      if (t - last > 33) {
+        last = t;
+        setNow(anchor.current.ts + (t - anchor.current.at) / 1000);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [lastTs]);
+  return now;
+}
+
+/** Scrolling time series: one y axis, recessive grid, crosshair + tooltip on hover. */
 function TimeChart({
   series,
   times,
+  now,
   max,
   format,
-  timeLabel,
+  timeLabels,
   area = false,
 }: {
   series: Series[];
   times: number[];
+  now: number;
   max: number;
   format: (v: number) => string;
-  timeLabel: (ts: number) => string;
+  timeLabels: [string, string];
   area?: boolean;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const n = times.length;
-  const x = (i: number) => (n <= 1 ? W : (i / (n - 1)) * W);
+  const x = (i: number) => W - ((now - times[i]) / WINDOW_S) * W;
   const y = (v: number) => H - (Math.min(v, max) / (max || 1)) * (H - 8);
-  const path = (values: number[]) => values.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join(" ");
+  const path = (values: number[]) => values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
 
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     const box = e.currentTarget.getBoundingClientRect();
-    const i = Math.round(((e.clientX - box.left) / box.width) * (n - 1));
-    setHover(Math.max(0, Math.min(n - 1, i)));
+    const t = now - WINDOW_S * (1 - (e.clientX - box.left) / box.width);
+    let best = 0;
+    for (let i = 1; i < n; i++) if (Math.abs(times[i] - t) < Math.abs(times[best] - t)) best = i;
+    setHover(n ? best : null);
   };
 
   return (
@@ -77,7 +110,7 @@ function TimeChart({
       <svg
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
-        className="h-36 w-full touch-none"
+        className="h-36 w-full touch-none overflow-hidden"
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
         aria-hidden
@@ -85,22 +118,21 @@ function TimeChart({
         {[0.25, 0.5, 0.75].map((f) => (
           <line key={f} x1={0} x2={W} y1={H * f} y2={H * f} className="stroke-grid" vectorEffect="non-scaling-stroke" />
         ))}
-        {series.map((s) => (
-          <g key={s.label}>
-            {area && (
-              <path d={`${path(s.values)} L${x(n - 1)},${H} L${x(0)},${H} Z`} fill={s.color} opacity={0.14} />
-            )}
-            <path
-              d={path(s.values)}
-              fill="none"
-              stroke={s.color}
-              strokeWidth={2}
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-            />
-          </g>
-        ))}
-        {hover !== null && (
+        {n > 0 &&
+          series.map((s) => (
+            <g key={s.label}>
+              {area && <path d={`${path(s.values)} L${x(n - 1)},${H} L${x(0)},${H} Z`} fill={s.color} opacity={0.14} />}
+              <path
+                d={path(s.values)}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={2}
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </g>
+          ))}
+        {hover !== null && hover < n && (
           <line
             x1={x(hover)}
             x2={x(hover)}
@@ -112,12 +144,14 @@ function TimeChart({
           />
         )}
       </svg>
-      {hover !== null && (
+      {hover !== null && hover < n && (
         <div
           className="pointer-events-none absolute top-1 z-10 rounded-md border bg-card px-2 py-1 text-xs shadow-md"
-          style={{ left: `${(x(hover) / W) * 100}%`, transform: `translateX(${hover > n / 2 ? "-105%" : "5%"})` }}
+          style={{
+            left: `${Math.max(0, Math.min(100, (x(hover) / W) * 100))}%`,
+            transform: `translateX(${x(hover) > W / 2 ? "-105%" : "5%"})`,
+          }}
         >
-          <div className="text-muted-foreground">{timeLabel(times[hover])}</div>
           {series.map((s) => (
             <div key={s.label} className="flex items-center gap-1.5 whitespace-nowrap">
               <span className="size-2 rounded-full" style={{ background: s.color }} />
@@ -128,8 +162,8 @@ function TimeChart({
         </div>
       )}
       <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-        <span>{n ? timeLabel(times[0]) : ""}</span>
-        <span>{n ? timeLabel(times[n - 1]) : ""}</span>
+        <span>{timeLabels[0]}</span>
+        <span>{timeLabels[1]}</span>
       </div>
     </div>
   );
@@ -149,10 +183,15 @@ function ChartCard({ title, value, children }: { title: string; value: React.Rea
 
 export function HostCharts() {
   const { t, lang } = useI18n();
-  const samples = useHostHistory();
+  const history = useHostHistory();
   const u = units(lang);
+  const now = useScrollingNow(history.at(-1)?.ts);
+  // Keep one sample beyond the left edge so the line enters from outside.
+  const firstVisible = history.findIndex((s) => s.ts >= now - WINDOW_S);
+  const samples = firstVisible < 0 ? history.slice(-1) : history.slice(Math.max(0, firstVisible - 1));
+  const timeLabels: [string, string] = [t("metrics.ago"), t("metrics.now")];
 
-  if (samples.length === 0) {
+  if (history.length === 0) {
     return (
       <div role="status" aria-label={t("common.loading")} className="grid gap-4 lg:grid-cols-3">
         {[0, 1, 2].map((i) => (
@@ -174,9 +213,10 @@ export function HostCharts() {
           area
           series={[{ label: t("metrics.cpu"), color: "var(--chart-1)", values: samples.map((s) => s.cpu_percent) }]}
           times={times}
+          now={now}
           max={100}
           format={(v) => `${u.num(v)} %`}
-          timeLabel={u.time}
+          timeLabels={timeLabels}
         />
       </ChartCard>
       <ChartCard
@@ -191,9 +231,10 @@ export function HostCharts() {
           area
           series={[{ label: t("metrics.ram"), color: "var(--chart-1)", values: samples.map((s) => s.mem_used) }]}
           times={times}
+          now={now}
           max={last.mem_total}
           format={u.gb}
-          timeLabel={u.time}
+          timeLabels={timeLabels}
         />
       </ChartCard>
       <ChartCard
@@ -218,9 +259,10 @@ export function HostCharts() {
             { label: t("metrics.out"), color: "var(--chart-1)", values: tx },
           ]}
           times={times}
+          now={now}
           max={netMax}
           format={u.rate}
-          timeLabel={u.time}
+          timeLabels={timeLabels}
         />
       </ChartCard>
       <table className="sr-only">

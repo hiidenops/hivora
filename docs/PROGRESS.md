@@ -18,6 +18,7 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | M5 Interface | Next.js statique, tous les écrans, e2e Playwright | ✅ | `8e86c92` |
 | Retours tests #1 | Déploiement Minecraft, logos, animations, mise en page | ✅ | `8953b3d` |
 | Retours tests #2 | Interrupteurs, fond en grille, graphiques système, vider l'historique, console | ✅ | voir `git log` |
+| Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | M6 Livraison | Image Docker, HTTPS, script d'installation, budgets CI, 3 templates | ⏳ à lancer | — |
 
 Tests : 110 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Playwright, contrôle du budget bundle. Tout passe.
@@ -31,6 +32,14 @@ Le serveur de test tourne sur la VM : **http://192.168.70.149:8000** (données d
 3. Interrupteurs dorés, fond en grille, alignements pendant un déploiement (bureau et mobile).
 
 Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
+
+## Retours traités (tour 3)
+
+| Retour | Réponse |
+|---|---|
+| Survol du fond trop prononcé, plusieurs cases à la fois | Pinceau 3×3 : centre à 20 % d'opacité max, côtés 45 % de ça, coins 20 % |
+| Métriques plus fréquentes, courbe continue | Relevé toutes les 2 s (psutil, coût négligeable), axe temporel de 5 min qui défile à chaque image, ancré sur l'heure du serveur |
+| Console à afficher tout le temps, bouton « Commandes » sans effet | Cause : il fallait d'abord « Ouvrir la console », et le guide était masqué sous 768 px. Console ouverte automatiquement, onglets commutables à chaud, guide toujours visible (sous le terminal sur mobile), « Reconnecter » |
 
 ## Retours traités (tour 2)
 

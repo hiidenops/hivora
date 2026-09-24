@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, SquareTerminal, X } from "lucide-react";
+import { BookOpen, RotateCw, SquareTerminal } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -22,18 +22,20 @@ const XTerm = dynamic(() => import("./terminal"), {
 });
 
 type Kind = "server" | "shell";
-type Phase = "idle" | "totp" | "open" | "closed";
+type Phase = "connecting" | "totp" | "open" | "closed";
 type Controller = ReturnType<ReturnType<typeof useRealtime>["openConsole"]>;
 
+/** Always-on console of a running app: connects by itself, reconnects on demand. */
 export function ConsolePanel({ app, running }: { app: AppDetail; running: boolean }) {
   const { t, l } = useI18n();
   const rt = useRealtime();
   const hasServer = app.console.server;
+  const commands = app.console.commands;
   const [kind, setKind] = useState<Kind>(hasServer ? "server" : "shell");
-  const [phase, setPhase] = useState<Phase>("idle");
+  const [phase, setPhase] = useState<Phase>("connecting");
   const [error, setError] = useState<string | null>(null);
   const [guideOpen, setGuideOpen] = useState(true);
-  const [session, setSession] = useState(0); // remounts the terminal per console
+  const [session, setSession] = useState(0); // a new terminal (and console) per session
   const ctrl = useRef<Controller | null>(null);
   const term = useRef<TerminalHandle | null>(null);
   const size = useRef({ rows: 24, cols: 80 });
@@ -41,12 +43,12 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
 
   const onMessage = useCallback(
     (msg: Message) => {
+      if (msg.type === "opened") setPhase("open");
       if (msg.type === "data") term.current?.write(String(msg.data));
       if (msg.type === "error") {
         ctrl.current = null;
         if (msg.code === "totp_required") return setPhase("totp");
-        const key = `error.${msg.code}` as MessageKey;
-        setError(t(key, { message: String(msg.message ?? msg.code) }));
+        setError(t(`error.${msg.code}` as MessageKey, { message: String(msg.message ?? msg.code) }));
         setPhase("closed");
       }
       if (msg.type === "closed") {
@@ -58,39 +60,50 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
     [t],
   );
 
-  const connect = useCallback(() => {
-    ctrl.current?.close();
-    setError(null);
-    ctrl.current = rt.openConsole(
-      { id: crypto.randomUUID(), app: app.id, kind, ...size.current, totp_code: totp.current },
-      onMessage,
-    );
-    totp.current = undefined;
-    setPhase("open");
-  }, [rt, app.id, kind, onMessage]);
+  const connect = useCallback(
+    (as: Kind) => {
+      ctrl.current?.close();
+      setError(null);
+      setPhase("connecting");
+      ctrl.current = rt.openConsole(
+        { id: crypto.randomUUID(), app: app.id, kind: as, ...size.current, totp_code: totp.current },
+        onMessage,
+      );
+      totp.current = undefined;
+    },
+    [rt, app.id, onMessage],
+  );
 
-  const start = () => {
-    setSession((n) => n + 1);
-    setPhase("open");
-  };
-  const stop = () => {
+  const disconnect = () => {
     ctrl.current?.close();
     ctrl.current = null;
-    setPhase("idle");
   };
-  useEffect(() => () => ctrl.current?.close(), []);
+
+  // A fresh terminal (and console) whenever the app runs, the kind changes or on reconnect.
+  const restart = () => setSession((n) => n + 1);
+  useEffect(() => {
+    if (running) restart();
+    else {
+      disconnect();
+      setPhase("closed");
+    }
+  }, [running, kind]);
+  useEffect(() => disconnect, []);
 
   const submitTotp = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     totp.current = String(new FormData(e.currentTarget).get("code"));
-    connect();
+    connect(kind);
   };
+
+  const showGuide = guideOpen && kind === "server" && commands.length > 0;
 
   return (
     <Card className="lg:col-span-2">
       <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
         <CardTitle className="flex items-center gap-2">
           <SquareTerminal className="size-5" /> {t("console.title")}
+          {phase === "open" && <span className="size-2 rounded-full bg-ok" aria-hidden />}
         </CardTitle>
         <div className="flex flex-wrap items-center gap-2">
           <div role="tablist" className="inline-flex rounded-md border p-0.5">
@@ -99,10 +112,9 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
                 key={k}
                 role="tab"
                 aria-selected={kind === k}
-                disabled={phase === "open"}
-                onClick={() => setKind(k)}
+                onClick={() => k !== kind && setKind(k)}
                 className={cn(
-                  "rounded px-3 py-1 text-sm transition-colors disabled:cursor-not-allowed",
+                  "rounded px-3 py-1 text-sm transition-colors",
                   kind === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
                 )}
               >
@@ -110,24 +122,20 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
               </button>
             ))}
           </div>
-          {app.console.commands.length > 0 && kind === "server" && (
+          {kind === "server" && commands.length > 0 && (
             <Button variant="outline" size="sm" aria-pressed={guideOpen} onClick={() => setGuideOpen((v) => !v)}>
               <BookOpen /> {t("console.guide")}
             </Button>
           )}
-          {phase === "open" ? (
-            <Button variant="outline" size="sm" onClick={stop}>
-              <X /> {t("console.close")}
-            </Button>
-          ) : (
-            <Button size="sm" disabled={!running} onClick={start}>
-              {t("console.open")}
+          {phase === "closed" && running && (
+            <Button size="sm" onClick={restart}>
+              <RotateCw /> {t("console.reconnect")}
             </Button>
           )}
         </div>
       </CardHeader>
       <CardContent className="grid gap-3">
-        {!running && phase !== "open" && <Alert>{t("console.notRunning")}</Alert>}
+        {!running && <Alert>{t("console.notRunning")}</Alert>}
         {kind === "shell" && <p className="text-xs text-muted-foreground">{t("console.shellHint")}</p>}
         {phase === "totp" && (
           <form onSubmit={submitTotp} className="flex flex-wrap items-end gap-2">
@@ -141,9 +149,9 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
           </form>
         )}
         {error && <Alert tone="danger">{error}</Alert>}
-        {(phase === "open" || phase === "closed") && session > 0 && (
-          <div className="flex h-96 gap-3">
-            <div className="min-w-0 flex-1">
+        <div className="flex flex-col gap-3 md:h-96 md:flex-row">
+          {running && session > 0 && (
+            <div className="h-80 min-w-0 flex-1 md:h-full">
               <XTerm
                 key={session}
                 onInput={(d) => ctrl.current?.input(d)}
@@ -154,33 +162,37 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
                 onReady={(handle, initial) => {
                   term.current = handle;
                   size.current = initial;
-                  connect();
+                  connect(kind);
                 }}
               />
             </div>
-            {guideOpen && kind === "server" && app.console.commands.length > 0 && (
-              <aside className="animate-enter hidden w-64 shrink-0 overflow-y-auto rounded-md border md:block" aria-label={t("console.guide")}>
-                <p className="border-b px-3 py-2 text-xs text-muted-foreground">{t("console.guideHint")}</p>
-                <ul>
-                  {app.console.commands.map((c) => (
-                    <li key={c.command}>
-                      <button
-                        className="w-full px-3 py-2 text-left transition-colors hover:bg-muted"
-                        onClick={() => {
-                          ctrl.current?.input(c.command);
-                          term.current?.focus();
-                        }}
-                      >
-                        <code className="block font-mono text-xs">{c.command}</code>
-                        <span className="text-xs text-muted-foreground">{l(c.description)}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </aside>
-            )}
-          </div>
-        )}
+          )}
+          {showGuide && (
+            <aside
+              className="animate-enter max-h-72 shrink-0 overflow-y-auto rounded-md border md:max-h-none md:w-64"
+              aria-label={t("console.guide")}
+            >
+              <p className="border-b px-3 py-2 text-xs text-muted-foreground">{t("console.guideHint")}</p>
+              <ul>
+                {commands.map((c) => (
+                  <li key={c.command}>
+                    <button
+                      className="w-full px-3 py-2 text-left transition-colors hover:bg-muted disabled:opacity-50"
+                      disabled={phase !== "open"}
+                      onClick={() => {
+                        ctrl.current?.input(c.command);
+                        term.current?.focus();
+                      }}
+                    >
+                      <code className="block font-mono text-xs">{c.command}</code>
+                      <span className="text-xs text-muted-foreground">{l(c.description)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
