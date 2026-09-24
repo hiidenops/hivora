@@ -314,3 +314,61 @@ def test_curseforge_key_setting_and_fallback(client: TestClient) -> None:
         a for a in client.get(f"{API}/audit").json() if a["action"] == "settings.secret_updated"
     )
     assert "$2a$10$abc" not in str(entry)
+
+
+def test_minecraft_players_whitelist_and_ops(client: TestClient) -> None:
+    import json
+    from pathlib import Path
+
+    from hivora.docker_gateway import ContainerInfo, ContainerState
+
+    admin(client)
+    body = {"template": "minecraft", "name": "cube", "inputs": {"eula": True}}
+    deployed = client.post(f"{API}/apps", json=body).json()
+    wait_job(client, deployed["job"]["id"])
+    app_id = deployed["app"]["id"]
+    assert client.get(f"{API}/apps/{app_id}").json()["game"] == "minecraft"
+
+    runtime = client.app.state.runtime  # type: ignore[attr-defined]
+    gw = runtime.gateway
+    # Stopped: players unknown, commands refused.
+    assert client.get(f"{API}/apps/{app_id}/minecraft/players").json()["running"] is False
+    refused = client.post(f"{API}/apps/{app_id}/minecraft/whitelist", json={"name": "Steve"})
+    assert refused.status_code == 409 and code(refused) == "server_not_running"
+
+    gw.put(ContainerInfo(
+        id="mc1", name="cube-server-1", image="mc", state=ContainerState.RUNNING,
+        labels={"io.hivora.app": "cube", "com.docker.compose.service": "server"},
+    ), "start")  # fmt: skip
+    deadline = time.monotonic() + 3
+    while runtime.state.store.app("cube").status.value != "healthy":
+        assert time.monotonic() < deadline
+        time.sleep(0.02)
+    gw.exec_results["rcon-cli list"] = (0, "There are 1 of a max of 10 players online: Steve")
+    gw.exec_results["rcon-cli whitelist add Steve"] = (0, "Added Steve to the whitelist")
+    gw.exec_results["rcon-cli op Ghost"] = (0, "That player does not exist")
+    assert client.get(f"{API}/apps/{app_id}/minecraft/players").json() == {
+        "running": True, "online": 1, "max": 10, "names": ["Steve"],
+    }  # fmt: skip
+    added = client.post(f"{API}/apps/{app_id}/minecraft/whitelist", json={"name": "Steve"})
+    assert added.json() == {"output": "Added Steve to the whitelist"}
+    bad = client.post(f"{API}/apps/{app_id}/minecraft/whitelist", json={"name": "Steve; stop"})
+    assert bad.status_code == 422
+    ghost = client.post(f"{API}/apps/{app_id}/minecraft/ops", json={"name": "Ghost"})
+    assert ghost.status_code == 502 and code(ghost) == "game_command_failed"
+    assert ["rcon-cli", "whitelist", "add", "Steve"] in gw.exec_calls
+
+    data = Path(runtime.settings.volumes_root) / "cube" / "data"
+    (data / "whitelist.json").write_text(json.dumps([{"uuid": "u", "name": "Steve"}]))
+    (data / "ops.json").write_text(json.dumps([{"uuid": "v", "name": "Alex", "level": 4}]))
+    access = client.get(f"{API}/apps/{app_id}/minecraft/access").json()
+    assert access == {"running": True, "whitelist_enabled": False, "whitelist": ["Steve"],
+                      "ops": [{"name": "Alex", "level": 4}]}  # fmt: skip
+
+    job = client.put(
+        f"{API}/apps/{app_id}/minecraft/whitelist-enabled", json={"enabled": True}
+    ).json()
+    assert wait_job(client, job["id"])["status"] == "succeeded"
+    assert client.get(f"{API}/apps/{app_id}/minecraft/access").json()["whitelist_enabled"] is True
+    compose = client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"]
+    assert "ENABLE_WHITELIST: 'true'" in compose

@@ -22,7 +22,8 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
 | Minecraft, partie A | Horodatage des graphiques, « Modifier les réglages » (révisions), types de serveur et modpacks, propriétés | ✅ | voir `git log` |
 | Catalogue de modpacks | Recherche Modrinth / CurseForge dans le panel, déploiement pré-rempli, clé CurseForge globale | ✅ | voir `git log` |
-| Minecraft, parties B et C | Joueurs, liste blanche, admins ; gestion des mondes | ⏳ proposé | — |
+| Minecraft, partie B | Joueurs connectés, liste blanche (on/off + ajout/retrait), admins | ✅ | voir `git log` |
+| Minecraft, partie C | Gestion des mondes | ⏳ proposé | — |
 | M6 Livraison | Image Docker, HTTPS, script d'installation, budgets CI, 3 templates | ⏳ à lancer | — |
 
 Tests : 110 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Playwright, contrôle du budget bundle. Tout passe.
@@ -52,9 +53,15 @@ Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
 - **CurseForge** : la clé API n'est demandée que pour un modpack CurseForge, stockée chiffrée par app. Modrinth n'en demande pas.
 - **Corrigé grâce au test réel** : un champ optionnel vide devenait le texte « None » dans l'environnement (Minecraft refusait de démarrer). Désormais une variable vide n'est pas définie.
 
-## Minecraft, parties B et C (proposées, à valider)
+## Minecraft, partie B (fait)
 
-- **B** : panneau Joueurs (connectés, via `rcon-cli`), liste blanche on/off + ajout/retrait, admins (op/deop). Module `games` (prévu en V2 dans le document, avancé).
+- Fiche d'un serveur Minecraft : carte **Joueurs** (connectés / max, pseudos, rafraîchie toutes les 15 s via `rcon-cli list`) et carte **Accès**.
+- **Liste blanche et admins** : lus dans `whitelist.json` / `ops.json` du serveur ; ajout/retrait à chaud via `rcon-cli` (pseudos validés `[A-Za-z0-9_]{3,16}`, exec sans shell) ; audit `game.*`.
+- **Activer/désactiver la liste blanche** = intention (réglage `enable_whitelist`, template 1.6.0) : nouvelle révision + redémarrage, car l'image réécrit `white-list` à chaque démarrage. L'interrupteur reflète immédiatement la demande.
+- Vérifié sur un vrai serveur : `Notch` ajouté puis retiré, passé op (UUID Mojang réel), `white-list` à true puis false dans `server.properties`.
+
+## Minecraft, partie C (proposée, à valider)
+
 - **C** : mondes (lister, monde actif, import `.zip` protégé, téléchargement, suppression ; serveur arrêté pour changer).
 
 ## Retours traités (tour 4)

@@ -102,6 +102,7 @@ class AppDetailOut(AppOut):
     ports: list[PortOut]
     volumes: list[str]
     console: ConsoleInfoOut
+    game: str | None  # game tools available (e.g. "minecraft")
 
 
 class DeployOut(BaseModel):
@@ -184,6 +185,14 @@ def console_info(rt: RuntimeDep, template: str | None) -> ConsoleInfoOut:
     )  # fmt: skip
 
 
+def game_kind(rt: RuntimeDep, template: str | None) -> str | None:
+    try:
+        game = rt.catalog.get(template).template.game if template else None
+    except NotFoundError:
+        return None
+    return game.query if game else None
+
+
 def plan_out(plan: DeployPlan) -> PlanOut:
     ports = [PortOut(service=p.service, container_port=p.container_port, host_port=p.host_port,
                      protocol=p.protocol, purpose=p.purpose, exposure=p.exposure,
@@ -252,6 +261,7 @@ async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
                    for s in app.services for p in s.ports],
             volumes=[v.source for s in app.services for v in s.volumes],
             console=console_info(rt, template),
+            game=game_kind(rt, template),
         )  # fmt: skip
 
 

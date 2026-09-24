@@ -236,6 +236,25 @@ class LocalDockerGateway(DockerGateway):
         await stream._init()
         return LocalExecSession(exec_, stream)
 
+    async def exec_run(self, container_id: str, cmd: list[str]) -> tuple[int, str]:
+        container = self._docker.containers.container(container_id)
+        try:
+            exec_ = await container.exec(cmd, stdout=True, stderr=True, tty=False)
+        except aiodocker.DockerError as exc:
+            if exc.status == 404:
+                raise ContainerNotFoundError(container_id) from exc
+            raise
+        stream = exec_.start(timeout=None, detach=False)
+        await stream._init()  # see open_exec: start once, explicitly
+        chunks: list[bytes] = []
+        try:  # callers bound the duration with asyncio.timeout
+            while (message := await stream.read_out()) is not None:
+                chunks.append(bytes(message.data))
+        finally:
+            await stream.close()
+        info = await exec_.inspect()
+        return int(info.get("ExitCode") or 0), b"".join(chunks).decode(errors="replace")
+
     async def list_networks(self) -> list[NetworkInfo]:
         return [
             NetworkInfo(

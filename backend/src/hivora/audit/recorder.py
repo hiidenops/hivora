@@ -21,6 +21,7 @@ AUDITED_PREFIXES = (
     "jobs.cleared",
     "console.",
     "settings.",
+    "game.",
 )
 _FAILED = {"auth.login_failed"}
 _BATCH_DELAY_S = 0.5

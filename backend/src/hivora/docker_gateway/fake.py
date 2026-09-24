@@ -42,6 +42,9 @@ class FakeDockerGateway(DockerGateway):
         self.networks: list[NetworkInfo] = []
         self.logs_by_container: dict[str, list[str]] = {}
         self.execs: list[FakeExecSession] = []
+        # exec_run answers: command (joined by spaces) -> (exit code, output)
+        self.exec_results: dict[str, tuple[int, str]] = {}
+        self.exec_calls: list[list[str]] = []
         self._subscribers: list[asyncio.Queue[DockerEvent | None]] = []
 
     # --- test helpers -----------------------------------------------------
@@ -105,6 +108,11 @@ class FakeDockerGateway(DockerGateway):
         session = FakeExecSession(cmd)
         self.execs.append(session)
         return session
+
+    async def exec_run(self, container_id: str, cmd: list[str]) -> tuple[int, str]:
+        await self.get_container(container_id)
+        self.exec_calls.append(cmd)
+        return self.exec_results.get(" ".join(cmd), (0, ""))
 
     async def list_networks(self) -> list[NetworkInfo]:
         return list(self.networks)

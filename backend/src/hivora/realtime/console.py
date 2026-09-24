@@ -14,15 +14,9 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import select
-
-from hivora.apps.models import Application
-from hivora.apps.service import AppNotFoundError
 from hivora.core.errors import ConflictError, HivoraError
-from hivora.docker_gateway import ContainerState, ExecSession
+from hivora.docker_gateway import ExecSession
 from hivora.runtime import Runtime
-from hivora.state import app_key
-from hivora.templates.models import TemplateVersion
 
 logger = logging.getLogger(__name__)
 
@@ -53,14 +47,8 @@ class Target:
 async def resolve(rt: Runtime, app_id: int, kind: str) -> Target:
     """The main service's running container and the command to run in it."""
     async with rt.sessions() as session:
-        app = await session.get(Application, app_id)
-        if app is None:
-            raise AppNotFoundError(str(app_id))
-        template_slug = await session.scalar(
-            select(TemplateVersion.slug).where(TemplateVersion.id == app.template_version_id)
-        )
-    template = rt.catalog.get(template_slug).template if template_slug else None
-    main = template.main_service if template else None
+        app, entry, container = await rt.apps.main_container(session, app_id)
+    template = entry.template if entry else None
     if kind == "server":
         cmd = template.game.console if template and template.game else None
         if not cmd:
@@ -69,15 +57,9 @@ async def resolve(rt: Runtime, app_id: int, kind: str) -> Target:
         cmd = SHELL
     else:
         raise ConsoleUnavailableError("unknown console kind")
-    running = [
-        c for c in rt.state.store.containers()
-        if app_key(c) == app.slug and c.state is ContainerState.RUNNING
-        and (main is None or c.labels.get(LABEL_SERVICE) == main)
-    ]  # fmt: skip
-    if not running:
+    if container is None:
         raise ConsoleUnavailableError("the app is not running")
-    c = running[0]
-    return Target(c.id, c.labels.get(LABEL_SERVICE, c.name), cmd, app.slug)
+    return Target(container.id, container.labels.get(LABEL_SERVICE, container.name), cmd, app.slug)
 
 
 class Console:

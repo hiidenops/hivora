@@ -72,6 +72,10 @@ class DockerGateway(ABC):
         """Start ``cmd`` with a TTY and stdin attached (never on the host itself)."""
 
     @abstractmethod
+    async def exec_run(self, container_id: str, cmd: list[str]) -> tuple[int, str]:
+        """Run ``cmd`` (no TTY, no shell) and return (exit code, stdout+stderr)."""
+
+    @abstractmethod
     async def list_networks(self) -> list[NetworkInfo]: ...
 
     @abstractmethod

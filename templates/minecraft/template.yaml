@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.5.0
+  version: 1.6.0
   category: games
   tags: [minecraft, java, sandbox]
   icon:
@@ -110,6 +110,10 @@ form:
         - { value: 8G, label: { fr: 8 Go, en: 8 GB } }
         - { value: 12G, label: { fr: 12 Go, en: 12 GB } }
         - { value: 16G, label: { fr: 16 Go, en: 16 GB } }
+    - id: enable_whitelist
+      label: { fr: Liste blanche (seuls les joueurs autorisés peuvent se connecter), en: Whitelist (only allowed players can join) }
+      type: boolean
+      default: false
     - id: pvp
       label: { fr: Combat entre joueurs (PvP), en: Player versus player (PvP) }
       type: boolean
@@ -208,6 +212,8 @@ services:
       CF_SLUG: "{{ form.cf_modpack }}"
       CF_API_KEY: "{{ secret.cf_api_key }}"
       MODRINTH_MODPACK: "{{ form.modrinth_modpack }}"
+      ENABLE_WHITELIST: "{{ form.enable_whitelist }}"
+      ENFORCE_WHITELIST: "{{ form.enable_whitelist }}"
       PVP: "{{ form.pvp }}"
       HARDCORE: "{{ form.hardcore }}"
       ALLOW_NETHER: "{{ form.allow_nether }}"

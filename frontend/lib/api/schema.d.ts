@@ -80,6 +80,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/{app_id}/minecraft/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Access */
+        get: operations["access_api_v1_apps__app_id__minecraft_access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/minecraft/ops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Op Add */
+        post: operations["op_add_api_v1_apps__app_id__minecraft_ops_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/minecraft/ops/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Op Remove */
+        delete: operations["op_remove_api_v1_apps__app_id__minecraft_ops__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/minecraft/players": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Players */
+        get: operations["players_api_v1_apps__app_id__minecraft_players_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/minecraft/whitelist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Whitelist Add */
+        post: operations["whitelist_add_api_v1_apps__app_id__minecraft_whitelist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/minecraft/whitelist-enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Whitelist Enabled
+         * @description Intent change: new revision, the server restarts.
+         */
+        put: operations["whitelist_enabled_api_v1_apps__app_id__minecraft_whitelist_enabled_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/minecraft/whitelist/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Whitelist Remove */
+        delete: operations["whitelist_remove_api_v1_apps__app_id__minecraft_whitelist__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{app_id}/removal-plan": {
         parameters: {
             query?: never;
@@ -720,6 +842,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccessOut */
+        AccessOut: {
+            /** Ops */
+            ops: components["schemas"]["OperatorOut"][];
+            /** Running */
+            running: boolean;
+            /** Whitelist */
+            whitelist: string[];
+            /** Whitelist Enabled */
+            whitelist_enabled: boolean;
+        };
         /** AppDetailOut */
         AppDetailOut: {
             console: components["schemas"]["ConsoleInfoOut"];
@@ -733,6 +866,8 @@ export interface components {
             desired_state: components["schemas"]["DesiredState"];
             /** Drift */
             drift: boolean;
+            /** Game */
+            game: string | null;
             /** Icon Url */
             icon_url: string | null;
             /** Id */
@@ -822,6 +957,11 @@ export interface components {
             /** Code */
             code: string;
         };
+        /** CommandOut */
+        CommandOut: {
+            /** Output */
+            output: string;
+        };
         /** ConflictOut */
         ConflictOut: {
             /** Port */
@@ -890,6 +1030,11 @@ export interface components {
          * @enum {string}
          */
         DesiredState: "running" | "stopped";
+        /** EnabledIn */
+        EnabledIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -990,6 +1135,15 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** JobRefOut */
+        JobRefOut: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+        };
         /**
          * JobStatus
          * @enum {string}
@@ -1055,6 +1209,13 @@ export interface components {
          * @enum {string}
          */
         NetworkMode: "none" | "shared" | "isolated" | "custom";
+        /** OperatorOut */
+        OperatorOut: {
+            /** Level */
+            level: number;
+            /** Name */
+            name: string;
+        };
         /** PasswordConfirmIn */
         PasswordConfirmIn: {
             /** Password */
@@ -1089,6 +1250,22 @@ export interface components {
             volumes: string[];
             /** Zone */
             zone: string | null;
+        };
+        /** PlayerIn */
+        PlayerIn: {
+            /** Name */
+            name: string;
+        };
+        /** PlayersOut */
+        PlayersOut: {
+            /** Max */
+            max: number | null;
+            /** Names */
+            names: string[];
+            /** Online */
+            online: number | null;
+            /** Running */
+            running: boolean;
         };
         /** PortOut */
         PortOut: {
@@ -1557,6 +1734,237 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    access_api_v1_apps__app_id__minecraft_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    op_add_api_v1_apps__app_id__minecraft_ops_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlayerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    op_remove_api_v1_apps__app_id__minecraft_ops__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    players_api_v1_apps__app_id__minecraft_players_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayersOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    whitelist_add_api_v1_apps__app_id__minecraft_whitelist_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlayerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    whitelist_enabled_api_v1_apps__app_id__minecraft_whitelist_enabled_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnabledIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRefOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    whitelist_remove_api_v1_apps__app_id__minecraft_whitelist__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommandOut"];
                 };
             };
             /** @description Validation Error */

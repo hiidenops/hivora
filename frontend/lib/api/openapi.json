@@ -1,6 +1,40 @@
 {
   "components": {
     "schemas": {
+      "AccessOut": {
+        "properties": {
+          "ops": {
+            "items": {
+              "$ref": "#/components/schemas/OperatorOut"
+            },
+            "title": "Ops",
+            "type": "array"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "whitelist": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Whitelist",
+            "type": "array"
+          },
+          "whitelist_enabled": {
+            "title": "Whitelist Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "running",
+          "whitelist_enabled",
+          "whitelist",
+          "ops"
+        ],
+        "title": "AccessOut",
+        "type": "object"
+      },
       "AppDetailOut": {
         "properties": {
           "console": {
@@ -24,6 +58,17 @@
           "drift": {
             "title": "Drift",
             "type": "boolean"
+          },
+          "game": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game"
           },
           "icon_url": {
             "anyOf": [
@@ -119,7 +164,8 @@
           "containers",
           "ports",
           "volumes",
-          "console"
+          "console",
+          "game"
         ],
         "title": "AppDetailOut",
         "type": "object"
@@ -329,6 +375,19 @@
         "title": "CodeIn",
         "type": "object"
       },
+      "CommandOut": {
+        "properties": {
+          "output": {
+            "title": "Output",
+            "type": "string"
+          }
+        },
+        "required": [
+          "output"
+        ],
+        "title": "CommandOut",
+        "type": "object"
+      },
       "ConflictOut": {
         "properties": {
           "port": {
@@ -523,6 +582,19 @@
         ],
         "title": "DesiredState",
         "type": "string"
+      },
+      "EnabledIn": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "EnabledIn",
+        "type": "object"
       },
       "HTTPValidationError": {
         "properties": {
@@ -863,6 +935,29 @@
         "title": "JobRef",
         "type": "object"
       },
+      "JobRefOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status"
+        ],
+        "title": "JobRefOut",
+        "type": "object"
+      },
       "JobStatus": {
         "enum": [
           "queued",
@@ -1036,6 +1131,24 @@
         "title": "NetworkMode",
         "type": "string"
       },
+      "OperatorOut": {
+        "properties": {
+          "level": {
+            "title": "Level",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "level"
+        ],
+        "title": "OperatorOut",
+        "type": "object"
+      },
       "PasswordConfirmIn": {
         "properties": {
           "password": {
@@ -1143,6 +1256,65 @@
           "public_ports"
         ],
         "title": "PlanOut",
+        "type": "object"
+      },
+      "PlayerIn": {
+        "properties": {
+          "name": {
+            "maxLength": 16,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PlayerIn",
+        "type": "object"
+      },
+      "PlayersOut": {
+        "properties": {
+          "max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "array"
+          },
+          "online": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Online"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "running",
+          "online",
+          "max",
+          "names"
+        ],
+        "title": "PlayersOut",
         "type": "object"
       },
       "PortOut": {
@@ -2205,6 +2377,349 @@
         "summary": "Get Compose",
         "tags": [
           "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/access": {
+      "get": {
+        "operationId": "access_api_v1_apps__app_id__minecraft_access_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Access",
+        "tags": [
+          "minecraft"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/ops": {
+      "post": {
+        "operationId": "op_add_api_v1_apps__app_id__minecraft_ops_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Op Add",
+        "tags": [
+          "minecraft"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/ops/{name}": {
+      "delete": {
+        "operationId": "op_remove_api_v1_apps__app_id__minecraft_ops__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Op Remove",
+        "tags": [
+          "minecraft"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/players": {
+      "get": {
+        "operationId": "players_api_v1_apps__app_id__minecraft_players_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Players",
+        "tags": [
+          "minecraft"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/whitelist": {
+      "post": {
+        "operationId": "whitelist_add_api_v1_apps__app_id__minecraft_whitelist_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Whitelist Add",
+        "tags": [
+          "minecraft"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/whitelist-enabled": {
+      "put": {
+        "description": "Intent change: new revision, the server restarts.",
+        "operationId": "whitelist_enabled_api_v1_apps__app_id__minecraft_whitelist_enabled_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnabledIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRefOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Whitelist Enabled",
+        "tags": [
+          "minecraft"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/whitelist/{name}": {
+      "delete": {
+        "operationId": "whitelist_remove_api_v1_apps__app_id__minecraft_whitelist__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Whitelist Remove",
+        "tags": [
+          "minecraft"
         ]
       }
     },

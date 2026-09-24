@@ -31,8 +31,9 @@ from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import Purpose, Sealed, SecretBox
+from hivora.docker_gateway import ContainerInfo, ContainerState
 from hivora.jobs import Job, JobKind, JobQueue
-from hivora.state import StateStore
+from hivora.state import StateStore, app_key
 from hivora.system.secrets import SecretSetting, SecretSettings
 from hivora.templates import (
     AppContext,
@@ -48,6 +49,8 @@ from hivora.templates import (
 )
 from hivora.templates.models import TemplateVersion
 from hivora.zones import Zone, get_zone
+
+LABEL_COMPOSE_SERVICE = "com.docker.compose.service"
 
 
 class AppNotFoundError(NotFoundError):
@@ -224,6 +227,23 @@ class AppService:
                 if value:
                     filled[f.id] = value
         return filled
+
+    async def main_container(self, session: AsyncSession, app_id: int) -> tuple[
+        Application, CatalogEntry | None, ContainerInfo | None
+    ]:  # fmt: skip
+        """The app, its template and its running main-service container (if any)."""
+        app = await self.get(session, app_id)
+        template_slug = await session.scalar(
+            select(TemplateVersion.slug).where(TemplateVersion.id == app.template_version_id)
+        )
+        entry = self.catalog.get(template_slug) if template_slug else None
+        main = entry.template.main_service if entry else None
+        running = [
+            c for c in self.state.containers()
+            if app_key(c) == app.slug and c.state is ContainerState.RUNNING
+            and (main is None or c.labels.get(LABEL_COMPOSE_SERVICE) == main)
+        ]  # fmt: skip
+        return app, entry, running[0] if running else None
 
     # --- settings (new revision) --------------------------------------------
     async def current_settings(self, session: AsyncSession, app_id: int) -> AppSettings:

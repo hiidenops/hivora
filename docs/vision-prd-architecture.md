@@ -349,7 +349,7 @@ Le backend est un monolithe modulaire : 16 modules V1 à frontières nettes, dé
 | `updates` | Comparaison des digests distants, planification, rollback | apps, jobs | V2 |
 | `backups` | Sauvegarde de volumes via conteneur éphémère (tar + zstd), base, destinations, restauration | apps, jobs | V2 |
 | `proxy` | Pilotage d'un Caddy managé (routes, certificats) | apps, zones | V2 |
-| `games` | RCON, requête Steam/A2S, joueurs connectés, planning de redémarrage, annonces avant arrêt | apps, docker_gateway | V2 |
+| `games` | Catalogue de modpacks (Modrinth, CurseForge), joueurs connectés, liste blanche et admins Minecraft (V1, avancé) ; requête Steam/A2S, planning de redémarrage, annonces avant arrêt | apps, docker_gateway | V1 (partiel) / V2 |
 | `notify` | Canaux de notification et règles | core | V2 |
 | `agent_hub` | Connexion et routage vers les agents distants | tous | V4 |
 

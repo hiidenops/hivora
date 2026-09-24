@@ -13,6 +13,7 @@ from hivora.auth.api import router as auth_router
 from hivora.auth.users_api import router as users_router
 from hivora.core.config import Settings
 from hivora.core.logging import configure_logging
+from hivora.games.api import minecraft_router
 from hivora.games.api import router as modpacks_router
 from hivora.jobs.api import router as jobs_router
 from hivora.metrics.api import router as metrics_router
@@ -57,6 +58,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
         ("/modpacks", modpacks_router),
     ):  # fmt: skip
         app.include_router(router, prefix=f"{API_PREFIX}{prefix}")
+    app.include_router(minecraft_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(ws_router)
     return app
 
