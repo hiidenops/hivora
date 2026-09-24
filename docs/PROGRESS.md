@@ -1,6 +1,6 @@
 # Hivora — Suivi d'avancement
 
-*Dernière mise à jour : 24 septembre 2026*
+*Dernière mise à jour : 24 septembre 2026 (fin de journée)*
 
 Document de reprise : où en est le projet, ce qui a été décidé, comment relancer l'environnement et ce qui reste à faire. Référence produit : [`vision-prd-architecture.md`](vision-prd-architecture.md).
 
@@ -30,7 +30,7 @@ Tests : 110 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Pla
 
 ## En attente de ton retour
 
-Le serveur de test tourne sur la VM : **http://192.168.70.149:8000** (données dans `~/hivora-dev`, Docker réel), relancé avec le tour 2. À tester :
+Le serveur de test tourne sur la VM : **http://192.168.70.149:8000** (données dans `~/hivora-dev`, Docker réel), relancé avec la partie B de Minecraft. À tester :
 
 1. **Console** : fiche d'une app démarrée → « Ouvrir la console ». Minecraft : onglet « Console serveur » (`rcon-cli`) + guide des commandes repliable ; toute app : onglet « Shell ».
 2. **Activité** : graphiques CPU / RAM / réseau (un point toutes les 10 s), boutons « Vider ».
@@ -59,6 +59,18 @@ Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
 - **Liste blanche et admins** : lus dans `whitelist.json` / `ops.json` du serveur ; ajout/retrait à chaud via `rcon-cli` (pseudos validés `[A-Za-z0-9_]{3,16}`, exec sans shell) ; audit `game.*`.
 - **Activer/désactiver la liste blanche** = intention (réglage `enable_whitelist`, template 1.6.0) : nouvelle révision + redémarrage, car l'image réécrit `white-list` à chaque démarrage. L'interrupteur reflète immédiatement la demande.
 - Vérifié sur un vrai serveur : `Notch` ajouté puis retiré, passé op (UUID Mojang réel), `white-list` à true puis false dans `server.properties`.
+
+## ▶ Reprise : prochaine étape (proposée, en attente de « go »)
+
+Retours du 24/09 sur la fiche d'app et les réglages. Proposition faite, **pas encore validée ni commencée** :
+
+1. **Carte d'état plus esthétique** (haut de la fiche, remplace « État ») : icône, grand badge d'état coloré, « en marche depuis 2 h 14 » (lire `State.StartedAt` du conteneur, à ajouter à `ContainerInfo`) ; pour un serveur de jeu : adresse de connexion + bouton Copier et aperçu « 3 / 10 joueurs » ; résumé type de serveur / version / mémoire / révision ; détail des conteneurs en mode avancé seulement.
+2. **Cartes Joueurs et Liste blanche repliables** : clic sur le titre, animation, état retenu dans le navigateur ; repliée, la carte Joueurs garde le compteur.
+3. **Retirer « Tâches récentes »** de la fiche d'app (l'historique reste dans Activité) ; garder l'affichage de la progression d'une action en cours.
+4. **Listes sélectionnables plutôt que saisie libre** : version de Minecraft = liste des vraies versions (manifeste Mojang récupéré par le backend, en cache ; « Dernière version », « Dernière snapshot », puis releases, snapshots en mode avancé). Mécanisme déclaratif dans le format de template : un champ peut déclarer une source de choix dynamique (comme `from_setting`). Revoir les autres saisies libres.
+5. **Aide pour les « propriétés personnalisées »** : panneau consultable/filtrable des propriétés `server.properties` sans champ dédié (nom, défaut, description FR/EN) ; un clic ajoute `clé=défaut` dans la zone. Mécanisme déclaratif : `suggestions` sur un champ texte du template.
+
+Ensuite : **Minecraft, partie C** (ci-dessous), puis **M6**.
 
 ## Minecraft, partie C (proposée, à valider)
 
