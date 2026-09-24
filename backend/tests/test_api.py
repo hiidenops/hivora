@@ -383,6 +383,50 @@ def test_minecraft_players_whitelist_and_ops(client: TestClient) -> None:
     compose = client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"]
     assert "ENABLE_WHITELIST: 'true'" in compose
 
+    # Worlds: import a .zip, list, download, switch, delete.
+    import io
+    import zipfile
+
+    (data / "world").mkdir()
+    (data / "world" / "level.dat").write_bytes(b"L")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("Skyblock/level.dat", b"S")
+        zf.writestr("Skyblock/region/r.0.0.mca", b"R" * 10)
+    url = f"{API}/apps/{app_id}/minecraft/worlds"
+    job = client.post(url, params={"name": "skyblock", "filename": "Skyblock.zip"},
+                      content=buf.getvalue())  # fmt: skip
+    assert job.status_code == 202 and job.json()["kind"] == "world_import"
+    assert wait_job(client, job.json()["id"])["status"] == "succeeded"
+    assert not list((data.parent).glob(".hivora-upload-*"))  # upload removed
+    listed = client.get(url).json()
+    assert listed["active"] == "world"
+    assert [(x["name"], x["active"]) for x in listed["worlds"]] == [
+        ("world", True), ("skyblock", False),
+    ]  # fmt: skip
+    again = client.post(url, params={"name": "skyblock"}, content=buf.getvalue())
+    assert again.status_code == 409 and code(again) == "world_exists"
+    bad = client.post(url, params={"name": "junk"}, content=b"not a zip")
+    assert wait_job(client, bad.json()["id"])["status"] == "failed"
+    assert not (data / "junk").exists()
+
+    gw.exec_results["rcon-cli save-all flush"] = (0, "Saved the game")
+    got = client.get(f"{url}/world/download")
+    assert got.status_code == 200 and got.headers["content-type"] == "application/zip"
+    assert zipfile.ZipFile(io.BytesIO(got.content)).namelist() == ["world/level.dat"]
+    assert ["rcon-cli", "save-all", "flush"] in gw.exec_calls
+
+    refused = client.delete(f"{url}/world")
+    assert refused.status_code == 409 and code(refused) == "world_active"
+    switched = client.put(f"{url}/active", json={"name": "skyblock"}).json()
+    assert wait_job(client, switched["id"])["status"] == "succeeded"
+    assert "LEVEL: skyblock" in client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"]
+    assert client.get(url).json()["active"] == "skyblock"
+    deleted = client.delete(f"{url}/world").json()
+    assert wait_job(client, deleted["id"])["status"] == "succeeded"
+    assert not (data / "world").exists()
+    assert client.delete(f"{url}/nope").status_code == 404
+
 
 def test_public_address_override(client: TestClient) -> None:
     admin(client)

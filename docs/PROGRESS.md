@@ -21,7 +21,7 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Minecraft A et B | Personnalisation, catalogue de modpacks (Modrinth, CurseForge) | ✅ | voir `git log` |
 | Fiche d'app | Carte d'état, cartes repliables, liste des versions, propriétés suggérées | ✅ | voir `git log` |
 | IP publique et consommation | Adresse publique, cartes repliées, CPU/RAM/réseau par app en direct | ✅ | `19e4aa6` |
-| Minecraft C | Mondes (import, export, changement) | ⏳ à valider | |
+| Minecraft C | Mondes (liste, activer, importer, télécharger, supprimer) | ✅ | voir `git log` |
 | M6 Livraison | Image Docker, HTTPS, script d'installation | ⏳ | |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
@@ -82,11 +82,19 @@ Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
 3. **Consommation en temps réel** par app : CPU (% de la machine), mémoire, réseau entrant/sortant, trois courbes défilantes. `stats` one-shot toutes les 5 s, **seulement tant qu'une fiche est ouverte** (canal WS `app_metrics`, compteur d'observateurs) ; historique de 5 min en mémoire, effacé quand plus personne ne regarde.
 - Vérifié en réel : IP publique détectée ; serveur Minecraft au repos ≈ 0,14 % CPU, 1,3 Go de RAM.
 
-▶ **Prochaine étape** : Minecraft, partie C (mondes), puis M6.
+## Minecraft, partie C : mondes (fait, 24/09)
 
-## Minecraft, partie C (proposée, à valider)
+Carte « Mondes » sur la fiche d'un serveur Minecraft (repliée par défaut) :
+1. **Liste** des mondes (dossiers avec `level.dat` dans le volume `data`) : nom, taille, date, badge « actif ». Les dossiers `<monde>_nether` / `<monde>_the_end` (Paper, Spigot) sont regroupés avec leur monde.
+2. **Activer** : nouveau champ de template `level` (monde actif, variable `LEVEL`) ; activer = nouvelle révision et redémarrage. Template Minecraft passé en 1.8.0 ; la suggestion `level-name` des propriétés personnalisées est retirée (doublon).
+3. **Télécharger** en `.zip`, généré à la volée sans fichier temporaire ; `save-all flush` avant si le monde actif tourne. Téléchargement audité (`game.world_downloaded`).
+4. **Supprimer** (tâche `world_delete`) ; refusé sur le monde actif.
+5. **Importer un `.zip`** (tâche `world_import`) : envoi en flux avec barre de progression, plafonds **10 Go envoyés / 30 Go décompressés / 500 000 fichiers**, vérification de l'espace disque, refus des chemins absolus, `..` et liens symboliques, monde trouvé à la racine ou dans un dossier, extraction dans un dossier caché puis renommage (rien de cassé en cas d'échec). Le fichier envoyé est stocké à côté du volume (`/srv/hivora/<slug>/.hivora-upload-*.zip`) et supprimé après.
+- Migration Alembic `0004` : nouveaux types de tâches.
+- Vérifié en réel : monde de `serveur-test` exporté puis réimporté à l'identique ; `save-all flush` répond.
+- Limite connue : dans un `.zip`, seul le `level.dat` le moins profond est pris ; des dossiers de dimensions Paper zippés à côté sont ignorés.
 
-- **C** : mondes (lister, monde actif, import `.zip` protégé, téléchargement, suppression ; serveur arrêté pour changer).
+▶ **Prochaine étape** : M6 (livraison).
 
 ## Retours traités (tour 4)
 

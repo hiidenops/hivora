@@ -9,13 +9,16 @@ a new revision (the image rewrites `white-list` on every start).
 import asyncio
 import json
 import re
+import secrets
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from hivora.core.errors import ConflictError, HivoraError, ValidationError
 from hivora.docker_gateway import ContainerInfo
-from hivora.jobs import Job
+from hivora.games import worlds as w
+from hivora.jobs import Job, JobKind
 from hivora.runtime import Runtime
 
 PLAYER_NAME = re.compile(r"^[A-Za-z0-9_]{3,16}$")
@@ -143,6 +146,63 @@ class MinecraftTools:
         async with self.rt.sessions() as session:
             settings = await self.rt.apps.current_settings(session, app_id)
         return await self.rt.apps.update(app_id, {**settings.values, "enable_whitelist": enabled})
+
+    # --- worlds -----------------------------------------------------------
+    async def _data(self, app_id: int) -> tuple[str, Path, ContainerInfo | None, str]:
+        slug, data, container = await self._server(app_id)
+        if data is None:
+            raise NotMinecraftError("no /data volume", slug=slug)
+        async with self.rt.sessions() as session:
+            settings = await self.rt.apps.current_settings(session, app_id)
+        return slug, data, container, str(settings.values.get("level") or "world")
+
+    async def worlds(self, app_id: int) -> tuple[str, list[w.World]]:
+        _, data, _, active = await self._data(app_id)
+        return active, await asyncio.to_thread(w.list_worlds, data, active)
+
+    async def _enqueue(self, app_id: int, slug: str, kind: JobKind, **params: str) -> Job:
+        async with self.rt.sessions() as session, session.begin():
+            job = self.rt.jobs.add(session, kind, app_id=app_id, app_slug=slug, params=params)
+        self.rt.jobs.wake()
+        return job
+
+    async def import_world(
+        self, app_id: int, name: str, filename: str, body: AsyncIterator[bytes]
+    ) -> Job:
+        slug, data, _, _ = await self._data(app_id)
+        if (data / w.valid_world_name(name)).exists():
+            raise w.WorldExistsError(f"a world named {name!r} already exists", name=name)
+        # Next to the data volume (same filesystem, not visible to the server).
+        upload = self.rt.apps.volumes_dir(slug) / f".hivora-upload-{secrets.token_hex(8)}.zip"
+        await w.receive_upload(body, upload)
+        return await self._enqueue(
+            app_id, slug, JobKind.WORLD_IMPORT,
+            name=name, data=str(data), upload=str(upload), filename=filename[:100],
+        )  # fmt: skip
+
+    async def activate_world(self, app_id: int, name: str) -> Job:
+        _, data, _, active = await self._data(app_id)
+        w.existing_world(data, name)
+        if name == active:
+            raise w.ActiveWorldError("this world is already active", name=name)
+        async with self.rt.sessions() as session:
+            settings = await self.rt.apps.current_settings(session, app_id)
+        return await self.rt.apps.update(app_id, {**settings.values, "level": name})
+
+    async def delete_world(self, app_id: int, name: str) -> Job:
+        slug, data, _, active = await self._data(app_id)
+        w.existing_world(data, name)
+        if name == active:
+            raise w.ActiveWorldError("the active world cannot be deleted", name=name)
+        return await self._enqueue(app_id, slug, JobKind.WORLD_DELETE, name=name, data=str(data))
+
+    async def download_world(self, app_id: int, name: str) -> AsyncIterator[bytes]:
+        slug, data, container, active = await self._data(app_id)
+        w.existing_world(data, name)
+        if container is not None and name == active:
+            await self._rcon(container, "save-all", "flush")  # consistent files on disk
+        self.rt.bus.publish("game.world_downloaded", app=slug, target=name)
+        return w.zip_stream(w.world_dirs(data, name), data)
 
 
 MOJANG_MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"

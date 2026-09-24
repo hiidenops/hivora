@@ -20,6 +20,7 @@ from hivora.db.engine import make_engine, make_sessionmaker
 from hivora.db.migrate import upgrade_to_head
 from hivora.docker_gateway import DockerGateway
 from hivora.games.modpacks import ModpackCatalog
+from hivora.games.worlds import WorldJobs
 from hivora.jobs import JobQueue
 from hivora.metrics.apps import AppMetrics
 from hivora.metrics.host import HostMetrics
@@ -110,6 +111,7 @@ class Runtime:
             public_address=public_address.current,
         )
         AppJobHandlers(apps).register()
+        WorldJobs(apps).register()
         auth = AuthService(settings=settings, sessions=sessions, box=box, bus=bus, clock=clock)
         audit = AuditRecorder(sessions, bus)
         icons = IconCache(settings.data_dir / "icons")

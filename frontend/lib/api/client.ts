@@ -26,6 +26,7 @@ export type Modpack = Schemas["ModpackOut"];
 export type Integrations = Schemas["IntegrationsOut"];
 export type Players = Schemas["PlayersOut"];
 export type GameAccess = Schemas["AccessOut"];
+export type Worlds = Schemas["WorldsOut"];
 
 /** Error returned by the backend: `code` is stable and translated by the UI. */
 export class ApiError extends Error {
@@ -66,4 +67,32 @@ export async function api<T>(
     throw new ApiError(res.status, err.code ?? "http_error", err.message ?? res.statusText, err.details);
   }
   return data as T;
+}
+
+/** Sends a file as the raw request body; XHR because fetch reports no upload progress. */
+export function upload<T>(
+  path: string,
+  file: Blob,
+  { query, onProgress }: { query?: Record<string, string>; onProgress?: (fraction: number) => void } = {},
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/v1${path}${query ? `?${new URLSearchParams(query)}` : ""}`);
+    xhr.setRequestHeader("Content-Type", "application/zip");
+    if (csrfToken) xhr.setRequestHeader("X-CSRF-Token", csrfToken);
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total);
+    xhr.onerror = () => reject(new ApiError(0, "http_error", "network error"));
+    xhr.onload = () => {
+      let data: { error?: { code?: string; message?: string; details?: Record<string, unknown> } } | null = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        /* non-JSON answer */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as T);
+      const err = data?.error ?? {};
+      reject(new ApiError(xhr.status, err.code ?? "http_error", err.message ?? xhr.statusText, err.details));
+    };
+    xhr.send(file);
+  });
 }

@@ -14,6 +14,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api, type GameAccess, type JobRef, type Players } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
+import { WorldsCard } from "./worlds-card";
+
 const NAME = "[A-Za-z0-9_]{3,16}";
 
 /** Players online, polled every 15 s while the server runs (shared cache key). */
@@ -244,6 +246,7 @@ export function MinecraftPanel({
     <>
       <PlayersCard appId={appId} running={running} />
       <AccessCard appId={appId} onJob={onJob} />
+      <WorldsCard appId={appId} onJob={onJob} />
     </>
   );
 }

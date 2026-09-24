@@ -19,8 +19,7 @@ export function AppUsage({ slug }: { slug: string }) {
   const rx = samples.map((s) => s.net_rx_bps);
   const tx = samples.map((s) => s.net_tx_bps);
   // An app rarely uses the whole machine: scale to its own peak so the line reads.
-  const mb = (bytes: number) => `${u.num(bytes / 1024 ** 2, 0)} ${lang === "fr" ? "Mo" : "MB"}`;
-  const size = (bytes: number) => (bytes >= 1024 ** 3 ? u.gb(bytes) : mb(bytes));
+  const size = u.size;
 
   return (
     <section className="grid gap-3 lg:col-span-2" aria-label={t("usage.title")}>

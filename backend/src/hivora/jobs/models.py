@@ -22,6 +22,8 @@ class JobKind(StrEnum):
     ADOPT = "adopt"
     CONVERT = "convert"
     MOVE_ZONE = "move_zone"
+    WORLD_IMPORT = "world_import"
+    WORLD_DELETE = "world_delete"
 
 
 class JobStatus(StrEnum):

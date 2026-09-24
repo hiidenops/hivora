@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.7.0
+  version: 1.8.0
   category: games
   tags: [minecraft, java, sandbox]
   icon:
@@ -176,6 +176,14 @@ form:
       label: { fr: Graine du monde (nouveau monde), en: World seed (new world) }
       type: string
       pattern: "-?[0-9A-Za-z_ ]{0,64}"
+    - id: level
+      label: { fr: Monde actif (dossier), en: Active world (folder) }
+      type: string
+      default: world
+      pattern: "[A-Za-z0-9][A-Za-z0-9_-]{0,47}"
+      help:
+        fr: "Dossier du monde chargé au démarrage ; un nom nouveau crée un monde. Se gère aussi depuis la carte Mondes."
+        en: "World folder loaded on start; a new name creates a world. Also managed from the Worlds card."
     - id: online_mode
       label: { fr: Vérifier les comptes Mojang (online-mode), en: Verify Mojang accounts (online-mode) }
       type: boolean
@@ -195,7 +203,6 @@ form:
         fr: "Une propriété par ligne, ex. « white-list=true ». Appliquées à chaque démarrage, après les réglages ci-dessus."
         en: "One property per line, e.g. \"white-list=true\". Applied on every start, after the settings above."
       suggestions:
-        - { value: "level-name=world", description: { fr: "Dossier du monde utilisé (changer pour en créer/charger un autre)", en: "World folder in use (change to create/load another)" } }
         - { value: "force-gamemode=false", description: { fr: "Forcer le mode de jeu par défaut à chaque connexion", en: "Force the default game mode on every join" } }
         - { value: "generate-structures=true", description: { fr: "Générer villages, temples, etc. (nouveau terrain)", en: "Generate villages, temples, etc. (new terrain)" } }
         - { value: "spawn-npcs=true", description: { fr: "Faire apparaître les villageois", en: "Spawn villagers" } }
@@ -259,6 +266,7 @@ services:
       MAX_WORLD_SIZE: "{{ form.max_world_size }}"
       LEVEL_TYPE: "{{ form.level_type }}"
       SEED: "{{ form.seed }}"
+      LEVEL: "{{ form.level }}"
       CUSTOM_SERVER_PROPERTIES: "{{ form.custom_properties }}"
       ENABLE_RCON: "TRUE"
       RCON_PASSWORD: "{{ secret.rcon_password }}"

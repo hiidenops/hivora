@@ -46,7 +46,9 @@ export function units(lang: string) {
     new Date(ts * 1000).toLocaleTimeString(lang, {
       hour: "2-digit", minute: "2-digit", ...(seconds ? { second: "2-digit" } : {}),
     });  // prettier-ignore
-  return { num, gb, rate, time, clock };
+  const size = (bytes: number) =>
+    bytes >= 1024 ** 3 ? gb(bytes) : `${num(bytes / 1024 ** 2, 0)} ${lang === "fr" ? "Mo" : "MB"}`;
+  return { num, gb, size, rate, time, clock };
 }
 
 /**

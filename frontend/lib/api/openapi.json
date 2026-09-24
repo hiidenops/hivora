@@ -866,7 +866,9 @@
           "rollback",
           "adopt",
           "convert",
-          "move_zone"
+          "move_zone",
+          "world_import",
+          "world_delete"
         ],
         "title": "JobKind",
         "type": "string"
@@ -2211,6 +2213,69 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "WorldIn": {
+        "properties": {
+          "name": {
+            "maxLength": 48,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "WorldIn",
+        "type": "object"
+      },
+      "WorldOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "modified": {
+            "title": "Modified",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "size",
+          "modified",
+          "active"
+        ],
+        "title": "WorldOut",
+        "type": "object"
+      },
+      "WorldsOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "string"
+          },
+          "worlds": {
+            "items": {
+              "$ref": "#/components/schemas/WorldOut"
+            },
+            "title": "Worlds",
+            "type": "array"
+          }
+        },
+        "required": [
+          "active",
+          "worlds"
+        ],
+        "title": "WorldsOut",
+        "type": "object"
+      },
       "ZoneOut": {
         "properties": {
           "color": {
@@ -2851,6 +2916,263 @@
           }
         },
         "summary": "Whitelist Remove",
+        "tags": [
+          "minecraft"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/worlds": {
+      "get": {
+        "operationId": "worlds_api_v1_apps__app_id__minecraft_worlds_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorldsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Worlds",
+        "tags": [
+          "minecraft"
+        ]
+      },
+      "post": {
+        "description": "Raw .zip body (streamed to disk, 10 GB max); extraction runs as a job.",
+        "operationId": "world_import_api_v1_apps__app_id__minecraft_worlds_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "maxLength": 48,
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filename",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRefOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "World Import",
+        "tags": [
+          "minecraft"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/worlds/active": {
+      "put": {
+        "description": "Intent change: new revision, the server restarts on that world.",
+        "operationId": "world_activate_api_v1_apps__app_id__minecraft_worlds_active_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorldIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRefOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "World Activate",
+        "tags": [
+          "minecraft"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/worlds/{name}": {
+      "delete": {
+        "operationId": "world_delete_api_v1_apps__app_id__minecraft_worlds__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRefOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "World Delete",
+        "tags": [
+          "minecraft"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/minecraft/worlds/{name}/download": {
+      "get": {
+        "operationId": "world_download_api_v1_apps__app_id__minecraft_worlds__name__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "World Download",
         "tags": [
           "minecraft"
         ]
