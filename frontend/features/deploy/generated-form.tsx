@@ -52,12 +52,14 @@ export function GeneratedForm({
   errors,
   onChange,
   appName = "",
+  secretsSet = [],
 }: {
   fields: FieldDef[];
   values: Values;
   errors: Record<string, string>;
   onChange: (id: string, value: unknown) => void;
   appName?: string;
+  secretsSet?: string[]; // editing: these secrets already have a value
 }) {
   const { t, l } = useI18n();
   const visible = fields.filter((f) => !f.showIf || Object.entries(f.showIf).every(([k, v]) => values[k] === v));
@@ -109,6 +111,19 @@ export function GeneratedForm({
               ))}
             </Select>
           );
+        } else if (f.type === "text") {
+          control = (
+            <textarea
+              id={id}
+              rows={5}
+              className="w-full rounded-md border border-input bg-card px-3 py-2 font-mono text-xs shadow-xs outline-none focus-visible:border-ring aria-invalid:border-danger"
+              value={values[f.id] === undefined ? "" : String(values[f.id])}
+              placeholder={hint}
+              onChange={(e) => onChange(f.id, e.target.value === "" ? undefined : e.target.value)}
+              aria-invalid={!!error}
+              aria-describedby={describe}
+            />
+          );
         } else {
           const numeric = ["integer", "number", "port"].includes(f.type);
           control = (
@@ -117,7 +132,13 @@ export function GeneratedForm({
               type={INPUT_TYPE[f.type] ?? "text"}
               className={MONO.has(f.type) ? "font-mono" : undefined}
               value={values[f.id] === undefined ? "" : String(values[f.id])}
-              placeholder={f.type === "secret" && f.generate ? t("deploy.secretGenerated") : hint}
+              placeholder={
+                f.type === "secret" && secretsSet.includes(f.id)
+                  ? t("edit.secretKept")
+                  : f.type === "secret" && f.generate
+                    ? t("deploy.secretGenerated")
+                    : hint
+              }
               min={f.range?.[0] ?? (f.type === "port" ? 1 : undefined)}
               max={f.range?.[1] ?? (f.type === "port" ? 65535 : undefined)}
               autoComplete={f.type === "secret" ? "new-password" : "off"}
@@ -136,7 +157,9 @@ export function GeneratedForm({
             {f.type !== "boolean" && (
               <Label htmlFor={id}>
                 {l(f.label)}
-                {f.required && <span className="text-danger"> *</span>}
+                {f.required && !(f.type === "secret" && secretsSet.includes(f.id)) && (
+                  <span className="text-danger"> *</span>
+                )}
               </Label>
             )}
             {control}

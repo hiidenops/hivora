@@ -163,7 +163,7 @@ def test_deploy_flow_websocket_and_audit(client: TestClient) -> None:
 
     body = {"template": "vaultwarden", "name": "Coffre", "inputs": {"web_port": 8090}}
     plan = client.post(f"{API}/apps/plan", json=body).json()
-    assert plan["slug"] == "coffre" and "${HV_SECRET_ADMIN_TOKEN}" in plan["compose_yaml"]
+    assert plan["slug"] == "coffre" and "${HV_SECRET_ADMIN_TOKEN:-}" in plan["compose_yaml"]
     invalid = client.post(f"{API}/apps/plan", json={**body, "inputs": {"web_port": 0}})
     assert invalid.status_code == 422 and invalid.json()["error"]["details"]["fields"] == {
         "web_port": "out_of_range"

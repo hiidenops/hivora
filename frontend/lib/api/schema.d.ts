@@ -131,6 +131,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/{app_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings_api_v1_apps__app_id__settings_get"];
+        /**
+         * Update Settings
+         * @description New revision from these inputs, applied by a job (secrets left empty are kept).
+         */
+        put: operations["update_settings_api_v1_apps__app_id__settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/settings/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Plan Settings
+         * @description Preview: new compose and its diff against the current revision. Nothing is written.
+         */
+        post: operations["plan_settings_api_v1_apps__app_id__settings_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{app_id}/start": {
         parameters: {
             query?: never;
@@ -1030,6 +1071,33 @@ export interface components {
             /** User Agent */
             user_agent: string | null;
         };
+        /** SettingsIn */
+        SettingsIn: {
+            /**
+             * Inputs
+             * @default {}
+             */
+            inputs: {
+                [key: string]: unknown;
+            };
+        };
+        /** SettingsOut */
+        SettingsOut: {
+            /** Form */
+            form: {
+                [key: string]: unknown;
+            };
+            /** Secrets Set */
+            secrets_set: string[];
+            /** Template */
+            template: string;
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
+            /** Version */
+            version: string;
+        };
         /** SystemInfo */
         SystemInfo: {
             /** Arch */
@@ -1110,6 +1178,33 @@ export interface components {
             secret: string;
             /** Uri */
             uri: string;
+        };
+        /** UpdatePlanOut */
+        UpdatePlanOut: {
+            /** Access */
+            access: {
+                [key: string]: string;
+            };
+            /** Compose Yaml */
+            compose_yaml: string;
+            /** Conflicts */
+            conflicts: components["schemas"]["ConflictOut"][];
+            /** Diff */
+            diff: string;
+            /** Name */
+            name: string;
+            /** Ports */
+            ports: components["schemas"]["PortOut"][];
+            /** Public Ports */
+            public_ports: number[];
+            /** Revision */
+            revision: number;
+            /** Slug */
+            slug: string;
+            /** Volumes */
+            volumes: string[];
+            /** Zone */
+            zone: string | null;
         };
         /** UserCreateIn */
         UserCreateIn: {
@@ -1450,6 +1545,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevisionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_api_v1_apps__app_id__settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_settings_api_v1_apps__app_id__settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_settings_api_v1_apps__app_id__settings_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatePlanOut"];
                 };
             };
             /** @description Validation Error */

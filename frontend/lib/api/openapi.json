@@ -1280,6 +1280,56 @@
         "title": "SessionOut",
         "type": "object"
       },
+      "SettingsIn": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Inputs",
+            "type": "object"
+          }
+        },
+        "title": "SettingsIn",
+        "type": "object"
+      },
+      "SettingsOut": {
+        "properties": {
+          "form": {
+            "additionalProperties": true,
+            "title": "Form",
+            "type": "object"
+          },
+          "secrets_set": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Secrets Set",
+            "type": "array"
+          },
+          "template": {
+            "title": "Template",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": true,
+            "title": "Values",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "template",
+          "version",
+          "form",
+          "values",
+          "secrets_set"
+        ],
+        "title": "SettingsOut",
+        "type": "object"
+      },
       "SystemInfo": {
         "properties": {
           "arch": {
@@ -1526,6 +1576,91 @@
           "uri"
         ],
         "title": "TotpEnrollOut",
+        "type": "object"
+      },
+      "UpdatePlanOut": {
+        "properties": {
+          "access": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Access",
+            "type": "object"
+          },
+          "compose_yaml": {
+            "title": "Compose Yaml",
+            "type": "string"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/ConflictOut"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "diff": {
+            "title": "Diff",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ports": {
+            "items": {
+              "$ref": "#/components/schemas/PortOut"
+            },
+            "title": "Ports",
+            "type": "array"
+          },
+          "public_ports": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Public Ports",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "volumes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Volumes",
+            "type": "array"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "zone",
+          "compose_yaml",
+          "ports",
+          "volumes",
+          "conflicts",
+          "access",
+          "public_ports",
+          "revision",
+          "diff"
+        ],
+        "title": "UpdatePlanOut",
         "type": "object"
       },
       "UserCreateIn": {
@@ -2103,6 +2238,152 @@
           }
         },
         "summary": "List Revisions",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/settings": {
+      "get": {
+        "operationId": "get_settings_api_v1_apps__app_id__settings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "apps"
+        ]
+      },
+      "put": {
+        "description": "New revision from these inputs, applied by a job (secrets left empty are kept).",
+        "operationId": "update_settings_api_v1_apps__app_id__settings_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Settings",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/settings/plan": {
+      "post": {
+        "description": "Preview: new compose and its diff against the current revision. Nothing is written.",
+        "operationId": "plan_settings_api_v1_apps__app_id__settings_plan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Settings",
         "tags": [
           "apps"
         ]

@@ -542,7 +542,7 @@ defaults:
 
 ### Expressions autorisées
 
-Substitutions uniquement : `form.*`, `secret.*`, `app.*` (slug, nom, zone), `host.*` (ip publique, ip LAN, fuseau, PUID/PGID), `service.<nom>.host` (nom DNS interne). Filtres limités : `default`, `lower`, `upper`, `quote`. Pas de boucles ni de conditions dans les services : un template qui en aurait besoin doit être découpé.
+Une variable d'environnement dont la valeur rendue est vide n'est pas définie (champs optionnels). Substitutions uniquement : `form.*`, `secret.*`, `app.*` (slug, nom, zone), `host.*` (ip publique, ip LAN, fuseau, PUID/PGID), `service.<nom>.host` (nom DNS interne). Filtres limités : `default`, `lower`, `upper`, `quote`. Pas de boucles ni de conditions dans les services : un template qui en aurait besoin doit être découpé.
 
 ### Versionnement
 

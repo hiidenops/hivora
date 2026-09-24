@@ -36,7 +36,7 @@ CTX: dict[str, Any] = {
         ('{{ host.lan_ip | default("localhost") }}', "localhost"),
         ("{{ form.empty | default(42) }}", 42),
         ("{{ form.name | quote }}", '"Léa"'),
-        ("{{ secret.admin_password }}", "${HV_SECRET_ADMIN_PASSWORD}"),
+        ("{{ secret.admin_password }}", "${HV_SECRET_ADMIN_PASSWORD:-}"),
         ("{{ form.missing }}", None),
     ],
 )
@@ -146,7 +146,7 @@ def test_compile_minecraft(catalog: Catalog) -> None:
     assert compiled.compose["name"] == "cube"
     assert svc["environment"]["EULA"] == "TRUE"
     assert svc["environment"]["MOTD"] == "Cost $$5"
-    assert svc["environment"]["RCON_PASSWORD"] == "${HV_SECRET_RCON_PASSWORD}"
+    assert svc["environment"]["RCON_PASSWORD"] == "${HV_SECRET_RCON_PASSWORD:-}"
     assert svc["ports"] == [{"target": 25565, "published": "25565", "protocol": "tcp"}]
     assert svc["expose"] == ["25575/tcp"]
     assert svc["volumes"] == [
@@ -184,3 +184,13 @@ def test_lan_exposure_binds_lan_ip_and_vpn_requires_interface(catalog: Catalog) 
     vpn.services["server"].ports[0].__dict__["exposure"] = "vpn"
     with pytest.raises(ValidationError):
         compile_template(vpn, app, HostInfo(), form, Path("/srv"))
+
+
+def test_empty_env_values_are_not_set(catalog: Catalog) -> None:
+    template = catalog.get("minecraft").template
+    form = validate_inputs(template, {"eula": True}, {"app": {"name": "C"}})
+    env = compile_template(template, AppContext(slug="c", name="C", revision=1), HostInfo(), form,
+                           Path("/srv")).compose["services"]["server"]["environment"]  # fmt: skip
+    assert "CUSTOM_SERVER_PROPERTIES" not in env and "SEED" not in env and "CF_SLUG" not in env
+    assert env["TYPE"] == "VANILLA"
+    assert "None" not in env.values()

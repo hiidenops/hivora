@@ -20,6 +20,8 @@ export type Revision = Schemas["RevisionOut"];
 export type RemovalPlan = Schemas["RemovalPlanOut"];
 export type SessionInfo = Schemas["SessionOut"];
 export type HostSample = Schemas["HostSampleOut"];
+export type AppSettings = Schemas["SettingsOut"];
+export type UpdatePlan = Schemas["UpdatePlanOut"];
 
 /** Error returned by the backend: `code` is stable and translated by the UI. */
 export class ApiError extends Error {

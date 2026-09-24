@@ -23,7 +23,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await expect(page.getByRole("heading", { name: "Déployer Vaultwarden" })).toBeVisible();
   await page.getByRole("button", { name: "Vérifier" }).click();
   await expect(page.getByText("Fichier compose généré")).toBeVisible();
-  await expect(page.locator("pre").first()).toContainText("${HV_SECRET_ADMIN_TOKEN}");
+  await expect(page.locator("pre").first()).toContainText("${HV_SECRET_ADMIN_TOKEN:-}");
   await page.getByRole("button", { name: "Déployer", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Application en ligne" })).toBeVisible({ timeout: 20_000 });
 

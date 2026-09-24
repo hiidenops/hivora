@@ -8,8 +8,9 @@ Grammar (deliberately tiny, no logic):
     literal := "..." | '...' | number | true | false
 
 Namespaces: form, secret, app, host, service. Secrets are never rendered as
-values: they become ``${HV_SECRET_<KEY>}`` references resolved by Compose
-from the app's ``.env`` file.
+values: they become ``${HV_SECRET_<KEY>:-}`` references resolved by Compose
+from the app's ``.env`` file (empty when a secret is unset, e.g. an optional
+API key, without a "variable is not set" warning).
 """
 
 import json
@@ -122,7 +123,7 @@ def _lookup(context: Mapping[str, Any], path: tuple[str, ...]) -> Any:
 
 def evaluate(expr: Expression, context: Mapping[str, Any]) -> Any:
     if expr.namespace == "secret":
-        return "${" + secret_env_name(expr.path[1]) + "}"
+        return "${" + secret_env_name(expr.path[1]) + ":-}"
     value = _lookup(context, expr.path)
     for f in expr.filters:
         value = _apply(value, f)

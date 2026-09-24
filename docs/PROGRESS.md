@@ -20,6 +20,8 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Retours tests #2 | Interrupteurs, fond en grille, graphiques système, vider l'historique, console | ✅ | voir `git log` |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
+| Minecraft, partie A | Horodatage des graphiques, « Modifier les réglages » (révisions), types de serveur et modpacks, propriétés | ✅ | voir `git log` |
+| Minecraft, parties B et C | Joueurs, liste blanche, admins ; gestion des mondes | ⏳ proposé | — |
 | M6 Livraison | Image Docker, HTTPS, script d'installation, budgets CI, 3 templates | ⏳ à lancer | — |
 
 Tests : 110 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Playwright, contrôle du budget bundle. Tout passe.
@@ -33,6 +35,19 @@ Le serveur de test tourne sur la VM : **http://192.168.70.149:8000** (données d
 3. Interrupteurs dorés, fond en grille, alignements pendant un déploiement (bureau et mobile).
 
 Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
+
+## Minecraft, partie A (fait)
+
+- **Graphiques** : repère horaire chaque minute, heure à la seconde dans l'infobulle.
+- **Modifier les réglages** (toutes les apps) : formulaire pré-rempli → diff du compose → nouvelle révision appliquée par une tâche. Secrets laissés vides = conservés.
+- **Minecraft 1.4.0** : type de serveur (Vanilla, Paper, Fabric, Forge, modpack CurseForge, modpack Modrinth), PvP, hardcore, Nether, vol, monstres, animaux, blocs de commande, distances, protection du spawn, taille du monde, type de monde, graine, propriétés personnalisées (`CUSTOM_SERVER_PROPERTIES`).
+- **CurseForge** : la clé API n'est demandée que pour un modpack CurseForge, stockée chiffrée par app. Modrinth n'en demande pas.
+- **Corrigé grâce au test réel** : un champ optionnel vide devenait le texte « None » dans l'environnement (Minecraft refusait de démarrer). Désormais une variable vide n'est pas définie.
+
+## Minecraft, parties B et C (proposées, à valider)
+
+- **B** : panneau Joueurs (connectés, via `rcon-cli`), liste blanche on/off + ajout/retrait, admins (op/deop). Module `games` (prévu en V2 dans le document, avancé).
+- **C** : mondes (lister, monde actif, import `.zip` protégé, téléchargement, suppression ; serveur arrêté pour changer).
 
 ## Retours traités (tour 4)
 

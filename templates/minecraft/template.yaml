@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.3.0
+  version: 1.4.0
   category: games
   tags: [minecraft, java, sandbox]
   icon:
@@ -55,6 +55,42 @@ form:
         - { value: survival, label: { fr: Survie, en: Survival } }
         - { value: creative, label: { fr: Créatif, en: Creative } }
         - { value: adventure, label: { fr: Aventure, en: Adventure } }
+    - id: server_type
+      label: { fr: Type de serveur, en: Server type }
+      type: select
+      default: VANILLA
+      options:
+        - { value: VANILLA, label: Vanilla }
+        - { value: PAPER, label: { fr: "Paper (plugins)", en: "Paper (plugins)" } }
+        - { value: FABRIC, label: { fr: "Fabric (mods)", en: "Fabric (mods)" } }
+        - { value: FORGE, label: { fr: "Forge (mods)", en: "Forge (mods)" } }
+        - { value: AUTO_CURSEFORGE, label: { fr: Modpack CurseForge, en: CurseForge modpack } }
+        - { value: MODRINTH, label: { fr: Modpack Modrinth, en: Modrinth modpack } }
+    - id: cf_modpack
+      label: { fr: Modpack CurseForge (nom dans l'URL), en: CurseForge modpack (name in the URL) }
+      type: string
+      required: true
+      showIf: { server_type: AUTO_CURSEFORGE }
+      pattern: "[a-z0-9-]+"
+      help:
+        fr: "Ex. all-the-mods-9 pour curseforge.com/minecraft/modpacks/all-the-mods-9. Prévoyez 6 Go de mémoire ou plus."
+        en: "E.g. all-the-mods-9 for curseforge.com/minecraft/modpacks/all-the-mods-9. Allow 6 GB of memory or more."
+    - id: cf_api_key
+      label: { fr: Clé API CurseForge, en: CurseForge API key }
+      type: secret
+      required: true
+      showIf: { server_type: AUTO_CURSEFORGE }
+      help:
+        fr: Exigée par CurseForge pour télécharger les modpacks. Gratuite sur console.curseforge.com.
+        en: Required by CurseForge to download modpacks. Free at console.curseforge.com.
+    - id: modrinth_modpack
+      label: { fr: Modpack Modrinth (nom ou URL), en: Modrinth modpack (name or URL) }
+      type: string
+      required: true
+      showIf: { server_type: MODRINTH }
+      help:
+        fr: "Ex. cobblemon-fabric ou https://modrinth.com/modpack/cobblemon-fabric. Aucune clé nécessaire."
+        en: "E.g. cobblemon-fabric or https://modrinth.com/modpack/cobblemon-fabric. No key needed."
   advanced:
     - id: version
       label: { fr: Version de Minecraft, en: Minecraft version }
@@ -71,6 +107,69 @@ form:
         - { value: 4G, label: { fr: 4 Go, en: 4 GB } }
         - { value: 6G, label: { fr: 6 Go, en: 6 GB } }
         - { value: 8G, label: { fr: 8 Go, en: 8 GB } }
+        - { value: 12G, label: { fr: 12 Go, en: 12 GB } }
+        - { value: 16G, label: { fr: 16 Go, en: 16 GB } }
+    - id: pvp
+      label: { fr: Combat entre joueurs (PvP), en: Player versus player (PvP) }
+      type: boolean
+      default: true
+    - id: hardcore
+      label: { fr: Mode hardcore, en: Hardcore mode }
+      type: boolean
+      default: false
+    - id: allow_nether
+      label: { fr: Autoriser le Nether, en: Allow the Nether }
+      type: boolean
+      default: true
+    - id: allow_flight
+      label: { fr: Autoriser le vol (mods), en: Allow flight (mods) }
+      type: boolean
+      default: false
+    - id: spawn_monsters
+      label: { fr: Apparition des monstres, en: Spawn monsters }
+      type: boolean
+      default: true
+    - id: spawn_animals
+      label: { fr: Apparition des animaux, en: Spawn animals }
+      type: boolean
+      default: true
+    - id: enable_command_block
+      label: { fr: Blocs de commande, en: Command blocks }
+      type: boolean
+      default: false
+    - id: view_distance
+      label: { fr: Distance de vue (chunks), en: View distance (chunks) }
+      type: integer
+      default: 10
+      range: [3, 32]
+    - id: simulation_distance
+      label: { fr: Distance de simulation (chunks), en: Simulation distance (chunks) }
+      type: integer
+      default: 10
+      range: [3, 32]
+    - id: spawn_protection
+      label: { fr: Protection du spawn (blocs), en: Spawn protection (blocks) }
+      type: integer
+      default: 16
+      range: [0, 256]
+    - id: max_world_size
+      label: { fr: Taille max du monde (rayon en blocs), en: Max world size (radius in blocks) }
+      type: integer
+      default: 29999984
+      range: [1000, 29999984]
+    - id: level_type
+      label: { fr: Type de monde (nouveau monde), en: World type (new world) }
+      type: select
+      default: minecraft:normal
+      options:
+        - { value: "minecraft:normal", label: { fr: Normal, en: Normal } }
+        - { value: "minecraft:flat", label: { fr: Plat, en: Flat } }
+        - { value: "minecraft:large_biomes", label: { fr: Grands biomes, en: Large biomes } }
+        - { value: "minecraft:amplified", label: { fr: Amplifié, en: Amplified } }
+    - id: seed
+      label: { fr: Graine du monde (nouveau monde), en: World seed (new world) }
+      type: string
+      pattern: "-?[0-9A-Za-z_ ]{0,64}"
     - id: online_mode
       label: { fr: Vérifier les comptes Mojang (online-mode), en: Verify Mojang accounts (online-mode) }
       type: boolean
@@ -83,6 +182,12 @@ form:
       label: { fr: Mot de passe RCON, en: RCON password }
       type: secret
       generate: { length: 24 }
+    - id: custom_properties
+      label: { fr: Propriétés personnalisées (server.properties), en: Custom properties (server.properties) }
+      type: text
+      help:
+        fr: "Une propriété par ligne, ex. « white-list=true ». Appliquées à chaque démarrage, après les réglages ci-dessus."
+        en: "One property per line, e.g. \"white-list=true\". Applied on every start, after the settings above."
 services:
   server:
     role: main
@@ -98,6 +203,24 @@ services:
       VERSION: "{{ form.version }}"
       MEMORY: "{{ form.memory }}"
       ONLINE_MODE: "{{ form.online_mode | upper }}"
+      TYPE: "{{ form.server_type }}"
+      CF_SLUG: "{{ form.cf_modpack }}"
+      CF_API_KEY: "{{ secret.cf_api_key }}"
+      MODRINTH_MODPACK: "{{ form.modrinth_modpack }}"
+      PVP: "{{ form.pvp }}"
+      HARDCORE: "{{ form.hardcore }}"
+      ALLOW_NETHER: "{{ form.allow_nether }}"
+      ALLOW_FLIGHT: "{{ form.allow_flight }}"
+      SPAWN_MONSTERS: "{{ form.spawn_monsters }}"
+      SPAWN_ANIMALS: "{{ form.spawn_animals }}"
+      ENABLE_COMMAND_BLOCK: "{{ form.enable_command_block }}"
+      VIEW_DISTANCE: "{{ form.view_distance }}"
+      SIMULATION_DISTANCE: "{{ form.simulation_distance }}"
+      SPAWN_PROTECTION: "{{ form.spawn_protection }}"
+      MAX_WORLD_SIZE: "{{ form.max_world_size }}"
+      LEVEL_TYPE: "{{ form.level_type }}"
+      SEED: "{{ form.seed }}"
+      CUSTOM_SERVER_PROPERTIES: "{{ form.custom_properties }}"
       ENABLE_RCON: "TRUE"
       RCON_PASSWORD: "{{ secret.rcon_password }}"
       TZ: "{{ host.timezone }}"

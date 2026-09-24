@@ -103,6 +103,10 @@ def _render_str(value: Any, ctx: dict[str, Any]) -> str:
     if not isinstance(value, str):
         return str(value)
     out = render(value, ctx, escape=escape_compose)
+    if out is None:  # unset optional field: empty, never the text "None"
+        return ""
+    if isinstance(out, bool):
+        return "true" if out else "false"
     return out if isinstance(out, str) else str(out)
 
 
@@ -168,8 +172,11 @@ def compile_template(
             )
         if spec.user:
             svc["user"] = _render_str(spec.user, ctx)
-        if spec.env:
-            svc["environment"] = {k: _render_str(v, ctx) for k, v in spec.env.items()}
+        # An empty value means "not set": optional fields (seed, modpack, custom
+        # properties) must not reach images that reject empty variables.
+        env = {k: _render_str(v, ctx) for k, v in spec.env.items()}
+        if env := {k: v for k, v in env.items() if v != ""}:
+            svc["environment"] = env
         published = [p for p in ports if p.host_port is not None]
         if published:
             svc["ports"] = [

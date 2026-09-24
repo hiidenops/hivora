@@ -1,12 +1,13 @@
 """Application commands. Every mutation is recorded as intent, then run as a job."""
 
+import difflib
 import re
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.models import (
@@ -80,6 +81,21 @@ class DeployPlan:
     compiled: CompiledApp
     form: FormValues
     conflicts: list[PortConflict]
+
+
+@dataclass(frozen=True, slots=True)
+class UpdatePlan:
+    plan: DeployPlan
+    number: int  # the revision this change would create
+    diff: str  # unified diff against the latest revision's compose
+
+
+@dataclass(frozen=True, slots=True)
+class AppSettings:
+    app: Application
+    entry: CatalogEntry
+    values: dict[str, Any]  # latest revision inputs (secrets excluded)
+    secrets_set: list[str]  # secret keys that already have a value
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,14 +183,121 @@ class AppService:
         ):
             raise ConflictError("slug already used", slug=slug)
         zone = await get_zone(session, req.zone) if req.zone else None
-        app_ctx = AppContext(slug=slug, name=name, revision=1, zone=zone.slug if zone else None)
+        return await self._plan(session, entry, slug, name, zone, req.inputs, revision=1)
+
+    async def _plan(
+        self,
+        session: AsyncSession,
+        entry: CatalogEntry,
+        slug: str,
+        name: str,
+        zone: Zone | None,
+        inputs: dict[str, Any],
+        *,
+        revision: int,
+    ) -> DeployPlan:
+        app_ctx = AppContext(
+            slug=slug, name=name, revision=revision, zone=zone.slug if zone else None
+        )
         host = self.host
         defaults_ctx = build_context(app_ctx, host, FormValues(), list(entry.template.services))
-        form = validate_inputs(entry.template, req.inputs, defaults_ctx)
+        form = validate_inputs(entry.template, inputs, defaults_ctx)
         compiled = compile_template(entry.template, app_ctx, host, form, self.settings.volumes_root)
         used = await used_ports(session, self.state, exclude_app=slug)
         conflicts = find_conflicts((p for s in compiled.services for p in s.ports), used)
         return DeployPlan(slug, name, entry, zone, compiled, form, conflicts)
+
+    # --- settings (new revision) --------------------------------------------
+    async def current_settings(self, session: AsyncSession, app_id: int) -> AppSettings:
+        app = await self.get(session, app_id)
+        entry = await self._entry_of(session, app)
+        revision = await self._latest_revision(session, app.id)
+        secrets = await self.decrypt_secrets(session, app.id)
+        return AppSettings(app, entry, dict(revision.inputs) if revision else {}, sorted(secrets))
+
+    async def plan_update(
+        self, session: AsyncSession, app_id: int, inputs: dict[str, Any]
+    ) -> UpdatePlan:
+        """Preview a settings change: new compose, its diff, port conflicts.
+
+        Secret fields left empty keep their current value.
+        """
+        app = await self.get(session, app_id)
+        entry = await self._entry_of(session, app)
+        current = await self.decrypt_secrets(session, app.id)
+        kept = {k: v for k, v in current.items() if not inputs.get(k)}
+        latest = await self._latest_revision(session, app.id)
+        number = (latest.number if latest else 0) + 1
+        zone = await session.get(Zone, app.zone_id) if app.zone_id else None
+        plan = await self._plan(session, entry, app.slug, app.name, zone, {**inputs, **kept},
+                                revision=number)  # fmt: skip
+        previous = latest.compose_yaml if latest else ""
+        new = plan.compiled.compose_yaml
+        diff = "".join(difflib.unified_diff(
+            previous.splitlines(keepends=True), new.splitlines(keepends=True),
+            fromfile=f"revision {number - 1}", tofile=f"revision {number}",
+        ))  # fmt: skip
+        return UpdatePlan(plan, number, diff)
+
+    async def update(self, app_id: int, inputs: dict[str, Any]) -> Job:
+        async with self.sessions() as session, session.begin():
+            upd = await self.plan_update(session, app_id, inputs)
+            plan = upd.plan
+            if plan.conflicts:
+                raise PortConflictError(
+                    "host ports already in use",
+                    conflicts=[_conflict_dict(c) for c in plan.conflicts],
+                )
+            app = await self.get(session, app_id)
+            version = await self._template_version(session, plan.entry)
+            app.template_version_id = version.id
+            await session.execute(delete(AppSecret).where(AppSecret.app_id == app.id))
+            for key, value in plan.form.secrets.items():
+                sealed = self.box.seal(Purpose.APP_SECRET, value, secret_context(app.id, key))
+                session.add(
+                    AppSecret(
+                        app_id=app.id, key=key, ciphertext=sealed.ciphertext, nonce=sealed.nonce
+                    )
+                )
+            # The declared services now describe the new revision. Delete the old
+            # ones first (orphan cascade + flush): same names, unique per app.
+            app.services.clear()
+            await session.flush()
+            app.services = _services_from(plan.compiled)
+            revision = AppRevision(
+                app_id=app.id, number=upd.number, inputs=plan.form.values,
+                compose_yaml=plan.compiled.compose_yaml, diff_from_previous=upd.diff,
+                created_at=self.clock.now(), status=RevisionStatus.PENDING,
+            )  # fmt: skip
+            session.add(revision)
+            await session.flush()
+            app.desired_state = DesiredState.RUNNING
+            job = self.jobs.add(
+                session,
+                JobKind.UPDATE,
+                app_id=app.id,
+                app_slug=app.slug,
+                params={"revision_id": revision.id},
+            )
+        self.jobs.wake()
+        self.bus.publish("app.updated", app=app.slug, revision=upd.number, job=job.id)
+        return job
+
+    async def _entry_of(self, session: AsyncSession, app: Application) -> CatalogEntry:
+        slug = await session.scalar(
+            select(TemplateVersion.slug).where(TemplateVersion.id == app.template_version_id)
+        )
+        if slug is None:
+            raise ConflictError("this app was not deployed from a template", slug=app.slug)
+        return self.catalog.get(slug)
+
+    @staticmethod
+    async def _latest_revision(session: AsyncSession, app_id: int) -> AppRevision | None:
+        latest: AppRevision | None = await session.scalar(
+            select(AppRevision).where(AppRevision.app_id == app_id)
+            .order_by(AppRevision.number.desc()).limit(1)
+        )  # fmt: skip
+        return latest
 
     async def deploy(self, req: DeployRequest) -> tuple[Application, Job]:
         async with self.sessions() as session, session.begin():

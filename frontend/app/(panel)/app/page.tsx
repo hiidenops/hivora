@@ -1,5 +1,7 @@
 "use client";
 
+import { Pencil } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
@@ -9,6 +11,7 @@ import { CodeView } from "@/components/code-view";
 import { JobProgress } from "@/components/job-progress";
 import { StatusBadge } from "@/components/status-badge";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppActions } from "@/features/apps/app-actions";
@@ -62,6 +65,13 @@ function AppDetail() {
         actions={
           <>
             <AppActions id={app.id} status={status} onJob={setActiveJob} />
+            {can("operator") && app.template && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/edit/?id=${app.id}`}>
+                  <Pencil /> {t("edit.button")}
+                </Link>
+              </Button>
+            )}
             {can("operator") && (
               <RemoveDialog
                 id={app.id}

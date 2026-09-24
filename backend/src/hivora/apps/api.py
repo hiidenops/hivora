@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from hivora.apps.models import Application, AppRevision, DesiredState, RevisionStatus
-from hivora.apps.service import DeployPlan, DeployRequest
+from hivora.apps.service import DeployPlan, DeployRequest, UpdatePlan
 from hivora.core.errors import NotFoundError
 from hivora.jobs import Job
 from hivora.state import AppStatus
@@ -116,6 +116,23 @@ class RevisionOut(BaseModel):
     inputs: dict[str, Any]
     created_at: datetime
     applied_at: datetime | None
+
+
+class SettingsOut(BaseModel):
+    template: str
+    version: str
+    form: dict[str, Any]
+    values: dict[str, Any]
+    secrets_set: list[str]
+
+
+class SettingsIn(BaseModel):
+    inputs: dict[str, Any] = {}
+
+
+class UpdatePlanOut(PlanOut):
+    revision: int
+    diff: str
 
 
 class RemovalPlanOut(BaseModel):
@@ -298,3 +315,32 @@ async def removal_plan(app_id: int, _: Operator, rt: RuntimeDep) -> RemovalPlanO
 async def remove(app_id: int, _: Operator, rt: RuntimeDep, remove_data: bool = False) -> JobRef:
     """Data is kept unless ``remove_data=true`` is passed explicitly."""
     return job_ref(await rt.apps.remove(app_id, remove_data=remove_data))
+
+
+@router.get("/{app_id}/settings")
+async def get_settings(app_id: int, _: Operator, rt: RuntimeDep) -> SettingsOut:
+    async with rt.sessions() as session:
+        st = await rt.apps.current_settings(session, app_id)
+    t = st.entry.template
+    return SettingsOut(template=st.entry.slug, version=t.metadata.version,
+                       form=t.form.model_dump(by_alias=True, exclude_none=True),
+                       values=st.values, secrets_set=st.secrets_set)  # fmt: skip
+
+
+def update_plan_out(upd: UpdatePlan) -> UpdatePlanOut:
+    return UpdatePlanOut(**plan_out(upd.plan).model_dump(), revision=upd.number, diff=upd.diff)
+
+
+@router.post("/{app_id}/settings/plan")
+async def plan_settings(
+    app_id: int, body: SettingsIn, _: Operator, rt: RuntimeDep
+) -> UpdatePlanOut:
+    """Preview: new compose and its diff against the current revision. Nothing is written."""
+    async with rt.sessions() as session:
+        return update_plan_out(await rt.apps.plan_update(session, app_id, body.inputs))
+
+
+@router.put("/{app_id}/settings", status_code=202)
+async def update_settings(app_id: int, body: SettingsIn, _: Operator, rt: RuntimeDep) -> JobRef:
+    """New revision from these inputs, applied by a job (secrets left empty are kept)."""
+    return job_ref(await rt.apps.update(app_id, body.inputs))

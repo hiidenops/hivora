@@ -221,3 +221,27 @@ async def test_failed_start_attaches_container_logs(
     assert done.error and "container logs" in done.error
     assert "--- container logs (last 40 lines) ---" in done.log
     assert "boom: the application crashed" in done.log
+
+
+async def test_update_creates_revision_and_keeps_secrets(env: Env) -> None:
+    app, job = await env.service.deploy(DeployRequest("vaultwarden", "vw"))
+    await run(env, job)
+    async with env.sessions() as session:
+        before = (await env.service.decrypt_secrets(session, app.id))["admin_token"]
+        settings = await env.service.current_settings(session, app.id)
+        assert settings.values["web_port"] == 8080 and settings.secrets_set == ["admin_token"]
+        upd = await env.service.plan_update(session, app.id, {**settings.values, "web_port": 8095})
+    assert upd.number == 2
+    assert "-      published: '8080'" in upd.diff and "+      published: '8095'" in upd.diff
+
+    done = await run(env, await env.service.update(app.id, {**settings.values, "web_port": 8095}))
+    assert done.status is JobStatus.SUCCEEDED, done.error
+    async with env.sessions() as session:
+        revs = {r.number: r for r in (await session.scalars(select(AppRevision))).all()}
+        app = await session.get_one(Application, app.id)
+        after = (await env.service.decrypt_secrets(session, app.id))["admin_token"]
+        [svc] = (await session.scalars(select(Service))).all()
+    assert revs[1].status is RevisionStatus.SUPERSEDED and revs[2].status is RevisionStatus.APPLIED
+    assert app.current_revision_id == revs[2].id and revs[2].diff_from_previous
+    assert after == before  # left empty in the form: kept
+    assert [p.host_port for p in svc.ports] == [8095]

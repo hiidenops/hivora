@@ -80,7 +80,7 @@ function TimeChart({
   now,
   max,
   format,
-  timeLabels,
+  clock,
   area = false,
 }: {
   series: Series[];
@@ -88,7 +88,7 @@ function TimeChart({
   now: number;
   max: number;
   format: (v: number) => string;
-  timeLabels: [string, string];
+  clock: (ts: number, seconds?: boolean) => string;
   area?: boolean;
 }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -96,6 +96,11 @@ function TimeChart({
   const x = (i: number) => W - ((now - times[i]) / WINDOW_S) * W;
   const y = (v: number) => H - (Math.min(v, max) / (max || 1)) * (H - 8);
   const path = (values: number[]) => values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+
+  // One tick per minute, scrolling with the data.
+  const ticks: number[] = [];
+  for (let t = Math.ceil((now - WINDOW_S) / 60) * 60; t <= now; t += 60) ticks.push(t);
+  const xAt = (t: number) => W - ((now - t) / WINDOW_S) * W;
 
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     const box = e.currentTarget.getBoundingClientRect();
@@ -117,6 +122,9 @@ function TimeChart({
       >
         {[0.25, 0.5, 0.75].map((f) => (
           <line key={f} x1={0} x2={W} y1={H * f} y2={H * f} className="stroke-grid" vectorEffect="non-scaling-stroke" />
+        ))}
+        {ticks.map((t) => (
+          <line key={t} x1={xAt(t)} x2={xAt(t)} y1={0} y2={H} className="stroke-grid" strokeDasharray="2 4" vectorEffect="non-scaling-stroke" />
         ))}
         {n > 0 &&
           series.map((s) => (
@@ -152,6 +160,7 @@ function TimeChart({
             transform: `translateX(${x(hover) > W / 2 ? "-105%" : "5%"})`,
           }}
         >
+          <div className="font-mono text-muted-foreground">{clock(times[hover], true)}</div>
           {series.map((s) => (
             <div key={s.label} className="flex items-center gap-1.5 whitespace-nowrap">
               <span className="size-2 rounded-full" style={{ background: s.color }} />
@@ -161,9 +170,16 @@ function TimeChart({
           ))}
         </div>
       )}
-      <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-        <span>{timeLabels[0]}</span>
-        <span>{timeLabels[1]}</span>
+      <div className="relative mt-1 h-4 overflow-hidden text-[11px] text-muted-foreground" aria-hidden>
+        {ticks.map((t) => (
+          <span
+            key={t}
+            className="absolute top-0 -translate-x-1/2 font-mono tabular-nums"
+            style={{ left: `${(xAt(t) / W) * 100}%` }}
+          >
+            {clock(t)}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -189,7 +205,10 @@ export function HostCharts() {
   // Keep one sample beyond the left edge so the line enters from outside.
   const firstVisible = history.findIndex((s) => s.ts >= now - WINDOW_S);
   const samples = firstVisible < 0 ? history.slice(-1) : history.slice(Math.max(0, firstVisible - 1));
-  const timeLabels: [string, string] = [t("metrics.ago"), t("metrics.now")];
+  const clock = (ts: number, seconds = false) =>
+    new Date(ts * 1000).toLocaleTimeString(lang, {
+      hour: "2-digit", minute: "2-digit", ...(seconds ? { second: "2-digit" } : {}),
+    });  // prettier-ignore
 
   if (history.length === 0) {
     return (
@@ -216,7 +235,7 @@ export function HostCharts() {
           now={now}
           max={100}
           format={(v) => `${u.num(v)} %`}
-          timeLabels={timeLabels}
+          clock={clock}
         />
       </ChartCard>
       <ChartCard
@@ -234,7 +253,7 @@ export function HostCharts() {
           now={now}
           max={last.mem_total}
           format={u.gb}
-          timeLabels={timeLabels}
+          clock={clock}
         />
       </ChartCard>
       <ChartCard
@@ -262,7 +281,7 @@ export function HostCharts() {
           now={now}
           max={netMax}
           format={u.rate}
-          timeLabels={timeLabels}
+          clock={clock}
         />
       </ChartCard>
       <table className="sr-only">

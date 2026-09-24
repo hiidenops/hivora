@@ -7,6 +7,7 @@ import {
   setCsrfToken,
   type App,
   type AppDetail,
+  type AppSettings,
   type AuditEntry,
   type DeployIn,
   type Job,
@@ -20,6 +21,7 @@ import {
   type SessionInfo,
   type TemplateDetail,
   type TemplateSummary,
+  type UpdatePlan,
   type User,
   type Zone,
 } from "./client";
@@ -176,3 +178,21 @@ export const userApi = {
 export const useAudit = () => useQuery({ queryKey: keys.audit, queryFn: () => api<AuditEntry[]>("/audit") });
 export const useMySessions = () =>
   useQuery({ queryKey: ["sessions"], queryFn: () => api<SessionInfo[]>("/auth/sessions") });
+
+export const useAppSettings = (id: number) =>
+  useQuery({ queryKey: [...keys.app(id), "settings"], queryFn: () => api<AppSettings>(`/apps/${id}/settings`), enabled: id > 0 });
+
+export const usePlanUpdate = (id: number) =>
+  useMutation({
+    mutationFn: (inputs: Record<string, unknown>) =>
+      api<UpdatePlan>(`/apps/${id}/settings/plan`, { method: "POST", body: { inputs } }),
+  });
+
+export function useUpdateSettings(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (inputs: Record<string, unknown>) =>
+      api<JobRef>(`/apps/${id}/settings`, { method: "PUT", body: { inputs } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.app(id) }),
+  });
+}

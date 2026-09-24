@@ -37,6 +37,7 @@ class AppJobHandlers:
     def register(self) -> None:
         q = self.s.jobs
         q.register(JobKind.DEPLOY, self.deploy)
+        q.register(JobKind.UPDATE, self.deploy)  # a new revision is applied the same way
         q.register(JobKind.START, self.start)
         q.register(JobKind.STOP, self.stop)
         q.register(JobKind.RESTART, self.restart)
