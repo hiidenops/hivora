@@ -18,6 +18,11 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | M5 Interface | Next.js statique, tous les écrans, e2e Playwright | ✅ | `8e86c92` |
 | Retours tests #1 | Déploiement Minecraft, logos, animations, mise en page | ✅ | `8953b3d` |
 | Retours tests #2 | Interrupteurs, fond en grille, graphiques système, vider l'historique, console | ✅ | voir `git log` |
+| Minecraft A et B | Personnalisation, catalogue de modpacks (Modrinth, CurseForge) | ✅ | voir `git log` |
+| Fiche d'app | Carte d'état, cartes repliables, liste des versions, propriétés suggérées | ✅ | voir `git log` |
+| IP publique et consommation | Adresse publique, cartes repliées, CPU/RAM/réseau par app en direct | ✅ | `19e4aa6` |
+| Minecraft C | Mondes (import, export, changement) | ⏳ à valider | |
+| M6 Livraison | Image Docker, HTTPS, script d'installation | ⏳ | |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
 | Minecraft, partie A | Horodatage des graphiques, « Modifier les réglages » (révisions), types de serveur et modpacks, propriétés | ✅ | voir `git log` |
