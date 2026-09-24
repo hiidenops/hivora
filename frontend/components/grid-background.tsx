@@ -1,59 +1,96 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef } from "react";
 
 const CELL = 44;
-const TRAIL = 10; // brush positions kept lit while they fade out
-// Soft brush: the cell under the pointer, then its sides, then its corners.
-const BRUSH = [-1, 0, 1].flatMap((dy) =>
-  [-1, 0, 1].map((dx) => ({ dx, dy, level: dx === 0 && dy === 0 ? 1 : dx === 0 || dy === 0 ? 0.45 : 0.2 })),
-);
+const LIFE_MS = 700; // how long the trail lingers behind the pointer
+const PEAK_ALPHA = 0.09; // at the pointer, before the CSS blur spreads it
+const WIDTH = 64; // trail thickness in CSS pixels
 
-/** Flat grid behind the whole UI; the cell under the pointer lights up and fades. */
+type Point = { x: number; y: number; t: number };
+
+/**
+ * Flat grid behind the UI, with a soft golden trail that follows the pointer.
+ * The trail is one continuous polyline on a canvas, faded by age and blurred by
+ * CSS (GPU, every browser). It only draws while the trail is alive: nothing
+ * runs when the pointer rests, and nothing at all with reduced motion.
+ */
 export function GridBackground() {
-  const [cells, setCells] = useState<{ x: number; y: number; id: number }[]>([]);
-  const last = useRef("");
-  const seq = useRef(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    // Listening on window: cards and sidebar sit above the grid and would hide :hover.
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d");
+    if (!ctx || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let gold = "#df911a";
+    let points: Point[] = [];
+    let raf = 0;
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = innerWidth * dpr;
+      canvas.height = innerHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const draw = () => {
+      const now = performance.now();
+      points = points.filter((p) => now - p.t < LIFE_MS);
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = WIDTH;
+      ctx.strokeStyle = gold;
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1];
+        const b = points[i];
+        ctx.globalAlpha = PEAK_ALPHA * (1 - (now - b.t) / LIFE_MS);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+      raf = points.length > 1 ? requestAnimationFrame(draw) : 0;
+    };
+
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== "mouse") return;
-      const x = Math.floor(e.clientX / CELL);
-      const y = Math.floor(e.clientY / CELL);
-      const key = `${x}:${y}`;
-      if (key === last.current) return;
-      last.current = key;
-      setCells((prev) => [...prev.slice(-(TRAIL - 1)), { x, y, id: seq.current++ }]);
+      points.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+      if (!raf) {
+        // Read the theme colour per trail: it follows light/dark switches.
+        gold = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() || gold;
+        raf = requestAnimationFrame(draw);
+      }
     };
+
+    resize();
+    window.addEventListener("resize", resize);
     window.addEventListener("pointermove", onMove, { passive: true });
-    return () => window.removeEventListener("pointermove", onMove);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("pointermove", onMove);
+    };
   }, []);
 
   return (
-    <svg
-      aria-hidden
-      className="pointer-events-none fixed inset-0 -z-10 size-full [mask-image:radial-gradient(900px_circle_at_50%_35%,white,transparent)]"
-    >
-      <defs>
-        <pattern id="hv-grid" width={CELL} height={CELL} patternUnits="userSpaceOnUse">
-          <path d={`M ${CELL} 0 L 0 0 0 ${CELL}`} fill="none" className="stroke-grid" strokeWidth="1" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#hv-grid)" />
-      {cells.flatMap((c) =>
-        BRUSH.map(({ dx, dy, level }) => (
-          <rect
-            key={`${c.id}:${dx}:${dy}`}
-            x={(c.x + dx) * CELL + 1}
-            y={(c.y + dy) * CELL + 1}
-            width={CELL - 1}
-            height={CELL - 1}
-            className="grid-cell"
-            style={{ "--level": level } as CSSProperties}
-          />
-        )),
-      )}
-    </svg>
+    <>
+      <canvas
+        ref={canvasRef}
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10 size-full blur-[18px]"
+      />
+      <svg
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10 size-full [mask-image:radial-gradient(900px_circle_at_50%_35%,white,transparent)]"
+      >
+        <defs>
+          <pattern id="hv-grid" width={CELL} height={CELL} patternUnits="userSpaceOnUse">
+            <path d={`M ${CELL} 0 L 0 0 0 ${CELL}`} fill="none" className="stroke-grid" strokeWidth="1" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#hv-grid)" />
+      </svg>
+    </>
   );
 }

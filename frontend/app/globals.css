@@ -143,17 +143,7 @@ body {
   animation: hv-stripes 0.8s linear infinite;
 }
 /* Interactive cards lift slightly on hover. */
-/* Peak opacity 0.2 at the brush centre, scaled down on its sides and corners. */
-@keyframes hv-cell {
-  from { opacity: calc(0.2 * var(--level, 1)); }
-  to { opacity: 0; }
-}
 @utility stroke-grid { stroke: var(--grid); }
-@utility grid-cell {
-  fill: var(--primary);
-  opacity: 0;
-  animation: hv-cell 1.6s ease-out forwards;
-}
 @utility card-interactive {
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   &:hover {

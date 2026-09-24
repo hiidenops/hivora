@@ -30,6 +30,10 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   // App page, then removal: data kept unless explicitly checked.
   await page.getByRole("link", { name: "Voir l'application" }).click();
   await expect(page.getByRole("heading", { name: /Vaultwarden/ })).toBeVisible();
+  expect(await page.evaluate(() => isSecureContext)).toBe(false); // the realistic case
+  await expect(page.getByRole("heading", { name: "Console" })).toBeVisible();
+  await expect(page.locator(".xterm")).toBeVisible(); // auto-connected on a running app
+  await expect(page.locator(".xterm-rows")).toContainText("$ sh -c"); // fake exec echoes its command
   await page.getByRole("button", { name: "Supprimer" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("switch", { name: "Aussi supprimer les données" })).not.toBeChecked();

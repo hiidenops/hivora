@@ -19,6 +19,7 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Retours tests #1 | Déploiement Minecraft, logos, animations, mise en page | ✅ | `8953b3d` |
 | Retours tests #2 | Interrupteurs, fond en grille, graphiques système, vider l'historique, console | ✅ | voir `git log` |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
+| Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
 | M6 Livraison | Image Docker, HTTPS, script d'installation, budgets CI, 3 templates | ⏳ à lancer | — |
 
 Tests : 110 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Playwright, contrôle du budget bundle. Tout passe.
@@ -32,6 +33,13 @@ Le serveur de test tourne sur la VM : **http://192.168.70.149:8000** (données d
 3. Interrupteurs dorés, fond en grille, alignements pendant un déploiement (bureau et mobile).
 
 Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
+
+## Retours traités (tour 4)
+
+| Retour | Réponse |
+|---|---|
+| La fiche d'une app ne charge pas | Cause : `crypto.randomUUID` n'existe pas en HTTP par IP (contexte non sécurisé) et plantait la console ouverte automatiquement. Remplacé ; l'e2e passe désormais par l'IP réseau et émule des conteneurs démarrés, il échoue sans le correctif |
+| Fond encore trop prononcé, pas fluide | Trait continu sur canvas (positions reliées, estompées sur 0,7 s, flou CSS), ~9 % d'opacité, rien ne tourne au repos |
 
 ## Retours traités (tour 3)
 

@@ -21,6 +21,11 @@ const XTerm = dynamic(() => import("./terminal"), {
   loading: () => <Skeleton className="size-full" />,
 });
 
+// Console ids only need to be unique per socket. (crypto.randomUUID is not an
+// option: browsers only expose it on HTTPS or localhost, and Hivora is often
+// reached over plain HTTP by LAN IP.)
+let consoleSeq = 0;
+
 type Kind = "server" | "shell";
 type Phase = "connecting" | "totp" | "open" | "closed";
 type Controller = ReturnType<ReturnType<typeof useRealtime>["openConsole"]>;
@@ -66,7 +71,7 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
       setError(null);
       setPhase("connecting");
       ctrl.current = rt.openConsole(
-        { id: crypto.randomUUID(), app: app.id, kind: as, ...size.current, totp_code: totp.current },
+        { id: `c${++consoleSeq}`, app: app.id, kind: as, ...size.current, totp_code: totp.current },
         onMessage,
       );
       totp.current = undefined;
