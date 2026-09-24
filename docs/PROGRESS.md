@@ -39,7 +39,7 @@ Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
 | Retour | Réponse |
 |---|---|
 | La fiche d'une app ne charge pas | Cause : `crypto.randomUUID` n'existe pas en HTTP par IP (contexte non sécurisé) et plantait la console ouverte automatiquement. Remplacé ; l'e2e passe désormais par l'IP réseau et émule des conteneurs démarrés, il échoue sans le correctif |
-| Fond encore trop prononcé, pas fluide | Trait continu sur canvas (positions reliées, estompées sur 0,7 s, flou CSS), ~9 % d'opacité, rien ne tourne au repos |
+| Fond encore trop prononcé, pas fluide | Remplacé (tour 5) par une grille qui se déforme sous la souris, cases allumées en doré autour, lignes dorées à proximité ; canvas animé seulement tant que des points bougent |
 
 ## Retours traités (tour 3)
 
