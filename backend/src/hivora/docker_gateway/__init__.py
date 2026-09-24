@@ -7,6 +7,7 @@ from hivora.docker_gateway.base import (
     ContainerNotFoundError,
     DockerGateway,
     DockerUnavailableError,
+    ExecSession,
 )
 from hivora.docker_gateway.models import (
     ContainerInfo,
@@ -25,6 +26,7 @@ __all__ = [
     "DockerEvent",
     "DockerGateway",
     "DockerUnavailableError",
+    "ExecSession",
     "Health",
     "NetworkInfo",
     "PublishedPort",

@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppActions } from "@/features/apps/app-actions";
 import { JobList } from "@/features/apps/job-list";
+import { ConsolePanel } from "@/features/console/console-panel";
 import { RemoveDialog } from "@/features/apps/remove-dialog";
 import { ApiError } from "@/lib/api/client";
 import { useApp, useAppCompose, useJob, useJobs, useRevisions } from "@/lib/api/hooks";
@@ -125,6 +126,9 @@ function AppDetail() {
             <JobList jobs={(jobs ?? []).slice(0, 8)} onSelect={setActiveJob} />
           </CardContent>
         </Card>
+        {can("operator") && (
+          <ConsolePanel app={app} running={["healthy", "starting", "degraded"].includes(status)} />
+        )}
         {advanced && (
           <>
             <Card>

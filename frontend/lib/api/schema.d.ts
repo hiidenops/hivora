@@ -613,6 +613,7 @@ export interface components {
     schemas: {
         /** AppDetailOut */
         AppDetailOut: {
+            console: components["schemas"]["ConsoleInfoOut"];
             /** Containers */
             containers: components["schemas"]["ContainerOut"][];
             /**
@@ -722,6 +723,22 @@ export interface components {
             suggestion: number | null;
             /** Used By */
             used_by: string;
+        };
+        /** ConsoleCommandOut */
+        ConsoleCommandOut: {
+            /** Command */
+            command: string;
+            /** Description */
+            description: string | {
+                [key: string]: string;
+            };
+        };
+        /** ConsoleInfoOut */
+        ConsoleInfoOut: {
+            /** Commands */
+            commands: components["schemas"]["ConsoleCommandOut"][];
+            /** Server */
+            server: boolean;
         };
         /** ContainerOut */
         ContainerOut: {

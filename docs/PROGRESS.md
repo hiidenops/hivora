@@ -1,6 +1,6 @@
 # Hivora — Suivi d'avancement
 
-*Dernière mise à jour : 23 septembre 2026*
+*Dernière mise à jour : 24 septembre 2026*
 
 Document de reprise : où en est le projet, ce qui a été décidé, comment relancer l'environnement et ce qui reste à faire. Référence produit : [`vision-prd-architecture.md`](vision-prd-architecture.md).
 
@@ -17,19 +17,31 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | M4 API | Auth, utilisateurs et rôles, routes `/api/v1`, WebSocket, audit | ✅ | `ff7b18f` |
 | M5 Interface | Next.js statique, tous les écrans, e2e Playwright | ✅ | `8e86c92` |
 | Retours tests #1 | Déploiement Minecraft, logos, animations, mise en page | ✅ | `8953b3d` |
+| Retours tests #2 | Interrupteurs, fond en grille, graphiques système, vider l'historique, console | ✅ | voir `git log` |
 | M6 Livraison | Image Docker, HTTPS, script d'installation, budgets CI, 3 templates | ⏳ à lancer | — |
 
-Tests : 105 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Playwright, contrôle du budget bundle. Tout passe.
+Tests : 110 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Playwright, contrôle du budget bundle. Tout passe.
 
 ## En attente de ton retour
 
-Le serveur de test tourne sur la VM : **http://192.168.70.149:8000** (données dans `~/hivora-dev`, Docker réel). Il a été relancé après les corrections du premier retour. À tester :
+Le serveur de test tourne sur la VM : **http://192.168.70.149:8000** (données dans `~/hivora-dev`, Docker réel), relancé avec le tour 2. À tester :
 
-1. Déployer **Minecraft** jusqu'au bout (image Java 25, premier téléchargement de quelques minutes).
-2. Vérifier les logos, les animations, la barre latérale fixe, le cadre du journal.
-3. Noter tout ce qui reste à ajuster avant de passer à M6.
+1. **Console** : fiche d'une app démarrée → « Ouvrir la console ». Minecraft : onglet « Console serveur » (`rcon-cli`) + guide des commandes repliable ; toute app : onglet « Shell ».
+2. **Activité** : graphiques CPU / RAM / réseau (un point toutes les 10 s), boutons « Vider ».
+3. Interrupteurs dorés, fond en grille, alignements pendant un déploiement (bureau et mobile).
 
 Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
+
+## Retours traités (tour 2)
+
+| Retour | Réponse |
+|---|---|
+| Fond « interactive grid » à plat, couleurs plus marquées | Grille SVG plate, case sous la souris en doré qui s'estompe (suivi global de la souris, pas de dépendance) |
+| Éléments mal alignés au lancement d'un serveur | Cause racine : éléments de grille CSS qui refusaient de rétrécir (`min-width: auto`) → règle globale ; liste des tâches sur deux lignes ; carte de tâche active titrée par son type |
+| Console des conteneurs + guide de commandes | Console serveur (`game.console`, ex. `rcon-cli`) et Shell (`sh`/`bash`) via xterm.js chargé à la demande ; guide repliable (`game.commands` du template) ; audit ouverture/fermeture, 8 max, 30 min d'inactivité, reconfirmation TOTP 15 min |
+| Graphiques système dans Activité | CPU, RAM « utilisée / totale », réseau entrant/sortant (interfaces physiques seulement), infobulle au survol, tableau accessible ; couleurs validées clair/sombre |
+| Vider les logs | Admin : vider les tâches terminées et le journal d'audit (une entrée « journal vidé par X » est conservée). Filtres du journal : plus tard |
+| Interrupteurs style iPhone | Composant unique doré (case native `role=switch`), y compris pour l'EULA |
 
 ## Retours déjà traités (tour 1)
 
@@ -59,10 +71,13 @@ Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
 
 - Détection des conflits de ports : ne voit que Docker et les apps Hivora (pas un sshd installé sur l'hôte).
 - Un code TOTP peut être réutilisé pendant sa fenêtre de validité (30 à 90 s).
+- Métriques : en mémoire (1 h), pas encore d'historique 24 h persisté. Dans le conteneur Hivora (M6), le débit réseau de l'hôte exigera `/proc` de l'hôte monté en lecture seule.
+- Console : panneau sur la fiche d'app ; le tiroir persistant multi-onglets (F-24, ⌘K, raccourci Ctrl+²) reste à faire.
+- Journal d'audit : pas encore de filtres ni de recherche.
 - Dérive : seulement état voulu (démarrée / arrêtée) contre état réel ; pas encore l'image modifiée à la main.
 - IP publique non détectée : l'adresse d'accès utilise l'IP LAN à défaut.
 - Budget frontend serré : base commune 183 Ko, page la plus lourde (`/users`) 238 Ko sur 250. Topologie et console devront être chargées à la demande.
-- Non implémenté : adoption de conteneurs existants, gestion des zones dans l'UI, révisions/rollback dans l'UI, logs et console en direct, métriques, topologie.
+- Non implémenté : adoption de conteneurs existants, gestion des zones dans l'UI, révisions/rollback dans l'UI, logs en direct, topologie.
 
 ## Prochaine étape proposée : M6 (livraison)
 

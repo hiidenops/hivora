@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from dataclasses import replace
 from datetime import datetime
 
-from hivora.docker_gateway.base import ContainerNotFoundError, DockerGateway
+from hivora.docker_gateway.base import ContainerNotFoundError, DockerGateway, ExecSession
 from hivora.docker_gateway.models import (
     ContainerInfo,
     DockerEvent,
@@ -14,11 +14,34 @@ from hivora.docker_gateway.models import (
 )
 
 
+class FakeExecSession(ExecSession):
+    """Echoes input back, prefixed with the command, like a tiny REPL."""
+
+    def __init__(self, cmd: list[str]) -> None:
+        self.cmd = cmd
+        self.size: tuple[int, int] | None = None
+        self._out: asyncio.Queue[bytes | None] = asyncio.Queue()
+        self._out.put_nowait(f"$ {' '.join(cmd)}\r\n".encode())
+
+    async def read(self) -> bytes | None:
+        return await self._out.get()
+
+    async def write(self, data: bytes) -> None:
+        self._out.put_nowait(data)
+
+    async def resize(self, rows: int, cols: int) -> None:
+        self.size = (rows, cols)
+
+    async def close(self) -> None:
+        self._out.put_nowait(None)
+
+
 class FakeDockerGateway(DockerGateway):
     def __init__(self) -> None:
         self.containers: dict[str, ContainerInfo] = {}
         self.networks: list[NetworkInfo] = []
         self.logs_by_container: dict[str, list[str]] = {}
+        self.execs: list[FakeExecSession] = []
         self._subscribers: list[asyncio.Queue[DockerEvent | None]] = []
 
     # --- test helpers -----------------------------------------------------
@@ -76,6 +99,12 @@ class FakeDockerGateway(DockerGateway):
     ) -> AsyncIterator[str]:
         for line in self.logs_by_container.get(container_id, [])[-tail:]:
             yield line
+
+    async def open_exec(self, container_id: str, cmd: list[str]) -> ExecSession:
+        await self.get_container(container_id)
+        session = FakeExecSession(cmd)
+        self.execs.append(session)
+        return session
 
     async def list_networks(self) -> list[NetworkInfo]:
         return list(self.networks)

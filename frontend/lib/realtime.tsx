@@ -14,7 +14,7 @@ export interface LiveJob {
   lines: string[];
 }
 
-type Message = Record<string, unknown> & { channel?: string; type?: string };
+export type Message = Record<string, unknown> & { channel?: string; type?: string };
 const MAX_LINES = 2000;
 
 /** One WebSocket per tab; the UI subscribes to slices of this store. */
@@ -22,6 +22,7 @@ class RealtimeStore {
   private ws: WebSocket | null = null;
   private listeners = new Set<() => void>();
   private watchedJobs = new Set<number>();
+  private consoles = new Map<string, (msg: Message) => void>();
   private retry = 0;
   private closed = false;
   onJobFinished: ((msg: Message) => void) | null = null;
@@ -68,6 +69,21 @@ class RealtimeStore {
     this.send({ op: "subscribe", channel: "job", id });
   }
 
+  /** Opens a console on the shared socket; `onMessage` gets opened/data/closed/error. */
+  openConsole(open: Record<string, unknown>, onMessage: (msg: Message) => void) {
+    const id = String(open.id);
+    this.consoles.set(id, onMessage);
+    this.send({ op: "console.open", ...open });
+    return {
+      input: (data: string) => this.send({ op: "console.input", id, data }),
+      resize: (rows: number, cols: number) => this.send({ op: "console.resize", id, rows, cols }),
+      close: () => {
+        this.send({ op: "console.close", id });
+        this.consoles.delete(id);
+      },
+    };
+  }
+
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -87,6 +103,10 @@ class RealtimeStore {
   }
 
   private handle(msg: Message) {
+    if (msg.channel === "console") {
+      this.consoles.get(String(msg.id))?.(msg);
+      return;
+    }
     if (msg.channel === "metrics") {
       this.host = [...this.host, msg as unknown as HostSample].slice(-360);
     } else if (msg.channel === "state") {
@@ -160,3 +180,7 @@ export function useLiveHost(): HostSample[] {
   return useSyncExternalStore(s.subscribe, () => s.host, () => EMPTY);
 }
 const EMPTY: HostSample[] = [];
+
+export function useRealtime(): RealtimeStore {
+  return useStore();
+}

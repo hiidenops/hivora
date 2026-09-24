@@ -224,6 +224,20 @@ export const fr = {
   "error.not_found": "Introuvable.",
   "error.docker_unavailable": "Docker est injoignable.",
   "error.generic": "Erreur : {message}",
+  "console.title": "Console",
+  "console.server": "Console serveur",
+  "console.shell": "Shell",
+  "console.open": "Ouvrir la console",
+  "console.close": "Fermer",
+  "console.guide": "Commandes",
+  "console.guideHint": "Cliquez pour insérer, complétez puis Entrée.",
+  "console.notRunning": "L'application doit être démarrée pour ouvrir une console.",
+  "console.closed": "Console fermée.",
+  "console.idle": "Console fermée après 30 min d'inactivité.",
+  "console.totp": "Confirmez avec votre code TOTP pour ouvrir une console (valable 15 min).",
+  "console.shellHint": "Commandes exécutées dans le conteneur, jamais sur la machine hôte.",
+  "error.too_many_consoles": "Trop de consoles ouvertes (8 au maximum).",
+  "error.console_unavailable": "Console indisponible : {message}",
 } as const;
 
 export type MessageKey = keyof typeof fr;

@@ -13,6 +13,7 @@ from hivora.docker_gateway.base import (
     ContainerNotFoundError,
     DockerGateway,
     DockerUnavailableError,
+    ExecSession,
 )
 from hivora.docker_gateway.models import (
     ContainerInfo,
@@ -141,6 +142,25 @@ def event_from_raw(raw: dict[str, Any]) -> DockerEvent:
     )
 
 
+class LocalExecSession(ExecSession):
+    def __init__(self, exec_: Any, stream: Any) -> None:
+        self._exec = exec_
+        self._stream = stream
+
+    async def read(self) -> bytes | None:
+        message = await self._stream.read_out()
+        return None if message is None else bytes(message.data)
+
+    async def write(self, data: bytes) -> None:
+        await self._stream.write_in(data)
+
+    async def resize(self, rows: int, cols: int) -> None:
+        await self._exec.resize(h=rows, w=cols)
+
+    async def close(self) -> None:
+        await self._stream.close()
+
+
 class LocalDockerGateway(DockerGateway):
     """Talks to the Engine API through aiodocker's low-level ``_query`` helpers.
 
@@ -200,6 +220,21 @@ class LocalDockerGateway(DockerGateway):
         else:
             for line in await container.log(stdout=True, stderr=True, tail=tail):
                 yield line.rstrip("\n")
+
+    async def open_exec(self, container_id: str, cmd: list[str]) -> ExecSession:
+        container = self._docker.containers.container(container_id)
+        try:
+            exec_ = await container.exec(cmd, stdin=True, tty=True)
+        except aiodocker.DockerError as exc:
+            if exc.status == 404:
+                raise ContainerNotFoundError(container_id) from exc
+            raise
+        stream = exec_.start(timeout=None, detach=False)
+        # aiodocker starts the exec lazily on the first read *or* write, with a
+        # check-then-await race: concurrent input and output start it twice
+        # ("exec ... is already running"). Start it once, here.
+        await stream._init()
+        return LocalExecSession(exec_, stream)
 
     async def list_networks(self) -> list[NetworkInfo]:
         return [

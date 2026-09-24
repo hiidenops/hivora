@@ -3,6 +3,9 @@
     "schemas": {
       "AppDetailOut": {
         "properties": {
+          "console": {
+            "$ref": "#/components/schemas/ConsoleInfoOut"
+          },
           "containers": {
             "items": {
               "$ref": "#/components/schemas/ContainerOut"
@@ -115,7 +118,8 @@
           "revision",
           "containers",
           "ports",
-          "volumes"
+          "volumes",
+          "console"
         ],
         "title": "AppDetailOut",
         "type": "object"
@@ -358,6 +362,61 @@
           "suggestion"
         ],
         "title": "ConflictOut",
+        "type": "object"
+      },
+      "ConsoleCommandOut": {
+        "properties": {
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "enum": [
+                    "fr",
+                    "en"
+                  ]
+                },
+                "type": "object"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "required": [
+          "command",
+          "description"
+        ],
+        "title": "ConsoleCommandOut",
+        "type": "object"
+      },
+      "ConsoleInfoOut": {
+        "properties": {
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/ConsoleCommandOut"
+            },
+            "title": "Commands",
+            "type": "array"
+          },
+          "server": {
+            "title": "Server",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "server",
+          "commands"
+        ],
+        "title": "ConsoleInfoOut",
         "type": "object"
       },
       "ContainerOut": {

@@ -4,6 +4,7 @@ import asyncio
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -23,6 +24,9 @@ from hivora.metrics.host import HostMetrics
 from hivora.state import StateService
 from hivora.templates import Catalog
 from hivora.templates.icons import IconCache
+
+if TYPE_CHECKING:
+    from hivora.realtime.console import ConsoleManager
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +50,12 @@ class Runtime:
     icons: IconCache
     metrics: HostMetrics
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
+    consoles: "ConsoleManager" = field(init=False)
+
+    def __post_init__(self) -> None:
+        from hivora.realtime.console import ConsoleManager  # needs Runtime itself
+
+        self.consoles = ConsoleManager(self)
 
     @classmethod
     def build(

@@ -13,7 +13,7 @@ from hivora.core.events import Event, EventBus
 logger = logging.getLogger(__name__)
 
 # Topics worth auditing. Secrets never travel on the bus, so payloads are safe.
-AUDITED_PREFIXES = ("auth.", "user.", "app.", "job.finished", "jobs.cleared")
+AUDITED_PREFIXES = ("auth.", "user.", "app.", "job.finished", "jobs.cleared", "console.")
 _FAILED = {"auth.login_failed"}
 _BATCH_DELAY_S = 0.5
 

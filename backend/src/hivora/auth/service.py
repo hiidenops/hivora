@@ -6,7 +6,7 @@ import logging
 import re
 import secrets
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import cache
 
 from sqlalchemy import delete, func, select
@@ -35,6 +35,7 @@ DEFAULT_ADMIN = "admin"
 MIN_PASSWORD_LENGTH = 10
 _USERNAME = re.compile(r"^[a-z0-9][a-z0-9._-]{1,63}$")
 _LAST_SEEN_RESOLUTION = timedelta(minutes=1)
+CONSOLE_CONFIRMATION = timedelta(minutes=15)
 
 
 @cache
@@ -114,6 +115,8 @@ class AuthService:
         self.bus = bus
         self.clock = clock or SystemClock()
         self.limiter = LoginRateLimiter(self.clock)
+        # session id -> until when consoles are allowed without a new TOTP code
+        self._console_ok: dict[int, datetime] = {}
 
     # --- bootstrap ------------------------------------------------------------
     async def ensure_initial_admin(self) -> bool:
@@ -210,6 +213,20 @@ class AuthService:
         async with self.sessions() as session, session.begin():
             await session.execute(delete(Session).where(Session.id == session_id))
         self.bus.publish("auth.logout")
+
+    # --- console re-confirmation ---------------------------------------------
+    def console_confirmed(self, user: User, session_id: int) -> bool:
+        if not user.totp_enabled:
+            return True
+        until = self._console_ok.get(session_id)
+        return until is not None and until > self.clock.now()
+
+    async def confirm_console(self, user_id: int, session_id: int, code: str) -> None:
+        async with self.sessions() as session, session.begin():
+            user = await self._user(session, user_id)
+            if user.totp_enabled and not self._check_second_factor(user, code):
+                raise InvalidCredentialsError("invalid TOTP code")
+        self._console_ok[session_id] = self.clock.now() + CONSOLE_CONFIRMATION
 
     # --- self service -----------------------------------------------------------
     async def change_password(

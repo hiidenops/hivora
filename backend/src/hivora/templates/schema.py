@@ -182,8 +182,16 @@ class Update(_Strict):
     strategy: Literal["manual", "auto-patch", "auto-minor"] = "manual"
 
 
+class GameCommand(_Strict):
+    command: str
+    description: Localized
+
+
 class Game(_Strict):
     query: Literal["a2s", "minecraft"] | None = None
+    # Server console: command run (with a TTY) in the main service, e.g. ["rcon-cli"].
+    console: list[str] | None = None
+    commands: list[GameCommand] = []  # the console's command guide
     rcon_port: int | None = None
     max_players: int | str | None = None
     stop_command: str | None = None

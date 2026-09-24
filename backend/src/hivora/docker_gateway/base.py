@@ -20,6 +20,23 @@ class ContainerNotFoundError(NotFoundError):
     code = "container_not_found"
 
 
+class ExecSession(ABC):
+    """An interactive process in a container (TTY): the console's transport."""
+
+    @abstractmethod
+    async def read(self) -> bytes | None:
+        """Next output chunk; None when the process has exited."""
+
+    @abstractmethod
+    async def write(self, data: bytes) -> None: ...
+
+    @abstractmethod
+    async def resize(self, rows: int, cols: int) -> None: ...
+
+    @abstractmethod
+    async def close(self) -> None: ...
+
+
 class DockerGateway(ABC):
     @abstractmethod
     async def ping(self) -> str:
@@ -49,6 +66,10 @@ class DockerGateway(ABC):
         self, container_id: str, *, follow: bool = False, tail: int = 200
     ) -> AsyncIterator[str]:
         """Container output lines (stdout and stderr)."""
+
+    @abstractmethod
+    async def open_exec(self, container_id: str, cmd: list[str]) -> ExecSession:
+        """Start ``cmd`` with a TTY and stdin attached (never on the host itself)."""
 
     @abstractmethod
     async def list_networks(self) -> list[NetworkInfo]: ...

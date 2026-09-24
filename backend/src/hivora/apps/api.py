@@ -13,6 +13,7 @@ from hivora.core.errors import NotFoundError
 from hivora.jobs import Job
 from hivora.state import AppStatus
 from hivora.templates.models import TemplateVersion
+from hivora.templates.schema import Localized
 from hivora.web.deps import Operator, RuntimeDep, Viewer
 
 router = APIRouter(tags=["apps"])
@@ -85,11 +86,22 @@ class AppOut(BaseModel):
     created_at: datetime
 
 
+class ConsoleCommandOut(BaseModel):
+    command: str
+    description: Localized
+
+
+class ConsoleInfoOut(BaseModel):
+    server: bool  # the template declares a server console (e.g. rcon-cli)
+    commands: list[ConsoleCommandOut]
+
+
 class AppDetailOut(AppOut):
     revision: int | None
     containers: list[ContainerOut]
     ports: list[PortOut]
     volumes: list[str]
+    console: ConsoleInfoOut
 
 
 class DeployOut(BaseModel):
@@ -139,6 +151,20 @@ def app_out(rt: RuntimeDep, app: Application, template: str | None) -> AppOut:
         drift=has_drift(app.desired_state, status),
         created_at=app.created_at,
     )
+
+
+def console_info(rt: RuntimeDep, template: str | None) -> ConsoleInfoOut:
+    game = None
+    if template:
+        try:
+            game = rt.catalog.get(template).template.game
+        except NotFoundError:  # template removed from the catalog since deployment
+            game = None
+    return ConsoleInfoOut(
+        server=bool(game and game.console),
+        commands=[ConsoleCommandOut(command=c.command, description=c.description)
+                  for c in (game.commands if game else [])],
+    )  # fmt: skip
 
 
 def plan_out(plan: DeployPlan) -> PlanOut:
@@ -208,6 +234,7 @@ async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
                            exposure=p.exposure.value, host_ip=p.host_ip)
                    for s in app.services for p in s.ports],
             volumes=[v.source for s in app.services for v in s.volumes],
+            console=console_info(rt, template),
         )  # fmt: skip
 
 

@@ -127,6 +127,19 @@ def test_totp_and_recovery_codes(client: TestClient) -> None:
         "recovery_codes"
     ]
     assert len(codes) == 10
+    with client.websocket_connect("/ws") as ws:  # consoles need a fresh TOTP (15 min)
+        ws.send_json({"op": "console.open", "id": "x", "app": 1, "kind": "shell"})
+        assert ws.receive_json()["code"] == "totp_required"
+        ws.send_json(
+            {
+                "op": "console.open",
+                "id": "x",
+                "app": 1,
+                "kind": "shell",
+                "totp_code": pyotp.TOTP(secret).now(),
+            }
+        )
+        assert ws.receive_json()["code"] == "app_not_found"  # past the TOTP gate
 
     with other_user(client) as other:
         r = other.post(f"{API}/auth/login", json={"username": "admin", "password": STRONG})
@@ -225,3 +238,54 @@ def test_clear_jobs_and_audit(client: TestClient) -> None:
     assert client.delete(f"{API}/audit").json()["deleted"] > 0
     [entry] = client.get(f"{API}/audit").json()
     assert (entry["action"], entry["username"]) == ("audit.cleared", "admin")
+
+
+def test_console_over_websocket(client: TestClient) -> None:
+    from hivora.docker_gateway import ContainerInfo, ContainerState
+
+    admin(client)
+    body = {"template": "minecraft", "name": "cube", "inputs": {"eula": True}}
+    deployed = client.post(f"{API}/apps", json=body).json()
+    wait_job(client, deployed["job"]["id"])
+    app_id = deployed["app"]["id"]
+    detail = client.get(f"{API}/apps/{app_id}").json()
+    assert detail["console"]["server"] is True and detail["console"]["commands"]
+
+    runtime = client.app.state.runtime  # type: ignore[attr-defined]
+    runtime.gateway.put(ContainerInfo(
+        id="c1", name="cube-server-1", image="mc", state=ContainerState.RUNNING,
+        labels={"io.hivora.app": "cube", "com.docker.compose.service": "server"},
+    ), "start")  # fmt: skip
+    deadline = time.monotonic() + 3
+    while runtime.state.store.app("cube").status.value != "healthy":
+        assert time.monotonic() < deadline
+        time.sleep(0.02)
+
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json(
+            {
+                "op": "console.open",
+                "id": "t1",
+                "app": app_id,
+                "kind": "server",
+                "rows": 30,
+                "cols": 100,
+            }
+        )
+        assert ws.receive_json()["type"] == "opened"
+        assert "rcon-cli" in ws.receive_json()["data"]  # the fake echoes its command first
+        ws.send_json({"op": "console.input", "id": "t1", "data": "list\r"})
+        assert ws.receive_json() == {
+            "channel": "console",
+            "id": "t1",
+            "type": "data",
+            "data": "list\r",
+        }
+        ws.send_json({"op": "console.close", "id": "t1"})
+    [session] = runtime.gateway.execs
+    assert session.cmd == ["rcon-cli"] and session.size == (30, 100)
+
+    time.sleep(0.8)
+    actions = [a["action"] for a in client.get(f"{API}/audit").json()]
+    assert "console.opened" in actions and "console.closed" in actions
+    assert runtime.consoles.open_count == 0
