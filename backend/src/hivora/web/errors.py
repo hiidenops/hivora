@@ -16,6 +16,7 @@ from hivora.core.errors import (
     ValidationError,
 )
 from hivora.docker_gateway import DockerUnavailableError
+from hivora.games.modpacks import ModpackSourceError
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ _STATUS: tuple[tuple[type[HivoraError], int], ...] = (
     (ValidationError, 422),
     (TooManyAttemptsError, 429),
     (DockerUnavailableError, 503),
+    (ModpackSourceError, 502),
 )
 
 

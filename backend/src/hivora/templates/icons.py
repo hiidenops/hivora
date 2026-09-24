@@ -1,6 +1,6 @@
 """Template icons: downloaded once from the template's source, then served locally.
 
-The browser never contacts third parties. Only PNG, JPEG, WebP and SVG are
+The browser never contacts third parties. Only PNG, JPEG, WebP, GIF and SVG are
 kept, size-capped and checked by their magic bytes; SVG is served sandboxed.
 """
 
@@ -25,6 +25,7 @@ MEDIA_TYPES = {
     "png": "image/png",
     "jpg": "image/jpeg",
     "webp": "image/webp",
+    "gif": "image/gif",
     "svg": "image/svg+xml",
 }
 
@@ -37,6 +38,8 @@ def sniff(data: bytes) -> str | None:
         return "jpg"
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
         return "webp"
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return "gif"
     head = data[:512].lstrip().lower()
     if head.startswith((b"<svg", b"<?xml")) and b"<svg" in data[:4096].lower():
         return "svg"
@@ -73,7 +76,7 @@ class IconCache:
                 if any(self.directory.glob(f"{stem}.*")):
                     continue
                 try:
-                    data = await self._fetch(http, url)
+                    data = await fetch_capped(http, url)
                 except Exception as exc:
                     logger.warning(
                         "icon download failed",
@@ -92,14 +95,15 @@ class IconCache:
                 (self.directory / f"{stem}.{ext}").write_bytes(data)
                 await asyncio.sleep(0)
 
-    @staticmethod
-    async def _fetch(http: "aiohttp.ClientSession", url: str) -> bytes:
-        async with http.get(url, allow_redirects=True) as response:
-            response.raise_for_status()
-            chunks, size = [], 0
-            async for chunk in response.content.iter_chunked(64 * 1024):
-                size += len(chunk)
-                if size > MAX_BYTES:
-                    raise ValueError("icon too large")
-                chunks.append(chunk)
-            return b"".join(chunks)
+
+async def fetch_capped(http: "aiohttp.ClientSession", url: str) -> bytes:
+    """Whole response body, refusing anything larger than MAX_BYTES."""
+    async with http.get(url, allow_redirects=True) as response:
+        response.raise_for_status()
+        chunks, size = [], 0
+        async for chunk in response.content.iter_chunked(64 * 1024):
+            size += len(chunk)
+            if size > MAX_BYTES:
+                raise ValueError("icon too large")
+            chunks.append(chunk)
+        return b"".join(chunks)

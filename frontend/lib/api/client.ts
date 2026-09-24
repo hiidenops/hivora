@@ -22,6 +22,8 @@ export type SessionInfo = Schemas["SessionOut"];
 export type HostSample = Schemas["HostSampleOut"];
 export type AppSettings = Schemas["SettingsOut"];
 export type UpdatePlan = Schemas["UpdatePlanOut"];
+export type Modpack = Schemas["ModpackOut"];
+export type Integrations = Schemas["IntegrationsOut"];
 
 /** Error returned by the backend: `code` is stable and translated by the UI. */
 export class ApiError extends Error {

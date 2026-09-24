@@ -21,6 +21,7 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
 | Minecraft, partie A | Horodatage des graphiques, « Modifier les réglages » (révisions), types de serveur et modpacks, propriétés | ✅ | voir `git log` |
+| Catalogue de modpacks | Recherche Modrinth / CurseForge dans le panel, déploiement pré-rempli, clé CurseForge globale | ✅ | voir `git log` |
 | Minecraft, parties B et C | Joueurs, liste blanche, admins ; gestion des mondes | ⏳ proposé | — |
 | M6 Livraison | Image Docker, HTTPS, script d'installation, budgets CI, 3 templates | ⏳ à lancer | — |
 
@@ -35,6 +36,13 @@ Le serveur de test tourne sur la VM : **http://192.168.70.149:8000** (données d
 3. Interrupteurs dorés, fond en grille, alignements pendant un déploiement (bureau et mobile).
 
 Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
+
+## Catalogue de modpacks (fait)
+
+- Catalogue → onglet « Modpacks Minecraft » : recherche, source Modrinth / CurseForge, filtres chargeur et version, cartes (icône, téléchargements, versions), « Déployer ce modpack » → assistant Minecraft pré-rempli (type, modpack, 6 Go).
+- Hivora interroge les API (module `games`, V2 avancée) : le navigateur ne contacte aucun tiers ; résultats en cache 1 min ; icônes relayées depuis `cdn.modrinth.com` / `media.forgecdn.net` uniquement, taille plafonnée, mises en cache.
+- **Clé CurseForge globale** : Paramètres → Intégrations (admin, chiffrée, jamais réaffichée). Les templates peuvent déclarer `from_setting` sur un champ secret : vide → valeur du réglage.
+- Corrigé : les icônes relayées étaient tronquées (lecture partielle) ; GIF acceptés.
 
 ## Minecraft, partie A (fait)
 

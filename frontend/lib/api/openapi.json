@@ -593,6 +593,19 @@
         "title": "HostSampleOut",
         "type": "object"
       },
+      "IntegrationsOut": {
+        "properties": {
+          "curseforge_api_key_set": {
+            "title": "Curseforge Api Key Set",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "curseforge_api_key_set"
+        ],
+        "title": "IntegrationsOut",
+        "type": "object"
+      },
       "JobDetailOut": {
         "properties": {
           "app_id": {
@@ -862,6 +875,18 @@
         "title": "JobStatus",
         "type": "string"
       },
+      "KeyIn": {
+        "properties": {
+          "key": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "title": "KeyIn",
+        "type": "object"
+      },
       "LoginIn": {
         "properties": {
           "password": {
@@ -929,6 +954,76 @@
           "csrf_token"
         ],
         "title": "MeOut",
+        "type": "object"
+      },
+      "ModpackOut": {
+        "properties": {
+          "downloads": {
+            "title": "Downloads",
+            "type": "integer"
+          },
+          "icon_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon Url"
+          },
+          "loaders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Loaders",
+            "type": "array"
+          },
+          "mc_versions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mc Versions",
+            "type": "array"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "modrinth",
+              "curseforge"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "slug",
+          "title",
+          "summary",
+          "icon_url",
+          "downloads",
+          "mc_versions",
+          "loaders",
+          "url"
+        ],
+        "title": "ModpackOut",
         "type": "object"
       },
       "NetworkMode": {
@@ -3017,6 +3112,159 @@
         ]
       }
     },
+    "/api/v1/modpacks/icon": {
+      "get": {
+        "operationId": "icon_api_v1_modpacks_icon_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "url",
+            "required": true,
+            "schema": {
+              "title": "Url",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Icon",
+        "tags": [
+          "modpacks"
+        ]
+      }
+    },
+    "/api/v1/modpacks/search": {
+      "get": {
+        "operationId": "search_api_v1_modpacks_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "default": "modrinth",
+              "enum": [
+                "modrinth",
+                "curseforge"
+              ],
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 100,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "loader",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "fabric",
+                    "forge",
+                    "neoforge",
+                    "quilt"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Loader"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mc_version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d+\\.\\d+(\\.\\d+)?$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mc Version"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 50,
+              "minimum": 0,
+              "title": "Page",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModpackOut"
+                  },
+                  "title": "Response Search Api V1 Modpacks Search Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search",
+        "tags": [
+          "modpacks"
+        ]
+      }
+    },
     "/api/v1/system/health": {
       "get": {
         "description": "Public: used by the container healthcheck.",
@@ -3055,6 +3303,61 @@
           }
         },
         "summary": "Info",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/integrations": {
+      "get": {
+        "operationId": "integrations_api_v1_system_integrations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Integrations",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/integrations/curseforge": {
+      "put": {
+        "operationId": "set_curseforge_key_api_v1_system_integrations_curseforge_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Curseforge Key",
         "tags": [
           "system"
         ]

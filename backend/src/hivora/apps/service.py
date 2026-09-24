@@ -33,6 +33,7 @@ from hivora.core.events import EventBus
 from hivora.crypto.cipher import Purpose, Sealed, SecretBox
 from hivora.jobs import Job, JobKind, JobQueue
 from hivora.state import StateStore
+from hivora.system.secrets import SecretSetting, SecretSettings
 from hivora.templates import (
     AppContext,
     Catalog,
@@ -129,6 +130,7 @@ class AppService:
         box: SecretBox,
         bus: EventBus,
         clock: Clock | None = None,
+        secret_settings: SecretSettings | None = None,
     ) -> None:
         self.settings = settings
         self.sessions = sessions
@@ -139,6 +141,7 @@ class AppService:
         self.box = box
         self.bus = bus
         self.clock = clock or SystemClock()
+        self.secret_settings = secret_settings
 
     @property
     def host(self) -> HostInfo:
@@ -196,6 +199,7 @@ class AppService:
         *,
         revision: int,
     ) -> DeployPlan:
+        inputs = await self._with_setting_fallbacks(entry, inputs)
         app_ctx = AppContext(
             slug=slug, name=name, revision=revision, zone=zone.slug if zone else None
         )
@@ -206,6 +210,20 @@ class AppService:
         used = await used_ports(session, self.state, exclude_app=slug)
         conflicts = find_conflicts((p for s in compiled.services for p in s.ports), used)
         return DeployPlan(slug, name, entry, zone, compiled, form, conflicts)
+
+    async def _with_setting_fallbacks(
+        self, entry: CatalogEntry, inputs: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Empty secrets declaring `from_setting` take the global setting's value."""
+        if self.secret_settings is None:
+            return inputs
+        filled = dict(inputs)
+        for f in entry.template.form.fields:
+            if f.type == "secret" and f.from_setting and not filled.get(f.id):
+                value = await self.secret_settings.get(SecretSetting(f.from_setting))
+                if value:
+                    filled[f.id] = value
+        return filled
 
     # --- settings (new revision) --------------------------------------------
     async def current_settings(self, session: AsyncSession, app_id: int) -> AppSettings:

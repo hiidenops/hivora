@@ -19,9 +19,11 @@ from hivora.crypto.cipher import SecretBox, load_or_create_master_key
 from hivora.db.engine import make_engine, make_sessionmaker
 from hivora.db.migrate import upgrade_to_head
 from hivora.docker_gateway import DockerGateway
+from hivora.games.modpacks import ModpackCatalog
 from hivora.jobs import JobQueue
 from hivora.metrics.host import HostMetrics
 from hivora.state import StateService
+from hivora.system.secrets import SecretSettings
 from hivora.templates import Catalog
 from hivora.templates.icons import IconCache
 
@@ -49,6 +51,8 @@ class Runtime:
     audit: AuditRecorder
     icons: IconCache
     metrics: HostMetrics
+    secrets: SecretSettings
+    modpacks: ModpackCatalog
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     consoles: "ConsoleManager" = field(init=False)
 
@@ -86,6 +90,7 @@ class Runtime:
         state = StateService(gateway, bus)
         runner = ComposeRunner(settings.apps_dir, compose_cmd=compose_cmd, env=compose_env)
         jobs = JobQueue(sessions, bus, clock=clock, workers=settings.job_workers)
+        secrets = SecretSettings(sessions, box, bus)
         apps = AppService(
             settings=settings,
             sessions=sessions,
@@ -96,13 +101,15 @@ class Runtime:
             box=box,
             bus=bus,
             clock=clock,
+            secret_settings=secrets,
         )
         AppJobHandlers(apps).register()
         auth = AuthService(settings=settings, sessions=sessions, box=box, bus=bus, clock=clock)
         audit = AuditRecorder(sessions, bus)
         icons = IconCache(settings.data_dir / "icons")
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
-                   jobs, apps, auth, audit, icons, HostMetrics(bus))  # fmt: skip
+                   jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
+                   ModpackCatalog(settings.data_dir / "icons" / "modpacks"))  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.

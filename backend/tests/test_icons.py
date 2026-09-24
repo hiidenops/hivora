@@ -23,7 +23,8 @@ SVG = b'<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"></svg>'
         (SVG, "svg"),
         (b"  <svg></svg>", "svg"),
         (b"<html><body>not an image</body></html>", None),
-        (b"GIF89a", None),
+        (b"GIF89a....", "gif"),
+        (b"BM....", None),
     ],
 )
 def test_sniff_uses_content_not_headers(data: bytes, ext: str | None) -> None:

@@ -9,6 +9,7 @@ import { applyTheme } from "@/components/providers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch, Label, Select } from "@/components/ui/input";
+import { IntegrationsCard } from "@/features/account/integrations-card";
 import { PasswordForm } from "@/features/account/password-form";
 import { TotpCard } from "@/features/account/totp-card";
 import { api } from "@/lib/api/client";
@@ -48,7 +49,7 @@ function Sessions() {
 
 export default function SettingsPage() {
   const { t, lang, setLang } = useI18n();
-  const { advanced, setAdvanced } = useSession();
+  const { advanced, setAdvanced, can } = useSession();
   const router = useRouter();
   const logout = useLogout();
   const [theme, setTheme] = useState("system");
@@ -118,6 +119,16 @@ export default function SettingsPage() {
             <TotpCard />
           </CardContent>
         </Card>
+        {can("admin") && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("settings.integrations")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <IntegrationsCard />
+            </CardContent>
+          </Card>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>{t("settings.sessions")}</CardTitle>

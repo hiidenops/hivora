@@ -289,3 +289,28 @@ def test_console_over_websocket(client: TestClient) -> None:
     actions = [a["action"] for a in client.get(f"{API}/audit").json()]
     assert "console.opened" in actions and "console.closed" in actions
     assert runtime.consoles.open_count == 0
+
+
+def test_curseforge_key_setting_and_fallback(client: TestClient) -> None:
+    admin(client)
+    assert client.get(f"{API}/system/integrations").json() == {"curseforge_api_key_set": False}
+    body = {
+        "template": "minecraft",
+        "name": "atm",
+        "inputs": {"eula": True, "server_type": "AUTO_CURSEFORGE", "cf_modpack": "all-the-mods-9"},
+    }
+    missing = client.post(f"{API}/apps/plan", json=body)
+    assert missing.json()["error"]["details"]["fields"] == {"cf_api_key": "required"}
+
+    assert (
+        client.put(f"{API}/system/integrations/curseforge", json={"key": "$2a$10$abc"}).status_code
+        == 204
+    )
+    assert client.get(f"{API}/system/integrations").json() == {"curseforge_api_key_set": True}
+    plan = client.post(f"{API}/apps/plan", json=body)
+    assert plan.status_code == 200 and "$2a$10$abc" not in plan.text  # used, never shown
+    time.sleep(0.8)
+    entry = next(
+        a for a in client.get(f"{API}/audit").json() if a["action"] == "settings.secret_updated"
+    )
+    assert "$2a$10$abc" not in str(entry)

@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.4.0
+  version: 1.5.0
   category: games
   tags: [minecraft, java, sandbox]
   icon:
@@ -79,10 +79,11 @@ form:
       label: { fr: Clé API CurseForge, en: CurseForge API key }
       type: secret
       required: true
+      from_setting: curseforge_api_key
       showIf: { server_type: AUTO_CURSEFORGE }
       help:
-        fr: Exigée par CurseForge pour télécharger les modpacks. Gratuite sur console.curseforge.com.
-        en: Required by CurseForge to download modpacks. Free at console.curseforge.com.
+        fr: Laissez vide pour utiliser la clé enregistrée dans Paramètres. Gratuite sur console.curseforge.com.
+        en: Leave empty to use the key saved in Settings. Free at console.curseforge.com.
     - id: modrinth_modpack
       label: { fr: Modpack Modrinth (nom ou URL), en: Modrinth modpack (name or URL) }
       type: string

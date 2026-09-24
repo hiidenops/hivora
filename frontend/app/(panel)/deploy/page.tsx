@@ -23,7 +23,8 @@ type Step = "form" | "review" | "progress";
 function Deploy() {
   const { t, errorMessage } = useI18n();
   const { advanced } = useSession();
-  const slug = useSearchParams().get("template") ?? "";
+  const params = useSearchParams();
+  const slug = params.get("template") ?? "";
   const { data: template, error: loadError } = useTemplate(slug);
   const { data: zones } = useZones();
   const planMutation = usePlan();
@@ -42,9 +43,14 @@ function Deploy() {
 
   useEffect(() => {
     if (!template) return;
-    setName(template.name);
-    setValues(initialValues([...basic, ...advancedFields]));
-  }, [template, basic, advancedFields]);
+    // Links (e.g. the modpack catalog) may prefill non-secret fields and the name.
+    const fields = [...basic, ...advancedFields];
+    const prefill = Object.fromEntries(
+      fields.filter((f) => f.type !== "secret" && params.has(f.id)).map((f) => [f.id, params.get(f.id)]),
+    );
+    setName(params.get("name") ?? template.name);
+    setValues({ ...initialValues(fields), ...prefill });
+  }, [template, basic, advancedFields, params]);
 
   const error = planMutation.error ?? deploy.error;
   const fieldErrors =

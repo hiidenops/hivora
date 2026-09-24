@@ -455,6 +455,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/modpacks/icon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Icon */
+        get: operations["icon_api_v1_modpacks_icon_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/modpacks/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search */
+        get: operations["search_api_v1_modpacks_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -485,6 +519,40 @@ export interface paths {
         /** Info */
         get: operations["info_api_v1_system_info_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Integrations */
+        get: operations["integrations_api_v1_system_integrations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/integrations/curseforge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Curseforge Key */
+        put: operations["set_curseforge_key_api_v1_system_integrations_curseforge_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -849,6 +917,11 @@ export interface components {
             /** Ts */
             ts: number;
         };
+        /** IntegrationsOut */
+        IntegrationsOut: {
+            /** Curseforge Api Key Set */
+            curseforge_api_key_set: boolean;
+        };
         /** JobDetailOut */
         JobDetailOut: {
             /** App Id */
@@ -922,6 +995,14 @@ export interface components {
          * @enum {string}
          */
         JobStatus: "queued" | "running" | "succeeded" | "failed" | "cancelled" | "interrupted";
+        /** KeyIn */
+        KeyIn: {
+            /**
+             * Key
+             * @default
+             */
+            key: string;
+        };
         /** LoginIn */
         LoginIn: {
             /** Password */
@@ -944,6 +1025,30 @@ export interface components {
             totp_enabled: boolean;
             /** Username */
             username: string;
+        };
+        /** ModpackOut */
+        ModpackOut: {
+            /** Downloads */
+            downloads: number;
+            /** Icon Url */
+            icon_url: string | null;
+            /** Loaders */
+            loaders: string[];
+            /** Mc Versions */
+            mc_versions: string[];
+            /** Slug */
+            slug: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "modrinth" | "curseforge";
+            /** Summary */
+            summary: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
         };
         /**
          * NetworkMode
@@ -2142,6 +2247,72 @@ export interface operations {
             };
         };
     };
+    icon_api_v1_modpacks_icon_get: {
+        parameters: {
+            query: {
+                url: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_v1_modpacks_search_get: {
+        parameters: {
+            query?: {
+                source?: "modrinth" | "curseforge";
+                q?: string;
+                loader?: ("fabric" | "forge" | "neoforge" | "quilt") | null;
+                mc_version?: string | null;
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModpackOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_v1_system_health_get: {
         parameters: {
             query?: never;
@@ -2178,6 +2349,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemInfo"];
+                };
+            };
+        };
+    };
+    integrations_api_v1_system_integrations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationsOut"];
+                };
+            };
+        };
+    };
+    set_curseforge_key_api_v1_system_integrations_curseforge_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

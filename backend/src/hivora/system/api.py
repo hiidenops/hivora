@@ -3,11 +3,12 @@
 import platform
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from hivora import __version__
+from hivora.system.secrets import SecretSetting
 from hivora.templates.catalog import host_arch
-from hivora.web.deps import RuntimeDep, Viewer
+from hivora.web.deps import Admin, RuntimeDep, Viewer
 
 router = APIRouter(tags=["system"])
 
@@ -42,3 +43,23 @@ async def info(_: Viewer, rt: RuntimeDep) -> SystemInfo:
         arch=host_arch(),
         python=platform.python_version(),
     )
+
+
+class IntegrationsOut(BaseModel):
+    curseforge_api_key_set: bool  # the key itself is never sent back
+
+
+class KeyIn(BaseModel):
+    key: str = Field("", max_length=200)  # empty: remove the key
+
+
+@router.get("/integrations")
+async def integrations(_: Admin, rt: RuntimeDep) -> IntegrationsOut:
+    return IntegrationsOut(
+        curseforge_api_key_set=await rt.secrets.is_set(SecretSetting.CURSEFORGE_API_KEY)
+    )
+
+
+@router.put("/integrations/curseforge", status_code=204)
+async def set_curseforge_key(body: KeyIn, _: Admin, rt: RuntimeDep) -> None:
+    await rt.secrets.set(SecretSetting.CURSEFORGE_API_KEY, body.key.strip() or None)

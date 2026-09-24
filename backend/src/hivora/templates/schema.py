@@ -112,13 +112,17 @@ class FormField(_Strict):
     range: tuple[float, float] | None = None
     options: list[SelectOption] | None = None
     generate: Generate | None = None
+    # Secret left empty -> value of this global secret setting (declarative).
+    from_setting: Literal["curseforge_api_key"] | None = None
 
     @model_validator(mode="after")
     def _check(self) -> "FormField":
         if self.type == "select" and not self.options:
             raise ValueError(f"select field {self.id!r} needs options")
-        if self.generate and self.type != "secret":
-            raise ValueError(f"only secret fields can be generated ({self.id!r})")
+        if (self.generate or self.from_setting) and self.type != "secret":
+            raise ValueError(
+                f"only secret fields can be generated or taken from a setting ({self.id!r})"
+            )
         if self.type == "secret" and self.default is not None:
             raise ValueError(f"secret field {self.id!r} cannot have a default")
         return self

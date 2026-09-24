@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 
 import { AppIcon } from "@/components/app-icon";
 import { PageHeader, useSession } from "@/components/app-shell";
@@ -10,11 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TileSkeletons } from "@/components/ui/skeleton";
+import { ModpackBrowser } from "@/features/modpacks/modpack-browser";
 import { useTemplates } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-export default function CatalogPage() {
+function AppsCatalog() {
   const { t, l } = useI18n();
   const { can } = useSession();
   const { data: templates, isPending } = useTemplates();
@@ -30,19 +32,7 @@ export default function CatalogPage() {
 
   return (
     <>
-      <PageHeader
-        title={t("catalog.title")}
-        actions={
-          <Input
-            className="w-64"
-            placeholder={t("catalog.search")}
-            aria-label={t("catalog.search")}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        }
-      />
-      <div className="mb-5 flex flex-wrap gap-2">
+      <div className="mb-5 flex flex-wrap items-center gap-2">
         {categories.map((c) => (
           <button
             key={c}
@@ -55,6 +45,13 @@ export default function CatalogPage() {
             {t(`catalog.category.${c}` as MessageKey)}
           </button>
         ))}
+        <Input
+          className="ml-auto w-64"
+          placeholder={t("catalog.search")}
+          aria-label={t("catalog.search")}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </div>
       {isPending && <TileSkeletons label={t("common.loading")} count={4} />}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-4">
@@ -92,5 +89,41 @@ export default function CatalogPage() {
         ))}
       </div>
     </>
+  );
+}
+
+function Catalog() {
+  const { t } = useI18n();
+  const router = useRouter();
+  const tab = useSearchParams().get("tab") === "modpacks" ? "modpacks" : "apps";
+  return (
+    <>
+      <PageHeader title={t("catalog.title")} />
+      <div role="tablist" className="mb-5 flex gap-1 border-b">
+        {(["apps", "modpacks"] as const).map((k) => (
+          <button
+            key={k}
+            role="tab"
+            aria-selected={tab === k}
+            onClick={() => router.replace(k === "apps" ? "/catalog/" : "/catalog/?tab=modpacks")}
+            className={cn(
+              "-mb-px border-b-2 px-4 py-2 text-sm transition-colors",
+              tab === k ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t(k === "apps" ? "catalog.tab.apps" : "catalog.tab.modpacks")}
+          </button>
+        ))}
+      </div>
+      {tab === "apps" ? <AppsCatalog /> : <ModpackBrowser />}
+    </>
+  );
+}
+
+export default function CatalogPage() {
+  return (
+    <Suspense>
+      <Catalog />
+    </Suspense>
   );
 }

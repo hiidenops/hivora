@@ -32,6 +32,7 @@ class Purpose(StrEnum):
     APP_SECRET = "app-secret"  # noqa: S105 (purpose label, not a secret)
     REGISTRY = "registry"
     TOTP = "totp"
+    SETTING = "setting"  # secret global settings (e.g. third-party API keys)
 
 
 @dataclass(frozen=True, slots=True)
