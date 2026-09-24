@@ -84,3 +84,15 @@ def test_event() -> None:
     )
     assert (e.type, e.actor_id, e.attributes) == ("container", "abc", {"io.hivora.app": "demo"})
     assert e.time is not None and e.time.year == 2023
+
+
+def test_parse_docker_times() -> None:
+    from datetime import UTC, datetime
+
+    from hivora.docker_gateway.local import _parse_time
+
+    assert _parse_time("2026-09-24T13:15:01.123456789Z") == datetime(
+        2026, 9, 24, 13, 15, 1, 123456, UTC
+    )
+    assert _parse_time("2026-09-24T13:15:01Z") == datetime(2026, 9, 24, 13, 15, 1, tzinfo=UTC)
+    assert _parse_time("0001-01-01T00:00:00Z") is None  # never started

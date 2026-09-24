@@ -1,5 +1,6 @@
 """Application routes (/api/v1/apps)."""
 
+from contextlib import suppress
 from datetime import datetime
 from typing import Any
 
@@ -9,7 +10,7 @@ from sqlalchemy import select
 
 from hivora.apps.models import Application, AppRevision, DesiredState, RevisionStatus
 from hivora.apps.service import DeployPlan, DeployRequest, UpdatePlan
-from hivora.core.errors import NotFoundError
+from hivora.core.errors import HivoraError, NotFoundError
 from hivora.jobs import Job
 from hivora.state import AppStatus
 from hivora.templates.models import TemplateVersion
@@ -96,6 +97,11 @@ class ConsoleInfoOut(BaseModel):
     commands: list[ConsoleCommandOut]
 
 
+class SummaryItemOut(BaseModel):
+    label: Localized
+    value: Localized
+
+
 class AppDetailOut(AppOut):
     revision: int | None
     containers: list[ContainerOut]
@@ -103,6 +109,9 @@ class AppDetailOut(AppOut):
     volumes: list[str]
     console: ConsoleInfoOut
     game: str | None  # game tools available (e.g. "minecraft")
+    started_at: datetime | None  # main container, when running
+    access: dict[str, str]  # where to connect (web / game)
+    summary: list[SummaryItemOut]  # template-chosen settings (type, version...)
 
 
 class DeployOut(BaseModel):
@@ -185,6 +194,28 @@ def console_info(rt: RuntimeDep, template: str | None) -> ConsoleInfoOut:
     )  # fmt: skip
 
 
+async def app_summary(
+    rt: RuntimeDep, session: Any, app_id: int, template: str | None
+) -> list[SummaryItemOut]:
+    """The template's `summary` fields with their current values (option labels)."""
+    try:
+        t = rt.catalog.get(template).template if template else None
+    except NotFoundError:
+        return []
+    if t is None or not t.summary:
+        return []
+    values = (await rt.apps.current_settings(session, app_id)).values
+    fields = {f.id: f for f in t.form.fields}
+    items = []
+    for fid in t.summary:
+        f, value = fields[fid], values.get(fid)
+        if value in (None, ""):
+            continue
+        option = next((o for o in f.options or [] if o.value == value), None)
+        items.append(SummaryItemOut(label=f.label, value=option.label if option else str(value)))
+    return items
+
+
 def game_kind(rt: RuntimeDep, template: str | None) -> str | None:
     try:
         game = rt.catalog.get(template).template.game if template else None
@@ -249,6 +280,13 @@ async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
         revision = (await session.get(AppRevision, app.current_revision_id)
                     if app.current_revision_id else None)  # fmt: skip
         state = rt.state.store.app(app.slug)
+        *_unused, main = await rt.apps.main_container(session, app.id)
+        access = await rt.apps.access_of(session, app)
+        summary = await app_summary(rt, session, app.id, template)
+        started_at = main.started_at if main else None
+        if main and started_at is None:  # listings omit it: ask Docker once
+            with suppress(HivoraError):
+                started_at = (await rt.gateway.get_container(main.id)).started_at
         return AppDetailOut(
             **app_out(rt, app, template).model_dump(),
             revision=revision.number if revision else None,
@@ -262,6 +300,9 @@ async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
             volumes=[v.source for s in app.services for v in s.volumes],
             console=console_info(rt, template),
             game=game_kind(rt, template),
+            started_at=started_at,
+            access=access,
+            summary=summary,
         )  # fmt: skip
 
 

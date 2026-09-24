@@ -30,3 +30,32 @@ def test_player_names_are_strict(bad: str) -> None:
 
 def test_clean_strips_colours() -> None:
     assert clean("§aAdded §lSteve\x1b[0m") == "Added Steve"
+
+
+async def test_versions_from_the_mojang_manifest() -> None:
+    from aiohttp import web
+    from aiohttp.test_utils import TestServer
+
+    from hivora.games.minecraft import MinecraftVersions
+
+    manifest = {
+        "latest": {"release": "26.3", "snapshot": "26.4-snapshot-1"},
+        "versions": [
+            {"id": "26.4-snapshot-1", "type": "snapshot"},
+            {"id": "26.3", "type": "release"},
+            {"id": "1.21.1", "type": "release"},
+            {"id": "b1.7.3", "type": "old_beta"},
+        ],
+    }
+
+    async def serve(_: web.Request) -> web.Response:
+        return web.json_response(manifest)
+
+    app = web.Application()
+    app.router.add_get("/m.json", serve)
+    async with TestServer(app) as srv:
+        versions = MinecraftVersions(str(srv.make_url("/m.json")))
+        releases = [o["value"] for o in await versions.options(snapshots=False)]
+        everything = [o["value"] for o in await versions.options(snapshots=True)]
+    assert releases == ["LATEST", "SNAPSHOT", "26.3", "1.21.1"]
+    assert everything == ["LATEST", "SNAPSHOT", "26.4-snapshot-1", "26.3", "1.21.1"]

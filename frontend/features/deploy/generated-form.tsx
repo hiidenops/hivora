@@ -1,5 +1,10 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+
+import { useSession } from "@/components/app-shell";
+import { api } from "@/lib/api/client";
 import { Switch, Input, Label, Select } from "@/components/ui/input";
 import { useI18n, type Localized, type MessageKey } from "@/lib/i18n";
 
@@ -15,6 +20,8 @@ export interface FieldDef {
   options?: { value: string | number; label: Localized }[];
   generate?: { length: number };
   showIf?: Record<string, unknown>;
+  options_from?: string; // choices fetched from /options/<source>
+  suggestions?: { value: string; description: Localized }[];
 }
 
 export type Values = Record<string, unknown>;
@@ -111,6 +118,17 @@ export function GeneratedForm({
               ))}
             </Select>
           );
+        } else if (f.options_from) {
+          control = (
+            <DynamicSelect
+              id={id}
+              source={f.options_from}
+              value={values[f.id] === undefined ? "" : String(values[f.id])}
+              onChange={(v) => onChange(f.id, v)}
+              invalid={!!error}
+              describedBy={describe}
+            />
+          );
         } else if (f.type === "text") {
           control = (
             <textarea
@@ -163,6 +181,12 @@ export function GeneratedForm({
               </Label>
             )}
             {control}
+            {f.type === "text" && f.suggestions && f.suggestions.length > 0 && (
+              <SuggestionPicker
+                suggestions={f.suggestions}
+                onPick={(line) => onChange(f.id, withLine(String(values[f.id] ?? ""), line))}
+              />
+            )}
             {f.help && (
               <p id={`${id}-help`} className="text-xs text-muted-foreground">
                 {l(f.help)}
@@ -177,5 +201,93 @@ export function GeneratedForm({
         );
       })}
     </div>
+  );
+}
+
+/** Replace the line with the same key ("key=..."), or append it. */
+export function withLine(text: string, line: string): string {
+  const key = line.split("=")[0];
+  const lines = text.split("\n").filter((l) => l.trim() !== "");
+  const i = lines.findIndex((l) => l.split("=")[0].trim() === key);
+  if (i >= 0) lines[i] = line;
+  else lines.push(line);
+  return lines.join("\n");
+}
+
+function DynamicSelect({
+  id,
+  source,
+  value,
+  onChange,
+  invalid,
+  describedBy,
+}: {
+  id: string;
+  source: string;
+  value: string;
+  onChange: (v: string) => void;
+  invalid: boolean;
+  describedBy?: string;
+}) {
+  const { advanced } = useSession();
+  const { data } = useQuery({
+    queryKey: ["options", source, advanced],
+    queryFn: () => api<{ value: string; label: string }[]>(`/options/${source}`, { query: { snapshots: String(advanced) } }),
+    staleTime: 3_600_000,
+  });
+  // The current value stays selectable even if the list does not offer it (yet).
+  const options = data ?? [];
+  const known = options.some((o) => o.value === value);
+  return (
+    <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={invalid} aria-describedby={describedBy} className="font-mono">
+      {!known && value && <option value={value}>{value}</option>}
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </Select>
+  );
+}
+
+function SuggestionPicker({
+  suggestions,
+  onPick,
+}: {
+  suggestions: { value: string; description: Localized }[];
+  onPick: (line: string) => void;
+}) {
+  const { t, l } = useI18n();
+  const [filter, setFilter] = useState("");
+  const q = filter.trim().toLowerCase();
+  const shown = suggestions.filter((s) => !q || s.value.toLowerCase().includes(q) || l(s.description).toLowerCase().includes(q));
+  return (
+    <details className="rounded-md border">
+      <summary className="cursor-pointer px-3 py-2 text-sm font-medium">{t("form.suggestions")}</summary>
+      <div className="grid gap-2 border-t p-3">
+        <Input
+          placeholder={t("form.suggestionsFilter")}
+          aria-label={t("form.suggestionsFilter")}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="h-8"
+        />
+        <p className="text-xs text-muted-foreground">{t("form.suggestionsHint")}</p>
+        <ul className="max-h-64 overflow-y-auto">
+          {shown.map((s) => (
+            <li key={s.value}>
+              <button
+                type="button"
+                className="w-full rounded px-2 py-1.5 text-left transition-colors hover:bg-muted"
+                onClick={() => onPick(s.value)}
+              >
+                <code className="block font-mono text-xs">{s.value}</code>
+                <span className="text-xs text-muted-foreground">{l(s.description)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
   );
 }

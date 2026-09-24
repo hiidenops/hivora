@@ -37,6 +37,13 @@
       },
       "AppDetailOut": {
         "properties": {
+          "access": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Access",
+            "type": "object"
+          },
           "console": {
             "$ref": "#/components/schemas/ConsoleInfoOut"
           },
@@ -115,8 +122,27 @@
             "title": "Slug",
             "type": "string"
           },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
           "status": {
             "$ref": "#/components/schemas/AppStatus"
+          },
+          "summary": {
+            "items": {
+              "$ref": "#/components/schemas/SummaryItemOut"
+            },
+            "title": "Summary",
+            "type": "array"
           },
           "template": {
             "anyOf": [
@@ -165,7 +191,10 @@
           "ports",
           "volumes",
           "console",
-          "game"
+          "game",
+          "started_at",
+          "access",
+          "summary"
         ],
         "title": "AppDetailOut",
         "type": "object"
@@ -1149,6 +1178,24 @@
         "title": "OperatorOut",
         "type": "object"
       },
+      "OptionOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "OptionOut",
+        "type": "object"
+      },
       "PasswordConfirmIn": {
         "properties": {
           "password": {
@@ -1595,6 +1642,56 @@
           "secrets_set"
         ],
         "title": "SettingsOut",
+        "type": "object"
+      },
+      "SummaryItemOut": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "enum": [
+                    "fr",
+                    "en"
+                  ]
+                },
+                "type": "object"
+              }
+            ],
+            "title": "Label"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "enum": [
+                    "fr",
+                    "en"
+                  ]
+                },
+                "type": "object"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "SummaryItemOut",
         "type": "object"
       },
       "SystemInfo": {
@@ -3777,6 +3874,54 @@
         "summary": "Search",
         "tags": [
           "modpacks"
+        ]
+      }
+    },
+    "/api/v1/options/minecraft_versions": {
+      "get": {
+        "description": "Choices for fields declaring `options_from: minecraft_versions`.",
+        "operationId": "minecraft_versions_api_v1_options_minecraft_versions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "snapshots",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Snapshots",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OptionOut"
+                  },
+                  "title": "Response Minecraft Versions Api V1 Options Minecraft Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Minecraft Versions",
+        "tags": [
+          "options"
         ]
       }
     },

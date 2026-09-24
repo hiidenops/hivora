@@ -542,7 +542,7 @@ defaults:
 
 ### Expressions autorisées
 
-Une variable d'environnement dont la valeur rendue est vide n'est pas définie (champs optionnels). Un champ `secret` peut déclarer `from_setting` (ex. `curseforge_api_key`) : laissé vide, il prend la valeur de ce réglage global chiffré. Substitutions uniquement : `form.*`, `secret.*`, `app.*` (slug, nom, zone), `host.*` (ip publique, ip LAN, fuseau, PUID/PGID), `service.<nom>.host` (nom DNS interne). Filtres limités : `default`, `lower`, `upper`, `quote`. Pas de boucles ni de conditions dans les services : un template qui en aurait besoin doit être découpé.
+Une variable d'environnement dont la valeur rendue est vide n'est pas définie (champs optionnels). Un champ `secret` peut déclarer `from_setting` (ex. `curseforge_api_key`) : laissé vide, il prend la valeur de ce réglage global chiffré. Un champ peut aussi déclarer `options_from` (choix récupérés par Hivora, ex. `minecraft_versions`) et `suggestions` (lignes insérables pour un champ texte) ; le bloc `summary` liste les champs mis en avant sur la fiche d'app. Substitutions uniquement : `form.*`, `secret.*`, `app.*` (slug, nom, zone), `host.*` (ip publique, ip LAN, fuseau, PUID/PGID), `service.<nom>.host` (nom DNS interne). Filtres limités : `default`, `lower`, `upper`, `quote`. Pas de boucles ni de conditions dans les services : un template qui en aurait besoin doit être découpé.
 
 ### Versionnement
 

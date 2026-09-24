@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from hivora.games.minecraft import MinecraftTools
+from hivora.games.minecraft import MinecraftTools, MinecraftVersions
 from hivora.games.modpacks import Loader, Source
 from hivora.system.secrets import SecretSetting
 from hivora.templates.icons import MEDIA_TYPES
@@ -14,6 +14,7 @@ from hivora.web.deps import Operator, RuntimeDep, Viewer
 
 router = APIRouter(tags=["modpacks"])
 minecraft_router = APIRouter(tags=["minecraft"])  # mounted under /apps
+options_router = APIRouter(tags=["options"])  # dynamic choices for template fields
 
 
 class ModpackOut(BaseModel):
@@ -125,3 +126,17 @@ async def whitelist_enabled(app_id: int, body: EnabledIn, _: Operator, rt: Runti
     """Intent change: new revision, the server restarts."""
     job = await MinecraftTools(rt).set_whitelist_enabled(app_id, body.enabled)
     return JobRefOut(id=job.id, kind=job.kind.value, status=job.status.value)
+
+
+class OptionOut(BaseModel):
+    value: str
+    label: str
+
+
+_versions = MinecraftVersions()
+
+
+@options_router.get("/minecraft_versions")
+async def minecraft_versions(_: Viewer, snapshots: bool = False) -> list[OptionOut]:
+    """Choices for fields declaring `options_from: minecraft_versions`."""
+    return [OptionOut(**o) for o in await _versions.options(snapshots=snapshots)]

@@ -1,5 +1,5 @@
 /** Per-browser preferences (language, theme, advanced mode). Storage may be unavailable. */
-export type PrefKey = "lang" | "theme" | "advanced";
+export type PrefKey = "lang" | "theme" | "advanced" | `fold.${string}`;
 
 export function readPref(key: PrefKey): string | null {
   try {

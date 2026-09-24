@@ -8,7 +8,7 @@ import { useSession } from "@/components/app-shell";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/collapsible-card";
 import { Input, Label, Switch } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type GameAccess, type JobRef, type Players } from "@/lib/api/client";
@@ -16,29 +16,40 @@ import { useI18n } from "@/lib/i18n";
 
 const NAME = "[A-Za-z0-9_]{3,16}";
 
+/** Players online, polled every 15 s while the server runs (shared cache key). */
+export function usePlayers(appId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["apps", appId, "minecraft", "players"],
+    queryFn: () => api<Players>(`/apps/${appId}/minecraft/players`),
+    refetchInterval: enabled ? 15_000 : false,
+    enabled,
+  });
+}
+
 function PlayersCard({ appId, running }: { appId: number; running: boolean }) {
   const { t, errorMessage } = useI18n();
-  const { data, error, isPending } = useQuery({
-    queryKey: ["apps", appId, "minecraft", "players", running],
-    queryFn: () => api<Players>(`/apps/${appId}/minecraft/players`),
-    refetchInterval: running ? 15_000 : false,
-  });
+  const { data, error, isPending } = usePlayers(appId, running);
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
+    <CollapsibleCard
+      storageKey="mc.players"
+      title={
+        <>
           <Users className="size-5" /> {t("mc.players")}
-        </CardTitle>
-        {data?.running && data.online !== null && (
+        </>
+      }
+      aside={
+        data?.running &&
+        data.online !== null && (
           <span className="text-sm font-medium tabular-nums">
             {t("mc.online", { online: data.online, max: data.max ?? "?" })}
           </span>
-        )}
-      </CardHeader>
-      <CardContent>
-        {isPending && <Skeleton className="h-8" />}
+        )
+      }
+    >
+        {!running && <p className="text-sm text-muted-foreground">{t("mc.offline")}</p>}
+        {running && isPending && <Skeleton className="h-8" />}
         {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
-        {data && !data.running && <p className="text-sm text-muted-foreground">{t("mc.offline")}</p>}
+
         {data?.running && data.names.length === 0 && <p className="text-sm text-muted-foreground">{t("mc.nobody")}</p>}
         <ul className="flex flex-wrap gap-2">
           {data?.names.map((n) => (
@@ -49,8 +60,7 @@ function PlayersCard({ appId, running }: { appId: number; running: boolean }) {
             </li>
           ))}
         </ul>
-      </CardContent>
-    </Card>
+    </CollapsibleCard>
   );
 }
 
@@ -161,11 +171,22 @@ function AccessCard({ appId, onJob }: { appId: number; onJob: (id: number) => vo
   const locked = !data?.running || !operator;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("mc.access")}</CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-5">
+    <CollapsibleCard
+      storageKey="mc.access"
+      title={
+        <>
+          <Crown className="size-5" /> {t("mc.access")}
+        </>
+      }
+      aside={
+        data && (
+          <span className="text-xs text-muted-foreground">
+            {(wanted ?? data.whitelist_enabled) ? t("mc.whitelist") + " ✓" : null}
+          </span>
+        )
+      }
+    >
+      <div className="grid gap-5">
         {!data ? (
           <Skeleton className="h-32" />
         ) : (
@@ -205,8 +226,8 @@ function AccessCard({ appId, onJob }: { appId: number; onJob: (id: number) => vo
           </>
         )}
         {(command.error ?? toggle.error) && <Alert tone="danger">{errorMessage(command.error ?? toggle.error)}</Alert>}
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }
 

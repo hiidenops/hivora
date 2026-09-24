@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.6.0
+  version: 1.7.0
   category: games
   tags: [minecraft, java, sandbox]
   icon:
@@ -97,7 +97,8 @@ form:
       label: { fr: Version de Minecraft, en: Minecraft version }
       type: string
       default: LATEST
-      pattern: "LATEST|SNAPSHOT|[0-9]+\\.[0-9]+(\\.[0-9]+)?"
+      options_from: minecraft_versions
+      pattern: "[0-9A-Za-z._-]{2,40}"
     - id: memory
       label: { fr: Mémoire allouée à Java, en: Java memory }
       type: select
@@ -193,6 +194,37 @@ form:
       help:
         fr: "Une propriété par ligne, ex. « white-list=true ». Appliquées à chaque démarrage, après les réglages ci-dessus."
         en: "One property per line, e.g. \"white-list=true\". Applied on every start, after the settings above."
+      suggestions:
+        - { value: "level-name=world", description: { fr: "Dossier du monde utilisé (changer pour en créer/charger un autre)", en: "World folder in use (change to create/load another)" } }
+        - { value: "force-gamemode=false", description: { fr: "Forcer le mode de jeu par défaut à chaque connexion", en: "Force the default game mode on every join" } }
+        - { value: "generate-structures=true", description: { fr: "Générer villages, temples, etc. (nouveau terrain)", en: "Generate villages, temples, etc. (new terrain)" } }
+        - { value: "spawn-npcs=true", description: { fr: "Faire apparaître les villageois", en: "Spawn villagers" } }
+        - { value: "player-idle-timeout=0", description: { fr: "Expulser un joueur inactif après N minutes (0 = jamais)", en: "Kick idle players after N minutes (0 = never)" } }
+        - { value: "op-permission-level=4", description: { fr: "Niveau de permission des opérateurs (1 à 4)", en: "Operators' permission level (1 to 4)" } }
+        - { value: "function-permission-level=2", description: { fr: "Niveau de permission des fonctions (datapacks)", en: "Permission level of functions (datapacks)" } }
+        - { value: "hide-online-players=false", description: { fr: "Masquer la liste des joueurs dans le menu multijoueur", en: "Hide the player list in the multiplayer menu" } }
+        - { value: "enable-status=true", description: { fr: "Apparaître comme en ligne dans la liste des serveurs", en: "Show as online in the server list" } }
+        - { value: "enforce-secure-profile=true", description: { fr: "Exiger des profils de discussion signés par Mojang", en: "Require Mojang-signed chat profiles" } }
+        - { value: "prevent-proxy-connections=false", description: { fr: "Refuser les connexions via VPN/proxy détectées", en: "Refuse connections detected through VPN/proxy" } }
+        - { value: "rate-limit=0", description: { fr: "Paquets max par seconde et par joueur (0 = illimité)", en: "Max packets per second per player (0 = unlimited)" } }
+        - { value: "network-compression-threshold=256", description: { fr: "Taille (octets) à partir de laquelle les paquets sont compressés", en: "Packet size (bytes) from which packets are compressed" } }
+        - { value: "max-tick-time=60000", description: { fr: "Durée max d'un tick (ms) avant arrêt de sécurité (-1 = désactivé)", en: "Max tick duration (ms) before a safety stop (-1 = off)" } }
+        - { value: "max-chained-neighbor-updates=1000000", description: { fr: "Limite des mises à jour de blocs en chaîne", en: "Limit of chained block updates" } }
+        - { value: "entity-broadcast-range-percentage=100", description: { fr: "Distance d'affichage des entités (10 à 1000 %)", en: "Entity display distance (10 to 1000 %)" } }
+        - { value: "sync-chunk-writes=true", description: { fr: "Écrire les chunks de façon synchrone (plus sûr, plus lent)", en: "Write chunks synchronously (safer, slower)" } }
+        - { value: "pause-when-empty-seconds=60", description: { fr: "Mettre le serveur en pause quand il est vide depuis N secondes", en: "Pause the server when empty for N seconds" } }
+        - { value: "resource-pack=", description: { fr: "URL d'un pack de ressources proposé aux joueurs", en: "URL of a resource pack offered to players" } }
+        - { value: "resource-pack-sha1=", description: { fr: "Empreinte SHA-1 du pack de ressources", en: "SHA-1 hash of the resource pack" } }
+        - { value: "require-resource-pack=false", description: { fr: "Refuser les joueurs qui déclinent le pack de ressources", en: "Kick players who decline the resource pack" } }
+        - { value: "resource-pack-prompt=", description: { fr: "Message affiché avec la demande de pack de ressources", en: "Message shown with the resource pack prompt" } }
+        - { value: "initial-enabled-packs=vanilla", description: { fr: "Datapacks activés à la création du monde", en: "Datapacks enabled when the world is created" } }
+        - { value: "generator-settings={}", description: { fr: "Réglages du générateur (monde plat personnalisé)", en: "Generator settings (custom flat world)" } }
+        - { value: "broadcast-console-to-ops=true", description: { fr: "Envoyer les commandes de la console aux opérateurs", en: "Send console commands to operators" } }
+        - { value: "broadcast-rcon-to-ops=true", description: { fr: "Envoyer les commandes RCON aux opérateurs", en: "Send RCON commands to operators" } }
+        - { value: "log-ips=true", description: { fr: "Enregistrer les adresses IP dans les logs", en: "Log player IP addresses" } }
+        - { value: "enable-query=false", description: { fr: "Activer le protocole Query (GameSpy4) sur le port de jeu", en: "Enable the Query (GameSpy4) protocol on the game port" } }
+        - { value: "accepts-transfers=false", description: { fr: "Accepter les joueurs transférés depuis un autre serveur", en: "Accept players transferred from another server" } }
+        - { value: "bug-report-link=", description: { fr: "Lien affiché aux joueurs pour signaler un bug", en: "Link shown to players to report a bug" } }
 services:
   server:
     role: main
@@ -271,6 +303,7 @@ game:
     - { command: "stop", description: { fr: Arrêter proprement le serveur, en: Stop the server cleanly } }
   max_players: "{{ form.max_players }}"
   stop_command: stop
+summary: [server_type, version, memory, max_players]
 defaults:
   zone: gaming
   restart: unless-stopped

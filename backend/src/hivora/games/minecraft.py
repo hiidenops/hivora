@@ -143,3 +143,47 @@ class MinecraftTools:
         async with self.rt.sessions() as session:
             settings = await self.rt.apps.current_settings(session, app_id)
         return await self.rt.apps.update(app_id, {**settings.values, "enable_whitelist": enabled})
+
+
+MOJANG_MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
+VERSIONS_TTL_S = 3600.0
+
+
+class MinecraftVersions:
+    """Official version list (Mojang manifest), cached for an hour."""
+
+    def __init__(self, url: str = MOJANG_MANIFEST) -> None:
+        self.url = url
+        self._cache: tuple[float, dict[str, Any]] | None = None
+
+    async def _manifest(self) -> dict[str, Any]:
+        import time
+
+        import aiohttp
+
+        from hivora.games.modpacks import USER_AGENT, ModpackSourceError
+
+        if self._cache and time.monotonic() - self._cache[0] < VERSIONS_TTL_S:
+            return self._cache[1]
+        try:
+            async with (
+                aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=10), headers={"User-Agent": USER_AGENT}
+                ) as http,
+                http.get(self.url) as r,
+            ):
+                r.raise_for_status()
+                data: dict[str, Any] = await r.json()
+        except Exception as exc:
+            raise ModpackSourceError(f"Mojang version list unavailable: {exc}") from exc
+        self._cache = (time.monotonic(), data)
+        return data
+
+    async def options(self, *, snapshots: bool) -> list[dict[str, str]]:
+        data = await self._manifest()
+        kinds = {"release", "snapshot"} if snapshots else {"release"}
+        return [
+            {"value": "LATEST", "label": f"latest ({data['latest']['release']})"},
+            {"value": "SNAPSHOT", "label": f"snapshot ({data['latest']['snapshot']})"},
+            *({"value": v["id"], "label": v["id"]} for v in data["versions"] if v["type"] in kinds),
+        ]

@@ -611,6 +611,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/options/minecraft_versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Minecraft Versions
+         * @description Choices for fields declaring `options_from: minecraft_versions`.
+         */
+        get: operations["minecraft_versions_api_v1_options_minecraft_versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -855,6 +875,10 @@ export interface components {
         };
         /** AppDetailOut */
         AppDetailOut: {
+            /** Access */
+            access: {
+                [key: string]: string;
+            };
             console: components["schemas"]["ConsoleInfoOut"];
             /** Containers */
             containers: components["schemas"]["ContainerOut"][];
@@ -882,7 +906,11 @@ export interface components {
             revision: number | null;
             /** Slug */
             slug: string;
+            /** Started At */
+            started_at: string | null;
             status: components["schemas"]["AppStatus"];
+            /** Summary */
+            summary: components["schemas"]["SummaryItemOut"][];
             /** Template */
             template: string | null;
             /** Volumes */
@@ -1216,6 +1244,13 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** OptionOut */
+        OptionOut: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
         /** PasswordConfirmIn */
         PasswordConfirmIn: {
             /** Password */
@@ -1379,6 +1414,17 @@ export interface components {
             };
             /** Version */
             version: string;
+        };
+        /** SummaryItemOut */
+        SummaryItemOut: {
+            /** Label */
+            label: string | {
+                [key: string]: string;
+            };
+            /** Value */
+            value: string | {
+                [key: string]: string;
+            };
         };
         /** SystemInfo */
         SystemInfo: {
@@ -2708,6 +2754,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModpackOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    minecraft_versions_api_v1_options_minecraft_versions_get: {
+        parameters: {
+            query?: {
+                snapshots?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptionOut"][];
                 };
             };
             /** @description Validation Error */

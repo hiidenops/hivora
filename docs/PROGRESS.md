@@ -1,6 +1,6 @@
 # Hivora — Suivi d'avancement
 
-*Dernière mise à jour : 24 septembre 2026 (fin de journée)*
+*Dernière mise à jour : 25 septembre 2026*
 
 Document de reprise : où en est le projet, ce qui a été décidé, comment relancer l'environnement et ce qui reste à faire. Référence produit : [`vision-prd-architecture.md`](vision-prd-architecture.md).
 
@@ -23,6 +23,7 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Minecraft, partie A | Horodatage des graphiques, « Modifier les réglages » (révisions), types de serveur et modpacks, propriétés | ✅ | voir `git log` |
 | Catalogue de modpacks | Recherche Modrinth / CurseForge dans le panel, déploiement pré-rempli, clé CurseForge globale | ✅ | voir `git log` |
 | Minecraft, partie B | Joueurs connectés, liste blanche (on/off + ajout/retrait), admins | ✅ | voir `git log` |
+| Fiche d'app et réglages | Carte d'état, cartes repliables, versions en liste, propriétés disponibles | ✅ | voir `git log` |
 | Minecraft, partie C | Gestion des mondes | ⏳ proposé | — |
 | M6 Livraison | Image Docker, HTTPS, script d'installation, budgets CI, 3 templates | ⏳ à lancer | — |
 
@@ -60,17 +61,16 @@ Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
 - **Activer/désactiver la liste blanche** = intention (réglage `enable_whitelist`, template 1.6.0) : nouvelle révision + redémarrage, car l'image réécrit `white-list` à chaque démarrage. L'interrupteur reflète immédiatement la demande.
 - Vérifié sur un vrai serveur : `Notch` ajouté puis retiré, passé op (UUID Mojang réel), `white-list` à true puis false dans `server.properties`.
 
-## ▶ Reprise : prochaine étape (proposée, en attente de « go »)
+## Fiche d'app et réglages (fait, 25/09)
 
-Retours du 24/09 sur la fiche d'app et les réglages. Proposition faite, **pas encore validée ni commencée** :
+1. **Carte d'état** en haut de la fiche : icône, badge d'état coloré, « en marche depuis » (`StartedAt` du conteneur), adresse de connexion à copier, joueurs connectés, résumé déclaré par le template (`summary` : type, version, mémoire, joueurs max) et révision. Conteneurs en mode avancé.
+2. **Cartes Joueurs et Accès repliables** (état mémorisé, compteur visible replié).
+3. **« Tâches récentes » retirée** de la fiche (historique dans Activité ; la progression d'une action en cours reste affichée).
+4. **Version de Minecraft = liste** des vraies versions (manifeste Mojang via le backend, cache 1 h ; snapshots en mode avancé). Format de template : `options_from`.
+5. **Propriétés disponibles** : panneau filtrable de 30 propriétés `server.properties` (défaut + description FR/EN) ; un clic ajoute ou remplace la ligne. Format de template : `suggestions`.
+- Vérifié en réel : serveur déployé en 1.21.1 choisie dans la liste, `player-idle-timeout=0` ajouté via le panneau présent dans `server.properties`.
 
-1. **Carte d'état plus esthétique** (haut de la fiche, remplace « État ») : icône, grand badge d'état coloré, « en marche depuis 2 h 14 » (lire `State.StartedAt` du conteneur, à ajouter à `ContainerInfo`) ; pour un serveur de jeu : adresse de connexion + bouton Copier et aperçu « 3 / 10 joueurs » ; résumé type de serveur / version / mémoire / révision ; détail des conteneurs en mode avancé seulement.
-2. **Cartes Joueurs et Liste blanche repliables** : clic sur le titre, animation, état retenu dans le navigateur ; repliée, la carte Joueurs garde le compteur.
-3. **Retirer « Tâches récentes »** de la fiche d'app (l'historique reste dans Activité) ; garder l'affichage de la progression d'une action en cours.
-4. **Listes sélectionnables plutôt que saisie libre** : version de Minecraft = liste des vraies versions (manifeste Mojang récupéré par le backend, en cache ; « Dernière version », « Dernière snapshot », puis releases, snapshots en mode avancé). Mécanisme déclaratif dans le format de template : un champ peut déclarer une source de choix dynamique (comme `from_setting`). Revoir les autres saisies libres.
-5. **Aide pour les « propriétés personnalisées »** : panneau consultable/filtrable des propriétés `server.properties` sans champ dédié (nom, défaut, description FR/EN) ; un clic ajoute `clé=défaut` dans la zone. Mécanisme déclaratif : `suggestions` sur un champ texte du template.
-
-Ensuite : **Minecraft, partie C** (ci-dessous), puis **M6**.
+▶ **Prochaine étape** : Minecraft, partie C (mondes), puis M6.
 
 ## Minecraft, partie C (proposée, à valider)
 

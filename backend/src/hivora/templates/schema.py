@@ -100,6 +100,11 @@ class Generate(_Strict):
     length: Annotated[int, Field(ge=12, le=128)] = 24
 
 
+class Suggestion(_Strict):
+    value: str
+    description: Localized
+
+
 class FormField(_Strict):
     id: Annotated[str, Field(pattern=FIELD_ID)]
     label: Localized
@@ -114,6 +119,10 @@ class FormField(_Strict):
     generate: Generate | None = None
     # Secret left empty -> value of this global secret setting (declarative).
     from_setting: Literal["curseforge_api_key"] | None = None
+    # Choices fetched by Hivora from a known source (rendered as a list).
+    options_from: Literal["minecraft_versions"] | None = None
+    # Text fields: insertable lines shown next to the field (e.g. properties).
+    suggestions: list["Suggestion"] = []
 
     @model_validator(mode="after")
     def _check(self) -> "FormField":
@@ -218,6 +227,8 @@ class Template(_Strict):
     update: Update | None = None
     game: Game | None = None
     defaults: Defaults = Defaults()
+    # Form fields highlighted on the app page (e.g. server type, version, memory).
+    summary: list[str] = []
 
     @property
     def main_service(self) -> str:
@@ -230,6 +241,8 @@ class Template(_Strict):
         fields = {f.id: f for f in self.form.fields}
         if len(fields) != len(self.form.fields):
             raise ValueError("duplicate form field ids")
+        if unknown := set(self.summary) - set(fields):
+            raise ValueError(f"summary lists unknown fields {sorted(unknown)}")
         names = set(self.services)
         for name, svc in self.services.items():
             if unknown := set(svc.depends_on) - names:

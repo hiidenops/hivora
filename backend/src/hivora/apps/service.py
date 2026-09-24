@@ -245,6 +245,20 @@ class AppService:
         ]  # fmt: skip
         return app, entry, running[0] if running else None
 
+    async def access_of(self, session: AsyncSession, app: Application) -> dict[str, str]:
+        """Connection addresses (web / game) for the latest revision's inputs."""
+        try:
+            entry = await self._entry_of(session, app)
+        except (ConflictError, NotFoundError):
+            return {}
+        latest = await self._latest_revision(session, app.id)
+        if latest is None:
+            return {}
+        ctx = AppContext(slug=app.slug, name=app.name, revision=latest.number)
+        compiled = compile_template(entry.template, ctx, self.host, FormValues(dict(latest.inputs)),
+                                    self.settings.volumes_root)  # fmt: skip
+        return compiled.access
+
     # --- settings (new revision) --------------------------------------------
     async def current_settings(self, session: AsyncSession, app_id: int) -> AppSettings:
         app = await self.get(session, app_id)

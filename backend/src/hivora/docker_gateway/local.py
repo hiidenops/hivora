@@ -33,6 +33,16 @@ _HEALTH_IN_STATUS = (
 )
 
 
+def _parse_time(value: str | None) -> datetime | None:
+    """Docker timestamps have nanoseconds: keep microseconds for fromisoformat."""
+    if not value or value.startswith("0001-"):
+        return None
+    m = re.match(r"(.+?:\d\d)(\.\d{1,6})?\d*(Z|[+-]\d\d:\d\d)$", value)
+    if not m:
+        return None
+    return datetime.fromisoformat(f"{m[1]}{m[2] or ''}{'+00:00' if m[3] == 'Z' else m[3]}")
+
+
 def _state(value: str) -> ContainerState:
     try:
         return ContainerState(value)
@@ -102,6 +112,7 @@ def container_from_inspect(raw: dict[str, Any]) -> ContainerInfo:
         exit_code=st.get("ExitCode")
         if state in (ContainerState.EXITED, ContainerState.DEAD)
         else None,
+        started_at=_parse_time(st.get("StartedAt")) if state is ContainerState.RUNNING else None,
         labels=(raw.get("Config") or {}).get("Labels") or {},
         ports=tuple(ports),
         networks=tuple(((raw.get("NetworkSettings") or {}).get("Networks") or {}).keys()),

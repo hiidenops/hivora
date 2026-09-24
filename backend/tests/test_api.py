@@ -29,6 +29,7 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
         dev_insecure_cookies=True,
         puid=os.getuid(),
         pgid=os.getgid(),
+        host_lan_ip="192.168.1.10",
     )
     runtime = Runtime.build(
         settings,
@@ -327,7 +328,11 @@ def test_minecraft_players_whitelist_and_ops(client: TestClient) -> None:
     deployed = client.post(f"{API}/apps", json=body).json()
     wait_job(client, deployed["job"]["id"])
     app_id = deployed["app"]["id"]
-    assert client.get(f"{API}/apps/{app_id}").json()["game"] == "minecraft"
+    detail = client.get(f"{API}/apps/{app_id}").json()
+    assert detail["game"] == "minecraft" and detail["started_at"] is None  # not running
+    assert detail["summary"][0] == {"label": {"fr": "Type de serveur", "en": "Server type"},
+                                    "value": "Vanilla"}  # fmt: skip
+    assert detail["access"] == {"game": "192.168.1.10:25565"}  # LAN IP when no public one
 
     runtime = client.app.state.runtime  # type: ignore[attr-defined]
     gw = runtime.gateway
