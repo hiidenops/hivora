@@ -8,7 +8,7 @@ import { PageHeader, useSession } from "@/components/app-shell";
 import { applyTheme } from "@/components/providers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox, Label, Select } from "@/components/ui/input";
+import { Switch, Label, Select } from "@/components/ui/input";
 import { PasswordForm } from "@/features/account/password-form";
 import { TotpCard } from "@/features/account/totp-card";
 import { api } from "@/lib/api/client";
@@ -97,7 +97,7 @@ export default function SettingsPage() {
               </Select>
             </div>
             <label className="flex items-center gap-2 self-end pb-2 text-sm">
-              <Checkbox checked={advanced} onChange={(e) => setAdvanced(e.target.checked)} />
+              <Switch checked={advanced} onChange={(e) => setAdvanced(e.target.checked)} />
               {t("nav.advanced")}
             </label>
           </CardContent>

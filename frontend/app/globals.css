@@ -22,6 +22,9 @@
   --warn: oklch(0.72 0.15 70);
   --danger: oklch(0.58 0.2 27);
   --idle: oklch(0.62 0.01 60);
+  --grid: oklch(0.72 0.03 70 / 0.35);
+  --chart-1: #df911a;
+  --chart-2: #1a89c5;
 }
 
 .dark {
@@ -37,6 +40,9 @@
   --ok: oklch(0.72 0.15 150);
   --info: oklch(0.7 0.12 240);
   --idle: oklch(0.6 0.01 60);
+  --grid: oklch(0.78 0.05 75 / 0.14);
+  --chart-1: #c98212;
+  --chart-2: #1a89c5;
   color-scheme: dark;
 }
 
@@ -70,6 +76,12 @@ body {
 
 * {
   border-color: var(--border);
+}
+
+/* Grid items default to min-width: auto and grow to fit long content (logs,
+   compose files), pushing the layout past the screen. Let them shrink. */
+.grid > * {
+  min-width: 0;
 }
 
 :focus-visible {
@@ -131,6 +143,16 @@ body {
   animation: hv-stripes 0.8s linear infinite;
 }
 /* Interactive cards lift slightly on hover. */
+@keyframes hv-cell {
+  from { opacity: 0.55; }
+  to { opacity: 0; }
+}
+@utility stroke-grid { stroke: var(--grid); }
+@utility grid-cell {
+  fill: var(--primary);
+  opacity: 0;
+  animation: hv-cell 1.6s ease-out forwards;
+}
 @utility card-interactive {
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   &:hover {

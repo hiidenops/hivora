@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 
 import { keys } from "@/lib/api/hooks";
-import type { AppStatus } from "@/lib/api/client";
+import type { AppStatus, HostSample } from "@/lib/api/client";
 
 export interface LiveJob {
   status: string;
@@ -29,6 +29,7 @@ class RealtimeStore {
   connected = false;
   statuses: Record<string, AppStatus> = {};
   jobs: Record<number, LiveJob> = {};
+  host: HostSample[] = [];
 
   connect() {
     this.closed = false;
@@ -40,6 +41,7 @@ class RealtimeStore {
       this.connected = true;
       this.send({ op: "subscribe", channel: "state" });
       this.send({ op: "subscribe", channel: "jobs" });
+      this.send({ op: "subscribe", channel: "metrics" });
       this.watchedJobs.forEach((id) => this.send({ op: "subscribe", channel: "job", id }));
       this.emit();
     };
@@ -85,7 +87,9 @@ class RealtimeStore {
   }
 
   private handle(msg: Message) {
-    if (msg.channel === "state") {
+    if (msg.channel === "metrics") {
+      this.host = [...this.host, msg as unknown as HostSample].slice(-360);
+    } else if (msg.channel === "state") {
       if (msg.type === "snapshot") this.statuses = msg.apps as Record<string, AppStatus>;
       else this.statuses = { ...this.statuses, [msg.app as string]: msg.status as AppStatus };
       this.onAppChanged?.();
@@ -149,3 +153,10 @@ export function useLiveJob(id: number | null): LiveJob | null {
   }, [id, s]);
   return useSyncExternalStore(s.subscribe, () => (id ? (s.jobs[id] ?? null) : null), () => null);
 }
+
+/** Host samples received since the page connected (history comes from REST). */
+export function useLiveHost(): HostSample[] {
+  const s = useStore();
+  return useSyncExternalStore(s.subscribe, () => s.host, () => EMPTY);
+}
+const EMPTY: HostSample[] = [];

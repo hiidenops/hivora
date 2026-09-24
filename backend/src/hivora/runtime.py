@@ -19,6 +19,7 @@ from hivora.db.engine import make_engine, make_sessionmaker
 from hivora.db.migrate import upgrade_to_head
 from hivora.docker_gateway import DockerGateway
 from hivora.jobs import JobQueue
+from hivora.metrics.host import HostMetrics
 from hivora.state import StateService
 from hivora.templates import Catalog
 from hivora.templates.icons import IconCache
@@ -43,6 +44,7 @@ class Runtime:
     auth: AuthService
     audit: AuditRecorder
     icons: IconCache
+    metrics: HostMetrics
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
 
     @classmethod
@@ -90,12 +92,13 @@ class Runtime:
         audit = AuditRecorder(sessions, bus)
         icons = IconCache(settings.data_dir / "icons")
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
-                   jobs, apps, auth, audit, icons)  # fmt: skip
+                   jobs, apps, auth, audit, icons, HostMetrics(bus))  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
         self._icons_task = asyncio.create_task(self._warm_icons())
         await self.audit.start()
+        await self.metrics.start()
         await self.auth.ensure_initial_admin()
         await self.state.start()
         await self.jobs.start()
@@ -110,6 +113,7 @@ class Runtime:
         if self._icons_task:
             self._icons_task.cancel()
         await self.jobs.stop()
+        await self.metrics.stop()
         await self.state.stop()
         await self.audit.stop()
         await self.gateway.close()

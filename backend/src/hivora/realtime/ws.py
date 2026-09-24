@@ -1,11 +1,12 @@
 """The single multiplexed WebSocket (/ws).
 
-Client -> server:  {"op": "subscribe" | "unsubscribe", "channel": "state" | "jobs"}
+Client -> server:  {"op": "subscribe" | "unsubscribe", "channel": "state" | "jobs" | "metrics"}
                    {"op": "subscribe" | "unsubscribe", "channel": "job", "id": <job id>}
 Server -> client:  {"channel": "state", "type": "snapshot", "apps": {slug: status}}
                    {"channel": "state", "type": "app", "app": slug, "status": ...}
                    {"channel": "jobs", "type": "started" | "progress" | "finished", ...}
                    {"channel": "job", "id": n, "type": "log", "line": ...}
+                   {"channel": "metrics", "type": "host", ...sample}
 
 Authenticated by the session cookie; the Origin must match the Host
 (cross-site WebSocket hijacking). Log and console channels come later.
@@ -58,7 +59,7 @@ class Connection:
             subscribe = op == "subscribe"
             if channel == "job" and isinstance(msg.get("id"), int):
                 (self.jobs.add if subscribe else self.jobs.discard)(msg["id"])
-            elif channel in ("state", "jobs"):
+            elif channel in ("state", "jobs", "metrics"):
                 (self.channels.add if subscribe else self.channels.discard)(channel)
                 if subscribe and channel == "state":
                     apps = {k: a.status.value for k, a in self.rt.state.store.apps().items()}
@@ -75,6 +76,8 @@ class Connection:
         elif event.topic.startswith("job.") and event.topic != "job.log":
             if "jobs" in self.channels:
                 await self.send({"channel": "jobs", "type": event.topic[4:], **p})
+        elif event.topic == "metrics.host" and "metrics" in self.channels:
+            await self.send({"channel": "metrics", "type": "host", **p})
         elif event.topic == "job.log" and p.get("id") in self.jobs:
             await self.send({"channel": "job", "id": p["id"], "type": "log", "line": p["line"]})
 

@@ -4,11 +4,11 @@ from datetime import datetime
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from hivora.core.errors import NotFoundError
 from hivora.jobs.models import Job, JobKind, JobStatus
-from hivora.web.deps import Operator, RuntimeDep, Viewer
+from hivora.web.deps import Admin, Operator, RuntimeDep, Viewer
 
 router = APIRouter(tags=["jobs"])
 
@@ -71,3 +71,19 @@ async def get_job(job_id: int, _: Viewer, rt: RuntimeDep) -> JobDetailOut:
 @router.post("/{job_id}/cancel", status_code=202)
 async def cancel_job(job_id: int, _: Operator, rt: RuntimeDep) -> None:
     await rt.jobs.cancel(job_id)
+
+
+class ClearedOut(BaseModel):
+    deleted: int
+
+
+@router.delete("")
+async def clear_jobs(_: Admin, rt: RuntimeDep) -> ClearedOut:
+    """Delete finished jobs and their logs; queued and running ones are kept."""
+    async with rt.sessions() as session, session.begin():
+        result = await session.execute(
+            delete(Job).where(Job.status.not_in((JobStatus.QUEUED, JobStatus.RUNNING)))
+        )
+    deleted = int(result.rowcount or 0)  # type: ignore[attr-defined]
+    rt.bus.publish("jobs.cleared", deleted=deleted)
+    return ClearedOut(deleted=deleted)

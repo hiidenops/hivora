@@ -15,8 +15,8 @@ import { AppActions } from "@/features/apps/app-actions";
 import { JobList } from "@/features/apps/job-list";
 import { RemoveDialog } from "@/features/apps/remove-dialog";
 import { ApiError } from "@/lib/api/client";
-import { useApp, useAppCompose, useJobs, useRevisions } from "@/lib/api/hooks";
-import { useI18n } from "@/lib/i18n";
+import { useApp, useAppCompose, useJob, useJobs, useRevisions } from "@/lib/api/hooks";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 import { useLiveStatus } from "@/lib/realtime";
 
 function AppDetail() {
@@ -30,6 +30,7 @@ function AppDetail() {
   const { data: revisions } = useRevisions(id, advanced && !!app);
   const [activeJob, setActiveJob] = useState<number | null>(null);
   const [removing, setRemoving] = useState(false);
+  const { data: active } = useJob(activeJob);
   const status = useLiveStatus(app?.slug ?? "", app?.status ?? "missing");
 
   if (error) {
@@ -75,9 +76,9 @@ function AppDetail() {
       />
       <div className="grid gap-4 lg:grid-cols-2">
         {activeJob && (
-          <Card className="lg:col-span-2">
+          <Card className="animate-enter lg:col-span-2">
             <CardHeader>
-              <CardTitle>{t("app.jobs")}</CardTitle>
+              <CardTitle>{active ? t(`job.kind.${active.kind}` as MessageKey) : t("common.loading")}</CardTitle>
             </CardHeader>
             <CardContent>
               <JobProgress

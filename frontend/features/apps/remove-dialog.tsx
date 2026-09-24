@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/input";
+import { Switch } from "@/components/ui/input";
 import { useRemovalPlan, useRemoveApp } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 
@@ -41,7 +41,7 @@ export function RemoveDialog({ id, name, onJob }: { id: number; name: string; on
             {plan.data.length > 0 && (
               <div className="grid gap-2">
                 <label className="flex items-center gap-2 font-medium">
-                  <Checkbox checked={removeData} onChange={(e) => setRemoveData(e.target.checked)} />
+                  <Switch checked={removeData} onChange={(e) => setRemoveData(e.target.checked)} />
                   {t("remove.data")}
                 </label>
                 {removeData ? (

@@ -176,7 +176,11 @@ export interface paths {
         get: operations["list_audit_api_v1_audit_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Clear Audit
+         * @description Empty the trail, leaving one entry that says who emptied it and when.
+         */
+        delete: operations["clear_audit_api_v1_audit_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -349,7 +353,11 @@ export interface paths {
         get: operations["list_jobs_api_v1_jobs_get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Clear Jobs
+         * @description Delete finished jobs and their logs; queued and running ones are kept.
+         */
+        delete: operations["clear_jobs_api_v1_jobs_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -383,6 +391,23 @@ export interface paths {
         put?: never;
         /** Cancel Job */
         post: operations["cancel_job_api_v1_jobs__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/metrics/host": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Host History */
+        get: operations["host_history_api_v1_metrics_host_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -677,6 +702,11 @@ export interface components {
             /** Username */
             username: string | null;
         };
+        /** ClearedOut */
+        ClearedOut: {
+            /** Deleted */
+            deleted: number;
+        };
         /** CodeIn */
         CodeIn: {
             /** Code */
@@ -745,6 +775,21 @@ export interface components {
             status: string;
             /** Version */
             version: string;
+        };
+        /** HostSampleOut */
+        HostSampleOut: {
+            /** Cpu Percent */
+            cpu_percent: number;
+            /** Mem Total */
+            mem_total: number;
+            /** Mem Used */
+            mem_used: number;
+            /** Net Rx Bps */
+            net_rx_bps: number;
+            /** Net Tx Bps */
+            net_tx_bps: number;
+            /** Ts */
+            ts: number;
         };
         /** JobDetailOut */
         JobDetailOut: {
@@ -1495,6 +1540,26 @@ export interface operations {
             };
         };
     };
+    clear_audit_api_v1_audit_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClearedOut"];
+                };
+            };
+        };
+    };
     login_api_v1_auth_login_post: {
         parameters: {
             query?: never;
@@ -1762,6 +1827,26 @@ export interface operations {
             };
         };
     };
+    clear_jobs_api_v1_jobs_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClearedOut"];
+                };
+            };
+        };
+    };
     get_job_api_v1_jobs__job_id__get: {
         parameters: {
             query?: never;
@@ -1820,6 +1905,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    host_history_api_v1_metrics_host_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostSampleOut"][];
                 };
             };
         };

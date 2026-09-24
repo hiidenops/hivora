@@ -298,6 +298,19 @@
         "title": "AuditOut",
         "type": "object"
       },
+      "ClearedOut": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "ClearedOut",
+        "type": "object"
+      },
       "CodeIn": {
         "properties": {
           "code": {
@@ -481,6 +494,44 @@
           "version"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "HostSampleOut": {
+        "properties": {
+          "cpu_percent": {
+            "title": "Cpu Percent",
+            "type": "number"
+          },
+          "mem_total": {
+            "title": "Mem Total",
+            "type": "integer"
+          },
+          "mem_used": {
+            "title": "Mem Used",
+            "type": "integer"
+          },
+          "net_rx_bps": {
+            "title": "Net Rx Bps",
+            "type": "number"
+          },
+          "net_tx_bps": {
+            "title": "Net Tx Bps",
+            "type": "number"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "number"
+          }
+        },
+        "required": [
+          "ts",
+          "cpu_percent",
+          "mem_used",
+          "mem_total",
+          "net_rx_bps",
+          "net_tx_bps"
+        ],
+        "title": "HostSampleOut",
         "type": "object"
       },
       "JobDetailOut": {
@@ -2083,6 +2134,26 @@
       }
     },
     "/api/v1/audit": {
+      "delete": {
+        "description": "Empty the trail, leaving one entry that says who emptied it and when.",
+        "operationId": "clear_audit_api_v1_audit_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClearedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Clear Audit",
+        "tags": [
+          "audit"
+        ]
+      },
       "get": {
         "operationId": "list_audit_api_v1_audit_get",
         "parameters": [
@@ -2415,6 +2486,26 @@
       }
     },
     "/api/v1/jobs": {
+      "delete": {
+        "description": "Delete finished jobs and their logs; queued and running ones are kept.",
+        "operationId": "clear_jobs_api_v1_jobs_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClearedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Clear Jobs",
+        "tags": [
+          "jobs"
+        ]
+      },
       "get": {
         "operationId": "list_jobs_api_v1_jobs_get",
         "parameters": [
@@ -2558,6 +2649,31 @@
         "summary": "Cancel Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/v1/metrics/host": {
+      "get": {
+        "operationId": "host_history_api_v1_metrics_host_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/HostSampleOut"
+                  },
+                  "title": "Response Host History Api V1 Metrics Host Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Host History",
+        "tags": [
+          "metrics"
         ]
       }
     },

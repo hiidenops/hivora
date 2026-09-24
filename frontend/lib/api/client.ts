@@ -19,6 +19,7 @@ export type AuditEntry = Schemas["AuditOut"];
 export type Revision = Schemas["RevisionOut"];
 export type RemovalPlan = Schemas["RemovalPlanOut"];
 export type SessionInfo = Schemas["SessionOut"];
+export type HostSample = Schemas["HostSampleOut"];
 
 /** Error returned by the backend: `code` is stable and translated by the UI. */
 export class ApiError extends Error {

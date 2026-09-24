@@ -156,6 +156,7 @@ def test_deploy_flow_websocket_and_audit(client: TestClient) -> None:
         "web_port": "out_of_range"
     }
 
+    assert isinstance(client.get(f"{API}/metrics/host").json(), list)
     with client.websocket_connect("/ws") as ws:
         ws.send_json({"op": "subscribe", "channel": "state"})
         assert ws.receive_json() == {"channel": "state", "type": "snapshot", "apps": {}}
@@ -210,3 +211,17 @@ def test_websocket_rejects_anonymous_and_cross_origin(client: TestClient) -> Non
         client.websocket_connect("/ws", headers={"origin": "https://evil.example"}) as ws,
     ):
         ws.receive_json()
+
+
+def test_clear_jobs_and_audit(client: TestClient) -> None:
+    admin(client)
+    body = {"template": "vaultwarden", "name": "vw"}
+    job = client.post(f"{API}/apps", json=body).json()["job"]
+    wait_job(client, job["id"])
+    assert client.delete(f"{API}/jobs").json() == {"deleted": 1}
+    assert client.get(f"{API}/jobs").json() == []
+
+    time.sleep(0.8)  # let the recorder flush
+    assert client.delete(f"{API}/audit").json()["deleted"] > 0
+    [entry] = client.get(f"{API}/audit").json()
+    assert (entry["action"], entry["username"]) == ("audit.cleared", "admin")

@@ -1,6 +1,6 @@
 "use client";
 
-import { Checkbox, Input, Label, Select } from "@/components/ui/input";
+import { Switch, Input, Label, Select } from "@/components/ui/input";
 import { useI18n, type Localized, type MessageKey } from "@/lib/i18n";
 
 export interface FieldDef {
@@ -79,14 +79,13 @@ export function GeneratedForm({
         let control;
         if (f.type === "boolean") {
           control = (
-            <label className="flex items-start gap-2 text-sm">
-              <Checkbox
+            <label className="flex items-center gap-3 text-sm">
+              <Switch
                 id={id}
                 checked={values[f.id] === true}
                 onChange={(e) => onChange(f.id, e.target.checked)}
                 aria-invalid={!!error}
                 aria-describedby={describe}
-                className="mt-0.5"
               />
               <span>{l(f.label)}</span>
             </label>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-import { Checkbox } from "@/components/ui/input";
+import { Switch } from "@/components/ui/input";
 import { ApiError, type Me, type Role } from "@/lib/api/client";
 import { useLogout, useMe } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
@@ -112,7 +112,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </nav>
             <div className="mt-auto hidden flex-col gap-3 px-2 pt-6 md:flex">
               <label className="flex items-center gap-2 text-sm">
-                <Checkbox checked={advanced} onChange={(e) => session.setAdvanced(e.target.checked)} />
+                <Switch checked={advanced} onChange={(e) => session.setAdvanced(e.target.checked)} />
                 {t("nav.advanced")}
               </label>
               <ConnectionDot />

@@ -32,7 +32,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await expect(page.getByRole("heading", { name: /Vaultwarden/ })).toBeVisible();
   await page.getByRole("button", { name: "Supprimer" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("checkbox", { name: "Aussi supprimer les données" })).not.toBeChecked();
+  await expect(dialog.getByRole("switch", { name: "Aussi supprimer les données" })).not.toBeChecked();
   await dialog.getByRole("button", { name: "Supprimer" }).click();
   await expect(page).toHaveURL(/\/$/, { timeout: 20_000 });
   await expect(page.getByText("Aucune application pour l'instant.")).toBeVisible();
