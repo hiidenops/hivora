@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hivora.apps.files import tree_size
 from hivora.apps.models import (
     Application,
     AppRevision,
@@ -93,6 +94,15 @@ class UpdatePlan:
     plan: DeployPlan
     number: int  # the revision this change would create
     diff: str  # unified diff against the latest revision's compose
+    # Fields flagged `reset_data_on_change` whose value changed: applying wipes
+    # the volumes below (host path -> top-level names kept), after confirmation.
+    reset_fields: list[str] = field(default_factory=list)
+    reset_volumes: dict[str, list[str]] = field(default_factory=dict)
+    reset_size: int = 0  # bytes currently stored in those volumes
+
+
+class DataResetRequiredError(ConflictError):
+    code = "data_reset_required"
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,12 +317,37 @@ class AppService:
             previous.splitlines(keepends=True), new.splitlines(keepends=True),
             fromfile=f"revision {number - 1}", tofile=f"revision {number}",
         ))  # fmt: skip
-        return UpdatePlan(plan, number, diff)
+        # Compare with the revision the data was produced by (the applied one),
+        # not a failed attempt after it.
+        applied = (
+            await session.get(AppRevision, app.current_revision_id)
+            if app.current_revision_id else latest
+        )  # fmt: skip
+        before = dict(applied.inputs) if applied else {}
+        reset_fields = [
+            f.id for f in entry.template.form.fields
+            if f.reset_data_on_change and f.id in before
+            and before[f.id] != plan.form.values.get(f.id)
+        ]  # fmt: skip
+        if not reset_fields:
+            return UpdatePlan(plan, number, diff)
+        specs = entry.template.services
+        reset_volumes = {
+            str(v.source): next(x.reset_keep for x in specs[v.service].volumes if x.name == v.name)
+            for svc in plan.compiled.services for v in svc.volumes if not v.read_only
+        }  # fmt: skip
+        size = sum(tree_size(Path(p)) for p in reset_volumes)
+        return UpdatePlan(plan, number, diff, reset_fields, reset_volumes, size)
 
-    async def update(self, app_id: int, inputs: dict[str, Any]) -> Job:
+    async def update(self, app_id: int, inputs: dict[str, Any], *, reset_data: bool = False) -> Job:
         async with self.sessions() as session, session.begin():
             upd = await self.plan_update(session, app_id, inputs)
             plan = upd.plan
+            if upd.reset_fields and not reset_data:
+                raise DataResetRequiredError(
+                    "this change erases the app data and must be confirmed",
+                    fields=upd.reset_fields,
+                )
             if plan.conflicts:
                 raise PortConflictError(
                     "host ports already in use",
@@ -347,7 +382,8 @@ class AppService:
                 JobKind.UPDATE,
                 app_id=app.id,
                 app_slug=app.slug,
-                params={"revision_id": revision.id},
+                params={"revision_id": revision.id}
+                | ({"reset_volumes": upd.reset_volumes} if upd.reset_fields else {}),
             )
         self.jobs.wake()
         self.bus.publish("app.updated", app=app.slug, revision=upd.number, job=job.id)

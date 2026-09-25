@@ -4,7 +4,7 @@ from pathlib import Path
 
 from sqlalchemy import update
 
-from hivora.apps.files import ensure_dir, remove_tree
+from hivora.apps.files import empty_dir, ensure_dir, remove_tree
 from hivora.apps.models import Application, AppRevision, RevisionStatus
 from hivora.apps.service import AppService
 from hivora.compose_runner import ComposeError, ProgressEvent, ProgressStatus
@@ -56,6 +56,8 @@ class AppJobHandlers:
         ctx.add_secrets(secrets.values())
         env = {secret_env_name(k): v for k, v in secrets.items()}
         try:
+            if reset := ctx.params.get("reset_volumes"):
+                await self._reset_data(ctx, app.slug, reset)
             await ctx.progress(2, "Preparing directories and files")
             for source in sources:
                 if ensure_dir(
@@ -117,6 +119,21 @@ class AppJobHandlers:
         async with s.sessions() as session, session.begin():
             await session.delete(await s.get(session, _app_id(ctx)))
         s.bus.publish("app.removed", app=slug, data_removed=remove_data)
+
+    async def _reset_data(self, ctx: JobContext, slug: str, volumes: dict[str, list[str]]) -> None:
+        """Confirmed wipe before a revision the current data cannot survive."""
+        s = self.s
+        async with s.runner.lock(slug):
+            await ctx.progress(1, "Stopping the app to erase its data")
+            if s.runner.compose_path(slug).exists():
+                await s.runner.down(slug, on_progress=lambda e: self._log_event(ctx, e))
+            for source, keep in volumes.items():
+                removed = empty_dir(Path(source), s.settings.volumes_root, keep)
+                await ctx.log(
+                    f"erased {len(removed)} entries in {source}"
+                    + (f" (kept {', '.join(keep)})" if keep else "")
+                )
+        s.bus.publish("app.data_reset", app=slug, volumes=sorted(volumes))
 
     async def _up(self, ctx: JobContext, slug: str, secrets: list[str]) -> None:
         """`compose up --wait`; on failure, append the containers' own logs to the job."""

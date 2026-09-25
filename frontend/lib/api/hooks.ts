@@ -191,8 +191,8 @@ export const usePlanUpdate = (id: number) =>
 export function useUpdateSettings(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (inputs: Record<string, unknown>) =>
-      api<JobRef>(`/apps/${id}/settings`, { method: "PUT", body: { inputs } }),
+    mutationFn: ({ inputs, resetData }: { inputs: Record<string, unknown>; resetData: boolean }) =>
+      api<JobRef>(`/apps/${id}/settings`, { method: "PUT", body: { inputs, reset_data: resetData } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.app(id) }),
   });
 }

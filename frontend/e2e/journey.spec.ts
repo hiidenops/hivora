@@ -43,6 +43,24 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await expect(page).toHaveURL(/\/$/, { timeout: 20_000 });
   await expect(page.getByText("Aucune application pour l'instant.")).toBeVisible();
 
+  // Changing a flagged setting (server type) erases the data: confirmed explicitly.
+  await page.getByRole("link", { name: "Parcourir le catalogue" }).click();
+  await page.getByRole("article", { name: "Minecraft Java" }).getByRole("link", { name: "Déployer" }).click();
+  await page.getByRole("switch", { name: /J'accepte le contrat de licence Minecraft/ }).check();
+  await page.getByRole("button", { name: "Vérifier" }).click();
+  await page.getByRole("button", { name: "Déployer", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Application en ligne" })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("link", { name: "Voir l'application" }).click();
+  await page.getByRole("link", { name: "Modifier" }).click();
+  await page.getByLabel("Type de serveur", { exact: true }).selectOption("PAPER");
+  await page.getByRole("button", { name: "Vérifier les changements" }).click();
+  await expect(page.getByText(/Changer « Type de serveur » efface tout le contenu du serveur/)).toBeVisible();
+  const erase = page.getByRole("button", { name: "Effacer et appliquer" });
+  await expect(erase).toBeDisabled();
+  await page.getByRole("switch", { name: "J'ai compris, tout effacer et appliquer" }).check();
+  await erase.click();
+  await expect(page.getByRole("heading", { name: "Réglages appliqués" })).toBeVisible({ timeout: 20_000 });
+
   // User management (admin only).
   await page.getByRole("link", { name: "Utilisateurs" }).click();
   await page.getByRole("button", { name: "Ajouter un utilisateur" }).click();

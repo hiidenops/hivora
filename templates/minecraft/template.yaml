@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.8.0
+  version: 1.9.0
   category: games
   tags: [minecraft, java, sandbox]
   icon:
@@ -57,6 +57,7 @@ form:
         - { value: adventure, label: { fr: Aventure, en: Adventure } }
     - id: server_type
       label: { fr: Type de serveur, en: Server type }
+      reset_data_on_change: true
       type: select
       default: VANILLA
       options:
@@ -68,6 +69,7 @@ form:
         - { value: MODRINTH, label: { fr: Modpack Modrinth, en: Modrinth modpack } }
     - id: cf_modpack
       label: { fr: Modpack CurseForge (nom dans l'URL), en: CurseForge modpack (name in the URL) }
+      reset_data_on_change: true
       type: string
       required: true
       showIf: { server_type: AUTO_CURSEFORGE }
@@ -86,6 +88,7 @@ form:
         en: Leave empty to use the key saved in Settings. Free at console.curseforge.com.
     - id: modrinth_modpack
       label: { fr: Modpack Modrinth (nom ou URL), en: Modrinth modpack (name or URL) }
+      reset_data_on_change: true
       type: string
       required: true
       showIf: { server_type: MODRINTH }
@@ -95,6 +98,7 @@ form:
   advanced:
     - id: version
       label: { fr: Version de Minecraft, en: Minecraft version }
+      reset_data_on_change: true
       type: string
       default: LATEST
       options_from: minecraft_versions
@@ -277,7 +281,8 @@ services:
       - { container: 25565, host: "{{ form.game_port }}", purpose: game, exposure: public }
       - { container: 25575, purpose: rcon, exposure: internal }
     volumes:
-      - { name: data, target: /data, backup: true }
+      - { name: data, target: /data, backup: true,
+          reset_keep: [whitelist.json, ops.json, banned-players.json, banned-ips.json] }
     stdin_open: true  # server console (attach)
     tty: true
 access:

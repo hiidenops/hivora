@@ -245,3 +245,38 @@ async def test_update_creates_revision_and_keeps_secrets(env: Env) -> None:
     assert app.current_revision_id == revs[2].id and revs[2].diff_from_previous
     assert after == before  # left empty in the form: kept
     assert [p.host_port for p in svc.ports] == [8095]
+
+
+async def test_version_change_requires_confirmation_and_wipes_data(env: Env) -> None:
+    app, job = await env.service.deploy(DeployRequest("minecraft", "mc", {"eula": True}))
+    assert (await run(env, job)).status is JobStatus.SUCCEEDED
+    data = env.settings.volumes_root / "mc" / "data"
+    (data / "world").mkdir()
+    (data / "world" / "level.dat").write_bytes(b"x" * 10)
+    (data / "whitelist.json").write_text("[]")
+    async with env.sessions() as session:
+        values = (await env.service.current_settings(session, app.id)).values
+        same = await env.service.plan_update(session, app.id, {**values, "motd": "hello"})
+        changed = await env.service.plan_update(session, app.id, {**values, "version": "1.20.1"})
+    assert not same.reset_fields
+    assert changed.reset_fields == ["version"] and changed.reset_size == 12
+    assert changed.reset_volumes == {
+        str(data): ["whitelist.json", "ops.json", "banned-players.json", "banned-ips.json"]
+    }
+
+    # A harmless change never touches the data.
+    assert (
+        await run(env, await env.service.update(app.id, {**values, "motd": "hello"}))
+    ).status is JobStatus.SUCCEEDED
+    assert (data / "world" / "level.dat").exists()
+
+    with pytest.raises(ConflictError) as exc:
+        await env.service.update(app.id, {**values, "version": "1.20.1"})
+    assert exc.value.code == "data_reset_required"
+    assert (data / "world").exists()
+
+    job = await env.service.update(app.id, {**values, "version": "1.20.1"}, reset_data=True)
+    done = await run(env, job)
+    assert done.status is JobStatus.SUCCEEDED, done.error
+    assert sorted(p.name for p in data.iterdir()) == ["whitelist.json"]
+    assert "erased 1 entries" in done.log

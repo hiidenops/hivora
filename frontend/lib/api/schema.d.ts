@@ -1439,6 +1439,15 @@ export interface components {
             /** Slug */
             slug: string;
         };
+        /** ResetOut */
+        ResetOut: {
+            /** Fields */
+            fields: string[];
+            /** Size */
+            size: number;
+            /** Volumes */
+            volumes: string[];
+        };
         /** RevisionOut */
         RevisionOut: {
             /** Applied At */
@@ -1501,6 +1510,11 @@ export interface components {
             inputs: {
                 [key: string]: unknown;
             };
+            /**
+             * Reset Data
+             * @default false
+             */
+            reset_data: boolean;
         };
         /** SettingsOut */
         SettingsOut: {
@@ -1629,6 +1643,7 @@ export interface components {
             ports: components["schemas"]["PortOut"][];
             /** Public Ports */
             public_ports: number[];
+            reset: components["schemas"]["ResetOut"] | null;
             /** Revision */
             revision: number;
             /** Slug */

@@ -138,11 +138,19 @@ class SettingsOut(BaseModel):
 
 class SettingsIn(BaseModel):
     inputs: dict[str, Any] = {}
+    reset_data: bool = False  # confirms a change that erases the app data
+
+
+class ResetOut(BaseModel):
+    fields: list[str]
+    volumes: list[str]
+    size: int
 
 
 class UpdatePlanOut(PlanOut):
     revision: int
     diff: str
+    reset: ResetOut | None  # set when applying erases the app data
 
 
 class RemovalPlanOut(BaseModel):
@@ -379,7 +387,12 @@ async def get_settings(app_id: int, _: Operator, rt: RuntimeDep) -> SettingsOut:
 
 
 def update_plan_out(upd: UpdatePlan) -> UpdatePlanOut:
-    return UpdatePlanOut(**plan_out(upd.plan).model_dump(), revision=upd.number, diff=upd.diff)
+    reset = (
+        ResetOut(fields=upd.reset_fields, volumes=sorted(upd.reset_volumes), size=upd.reset_size)
+        if upd.reset_fields else None
+    )  # fmt: skip
+    return UpdatePlanOut(**plan_out(upd.plan).model_dump(), revision=upd.number, diff=upd.diff,
+                         reset=reset)  # fmt: skip
 
 
 @router.post("/{app_id}/settings/plan")
@@ -394,4 +407,4 @@ async def plan_settings(
 @router.put("/{app_id}/settings", status_code=202)
 async def update_settings(app_id: int, body: SettingsIn, _: Operator, rt: RuntimeDep) -> JobRef:
     """New revision from these inputs, applied by a job (secrets left empty are kept)."""
-    return job_ref(await rt.apps.update(app_id, body.inputs))
+    return job_ref(await rt.apps.update(app_id, body.inputs, reset_data=body.reset_data))

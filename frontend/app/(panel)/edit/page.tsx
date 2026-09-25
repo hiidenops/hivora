@@ -11,7 +11,9 @@ import { JobProgress } from "@/components/job-progress";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { units } from "@/features/activity/host-charts";
 import { GeneratedForm, type FieldDef, type Values } from "@/features/deploy/generated-form";
 import { ApiError, type UpdatePlan } from "@/lib/api/client";
 import { useApp, useAppSettings, usePlanUpdate, useUpdateSettings } from "@/lib/api/hooks";
@@ -27,7 +29,7 @@ function hasChanges(diff: string): boolean {
 }
 
 function Edit() {
-  const { t, errorMessage } = useI18n();
+  const { t, l, lang, errorMessage } = useI18n();
   const { advanced } = useSession();
   const id = Number(useSearchParams().get("id") ?? 0);
   const { data: app } = useApp(id);
@@ -39,6 +41,7 @@ function Edit() {
   const [review, setReview] = useState<UpdatePlan | null>(null);
   const [jobId, setJobId] = useState<number | null>(null);
   const [finished, setFinished] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   const form = settings?.form as { basic?: FieldDef[]; advanced?: FieldDef[] } | undefined;
   const basic = useMemo(() => form?.basic ?? [], [form]);
@@ -109,6 +112,7 @@ function Edit() {
                   plan.mutate(values, {
                     onSuccess: (p) => {
                       setReview(p);
+                      setConfirmReset(false);
                       setStep("review");
                     },
                   })
@@ -133,6 +137,28 @@ function Edit() {
               </Alert>
             ))}
             {review.public_ports.length > 0 && <Alert tone="warn">{t("deploy.public")}</Alert>}
+            {review.reset && (
+              <Alert tone="danger" className="grid gap-3">
+                <p className="font-medium">
+                  {t("edit.resetWarning", {
+                    fields: review.reset.fields
+                      .map((f) => l([...basic, ...advancedFields].find((d) => d.id === f)?.label ?? f))
+                      .join(", "),
+                    size: units(lang).size(review.reset.size),
+                  })}
+                </p>
+                <p>
+                  {t("edit.resetKept")}{" "}
+                  <Link href={`/app/?id=${id}`} className="underline">
+                    {t("edit.resetBackup")}
+                  </Link>
+                </p>
+                <label className="flex items-center gap-3 font-medium">
+                  <Switch checked={confirmReset} onChange={(e) => setConfirmReset(e.target.checked)} />
+                  {t("edit.resetConfirm")}
+                </label>
+              </Alert>
+            )}
             <div>
               <h4 className="mb-2 text-sm font-medium">
                 {t("edit.diff", { from: review.revision - 1, to: review.revision })}
@@ -143,16 +169,17 @@ function Edit() {
                 <DiffView diff={review.diff} />
               )}
             </div>
-            <p className="text-sm text-muted-foreground">{t("edit.applyNote")}</p>
+            {!review.reset && <p className="text-sm text-muted-foreground">{t("edit.applyNote")}</p>}
             {apply.error && <Alert tone="danger">{errorMessage(apply.error)}</Alert>}
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setStep("form")}>
                 {t("common.back")}
               </Button>
               <Button
-                disabled={review.conflicts.length > 0 || apply.isPending}
+                variant={review.reset ? "destructive" : undefined}
+                disabled={review.conflicts.length > 0 || apply.isPending || (!!review.reset && !confirmReset)}
                 onClick={() =>
-                  apply.mutate(values, {
+                  apply.mutate({ inputs: values, resetData: !!review.reset && confirmReset }, {
                     onSuccess: (job) => {
                       setJobId(job.id);
                       setStep("progress");
@@ -160,7 +187,7 @@ function Edit() {
                   })
                 }
               >
-                {t("edit.apply")}
+                {review.reset ? t("edit.resetApply") : t("edit.apply")}
               </Button>
             </div>
           </CardContent>

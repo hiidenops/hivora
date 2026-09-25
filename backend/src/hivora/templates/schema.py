@@ -123,6 +123,9 @@ class FormField(_Strict):
     options_from: Literal["minecraft_versions"] | None = None
     # Text fields: insertable lines shown next to the field (e.g. properties).
     suggestions: list["Suggestion"] = []
+    # Changing this value on an existing app wipes its volumes (e.g. a game
+    # version whose saves cannot be read by another one). Always confirmed.
+    reset_data_on_change: bool = False
 
     @model_validator(mode="after")
     def _check(self) -> "FormField":
@@ -159,6 +162,7 @@ class VolumeSpec(_Strict):
     target: str
     backup: bool = False
     read_only: bool = False
+    reset_keep: list[Annotated[str, Field(pattern=r"^[A-Za-z0-9._*-]+$")]] = []  # top-level globs
 
 
 class ServiceSpec(_Strict):

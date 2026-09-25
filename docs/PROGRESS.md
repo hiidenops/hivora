@@ -22,6 +22,7 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Fiche d'app | Carte d'état, cartes repliables, liste des versions, propriétés suggérées | ✅ | voir `git log` |
 | IP publique et consommation | Adresse publique, cartes repliées, CPU/RAM/réseau par app en direct | ✅ | `19e4aa6` |
 | Minecraft C | Mondes (liste, activer, importer, télécharger, supprimer) | ✅ | voir `git log` |
+| Changement de version | Avertissement, confirmation, contenu du serveur effacé | ✅ | voir `git log` |
 | M6 Livraison | Image Docker, HTTPS, script d'installation | ⏳ | |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
@@ -36,7 +37,7 @@ Tests : 110 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Pla
 
 ## En attente de ton retour
 
-Le serveur de test tourne sur la VM : **http://192.168.70.149:8000** (données dans `~/hivora-dev`, Docker réel), relancé avec la partie B de Minecraft. À tester :
+Le serveur de test tourne sur la VM : **http://192.168.70.150:8000** (données dans `~/hivora-dev`, Docker réel), relancé avec la partie B de Minecraft. À tester :
 
 1. **Console** : fiche d'une app démarrée → « Ouvrir la console ». Minecraft : onglet « Console serveur » (`rcon-cli`) + guide des commandes repliable ; toute app : onglet « Shell ».
 2. **Activité** : graphiques CPU / RAM / réseau (un point toutes les 10 s), boutons « Vider ».
@@ -94,7 +95,15 @@ Carte « Mondes » sur la fiche d'un serveur Minecraft (repliée par défaut) :
 - Vérifié en réel : monde de `serveur-test` exporté puis réimporté à l'identique ; `save-all flush` répond.
 - Limite connue : dans un `.zip`, seul le `level.dat` le moins profond est pris ; des dossiers de dimensions Paper zippés à côté sont ignorés.
 
-▶ **Prochaine étape** : M6 (livraison).
+## Changement de version Minecraft (fait, 25/09)
+
+Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en boucle (`No key dimensions in MapLike`), car Minecraft ne lit pas un monde enregistré par une version plus récente.
+1. Nouveau champ de template `reset_data_on_change` (Minecraft 1.9.0 : version, type de serveur, modpacks) et `reset_keep` sur un volume (`whitelist.json`, `ops.json`, `banned-*.json`).
+2. « Modifier les réglages » : si un tel champ change par rapport à la révision **appliquée**, l'aperçu affiche un avertissement rouge (champs, taille effacée, lien pour télécharger les mondes) ; « Effacer et appliquer » reste grisé tant que la confirmation n'est pas cochée.
+3. L'API refuse ce changement sans `reset_data: true` (409 `data_reset_required`). La tâche arrête l'app, vide le volume en gardant les fichiers listés, puis redémarre ; journal de tâche et audit `app.data_reset`.
+- Tests : unitaire (refus, effacement, réglage anodin sans effacement) et e2e (changement de type de serveur).
+
+▶ **Prochaine étape** : M6 (livraison), après les modifications de contenu en cours.
 
 ## Retours traités (tour 4)
 
@@ -197,11 +206,11 @@ cd /mnt/hgfs/shared/hivora/frontend && npm run build
 cd ../backend && PATH=$HOME/.local/bin:$PATH UV_PROJECT_ENVIRONMENT=$HOME/.venvs/hivora \
   HIVORA_DATA_DIR=$HOME/hivora-dev/data HIVORA_VOLUMES_ROOT=$HOME/hivora-dev/srv \
   HIVORA_CATALOG_DIR=../templates HIVORA_FRONTEND_DIR=../frontend/out \
-  HIVORA_DEV_INSECURE_COOKIES=true HIVORA_HOST_LAN_IP=192.168.70.149 \
+  HIVORA_DEV_INSECURE_COOKIES=true HIVORA_HOST_LAN_IP=192.168.70.150 \
   uv run uvicorn --factory hivora.main:app --host 0.0.0.0 --port 8000
 ```
 
-Puis ouvrir http://192.168.70.149:8000. Pour repartir de zéro : arrêter le serveur, supprimer les apps depuis l'UI, puis `rm -rf ~/hivora-dev`.
+Puis ouvrir http://192.168.70.150:8000. Pour repartir de zéro : arrêter le serveur, supprimer les apps depuis l'UI, puis `rm -rf ~/hivora-dev`.
 
 ## Arborescence
 

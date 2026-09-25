@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
-from hivora.apps.files import confined, remove_tree
+from hivora.apps.files import confined, remove_tree, tree_size
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.jobs import JobContext, JobKind
 
@@ -73,17 +73,6 @@ def valid_world_name(name: str) -> str:
     return name
 
 
-def _tree_size(path: Path) -> int:
-    total = 0
-    for dirpath, _, files in os.walk(path):
-        for f in files:
-            try:
-                total += os.lstat(os.path.join(dirpath, f)).st_size
-            except OSError:
-                pass
-    return total
-
-
 def world_dirs(data: Path, name: str) -> list[Path]:
     """The world's folder and its dimension siblings (Paper/Spigot layout)."""
     return [p for p in (data / name, *(data / f"{name}{s}" for s in DIMENSIONS)) if p.is_dir()]
@@ -101,7 +90,7 @@ def list_worlds(data: Path, active: str) -> list[World]:
     worlds = [
         World(
             name=name,
-            size=sum(_tree_size(p) for p in world_dirs(data, name)),
+            size=sum(tree_size(p) for p in world_dirs(data, name)),
             modified=(data / name / "level.dat").stat().st_mtime,
             active=name == active,
         )

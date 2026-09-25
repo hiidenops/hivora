@@ -1,5 +1,6 @@
 """Filesystem operations on app directories, confined to their roots."""
 
+import fnmatch
 import os
 import shutil
 from pathlib import Path
@@ -36,3 +37,34 @@ def remove_tree(path: Path, root: Path) -> bool:
         return False
     shutil.rmtree(target)
     return True
+
+
+def tree_size(path: Path) -> int:
+    total = 0
+    for dirpath, _, files in os.walk(path):
+        for f in files:
+            try:
+                total += os.lstat(os.path.join(dirpath, f)).st_size
+            except OSError:
+                pass
+    return total
+
+
+def empty_dir(path: Path, root: Path, keep: list[str]) -> list[str]:
+    """Delete everything in ``path`` except top-level entries matching ``keep``.
+
+    Returns the removed entry names. Symlinks are unlinked, never followed.
+    """
+    target = confined(path, root)
+    if not target.is_dir():
+        return []
+    removed = []
+    for entry in sorted(target.iterdir()):
+        if any(fnmatch.fnmatch(entry.name, k) for k in keep):
+            continue
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+        removed.append(entry.name)
+    return removed
