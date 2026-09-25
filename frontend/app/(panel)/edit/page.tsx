@@ -76,53 +76,53 @@ function Edit() {
         }
       />
       {step === "form" && (
-        <Card className="max-w-2xl">
-          <CardContent className="grid gap-6 pt-5">
-            <GeneratedForm
-              fields={basic}
-              values={values}
-              errors={fieldErrors}
-              onChange={setValue}
-              appName={app.name}
-              secretsSet={settings.secrets_set}
-            />
-            {advancedFields.length > 0 && (
-              <details open={advanced || advancedFields.some((f) => fieldErrors[f.id])}>
-                <summary className="cursor-pointer text-sm font-medium">{t("deploy.advanced")}</summary>
-                <div className="mt-4">
-                  <GeneratedForm
-                    fields={advancedFields}
-                    values={values}
-                    errors={fieldErrors}
-                    onChange={setValue}
-                    appName={app.name}
-                    secretsSet={settings.secrets_set}
-                  />
-                </div>
-              </details>
-            )}
-            {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
-            <div className="flex gap-2">
-              <Button variant="outline" asChild>
-                <Link href={`/app/?id=${id}`}>{t("common.cancel")}</Link>
-              </Button>
-              <Button
-                disabled={plan.isPending}
-                onClick={() =>
-                  plan.mutate(values, {
-                    onSuccess: (p) => {
-                      setReview(p);
-                      setConfirmReset(false);
-                      setStep("review");
-                    },
-                  })
-                }
-              >
-                {t("edit.review")}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4">
+          <GeneratedForm
+            fields={basic}
+            values={values}
+            errors={fieldErrors}
+            onChange={setValue}
+            appName={app.name}
+            secretsSet={settings.secrets_set}
+          />
+          {advancedFields.length > 0 && (
+            <details open={advanced || advancedFields.some((f) => fieldErrors[f.id])}>
+              <summary className="rounded-lg border bg-card px-4 py-3 text-sm font-medium shadow-xs">
+                {t("deploy.advanced")}
+              </summary>
+              <div className="mt-4">
+                <GeneratedForm
+                  fields={advancedFields}
+                  values={values}
+                  errors={fieldErrors}
+                  onChange={setValue}
+                  appName={app.name}
+                  secretsSet={settings.secrets_set}
+                />
+              </div>
+            </details>
+          )}
+          {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href={`/app/?id=${id}`}>{t("common.cancel")}</Link>
+            </Button>
+            <Button
+              disabled={plan.isPending}
+              onClick={() =>
+                plan.mutate(values, {
+                  onSuccess: (p) => {
+                    setReview(p);
+                    setConfirmReset(false);
+                    setStep("review");
+                  },
+                })
+              }
+            >
+              {t("edit.review")}
+            </Button>
+          </div>
+        </div>
       )}
 
       {step === "review" && review && (

@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.9.0
+  version: 1.10.0
   category: games
   tags: [minecraft, java, sandbox]
   icon:
@@ -29,33 +29,8 @@ form:
         en: I accept the Minecraft EULA (https://aka.ms/MinecraftEULA)
       type: boolean
       required: true
-    - id: motd
-      label: { fr: Message affiché dans la liste des serveurs, en: Message shown in the server list }
-      type: string
-      default: "Serveur {{ app.name }}"
-    - id: max_players
-      label: { fr: Joueurs max, en: Max players }
-      type: integer
-      default: 10
-      range: [1, 100]
-    - id: difficulty
-      label: { fr: Difficulté, en: Difficulty }
-      type: select
-      default: normal
-      options:
-        - { value: peaceful, label: { fr: Paisible, en: Peaceful } }
-        - { value: easy, label: { fr: Facile, en: Easy } }
-        - { value: normal, label: { fr: Normale, en: Normal } }
-        - { value: hard, label: { fr: Difficile, en: Hard } }
-    - id: mode
-      label: { fr: Mode de jeu, en: Game mode }
-      type: select
-      default: survival
-      options:
-        - { value: survival, label: { fr: Survie, en: Survival } }
-        - { value: creative, label: { fr: Créatif, en: Creative } }
-        - { value: adventure, label: { fr: Aventure, en: Adventure } }
     - id: server_type
+      group: { fr: Serveur, en: Server }
       label: { fr: Type de serveur, en: Server type }
       reset_data_on_change: true
       type: select
@@ -68,6 +43,7 @@ form:
         - { value: AUTO_CURSEFORGE, label: { fr: Modpack CurseForge, en: CurseForge modpack } }
         - { value: MODRINTH, label: { fr: Modpack Modrinth, en: Modrinth modpack } }
     - id: cf_modpack
+      group: { fr: Serveur, en: Server }
       label: { fr: Modpack CurseForge (nom dans l'URL), en: CurseForge modpack (name in the URL) }
       reset_data_on_change: true
       type: string
@@ -78,6 +54,7 @@ form:
         fr: "Ex. all-the-mods-9 pour curseforge.com/minecraft/modpacks/all-the-mods-9. Prévoyez 6 Go de mémoire ou plus."
         en: "E.g. all-the-mods-9 for curseforge.com/minecraft/modpacks/all-the-mods-9. Allow 6 GB of memory or more."
     - id: cf_api_key
+      group: { fr: Serveur, en: Server }
       label: { fr: Clé API CurseForge, en: CurseForge API key }
       type: secret
       required: true
@@ -87,6 +64,7 @@ form:
         fr: Laissez vide pour utiliser la clé enregistrée dans Paramètres. Gratuite sur console.curseforge.com.
         en: Leave empty to use the key saved in Settings. Free at console.curseforge.com.
     - id: modrinth_modpack
+      group: { fr: Serveur, en: Server }
       label: { fr: Modpack Modrinth (nom ou URL), en: Modrinth modpack (name or URL) }
       reset_data_on_change: true
       type: string
@@ -95,8 +73,8 @@ form:
       help:
         fr: "Ex. cobblemon-fabric ou https://modrinth.com/modpack/cobblemon-fabric. Aucune clé nécessaire."
         en: "E.g. cobblemon-fabric or https://modrinth.com/modpack/cobblemon-fabric. No key needed."
-  advanced:
     - id: version
+      group: { fr: Serveur, en: Server }
       label: { fr: Version de Minecraft, en: Minecraft version }
       reset_data_on_change: true
       type: string
@@ -104,6 +82,7 @@ form:
       options_from: minecraft_versions
       pattern: "[0-9A-Za-z._-]{2,40}"
     - id: memory
+      group: { fr: Serveur, en: Server }
       label: { fr: Mémoire allouée à Java, en: Java memory }
       type: select
       default: 2G
@@ -115,59 +94,73 @@ form:
         - { value: 8G, label: { fr: 8 Go, en: 8 GB } }
         - { value: 12G, label: { fr: 12 Go, en: 12 GB } }
         - { value: 16G, label: { fr: 16 Go, en: 16 GB } }
+    - id: motd
+      group: { fr: Général, en: General }
+      label: { fr: Message affiché dans la liste des serveurs, en: Message shown in the server list }
+      type: string
+      default: "Serveur {{ app.name }}"
+    - id: max_players
+      group: { fr: Général, en: General }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 10
+      range: [1, 100]
+    - id: difficulty
+      group: { fr: Général, en: General }
+      label: { fr: Difficulté, en: Difficulty }
+      type: select
+      default: normal
+      options:
+        - { value: peaceful, label: { fr: Paisible, en: Peaceful } }
+        - { value: easy, label: { fr: Facile, en: Easy } }
+        - { value: normal, label: { fr: Normale, en: Normal } }
+        - { value: hard, label: { fr: Difficile, en: Hard } }
+    - id: mode
+      group: { fr: Général, en: General }
+      label: { fr: Mode de jeu, en: Game mode }
+      type: select
+      default: survival
+      options:
+        - { value: survival, label: { fr: Survie, en: Survival } }
+        - { value: creative, label: { fr: Créatif, en: Creative } }
+        - { value: adventure, label: { fr: Aventure, en: Adventure } }
     - id: enable_whitelist
+      group: { fr: Règles du jeu, en: Game rules }
       label: { fr: Liste blanche (seuls les joueurs autorisés peuvent se connecter), en: Whitelist (only allowed players can join) }
       type: boolean
       default: false
     - id: pvp
+      group: { fr: Règles du jeu, en: Game rules }
       label: { fr: Combat entre joueurs (PvP), en: Player versus player (PvP) }
       type: boolean
       default: true
     - id: hardcore
+      group: { fr: Règles du jeu, en: Game rules }
       label: { fr: Mode hardcore, en: Hardcore mode }
       type: boolean
       default: false
     - id: allow_nether
+      group: { fr: Règles du jeu, en: Game rules }
       label: { fr: Autoriser le Nether, en: Allow the Nether }
       type: boolean
       default: true
     - id: allow_flight
+      group: { fr: Règles du jeu, en: Game rules }
       label: { fr: Autoriser le vol (mods), en: Allow flight (mods) }
       type: boolean
       default: false
     - id: spawn_monsters
+      group: { fr: Règles du jeu, en: Game rules }
       label: { fr: Apparition des monstres, en: Spawn monsters }
       type: boolean
       default: true
     - id: spawn_animals
+      group: { fr: Règles du jeu, en: Game rules }
       label: { fr: Apparition des animaux, en: Spawn animals }
       type: boolean
       default: true
-    - id: enable_command_block
-      label: { fr: Blocs de commande, en: Command blocks }
-      type: boolean
-      default: false
-    - id: view_distance
-      label: { fr: Distance de vue (chunks), en: View distance (chunks) }
-      type: integer
-      default: 10
-      range: [3, 32]
-    - id: simulation_distance
-      label: { fr: Distance de simulation (chunks), en: Simulation distance (chunks) }
-      type: integer
-      default: 10
-      range: [3, 32]
-    - id: spawn_protection
-      label: { fr: Protection du spawn (blocs), en: Spawn protection (blocks) }
-      type: integer
-      default: 16
-      range: [0, 256]
-    - id: max_world_size
-      label: { fr: Taille max du monde (rayon en blocs), en: Max world size (radius in blocks) }
-      type: integer
-      default: 29999984
-      range: [1000, 29999984]
     - id: level_type
+      group: { fr: Monde, en: World }
       label: { fr: Type de monde (nouveau monde), en: World type (new world) }
       type: select
       default: minecraft:normal
@@ -177,10 +170,12 @@ form:
         - { value: "minecraft:large_biomes", label: { fr: Grands biomes, en: Large biomes } }
         - { value: "minecraft:amplified", label: { fr: Amplifié, en: Amplified } }
     - id: seed
+      group: { fr: Monde, en: World }
       label: { fr: Graine du monde (nouveau monde), en: World seed (new world) }
       type: string
       pattern: "-?[0-9A-Za-z_ ]{0,64}"
     - id: level
+      group: { fr: Monde, en: World }
       label: { fr: Monde actif (dossier), en: Active world (folder) }
       type: string
       default: world
@@ -188,19 +183,53 @@ form:
       help:
         fr: "Dossier du monde chargé au démarrage ; un nom nouveau crée un monde. Se gère aussi depuis la carte Mondes."
         en: "World folder loaded on start; a new name creates a world. Also managed from the Worlds card."
-    - id: online_mode
-      label: { fr: Vérifier les comptes Mojang (online-mode), en: Verify Mojang accounts (online-mode) }
+  advanced:
+    - id: view_distance
+      group: { fr: Monde et performances, en: World and performance }
+      label: { fr: Distance de vue (chunks), en: View distance (chunks) }
+      type: integer
+      default: 10
+      range: [3, 32]
+    - id: simulation_distance
+      group: { fr: Monde et performances, en: World and performance }
+      label: { fr: Distance de simulation (chunks), en: Simulation distance (chunks) }
+      type: integer
+      default: 10
+      range: [3, 32]
+    - id: spawn_protection
+      group: { fr: Monde et performances, en: World and performance }
+      label: { fr: Protection du spawn (blocs), en: Spawn protection (blocks) }
+      type: integer
+      default: 16
+      range: [0, 256]
+    - id: max_world_size
+      group: { fr: Monde et performances, en: World and performance }
+      label: { fr: Taille max du monde (rayon en blocs), en: Max world size (radius in blocks) }
+      type: integer
+      default: 29999984
+      range: [1000, 29999984]
+    - id: enable_command_block
+      group: { fr: Monde et performances, en: World and performance }
+      label: { fr: Blocs de commande, en: Command blocks }
       type: boolean
-      default: true
+      default: false
     - id: game_port
+      group: { fr: Réseau et sécurité, en: Network and security }
       label: { fr: Port de jeu (TCP), en: Game port (TCP) }
       type: port
       default: 25565
+    - id: online_mode
+      group: { fr: Réseau et sécurité, en: Network and security }
+      label: { fr: Vérifier les comptes Mojang (online-mode), en: Verify Mojang accounts (online-mode) }
+      type: boolean
+      default: true
     - id: rcon_password
+      group: { fr: Réseau et sécurité, en: Network and security }
       label: { fr: Mot de passe RCON, en: RCON password }
       type: secret
       generate: { length: 24 }
     - id: custom_properties
+      group: { fr: Propriétés personnalisées, en: Custom properties }
       label: { fr: Propriétés personnalisées (server.properties), en: Custom properties (server.properties) }
       type: text
       help:

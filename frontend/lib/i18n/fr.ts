@@ -16,6 +16,7 @@ export const fr = {
   "common.delete": "Supprimer",
   "common.copy": "Copier",
   "common.copied": "Copié",
+  "common.textCopied": "Texte copié !",
   "common.loading": "Chargement…",
   "common.none": "Aucun",
   "common.back": "Retour",

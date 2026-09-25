@@ -4,6 +4,7 @@ import { Check, Copy, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AppIcon } from "@/components/app-icon";
+import { useCopy } from "@/components/copy";
 import { Card } from "@/components/ui/card";
 import type { AppDetail, AppStatus } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
@@ -39,22 +40,15 @@ function useNow(ms = 30_000): number {
 
 function CopyAddress({ value }: { value: string }) {
   const { t } = useI18n();
-  const [copied, setCopied] = useState(false);
+  const { copied, copy, bubble } = useCopy();
   return (
     <button
       type="button"
-      className="group inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 font-mono text-sm transition-colors hover:bg-muted"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          /* plain HTTP: no clipboard API, the address stays selectable */
-        }
-      }}
+      className="group relative inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-1.5 font-mono text-sm transition-colors hover:bg-muted"
+      onClick={() => copy(value)}
       title={t("common.copy")}
     >
+      {bubble}
       {value}
       {copied ? <Check className="size-4 text-ok" /> : <Copy className="size-4 text-muted-foreground group-hover:text-foreground" />}
     </button>

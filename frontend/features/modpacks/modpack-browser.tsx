@@ -73,8 +73,8 @@ export function ModpackBrowser() {
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-wrap items-end gap-3">
-        <div role="tablist" aria-label={t("modpacks.source")} className="inline-flex rounded-md border p-0.5">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-3 shadow-xs">
+        <div role="tablist" aria-label={t("modpacks.source")} className="inline-flex rounded-md border bg-card p-0.5">
           {(["modrinth", "curseforge"] as Source[]).map((s) => (
             <button
               key={s}

@@ -88,46 +88,46 @@ function Deploy() {
         }
       />
       {step === "form" && (
-        <Card className="max-w-2xl">
-          <CardContent className="grid gap-6 pt-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5">
-                <Label htmlFor="app-name">{t("deploy.name")}</Label>
-                <Input id="app-name" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="app-zone">{t("deploy.zone")}</Label>
-                <Select id="app-zone" value={zone} onChange={(e) => setZone(e.target.value)}>
-                  <option value="">{t("dashboard.unclassified")}</option>
-                  {zones?.map((z) => (
-                    <option key={z.slug} value={z.slug}>
-                      {z.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
+        <div className="grid gap-4">
+          <div className="grid gap-4 rounded-lg border bg-card p-4 shadow-xs sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="app-name">{t("deploy.name")}</Label>
+              <Input id="app-name" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
             </div>
-            <GeneratedForm fields={basic} values={values} errors={fieldErrors} onChange={setValue} appName={name} />
-            {advancedFields.length > 0 && (
-              <details open={advanced || advancedFields.some((f) => fieldErrors[f.id])}>
-                <summary className="cursor-pointer text-sm font-medium">{t("deploy.advanced")}</summary>
-                <div className="mt-4">
-                  <GeneratedForm
-                    fields={advancedFields}
-                    values={values}
-                    errors={fieldErrors}
-                    onChange={setValue}
-                    appName={name}
-                  />
-                </div>
-              </details>
-            )}
-            {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
-            <Button className="justify-self-start" onClick={review} disabled={planMutation.isPending}>
-              {t("deploy.preview")}
-            </Button>
-          </CardContent>
-        </Card>
+            <div className="grid gap-1.5">
+              <Label htmlFor="app-zone">{t("deploy.zone")}</Label>
+              <Select id="app-zone" value={zone} onChange={(e) => setZone(e.target.value)}>
+                <option value="">{t("dashboard.unclassified")}</option>
+                {zones?.map((z) => (
+                  <option key={z.slug} value={z.slug}>
+                    {z.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          <GeneratedForm fields={basic} values={values} errors={fieldErrors} onChange={setValue} appName={name} />
+          {advancedFields.length > 0 && (
+            <details open={advanced || advancedFields.some((f) => fieldErrors[f.id])}>
+              <summary className="rounded-lg border bg-card px-4 py-3 text-sm font-medium shadow-xs">
+                {t("deploy.advanced")}
+              </summary>
+              <div className="mt-4">
+                <GeneratedForm
+                  fields={advancedFields}
+                  values={values}
+                  errors={fieldErrors}
+                  onChange={setValue}
+                  appName={name}
+                />
+              </div>
+            </details>
+          )}
+          {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
+          <Button className="justify-self-start" onClick={review} disabled={planMutation.isPending}>
+            {t("deploy.preview")}
+          </Button>
+        </div>
       )}
 
       {step === "review" && plan && (

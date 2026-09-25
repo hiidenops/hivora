@@ -113,6 +113,7 @@ class FormField(_Strict):
     default: Any = None
     pattern: str | None = None
     help: Localized | None = None
+    group: Localized | None = None  # section title; consecutive fields share it
     show_if: dict[str, Any] | None = Field(default=None, alias="showIf")
     range: tuple[float, float] | None = None
     options: list[SelectOption] | None = None

@@ -120,7 +120,7 @@ export const useZones = () => useQuery({ queryKey: keys.zones, queryFn: () => ap
 export const useJobs = (appId?: number) =>
   useQuery({
     queryKey: appId ? [...keys.jobs, { appId }] : keys.jobs,
-    queryFn: () => api<Job[]>("/jobs", { query: appId ? { app_id: String(appId) } : undefined }),
+    queryFn: () => api<Job[]>("/jobs", { query: { limit: "30", ...(appId ? { app_id: String(appId) } : {}) } }),
   });
 export const useJob = (id: number | null) =>
   useQuery({ queryKey: keys.job(id ?? 0), queryFn: () => api<JobDetail>(`/jobs/${id}`), enabled: !!id });

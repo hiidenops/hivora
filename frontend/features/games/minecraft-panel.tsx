@@ -242,11 +242,12 @@ export function MinecraftPanel({
   running: boolean;
   onJob: (jobId: number) => void;
 }) {
+  // Own full-width row: each card keeps its own height, opening one moves no other.
   return (
-    <>
+    <div className="grid items-start gap-4 lg:col-span-2 xl:grid-cols-3">
       <PlayersCard appId={appId} running={running} />
       <AccessCard appId={appId} onJob={onJob} />
       <WorldsCard appId={appId} onJob={onJob} />
-    </>
+    </div>
   );
 }

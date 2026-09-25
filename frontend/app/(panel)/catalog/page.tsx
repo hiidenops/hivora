@@ -32,14 +32,16 @@ function AppsCatalog() {
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 shadow-xs">
         {categories.map((c) => (
           <button
             key={c}
             onClick={() => setCategory(c)}
             className={cn(
               "rounded-full border px-3 py-1 text-sm transition-colors",
-              category === c ? "border-primary bg-primary/15 font-medium" : "text-muted-foreground hover:bg-muted",
+              category === c
+                ? "border-primary bg-primary font-medium text-primary-foreground"
+                : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
             {t(`catalog.category.${c}` as MessageKey)}
@@ -99,7 +101,7 @@ function Catalog() {
   return (
     <>
       <PageHeader title={t("catalog.title")} />
-      <div role="tablist" className="mb-5 flex gap-1 border-b">
+      <div role="tablist" className="mb-5 flex gap-1 rounded-lg border bg-card p-1 shadow-xs">
         {(["apps", "modpacks"] as const).map((k) => (
           <button
             key={k}
@@ -107,8 +109,10 @@ function Catalog() {
             aria-selected={tab === k}
             onClick={() => router.replace(k === "apps" ? "/catalog/" : "/catalog/?tab=modpacks")}
             className={cn(
-              "-mb-px border-b-2 px-4 py-2 text-sm transition-colors",
-              tab === k ? "border-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground",
+              "rounded-md px-4 py-2 text-sm transition-colors",
+              tab === k
+                ? "bg-primary font-medium text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
             {t(k === "apps" ? "catalog.tab.apps" : "catalog.tab.modpacks")}

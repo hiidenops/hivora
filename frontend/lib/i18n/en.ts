@@ -17,6 +17,7 @@ export const en: Record<MessageKey, string> = {
   "common.delete": "Delete",
   "common.copy": "Copy",
   "common.copied": "Copied",
+  "common.textCopied": "Text copied!",
   "common.loading": "Loading…",
   "common.none": "None",
   "common.back": "Back",
