@@ -46,7 +46,7 @@ function deployHref(p: Modpack): string {
 export function ModpackBrowser() {
   const { t, lang, errorMessage } = useI18n();
   const { can } = useSession();
-  const [source, setSource] = useState<Source>("modrinth");
+  const [source, setSource] = useState<Source>("curseforge"); // the larger catalog
   const [query, setQuery] = useState("");
   const [loader, setLoader] = useState("");
   const [version, setVersion] = useState("");
@@ -76,7 +76,7 @@ export function ModpackBrowser() {
     <div className="grid gap-5">
       <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-3 shadow-xs">
         <div role="tablist" aria-label={t("modpacks.source")} className="inline-flex rounded-md border bg-card p-0.5">
-          {(["modrinth", "curseforge"] as Source[]).map((s) => (
+          {(["curseforge", "modrinth"] as Source[]).map((s) => (
             <button
               key={s}
               role="tab"

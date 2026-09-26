@@ -179,12 +179,52 @@ class ArchVariant(_Strict):
     env: dict[str, str | int | bool] = {}  # merged over the service env
 
 
+def version_tuple(value: str) -> tuple[int, ...] | None:
+    """ "1.20.4" -> (1, 20, 4); None for anything else (LATEST, snapshots...)."""
+    if not re.fullmatch(r"\d+(\.\d+)*", value):
+        return None
+    return tuple(int(n) for n in value.split("."))
+
+
+class TagChoice(_Strict):
+    """An image tag picked by a form value, exact or as a version range."""
+
+    tag: str
+    value: str | None = None  # this exact value
+    below: str | None = None  # versions lower than this one (choices go in ascending order)
+
+    @model_validator(mode="after")
+    def _one_rule(self) -> "TagChoice":
+        if (self.value is None) == (self.below is None):
+            raise ValueError("a tag choice needs exactly one of value or below")
+        if self.below is not None and version_tuple(self.below) is None:
+            raise ValueError(f"below: {self.below!r} is not a version number")
+        return self
+
+
+class TagSelect(_Strict):
+    """The image tag follows a form field (e.g. game version -> Java runtime)."""
+
+    field: str
+    choices: list[TagChoice]
+
+    def pick(self, value: object) -> str | None:
+        text = "" if value is None else str(value)
+        version = version_tuple(text)
+        for c in self.choices:
+            below = version_tuple(c.below) if c.below else None
+            if c.value == text or (below and version is not None and version < below):
+                return c.tag
+        return None
+
+
 class ServiceSpec(_Strict):
     role: Literal["main", "database", "cache", "sidecar"] = "main"
     image: str
     tag: str
     env: dict[str, str | int | bool] = {}
     arch: dict[Arch, ArchVariant] = {}
+    tag_select: TagSelect | None = None  # default: ``tag``
     ports: list[PortSpec] = []
     volumes: list[VolumeSpec] = []
     command: str | list[str] | None = None
@@ -199,6 +239,10 @@ class ServiceSpec(_Strict):
     @property
     def image_ref(self) -> str:
         return f"{self.image}:{self.tag}"
+
+    def for_values(self, values: dict[str, Any]) -> "ServiceSpec":
+        tag = self.tag_select.pick(values.get(self.tag_select.field)) if self.tag_select else None
+        return self.model_copy(update={"tag": tag}) if tag else self
 
     def for_arch(self, arch: str) -> "ServiceSpec":
         v = self.arch.get(arch)  # type: ignore[call-overload]
@@ -351,6 +395,8 @@ class Template(_Strict):
                 raise ValueError("game.saves: unknown volume of the main service")
         names = set(self.services)
         for name, svc in self.services.items():
+            if svc.tag_select and (svc.arch or svc.tag_select.field not in fields):
+                raise ValueError(f"service {name!r}: tag_select needs a form field and no arch")
             if extra := set(svc.arch) - set(self.requirements.arch):
                 raise ValueError(f"service {name!r}: image for unsupported arch {sorted(extra)}")
             if unknown := set(svc.depends_on) - names:
@@ -371,6 +417,7 @@ class Template(_Strict):
     def check_pinned(self) -> None:
         """Official templates must pin every image by digest."""
         for name, svc in self.services.items():
-            for tag in (svc.tag, *(v.tag for v in svc.arch.values())):
+            choices = svc.tag_select.choices if svc.tag_select else []
+            for tag in (svc.tag, *(v.tag for v in svc.arch.values()), *(c.tag for c in choices)):
                 if not DIGEST.search(tag):
                     raise ValueError(f"service {name!r}: tag must be pinned by digest")

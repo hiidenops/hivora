@@ -37,7 +37,7 @@ async def search(
     _: Viewer, rt: RuntimeDep, source: Source = "modrinth",
     q: str = Query("", max_length=100), loader: Loader | None = None,
     mc_version: str | None = Query(None, pattern=r"^\d+\.\d+(\.\d+)?$"),
-    page: int = Query(0, ge=0, le=50),
+    page: int = Query(0, ge=0, le=400),
 ) -> list[ModpackOut]:  # fmt: skip
     key = await rt.secrets.get(SecretSetting.CURSEFORGE_API_KEY) if source == "curseforge" else None
     packs = await rt.modpacks.search(source, q.strip(), loader=loader, mc_version=mc_version,

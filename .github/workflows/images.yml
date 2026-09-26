@@ -1,0 +1,22 @@
+name: Template images
+
+# Weekly: fails when a template pins an image older than the newest published
+# version (or a moving tag was rebuilt), so the catalog never drifts silently.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --locked
+      - run: uv run python scripts/check_images.py

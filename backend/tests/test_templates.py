@@ -253,3 +253,17 @@ def test_every_repo_template_compiles_on_its_architectures(catalog: Catalog) -> 
                 ports = {(p.container_port, p.protocol)
                          for s in compiled.services for p in s.ports}  # fmt: skip
                 assert (t.game.players.a2s_port, "udp") in ports, t.metadata.slug
+
+
+@pytest.mark.parametrize(
+    ("version", "java"),
+    [("1.12.2", "java8"), ("1.16.5", "java8"), ("1.17", "java17"), ("1.20.4", "java17"),
+     ("1.20.5", "java21"), ("1.21.1", "java21"), ("26.1", "java25"), ("LATEST", "java25"),
+     ("SNAPSHOT", "java25")],
+)  # fmt: skip
+def test_minecraft_version_picks_its_java(catalog: Catalog, version: str, java: str) -> None:
+    t = catalog.get("minecraft").template
+    form = validate_inputs(t, {"eula": True, "version": version}, {"app": {"name": "C"}})
+    compiled = compile_template(t, AppContext(slug="c", name="C", revision=1), HostInfo(), form,
+                                Path("/srv"))  # fmt: skip
+    assert f"-{java}@sha256:" in compiled.compose["services"]["server"]["image"]

@@ -159,7 +159,7 @@ def compile_template(
     compose_services: dict[str, Any] = {}
     plans: list[ServicePlan] = []
     for name, spec in template.services.items():
-        spec = spec.for_arch(host.arch)
+        spec = spec.for_arch(host.arch).for_values(form.values)
         ports = tuple(_plan_port(name, p, ctx, host) for p in spec.ports)
         volumes = tuple(
             VolumePlan(name, v.name, volumes_root / app.slug / v.name, v.target, v.read_only,
