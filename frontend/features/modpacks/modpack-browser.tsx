@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { AppIcon } from "@/components/app-icon";
 import { useSession } from "@/components/app-shell";
+import { IntegrationsCard } from "@/features/account/integrations-card";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -125,7 +126,19 @@ export function ModpackBrowser() {
       </div>
 
       {noKey ? (
-        <Alert tone="warn">{t("modpacks.noKey")}</Alert>
+        can("admin") ? (
+          <div className="grid max-w-2xl gap-4 rounded-lg border border-warn/50 bg-card p-4 shadow-xs">
+            <p className="text-sm">
+              {t("modpacks.noKeyAdmin")}{" "}
+              <a href="https://console.curseforge.com/" target="_blank" rel="noreferrer" className="underline">
+                console.curseforge.com
+              </a>
+            </p>
+            <IntegrationsCard />
+          </div>
+        ) : (
+          <Alert tone="warn">{t("modpacks.noKey")}</Alert>
+        )
       ) : search.error ? (
         <Alert tone="danger">{errorMessage(search.error)}</Alert>
       ) : null}
