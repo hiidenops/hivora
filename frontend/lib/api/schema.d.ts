@@ -1557,6 +1557,8 @@ export interface components {
         };
         /** TemplateDetail */
         TemplateDetail: {
+            /** Arch */
+            arch: string[];
             /** Category */
             category: string;
             /** Compatible */
@@ -1594,6 +1596,8 @@ export interface components {
         };
         /** TemplateSummary */
         TemplateSummary: {
+            /** Arch */
+            arch: string[];
             /** Category */
             category: string;
             /** Compatible */

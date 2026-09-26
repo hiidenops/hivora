@@ -6,9 +6,10 @@ from sqlalchemy import update
 
 from hivora.apps.files import empty_dir, ensure_dir, remove_tree
 from hivora.apps.models import Application, AppRevision, RevisionStatus
-from hivora.apps.service import AppService
+from hivora.apps.service import AppService, UnsupportedArchitectureError
 from hivora.compose_runner import ComposeError, ProgressEvent, ProgressStatus
 from hivora.jobs import JobContext, JobKind
+from hivora.templates.catalog import host_arch
 from hivora.templates.expressions import secret_env_name
 
 
@@ -53,9 +54,11 @@ class AppJobHandlers:
             revision = await session.get_one(AppRevision, ctx.params["revision_id"])
             secrets = await s.decrypt_secrets(session, app.id)
             sources = [v.source for svc in app.services for v in svc.volumes]
+            images = sorted({svc.image for svc in app.services})
         ctx.add_secrets(secrets.values())
         env = {secret_env_name(k): v for k, v in secrets.items()}
         try:
+            await self._check_platforms(ctx, images)
             if reset := ctx.params.get("reset_volumes"):
                 await self._reset_data(ctx, app.slug, reset)
             await ctx.progress(2, "Preparing directories and files")
@@ -119,6 +122,23 @@ class AppJobHandlers:
         async with s.sessions() as session, session.begin():
             await session.delete(await s.get(session, _app_id(ctx)))
         s.bus.publish("app.removed", app=slug, data_removed=remove_data)
+
+    async def _check_platforms(self, ctx: JobContext, images: list[str]) -> None:
+        """Refuse early and clearly an image with no build for this machine."""
+        if self.s.gateway is None:
+            return
+        arch = host_arch()
+        for image in images:
+            platforms = await self.s.gateway.image_platforms(image)
+            if platforms is not None and arch not in platforms:
+                raise UnsupportedArchitectureError(
+                    f"{image} has no {arch} build (only {', '.join(sorted(platforms))})",
+                    arch=arch,
+                    image=image,
+                    platforms=platforms,
+                )
+            if platforms:
+                await ctx.log(f"{image}: {arch} build available")
 
     async def _reset_data(self, ctx: JobContext, slug: str, volumes: dict[str, list[str]]) -> None:
         """Confirmed wipe before a revision the current data cannot survive."""

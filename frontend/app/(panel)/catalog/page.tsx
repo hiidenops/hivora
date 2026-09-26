@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TileSkeletons } from "@/components/ui/skeleton";
 import { ModpackBrowser } from "@/features/modpacks/modpack-browser";
-import { useTemplates } from "@/lib/api/hooks";
+import { useSystemInfo, useTemplates } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,7 @@ function AppsCatalog() {
   const { t, l } = useI18n();
   const { can } = useSession();
   const { data: templates, isPending } = useTemplates();
+  const { data: system } = useSystemInfo();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
 
@@ -47,8 +48,13 @@ function AppsCatalog() {
             {t(`catalog.category.${c}` as MessageKey)}
           </button>
         ))}
+        {system && (
+          <Badge className="ml-auto" title={t("catalog.hostArchHelp")}>
+            {t("catalog.hostArch", { arch: t(`arch.${system.arch}` as MessageKey) })}
+          </Badge>
+        )}
         <Input
-          className="ml-auto w-64"
+          className={system ? "w-64" : "ml-auto w-64"}
           placeholder={t("catalog.search")}
           aria-label={t("catalog.search")}
           value={query}
@@ -79,7 +85,9 @@ function AppsCatalog() {
               ))}
             </div>
             {!tp.compatible ? (
-              <Badge className="self-start border-warn/50 text-warn">{t("catalog.incompatible")}</Badge>
+              <Badge className="self-start border-warn/50 text-warn" title={t("catalog.incompatibleHelp")}>
+                {tp.arch.length === 1 ? t(`catalog.only.${tp.arch[0]}` as MessageKey) : t("catalog.incompatible")}
+              </Badge>
             ) : (
               can("operator") && (
                 <Button asChild className="self-start">

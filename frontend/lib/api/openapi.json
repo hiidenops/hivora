@@ -1803,6 +1803,13 @@
       },
       "TemplateDetail": {
         "properties": {
+          "arch": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Arch",
+            "type": "array"
+          },
           "category": {
             "title": "Category",
             "type": "string"
@@ -1899,6 +1906,7 @@
           "icon_url",
           "description",
           "compatible",
+          "arch",
           "links",
           "requirements",
           "form",
@@ -1910,6 +1918,13 @@
       },
       "TemplateSummary": {
         "properties": {
+          "arch": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Arch",
+            "type": "array"
+          },
           "category": {
             "title": "Category",
             "type": "string"
@@ -1977,7 +1992,8 @@
           "tags",
           "icon_url",
           "description",
-          "compatible"
+          "compatible",
+          "arch"
         ],
         "title": "TemplateSummary",
         "type": "object"

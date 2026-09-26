@@ -28,6 +28,7 @@ class HostInfo:
     timezone: str = "UTC"
     puid: int = 1000
     pgid: int = 1000
+    arch: str = "amd64"  # picks the service image variant
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +158,7 @@ def compile_template(
     compose_services: dict[str, Any] = {}
     plans: list[ServicePlan] = []
     for name, spec in template.services.items():
+        spec = spec.for_arch(host.arch)
         ports = tuple(_plan_port(name, p, ctx, host) for p in spec.ports)
         volumes = tuple(
             VolumePlan(name, v.name, volumes_root / app.slug / v.name, v.target, v.read_only,

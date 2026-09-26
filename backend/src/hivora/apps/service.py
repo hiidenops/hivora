@@ -33,7 +33,7 @@ from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import Purpose, Sealed, SecretBox
-from hivora.docker_gateway import ContainerInfo, ContainerState
+from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
 from hivora.jobs import Job, JobKind, JobQueue
 from hivora.state import StateStore, app_key
 from hivora.system.secrets import SecretSetting, SecretSettings
@@ -150,7 +150,9 @@ class AppService:
         clock: Clock | None = None,
         secret_settings: SecretSettings | None = None,
         public_address: Callable[[], str | None] | None = None,
+        gateway: DockerGateway | None = None,  # registry lookups (image platforms)
     ) -> None:
+        self.gateway = gateway
         self.settings = settings
         self.sessions = sessions
         self.catalog = catalog
@@ -173,6 +175,7 @@ class AppService:
             timezone=s.timezone,
             puid=s.puid,
             pgid=s.pgid,
+            arch=host_arch(),
         )
 
     def volumes_dir(self, slug: str) -> Path:

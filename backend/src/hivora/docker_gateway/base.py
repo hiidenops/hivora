@@ -79,4 +79,12 @@ class DockerGateway(ABC):
     async def list_networks(self) -> list[NetworkInfo]: ...
 
     @abstractmethod
+    async def architecture(self) -> str:
+        """The Engine's CPU architecture as reported by Docker (e.g. ``x86_64``)."""
+
+    @abstractmethod
+    async def image_platforms(self, ref: str) -> list[str] | None:
+        """Architectures the registry offers for ``ref`` (e.g. ``["amd64"]``), None if unknown."""
+
+    @abstractmethod
     async def close(self) -> None: ...

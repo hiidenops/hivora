@@ -30,8 +30,21 @@ class TemplateInvalidError(ValidationError):
     code = "template_invalid"
 
 
+_detected_arch: str | None = None
+
+
+def set_host_arch(machine: str) -> None:
+    """Architecture reported by Docker (the source of truth), set at startup."""
+    global _detected_arch
+    _detected_arch = normalize_arch(machine) if machine else None
+
+
+def normalize_arch(machine: str) -> str:
+    return _ARCH.get(machine.lower(), machine.lower())
+
+
 def host_arch() -> str:
-    return _ARCH.get(platform.machine().lower(), platform.machine().lower())
+    return _detected_arch or normalize_arch(platform.machine())
 
 
 @dataclass(frozen=True, slots=True)

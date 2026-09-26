@@ -11,6 +11,7 @@ export type JobRef = Schemas["JobRef"];
 export type Job = Schemas["JobOut"];
 export type JobDetail = Schemas["JobDetailOut"];
 export type TemplateSummary = Schemas["TemplateSummary"];
+export type SystemInfo = Schemas["SystemInfo"];
 export type TemplateDetail = Schemas["TemplateDetail"];
 export type User = Schemas["UserOut"];
 export type Role = User["role"];

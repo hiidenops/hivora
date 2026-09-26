@@ -20,6 +20,7 @@ import {
   type Role,
   type SessionInfo,
   type TemplateDetail,
+  type SystemInfo,
   type TemplateSummary,
   type UpdatePlan,
   type User,
@@ -106,6 +107,8 @@ export const useRemovalPlan = (id: number, enabled: boolean) =>
     enabled,
   });
 
+export const useSystemInfo = () =>
+  useQuery({ queryKey: ["system-info"], queryFn: () => api<SystemInfo>("/system/info"), staleTime: 300_000 });
 export const useTemplates = () =>
   useQuery({ queryKey: keys.templates, queryFn: () => api<TemplateSummary[]>("/templates"), staleTime: 300_000 });
 export const useTemplate = (slug: string) =>

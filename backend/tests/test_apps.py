@@ -280,3 +280,24 @@ async def test_version_change_requires_confirmation_and_wipes_data(env: Env) -> 
     assert done.status is JobStatus.SUCCEEDED, done.error
     assert sorted(p.name for p in data.iterdir()) == ["whitelist.json"]
     assert "erased 1 entries" in done.log
+
+
+async def test_deploy_refuses_an_image_without_a_build_for_this_machine(env: Env) -> None:
+    from hivora.docker_gateway.fake import FakeDockerGateway
+    from hivora.templates.catalog import host_arch
+
+    gw = FakeDockerGateway()
+    env.service.gateway = gw
+    other = "arm64" if host_arch() == "amd64" else "amd64"
+    image = env.service.catalog.get("vaultwarden").template.services["server"].image_ref
+    gw.platforms[image] = [other]
+    _, job = await env.service.deploy(DeployRequest("vaultwarden", "vw"))
+    done = await run(env, job)
+    assert done.status is JobStatus.FAILED
+    assert done.error and f"has no {host_arch()} build" in done.error
+
+    gw.platforms[image] = [other, host_arch()]
+    _, job = await env.service.deploy(DeployRequest("vaultwarden", "vw2", {"web_port": 8096}))
+    done = await run(env, job)
+    assert done.status is JobStatus.SUCCEEDED, done.error
+    assert f"{host_arch()} build available" in done.log

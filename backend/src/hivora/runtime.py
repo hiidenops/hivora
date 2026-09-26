@@ -28,6 +28,7 @@ from hivora.state import StateService
 from hivora.system.public_address import PublicAddress
 from hivora.system.secrets import SecretSettings
 from hivora.templates import Catalog
+from hivora.templates.catalog import set_host_arch
 from hivora.templates.icons import IconCache
 
 if TYPE_CHECKING:
@@ -109,6 +110,7 @@ class Runtime:
             clock=clock,
             secret_settings=secrets,
             public_address=public_address.current,
+            gateway=gateway,
         )
         AppJobHandlers(apps).register()
         WorldJobs(apps).register()
@@ -128,6 +130,10 @@ class Runtime:
         await self.public_address.start()
         await self.app_metrics.start()
         await self.auth.ensure_initial_admin()
+        try:
+            set_host_arch(await self.gateway.architecture())
+        except Exception:
+            logger.warning("Docker did not report its architecture; using the local one")
         await self.state.start()
         await self.jobs.start()
 

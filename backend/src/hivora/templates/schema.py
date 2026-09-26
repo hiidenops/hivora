@@ -85,7 +85,7 @@ class ResourceReq(_Strict):
 
 
 class Requirements(_Strict):
-    arch: list[Literal["amd64", "arm64"]]
+    arch: list[Literal["amd64", "arm64"]]  # where the template runs (images checked at deploy)
     memory: ResourceReq | None = None
     cpu: ResourceReq | None = None
     disk: ResourceReq | None = None
@@ -166,11 +166,23 @@ class VolumeSpec(_Strict):
     reset_keep: list[Annotated[str, Field(pattern=r"^[A-Za-z0-9._*-]+$")]] = []  # top-level globs
 
 
+Arch = Literal["amd64", "arm64"]
+
+
+class ArchVariant(_Strict):
+    """Another image for one CPU architecture (e.g. no ARM build of the default one)."""
+
+    image: str
+    tag: str
+    env: dict[str, str | int | bool] = {}  # merged over the service env
+
+
 class ServiceSpec(_Strict):
     role: Literal["main", "database", "cache", "sidecar"] = "main"
     image: str
     tag: str
     env: dict[str, str | int | bool] = {}
+    arch: dict[Arch, ArchVariant] = {}
     ports: list[PortSpec] = []
     volumes: list[VolumeSpec] = []
     command: str | list[str] | None = None
@@ -183,6 +195,14 @@ class ServiceSpec(_Strict):
     @property
     def image_ref(self) -> str:
         return f"{self.image}:{self.tag}"
+
+    def for_arch(self, arch: str) -> "ServiceSpec":
+        v = self.arch.get(arch)  # type: ignore[call-overload]
+        if v is None:
+            return self
+        return self.model_copy(
+            update={"image": v.image, "tag": v.tag, "env": {**self.env, **v.env}}
+        )
 
 
 class Access(_Strict):
@@ -250,6 +270,8 @@ class Template(_Strict):
             raise ValueError(f"summary lists unknown fields {sorted(unknown)}")
         names = set(self.services)
         for name, svc in self.services.items():
+            if extra := set(svc.arch) - set(self.requirements.arch):
+                raise ValueError(f"service {name!r}: image for unsupported arch {sorted(extra)}")
             if unknown := set(svc.depends_on) - names:
                 raise ValueError(f"service {name!r} depends on unknown {sorted(unknown)}")
         exprs = (e for text in iter_strings(self.model_dump()) for e in find_expressions(text))
@@ -268,5 +290,6 @@ class Template(_Strict):
     def check_pinned(self) -> None:
         """Official templates must pin every image by digest."""
         for name, svc in self.services.items():
-            if not DIGEST.search(svc.tag):
-                raise ValueError(f"service {name!r}: tag must be pinned by digest")
+            for tag in (svc.tag, *(v.tag for v in svc.arch.values())):
+                if not DIGEST.search(tag):
+                    raise ValueError(f"service {name!r}: tag must be pinned by digest")

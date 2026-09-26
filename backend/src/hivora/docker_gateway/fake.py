@@ -46,6 +46,8 @@ class FakeDockerGateway(DockerGateway):
         self.exec_results: dict[str, tuple[int, str]] = {}
         self.exec_calls: list[list[str]] = []
         self.stats: dict[str, StatsSample] = {}  # stats_once answers, zeros by default
+        self.arch = "x86_64"
+        self.platforms: dict[str, list[str]] = {}  # image ref -> architectures (unknown if absent)
         self._subscribers: list[asyncio.Queue[DockerEvent | None]] = []
 
     # --- test helpers -----------------------------------------------------
@@ -74,6 +76,12 @@ class FakeDockerGateway(DockerGateway):
     # --- DockerGateway ----------------------------------------------------
     async def ping(self) -> str:
         return "fake"
+
+    async def architecture(self) -> str:
+        return self.arch
+
+    async def image_platforms(self, ref: str) -> list[str] | None:
+        return self.platforms.get(ref)
 
     async def list_containers(self, labels: dict[str, str] | None = None) -> list[ContainerInfo]:
         wanted = (labels or {}).items()

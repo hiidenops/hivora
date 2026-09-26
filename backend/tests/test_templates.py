@@ -194,3 +194,42 @@ def test_empty_env_values_are_not_set(catalog: Catalog) -> None:
     assert "CUSTOM_SERVER_PROPERTIES" not in env and "SEED" not in env and "CF_SLUG" not in env
     assert env["TYPE"] == "VANILLA"
     assert "None" not in env.values()
+
+
+def test_service_image_follows_the_host_architecture() -> None:
+    doc = minimal(form={}, requirements={"arch": ["amd64", "arm64"]}, services={"web": {
+        "image": "x86", "tag": "1", "env": {"MODE": "native", "KEEP": "yes"},
+        "arch": {"arm64": {"image": "arm", "tag": "2", "env": {"MODE": "arm"}}},
+    }})  # fmt: skip
+    template = parse_template(yaml.safe_dump(doc), require_pinned=False)
+    app, form = AppContext(slug="d", name="D", revision=1), validate_inputs(template, {}, {})
+
+    def service(arch: str) -> dict[str, Any]:
+        host = HostInfo(arch=arch)
+        compose = compile_template(template, app, host, form, Path("/srv")).compose
+        return dict(compose["services"]["web"])
+
+    amd, arm = service("amd64"), service("arm64")
+    assert amd["image"] == "x86:1" and amd["environment"] == {"MODE": "native", "KEEP": "yes"}
+    assert arm["image"] == "arm:2" and arm["environment"] == {"MODE": "arm", "KEEP": "yes"}
+
+    doc["requirements"] = {"arch": ["amd64"]}  # an ARM image for an unsupported arch
+    with pytest.raises(TemplateInvalidError, match="unsupported arch"):
+        parse_template(yaml.safe_dump(doc), require_pinned=False)
+    with pytest.raises(TemplateInvalidError, match="digest"):
+        parse_template(yaml.safe_dump(minimal(services={"web": {
+            "image": "x", "tag": "1@sha256:" + "0" * 64,
+            "arch": {"arm64": {"image": "y", "tag": "2"}},
+        }})), require_pinned=True)  # fmt: skip
+
+
+def test_docker_reported_arch_wins() -> None:
+    from hivora.templates import catalog as cat
+
+    try:
+        cat.set_host_arch("aarch64")
+        assert cat.host_arch() == "arm64"
+        cat.set_host_arch("x86_64")
+        assert cat.host_arch() == "amd64"
+    finally:
+        cat.set_host_arch("")

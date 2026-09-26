@@ -199,6 +199,17 @@ class LocalDockerGateway(DockerGateway):
         info = await self._get_json("version")
         return str(info.get("Version", "unknown"))
 
+    async def architecture(self) -> str:
+        return str((await self._get_json("info")).get("Architecture", ""))
+
+    async def image_platforms(self, ref: str) -> list[str] | None:
+        try:
+            data = await self._get_json(f"distribution/{ref}/json")
+        except (ContainerNotFoundError, aiodocker.DockerError, DockerUnavailableError):
+            return None  # offline, private registry...: let the pull decide
+        platforms = [p.get("architecture", "") for p in data.get("Platforms") or []]
+        return [p for p in platforms if p and p != "unknown"] or None
+
     async def list_containers(self, labels: dict[str, str] | None = None) -> list[ContainerInfo]:
         params: dict[str, Any] = {"all": "true"}
         if labels:

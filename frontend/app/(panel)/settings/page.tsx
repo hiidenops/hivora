@@ -13,8 +13,8 @@ import { IntegrationsCard, PublicAddressCard } from "@/features/account/integrat
 import { PasswordForm } from "@/features/account/password-form";
 import { TotpCard } from "@/features/account/totp-card";
 import { api } from "@/lib/api/client";
-import { useLogout, useMySessions } from "@/lib/api/hooks";
-import { LANGS, useI18n, type Lang } from "@/lib/i18n";
+import { useLogout, useMySessions, useSystemInfo } from "@/lib/api/hooks";
+import { LANGS, useI18n, type Lang, type MessageKey } from "@/lib/i18n";
 import { readPref, writePref } from "@/lib/prefs";
 
 function Sessions() {
@@ -52,6 +52,7 @@ export default function SettingsPage() {
   const { advanced, setAdvanced, can } = useSession();
   const router = useRouter();
   const logout = useLogout();
+  const { data: system } = useSystemInfo();
   const [theme, setTheme] = useState("system");
   useEffect(() => setTheme(readPref("theme") ?? "system"), []);
 
@@ -139,6 +140,29 @@ export default function SettingsPage() {
             <Sessions />
           </CardContent>
         </Card>
+        {system && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("settings.system")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid gap-3 text-sm sm:grid-cols-3">
+                {(
+                  [
+                    ["settings.system.version", system.version],
+                    ["settings.system.docker", system.docker_version ?? "—"],
+                    ["settings.system.arch", `${t(`arch.${system.arch}` as MessageKey)} (${system.arch})`],
+                  ] as const
+                ).map(([k, v]) => (
+                  <div key={k}>
+                    <dt className="text-muted-foreground">{t(k)}</dt>
+                    <dd className="font-mono">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </>
   );

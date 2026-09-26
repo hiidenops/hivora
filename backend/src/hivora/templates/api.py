@@ -25,6 +25,7 @@ class TemplateSummary(BaseModel):
     icon_url: str | None  # served by Hivora from its cache
     description: Localized
     compatible: bool  # supports this host's CPU architecture
+    arch: list[str]  # architectures the template runs on
 
 
 class TemplateDetail(TemplateSummary):
@@ -50,6 +51,7 @@ def summary(rt: Runtime, entry: CatalogEntry) -> TemplateSummary:
         icon_url=icon_url(rt, m.slug),
         description=m.description,
         compatible=entry.supports(host_arch()),
+        arch=list(entry.template.requirements.arch),
     )
 
 
