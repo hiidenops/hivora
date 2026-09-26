@@ -11,18 +11,16 @@ import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/collapsible-card";
 import { Input, Label, Switch } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api, type GameAccess, type JobRef, type Players } from "@/lib/api/client";
+import { api, type GameCaps, type GameLists, type JobRef, type Players } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
 import { WorldsCard } from "./worlds-card";
 
-const NAME = "[A-Za-z0-9_]{3,16}";
-
 /** Players online, polled every 15 s while the server runs (shared cache key). */
 export function usePlayers(appId: number, enabled: boolean) {
   return useQuery({
-    queryKey: ["apps", appId, "minecraft", "players"],
-    queryFn: () => api<Players>(`/apps/${appId}/minecraft/players`),
+    queryKey: ["apps", appId, "game", "players"],
+    queryFn: () => api<Players>(`/apps/${appId}/game/players`),
     refetchInterval: enabled ? 15_000 : false,
     enabled,
   });
@@ -69,6 +67,7 @@ function PlayersCard({ appId, running }: { appId: number; running: boolean }) {
 function NameList({
   title,
   icon: Icon,
+  pattern,
   names,
   disabled,
   onAdd,
@@ -77,6 +76,7 @@ function NameList({
 }: {
   title: string;
   icon: typeof Users;
+  pattern: string;
   names: { name: string; extra?: string }[];
   disabled: boolean;
   busy: boolean;
@@ -126,10 +126,9 @@ function NameList({
           id={id}
           className="w-48 font-mono"
           placeholder={t("mc.playerName")}
-          pattern={NAME}
-          title={t("mc.nameRule")}
+          pattern={pattern}
           value={name}
-          maxLength={16}
+          maxLength={64}
           onChange={(e) => setName(e.target.value)}
           disabled={disabled}
           required
@@ -142,35 +141,39 @@ function NameList({
   );
 }
 
-function AccessCard({ appId, onJob }: { appId: number; onJob: (id: number) => void }) {
-  const { t, errorMessage } = useI18n();
+function ListsCard({ appId, onJob }: { appId: number; onJob: (id: number) => void }) {
+  const { t, l, errorMessage } = useI18n();
   const { can } = useSession();
   const qc = useQueryClient();
-  const key = ["apps", appId, "minecraft", "access"];
-  const { data } = useQuery({ queryKey: key, queryFn: () => api<GameAccess>(`/apps/${appId}/minecraft/access`) });
+  const key = ["apps", appId, "game", "lists"];
+  const { data } = useQuery({ queryKey: key, queryFn: () => api<GameLists>(`/apps/${appId}/game/lists`) });
   const refresh = () => qc.invalidateQueries({ queryKey: key });
-  // Shows the requested whitelist state right away; the server applies it on restart.
-  const [wanted, setWanted] = useState<boolean | null>(null);
+  // Shows the requested on/off state right away; the server applies it on restart.
+  const [wanted, setWanted] = useState<Record<string, boolean>>({});
   const command = useMutation({
-    mutationFn: ({ list, name, add }: { list: "whitelist" | "ops"; name: string; add: boolean }) =>
+    mutationFn: ({ list, name, add }: { list: string; name: string; add: boolean }) =>
       add
-        ? api(`/apps/${appId}/minecraft/${list}`, { method: "POST", body: { name } })
-        : api(`/apps/${appId}/minecraft/${list}/${encodeURIComponent(name)}`, { method: "DELETE" }),
-    // The server writes its JSON files right after the command.
+        ? api(`/apps/${appId}/game/lists/${list}`, { method: "POST", body: { name } })
+        : api(`/apps/${appId}/game/lists/${list}/${encodeURIComponent(name)}`, { method: "DELETE" }),
+    // The server writes its files right after the command.
     onSuccess: () => setTimeout(() => void refresh(), 500),
   });
   const toggle = useMutation({
-    mutationFn: (enabled: boolean) =>
-      api<JobRef>(`/apps/${appId}/minecraft/whitelist-enabled`, { method: "PUT", body: { enabled } }),
-    onMutate: (enabled) => setWanted(enabled),
-    onError: () => setWanted(null),
+    mutationFn: ({ list, enabled }: { list: string; enabled: boolean }) =>
+      api<JobRef>(`/apps/${appId}/game/lists/${list}/enabled`, { method: "PUT", body: { enabled } }),
+    onMutate: ({ list, enabled }) => setWanted((w) => ({ ...w, [list]: enabled })),
+    onError: (_, { list }) =>
+      setWanted((w) => {
+        const { [list]: _dropped, ...rest } = w;
+        return rest;
+      }),
     onSuccess: (job) => {
       onJob(job.id);
       void refresh();
     },
   });
   const operator = can("operator");
-  const locked = !data?.running || !operator;
+  const on = (list: GameLists["lists"][number]) => wanted[list.id] ?? list.enabled;
 
   return (
     <CollapsibleCard
@@ -180,52 +183,44 @@ function AccessCard({ appId, onJob }: { appId: number; onJob: (id: number) => vo
           <Crown className="size-5" /> {t("mc.access")}
         </>
       }
-      aside={
-        data && (
-          <span className="text-xs text-muted-foreground">
-            {(wanted ?? data.whitelist_enabled) ? t("mc.whitelist") + " ✓" : null}
-          </span>
-        )
-      }
     >
       <div className="grid gap-5">
         {!data ? (
           <Skeleton className="h-32" />
         ) : (
-          <>
-            <label className="flex items-start gap-3 text-sm">
-              <Switch
-                checked={wanted ?? data.whitelist_enabled}
-                disabled={!operator || toggle.isPending}
-                onChange={(e) => window.confirm(t("mc.whitelistConfirm")) && toggle.mutate(e.target.checked)}
+          data.lists.map((list) => (
+            <div key={list.id} className="grid gap-3">
+              {list.enabled !== null && (
+                <label className="flex items-start gap-3 text-sm">
+                  <Switch
+                    checked={!!on(list)}
+                    disabled={!operator || toggle.isPending}
+                    onChange={(e) =>
+                      window.confirm(t("game.listConfirm", { list: l(list.label) })) &&
+                      toggle.mutate({ list: list.id, enabled: e.target.checked })
+                    }
+                  />
+                  <span>
+                    <span className="block font-medium">{l(list.label)}</span>
+                    <span className="text-muted-foreground">{on(list) ? t("game.listOn") : t("game.listOff")}</span>
+                  </span>
+                </label>
+              )}
+              <NameList
+                title={l(list.label)}
+                icon={list.enabled === null ? Crown : Users}
+                pattern={list.name_pattern.replace(/^\^|\$$/g, "")}
+                names={list.entries.map((e) => ({ name: e.name, extra: e.extra ?? undefined }))}
+                disabled={!list.editable || !operator}
+                busy={command.isPending}
+                onAdd={(name) => command.mutate({ list: list.id, name, add: true })}
+                onRemove={(name) => command.mutate({ list: list.id, name, add: false })}
               />
-              <span>
-                <span className="block font-medium">{t("mc.whitelist")}</span>
-                <span className="text-muted-foreground">
-                  {(wanted ?? data.whitelist_enabled) ? t("mc.whitelistOn") : t("mc.whitelistOff")}
-                </span>
-              </span>
-            </label>
-            {!data.running && operator && <p className="text-xs text-muted-foreground">{t("mc.needsRunning")}</p>}
-            <NameList
-              title={t("mc.whitelist")}
-              icon={Users}
-              names={data.whitelist.map((name) => ({ name }))}
-              disabled={locked}
-              busy={command.isPending}
-              onAdd={(name) => command.mutate({ list: "whitelist", name, add: true })}
-              onRemove={(name) => command.mutate({ list: "whitelist", name, add: false })}
-            />
-            <NameList
-              title={t("mc.ops")}
-              icon={Crown}
-              names={data.ops.map((o) => ({ name: o.name, extra: t("mc.level", { level: o.level }) }))}
-              disabled={locked}
-              busy={command.isPending}
-              onAdd={(name) => command.mutate({ list: "ops", name, add: true })}
-              onRemove={(name) => command.mutate({ list: "ops", name, add: false })}
-            />
-          </>
+            </div>
+          ))
+        )}
+        {data && !data.running && operator && data.lists.some((x) => !x.editable) && (
+          <p className="text-xs text-muted-foreground">{t("mc.needsRunning")}</p>
         )}
         {(command.error ?? toggle.error) && <Alert tone="danger">{errorMessage(command.error ?? toggle.error)}</Alert>}
       </div>
@@ -233,21 +228,25 @@ function AccessCard({ appId, onJob }: { appId: number; onJob: (id: number) => vo
   );
 }
 
-export function MinecraftPanel({
+/** Cards for what the template's `game` section declares; each keeps its own height. */
+export function GamePanel({
   appId,
+  caps,
   running,
   onJob,
 }: {
   appId: number;
+  caps: GameCaps;
   running: boolean;
   onJob: (jobId: number) => void;
 }) {
-  // Own full-width row: each card keeps its own height, opening one moves no other.
   return (
     <div className="grid items-start gap-4 lg:col-span-2 xl:grid-cols-3">
-      <PlayersCard appId={appId} running={running} />
-      <AccessCard appId={appId} onJob={onJob} />
-      <WorldsCard appId={appId} onJob={onJob} />
+      {caps.players && <PlayersCard appId={appId} running={running} />}
+      {caps.lists && <ListsCard appId={appId} onJob={onJob} />}
+      {caps.worlds && (
+        <WorldsCard appId={appId} onJob={onJob} canImport={caps.world_import} canActivate={caps.world_activate} />
+      )}
     </div>
   );
 }

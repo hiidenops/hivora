@@ -37,7 +37,7 @@ function ImportForm({ appId, onJob }: { appId: number; onJob: (id: number) => vo
     mutationFn: () => {
       if (file!.size > MAX_UPLOAD) throw new ApiError(413, "archive_too_large", "");
       setProgress(0);
-      return upload<JobRef>(`/apps/${appId}/minecraft/worlds`, file!, {
+      return upload<JobRef>(`/apps/${appId}/game/worlds`, file!, {
         query: { name, filename: file!.name },
         onProgress: setProgress,
       });
@@ -110,18 +110,28 @@ function ImportForm({ appId, onJob }: { appId: number; onJob: (id: number) => vo
 }
 
 /** The server's worlds: switch, download, delete, import a .zip. */
-export function WorldsCard({ appId, onJob }: { appId: number; onJob: (id: number) => void }) {
+export function WorldsCard({
+  appId,
+  onJob,
+  canImport,
+  canActivate,
+}: {
+  appId: number;
+  onJob: (id: number) => void;
+  canImport: boolean;
+  canActivate: boolean;
+}) {
   const { t, lang, errorMessage } = useI18n();
   const { can } = useSession();
   const qc = useQueryClient();
-  const key = ["apps", appId, "minecraft", "worlds"];
-  const { data, error } = useQuery({ queryKey: key, queryFn: () => api<Worlds>(`/apps/${appId}/minecraft/worlds`) });
+  const key = ["apps", appId, "game", "worlds"];
+  const { data, error } = useQuery({ queryKey: key, queryFn: () => api<Worlds>(`/apps/${appId}/game/worlds`) });
   const u = units(lang);
   const act = useMutation({
     mutationFn: ({ name, remove }: { name: string; remove: boolean }) =>
       remove
-        ? api<JobRef>(`/apps/${appId}/minecraft/worlds/${encodeURIComponent(name)}`, { method: "DELETE" })
-        : api<JobRef>(`/apps/${appId}/minecraft/worlds/active`, { method: "PUT", body: { name } }),
+        ? api<JobRef>(`/apps/${appId}/game/worlds/${encodeURIComponent(name)}`, { method: "DELETE" })
+        : api<JobRef>(`/apps/${appId}/game/worlds/active`, { method: "PUT", body: { name } }),
     onSuccess: (job) => {
       onJob(job.id);
       void qc.invalidateQueries({ queryKey: key });
@@ -137,7 +147,7 @@ export function WorldsCard({ appId, onJob }: { appId: number; onJob: (id: number
           <Globe className="size-5" /> {t("worlds.title")}
         </>
       }
-      aside={data && <span className="font-mono text-xs text-muted-foreground">{data.active}</span>}
+      aside={data?.active && <span className="font-mono text-xs text-muted-foreground">{data.active}</span>}
     >
       <div className="grid gap-4">
         {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
@@ -158,7 +168,7 @@ export function WorldsCard({ appId, onJob }: { appId: number; onJob: (id: number
                 </div>
                 {operator && (
                   <div className="flex gap-1">
-                    {!w.active && (
+                    {!w.active && canActivate && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -170,7 +180,7 @@ export function WorldsCard({ appId, onJob }: { appId: number; onJob: (id: number
                     )}
                     <Button size="sm" variant="ghost" asChild>
                       <a
-                        href={`/api/v1/apps/${appId}/minecraft/worlds/${encodeURIComponent(w.name)}/download`}
+                        href={`/api/v1/apps/${appId}/game/worlds/${encodeURIComponent(w.name)}/download`}
                         download={`${w.name}.zip`}
                         aria-label={t("worlds.download", { name: w.name })}
                         title={t("worlds.download", { name: w.name })}
@@ -197,7 +207,7 @@ export function WorldsCard({ appId, onJob }: { appId: number; onJob: (id: number
           </ul>
         )}
         {act.error && <Alert tone="danger">{errorMessage(act.error)}</Alert>}
-        {operator && <ImportForm appId={appId} onJob={onJob} />}
+        {operator && canImport && <ImportForm appId={appId} onJob={onJob} />}
       </div>
     </CollapsibleCard>
   );

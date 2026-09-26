@@ -1,40 +1,6 @@
 {
   "components": {
     "schemas": {
-      "AccessOut": {
-        "properties": {
-          "ops": {
-            "items": {
-              "$ref": "#/components/schemas/OperatorOut"
-            },
-            "title": "Ops",
-            "type": "array"
-          },
-          "running": {
-            "title": "Running",
-            "type": "boolean"
-          },
-          "whitelist": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Whitelist",
-            "type": "array"
-          },
-          "whitelist_enabled": {
-            "title": "Whitelist Enabled",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "running",
-          "whitelist_enabled",
-          "whitelist",
-          "ops"
-        ],
-        "title": "AccessOut",
-        "type": "object"
-      },
       "AddressIn": {
         "properties": {
           "address": {
@@ -81,13 +47,12 @@
           "game": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/GameCapsOut"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Game"
+            ]
           },
           "icon_url": {
             "anyOf": [
@@ -637,6 +602,39 @@
         "title": "EnabledIn",
         "type": "object"
       },
+      "GameCapsOut": {
+        "properties": {
+          "lists": {
+            "title": "Lists",
+            "type": "boolean"
+          },
+          "players": {
+            "title": "Players",
+            "type": "boolean"
+          },
+          "world_activate": {
+            "title": "World Activate",
+            "type": "boolean"
+          },
+          "world_import": {
+            "title": "World Import",
+            "type": "boolean"
+          },
+          "worlds": {
+            "title": "Worlds",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "players",
+          "lists",
+          "worlds",
+          "world_import",
+          "world_activate"
+        ],
+        "title": "GameCapsOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1049,6 +1047,52 @@
         "title": "KeyIn",
         "type": "object"
       },
+      "ListEntryOut": {
+        "properties": {
+          "extra": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "extra"
+        ],
+        "title": "ListEntryOut",
+        "type": "object"
+      },
+      "ListsOut": {
+        "properties": {
+          "lists": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerListOut"
+            },
+            "title": "Lists",
+            "type": "array"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "running",
+          "lists"
+        ],
+        "title": "ListsOut",
+        "type": "object"
+      },
       "LoginIn": {
         "properties": {
           "password": {
@@ -1198,24 +1242,6 @@
         "title": "NetworkMode",
         "type": "string"
       },
-      "OperatorOut": {
-        "properties": {
-          "level": {
-            "title": "Level",
-            "type": "integer"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "level"
-        ],
-        "title": "OperatorOut",
-        "type": "object"
-      },
       "OptionOut": {
         "properties": {
           "label": {
@@ -1346,7 +1372,7 @@
       "PlayerIn": {
         "properties": {
           "name": {
-            "maxLength": 16,
+            "maxLength": 64,
             "title": "Name",
             "type": "string"
           }
@@ -1355,6 +1381,70 @@
           "name"
         ],
         "title": "PlayerIn",
+        "type": "object"
+      },
+      "PlayerListOut": {
+        "properties": {
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ListEntryOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "propertyNames": {
+                  "enum": [
+                    "fr",
+                    "en"
+                  ]
+                },
+                "type": "object"
+              }
+            ],
+            "title": "Label"
+          },
+          "name_pattern": {
+            "title": "Name Pattern",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "editable",
+          "enabled",
+          "name_pattern",
+          "entries"
+        ],
+        "title": "PlayerListOut",
         "type": "object"
       },
       "PlayersOut": {
@@ -2639,9 +2729,9 @@
         ]
       }
     },
-    "/api/v1/apps/{app_id}/minecraft/access": {
+    "/api/v1/apps/{app_id}/game/lists": {
       "get": {
-        "operationId": "access_api_v1_apps__app_id__minecraft_access_get",
+        "operationId": "lists_api_v1_apps__app_id__game_lists_get",
         "parameters": [
           {
             "in": "path",
@@ -2658,7 +2748,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccessOut"
+                  "$ref": "#/components/schemas/ListsOut"
                 }
               }
             },
@@ -2675,67 +2765,15 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Access",
+        "summary": "Lists",
         "tags": [
-          "minecraft"
+          "game"
         ]
       }
     },
-    "/api/v1/apps/{app_id}/minecraft/ops": {
+    "/api/v1/apps/{app_id}/game/lists/{list_id}": {
       "post": {
-        "operationId": "op_add_api_v1_apps__app_id__minecraft_ops_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "app_id",
-            "required": true,
-            "schema": {
-              "title": "App Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PlayerIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommandOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Op Add",
-        "tags": [
-          "minecraft"
-        ]
-      }
-    },
-    "/api/v1/apps/{app_id}/minecraft/ops/{name}": {
-      "delete": {
-        "operationId": "op_remove_api_v1_apps__app_id__minecraft_ops__name__delete",
+        "operationId": "list_add_api_v1_apps__app_id__game_lists__list_id__post",
         "parameters": [
           {
             "in": "path",
@@ -2748,98 +2786,14 @@
           },
           {
             "in": "path",
-            "name": "name",
+            "name": "list_id",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "List Id",
               "type": "string"
             }
           }
         ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CommandOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Op Remove",
-        "tags": [
-          "minecraft"
-        ]
-      }
-    },
-    "/api/v1/apps/{app_id}/minecraft/players": {
-      "get": {
-        "operationId": "players_api_v1_apps__app_id__minecraft_players_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "app_id",
-            "required": true,
-            "schema": {
-              "title": "App Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlayersOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Players",
-        "tags": [
-          "minecraft"
-        ]
-      }
-    },
-    "/api/v1/apps/{app_id}/minecraft/whitelist": {
-      "post": {
-        "operationId": "whitelist_add_api_v1_apps__app_id__minecraft_whitelist_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "app_id",
-            "required": true,
-            "schema": {
-              "title": "App Id",
-              "type": "integer"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -2872,16 +2826,16 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Whitelist Add",
+        "summary": "List Add",
         "tags": [
-          "minecraft"
+          "game"
         ]
       }
     },
-    "/api/v1/apps/{app_id}/minecraft/whitelist-enabled": {
+    "/api/v1/apps/{app_id}/game/lists/{list_id}/enabled": {
       "put": {
         "description": "Intent change: new revision, the server restarts.",
-        "operationId": "whitelist_enabled_api_v1_apps__app_id__minecraft_whitelist_enabled_put",
+        "operationId": "list_enabled_api_v1_apps__app_id__game_lists__list_id__enabled_put",
         "parameters": [
           {
             "in": "path",
@@ -2890,6 +2844,15 @@
             "schema": {
               "title": "App Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "list_id",
+            "required": true,
+            "schema": {
+              "title": "List Id",
+              "type": "string"
             }
           }
         ],
@@ -2925,15 +2888,15 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Whitelist Enabled",
+        "summary": "List Enabled",
         "tags": [
-          "minecraft"
+          "game"
         ]
       }
     },
-    "/api/v1/apps/{app_id}/minecraft/whitelist/{name}": {
+    "/api/v1/apps/{app_id}/game/lists/{list_id}/{name}": {
       "delete": {
-        "operationId": "whitelist_remove_api_v1_apps__app_id__minecraft_whitelist__name__delete",
+        "operationId": "list_remove_api_v1_apps__app_id__game_lists__list_id___name__delete",
         "parameters": [
           {
             "in": "path",
@@ -2942,6 +2905,15 @@
             "schema": {
               "title": "App Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "list_id",
+            "required": true,
+            "schema": {
+              "title": "List Id",
+              "type": "string"
             }
           },
           {
@@ -2976,15 +2948,57 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Whitelist Remove",
+        "summary": "List Remove",
         "tags": [
-          "minecraft"
+          "game"
         ]
       }
     },
-    "/api/v1/apps/{app_id}/minecraft/worlds": {
+    "/api/v1/apps/{app_id}/game/players": {
       "get": {
-        "operationId": "worlds_api_v1_apps__app_id__minecraft_worlds_get",
+        "operationId": "players_api_v1_apps__app_id__game_players_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Players",
+        "tags": [
+          "game"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/game/worlds": {
+      "get": {
+        "operationId": "worlds_api_v1_apps__app_id__game_worlds_get",
         "parameters": [
           {
             "in": "path",
@@ -3020,12 +3034,12 @@
         },
         "summary": "Worlds",
         "tags": [
-          "minecraft"
+          "game"
         ]
       },
       "post": {
         "description": "Raw .zip body (streamed to disk, 10 GB max); extraction runs as a job.",
-        "operationId": "world_import_api_v1_apps__app_id__minecraft_worlds_post",
+        "operationId": "world_import_api_v1_apps__app_id__game_worlds_post",
         "parameters": [
           {
             "in": "path",
@@ -3082,14 +3096,14 @@
         },
         "summary": "World Import",
         "tags": [
-          "minecraft"
+          "game"
         ]
       }
     },
-    "/api/v1/apps/{app_id}/minecraft/worlds/active": {
+    "/api/v1/apps/{app_id}/game/worlds/active": {
       "put": {
         "description": "Intent change: new revision, the server restarts on that world.",
-        "operationId": "world_activate_api_v1_apps__app_id__minecraft_worlds_active_put",
+        "operationId": "world_activate_api_v1_apps__app_id__game_worlds_active_put",
         "parameters": [
           {
             "in": "path",
@@ -3135,13 +3149,13 @@
         },
         "summary": "World Activate",
         "tags": [
-          "minecraft"
+          "game"
         ]
       }
     },
-    "/api/v1/apps/{app_id}/minecraft/worlds/{name}": {
+    "/api/v1/apps/{app_id}/game/worlds/{name}": {
       "delete": {
-        "operationId": "world_delete_api_v1_apps__app_id__minecraft_worlds__name__delete",
+        "operationId": "world_delete_api_v1_apps__app_id__game_worlds__name__delete",
         "parameters": [
           {
             "in": "path",
@@ -3186,13 +3200,13 @@
         },
         "summary": "World Delete",
         "tags": [
-          "minecraft"
+          "game"
         ]
       }
     },
-    "/api/v1/apps/{app_id}/minecraft/worlds/{name}/download": {
+    "/api/v1/apps/{app_id}/game/worlds/{name}/download": {
       "get": {
-        "operationId": "world_download_api_v1_apps__app_id__minecraft_worlds__name__download_get",
+        "operationId": "world_download_api_v1_apps__app_id__game_worlds__name__download_get",
         "parameters": [
           {
             "in": "path",
@@ -3235,7 +3249,7 @@
         },
         "summary": "World Download",
         "tags": [
-          "minecraft"
+          "game"
         ]
       }
     },

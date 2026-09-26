@@ -1,7 +1,9 @@
+import re
+
 import pytest
 
-from hivora.core.errors import ValidationError
-from hivora.games.minecraft import GameCommandError, clean, parse_list, valid_name
+from hivora.games.minecraft import clean, parse_list
+from hivora.templates.schema import GameList
 
 
 @pytest.mark.parametrize(
@@ -18,14 +20,14 @@ def test_parse_list(text: str, expected: tuple[int, int, list[str]]) -> None:
 
 
 def test_parse_list_rejects_other_answers() -> None:
-    with pytest.raises(GameCommandError):
+    with pytest.raises(ValueError):
         parse_list("Unknown command")
 
 
 @pytest.mark.parametrize("bad", ["ab", "a" * 17, "Steve; stop", "Steve\nop", "../x", "Stéve"])
 def test_player_names_are_strict(bad: str) -> None:
-    with pytest.raises(ValidationError):
-        valid_name(bad)
+    default = GameList(id="x", label="x", file="x").name_pattern
+    assert not re.fullmatch(default, bad)
 
 
 def test_clean_strips_colours() -> None:

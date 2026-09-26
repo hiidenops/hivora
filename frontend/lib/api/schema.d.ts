@@ -80,15 +80,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/apps/{app_id}/minecraft/access": {
+    "/api/v1/apps/{app_id}/game/lists": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Access */
-        get: operations["access_api_v1_apps__app_id__minecraft_access_get"];
+        /** Lists */
+        get: operations["lists_api_v1_apps__app_id__game_lists_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -97,7 +97,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/apps/{app_id}/minecraft/ops": {
+    "/api/v1/apps/{app_id}/game/lists/{list_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -106,15 +106,35 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Op Add */
-        post: operations["op_add_api_v1_apps__app_id__minecraft_ops_post"];
+        /** List Add */
+        post: operations["list_add_api_v1_apps__app_id__game_lists__list_id__post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/apps/{app_id}/minecraft/ops/{name}": {
+    "/api/v1/apps/{app_id}/game/lists/{list_id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * List Enabled
+         * @description Intent change: new revision, the server restarts.
+         */
+        put: operations["list_enabled_api_v1_apps__app_id__game_lists__list_id__enabled_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/game/lists/{list_id}/{name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -124,14 +144,14 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Op Remove */
-        delete: operations["op_remove_api_v1_apps__app_id__minecraft_ops__name__delete"];
+        /** List Remove */
+        delete: operations["list_remove_api_v1_apps__app_id__game_lists__list_id___name__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/apps/{app_id}/minecraft/players": {
+    "/api/v1/apps/{app_id}/game/players": {
         parameters: {
             query?: never;
             header?: never;
@@ -139,7 +159,7 @@ export interface paths {
             cookie?: never;
         };
         /** Players */
-        get: operations["players_api_v1_apps__app_id__minecraft_players_get"];
+        get: operations["players_api_v1_apps__app_id__game_players_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -148,61 +168,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/apps/{app_id}/minecraft/whitelist": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Whitelist Add */
-        post: operations["whitelist_add_api_v1_apps__app_id__minecraft_whitelist_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/apps/{app_id}/minecraft/whitelist-enabled": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Whitelist Enabled
-         * @description Intent change: new revision, the server restarts.
-         */
-        put: operations["whitelist_enabled_api_v1_apps__app_id__minecraft_whitelist_enabled_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/apps/{app_id}/minecraft/whitelist/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Whitelist Remove */
-        delete: operations["whitelist_remove_api_v1_apps__app_id__minecraft_whitelist__name__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/apps/{app_id}/minecraft/worlds": {
+    "/api/v1/apps/{app_id}/game/worlds": {
         parameters: {
             query?: never;
             header?: never;
@@ -210,20 +176,20 @@ export interface paths {
             cookie?: never;
         };
         /** Worlds */
-        get: operations["worlds_api_v1_apps__app_id__minecraft_worlds_get"];
+        get: operations["worlds_api_v1_apps__app_id__game_worlds_get"];
         put?: never;
         /**
          * World Import
          * @description Raw .zip body (streamed to disk, 10 GB max); extraction runs as a job.
          */
-        post: operations["world_import_api_v1_apps__app_id__minecraft_worlds_post"];
+        post: operations["world_import_api_v1_apps__app_id__game_worlds_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/apps/{app_id}/minecraft/worlds/active": {
+    "/api/v1/apps/{app_id}/game/worlds/active": {
         parameters: {
             query?: never;
             header?: never;
@@ -235,7 +201,7 @@ export interface paths {
          * World Activate
          * @description Intent change: new revision, the server restarts on that world.
          */
-        put: operations["world_activate_api_v1_apps__app_id__minecraft_worlds_active_put"];
+        put: operations["world_activate_api_v1_apps__app_id__game_worlds_active_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -243,7 +209,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/apps/{app_id}/minecraft/worlds/{name}": {
+    "/api/v1/apps/{app_id}/game/worlds/{name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -254,13 +220,13 @@ export interface paths {
         put?: never;
         post?: never;
         /** World Delete */
-        delete: operations["world_delete_api_v1_apps__app_id__minecraft_worlds__name__delete"];
+        delete: operations["world_delete_api_v1_apps__app_id__game_worlds__name__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/apps/{app_id}/minecraft/worlds/{name}/download": {
+    "/api/v1/apps/{app_id}/game/worlds/{name}/download": {
         parameters: {
             query?: never;
             header?: never;
@@ -268,7 +234,7 @@ export interface paths {
             cookie?: never;
         };
         /** World Download */
-        get: operations["world_download_api_v1_apps__app_id__minecraft_worlds__name__download_get"];
+        get: operations["world_download_api_v1_apps__app_id__game_worlds__name__download_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -954,17 +920,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** AccessOut */
-        AccessOut: {
-            /** Ops */
-            ops: components["schemas"]["OperatorOut"][];
-            /** Running */
-            running: boolean;
-            /** Whitelist */
-            whitelist: string[];
-            /** Whitelist Enabled */
-            whitelist_enabled: boolean;
-        };
         /** AddressIn */
         AddressIn: {
             /**
@@ -990,8 +945,7 @@ export interface components {
             desired_state: components["schemas"]["DesiredState"];
             /** Drift */
             drift: boolean;
-            /** Game */
-            game: string | null;
+            game: components["schemas"]["GameCapsOut"] | null;
             /** Icon Url */
             icon_url: string | null;
             /** Id */
@@ -1163,6 +1117,19 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /** GameCapsOut */
+        GameCapsOut: {
+            /** Lists */
+            lists: boolean;
+            /** Players */
+            players: boolean;
+            /** World Activate */
+            world_activate: boolean;
+            /** World Import */
+            world_import: boolean;
+            /** Worlds */
+            worlds: boolean;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1289,6 +1256,20 @@ export interface components {
              */
             key: string;
         };
+        /** ListEntryOut */
+        ListEntryOut: {
+            /** Extra */
+            extra: string | null;
+            /** Name */
+            name: string;
+        };
+        /** ListsOut */
+        ListsOut: {
+            /** Lists */
+            lists: components["schemas"]["PlayerListOut"][];
+            /** Running */
+            running: boolean;
+        };
         /** LoginIn */
         LoginIn: {
             /** Password */
@@ -1341,13 +1322,6 @@ export interface components {
          * @enum {string}
          */
         NetworkMode: "none" | "shared" | "isolated" | "custom";
-        /** OperatorOut */
-        OperatorOut: {
-            /** Level */
-            level: number;
-            /** Name */
-            name: string;
-        };
         /** OptionOut */
         OptionOut: {
             /** Label */
@@ -1394,6 +1368,23 @@ export interface components {
         PlayerIn: {
             /** Name */
             name: string;
+        };
+        /** PlayerListOut */
+        PlayerListOut: {
+            /** Editable */
+            editable: boolean;
+            /** Enabled */
+            enabled: boolean | null;
+            /** Entries */
+            entries: components["schemas"]["ListEntryOut"][];
+            /** Id */
+            id: string;
+            /** Label */
+            label: string | {
+                [key: string]: string;
+            };
+            /** Name Pattern */
+            name_pattern: string;
         };
         /** PlayersOut */
         PlayersOut: {
@@ -1939,7 +1930,7 @@ export interface operations {
             };
         };
     };
-    access_api_v1_apps__app_id__minecraft_access_get: {
+    lists_api_v1_apps__app_id__game_lists_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1956,7 +1947,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AccessOut"];
+                    "application/json": components["schemas"]["ListsOut"];
                 };
             };
             /** @description Validation Error */
@@ -1970,12 +1961,13 @@ export interface operations {
             };
         };
     };
-    op_add_api_v1_apps__app_id__minecraft_ops_post: {
+    list_add_api_v1_apps__app_id__game_lists__list_id__post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 app_id: number;
+                list_id: string;
             };
             cookie?: never;
         };
@@ -2005,12 +1997,49 @@ export interface operations {
             };
         };
     };
-    op_remove_api_v1_apps__app_id__minecraft_ops__name__delete: {
+    list_enabled_api_v1_apps__app_id__game_lists__list_id__enabled_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 app_id: number;
+                list_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnabledIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRefOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_remove_api_v1_apps__app_id__game_lists__list_id___name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                list_id: string;
                 name: string;
             };
             cookie?: never;
@@ -2037,7 +2066,7 @@ export interface operations {
             };
         };
     };
-    players_api_v1_apps__app_id__minecraft_players_get: {
+    players_api_v1_apps__app_id__game_players_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2068,109 +2097,7 @@ export interface operations {
             };
         };
     };
-    whitelist_add_api_v1_apps__app_id__minecraft_whitelist_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                app_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PlayerIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommandOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    whitelist_enabled_api_v1_apps__app_id__minecraft_whitelist_enabled_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                app_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EnabledIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JobRefOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    whitelist_remove_api_v1_apps__app_id__minecraft_whitelist__name__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                app_id: number;
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CommandOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    worlds_api_v1_apps__app_id__minecraft_worlds_get: {
+    worlds_api_v1_apps__app_id__game_worlds_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2201,7 +2128,7 @@ export interface operations {
             };
         };
     };
-    world_import_api_v1_apps__app_id__minecraft_worlds_post: {
+    world_import_api_v1_apps__app_id__game_worlds_post: {
         parameters: {
             query: {
                 name: string;
@@ -2235,7 +2162,7 @@ export interface operations {
             };
         };
     };
-    world_activate_api_v1_apps__app_id__minecraft_worlds_active_put: {
+    world_activate_api_v1_apps__app_id__game_worlds_active_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -2270,7 +2197,7 @@ export interface operations {
             };
         };
     };
-    world_delete_api_v1_apps__app_id__minecraft_worlds__name__delete: {
+    world_delete_api_v1_apps__app_id__game_worlds__name__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -2302,7 +2229,7 @@ export interface operations {
             };
         };
     };
-    world_download_api_v1_apps__app_id__minecraft_worlds__name__download_get: {
+    world_download_api_v1_apps__app_id__game_worlds__name__download_get: {
         parameters: {
             query?: never;
             header?: never;

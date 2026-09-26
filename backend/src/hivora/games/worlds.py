@@ -1,6 +1,8 @@
-"""Minecraft worlds on a server's data volume: list, import, download, delete.
+"""Game worlds/saves on a server's volume: list, import, download, delete.
 
-A world is a folder holding a `level.dat`. Hivora reaches it through the bind
+The template's `game.saves` describes them: folders holding a marker file
+(Minecraft: `level.dat`, plus sibling dimension folders), or files grouped by
+name (`*.fwl`: `<name>.fwl`, `<name>.db`...). Hivora reaches it through the bind
 mount (same path as on the host), never through Docker. Imports are untrusted
 archives: every member is checked (no absolute path, no `..`, no symlink),
 sizes are capped and the world lands in place with one rename.
@@ -14,7 +16,7 @@ import shutil
 import stat
 import threading
 import zipfile
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
@@ -22,6 +24,7 @@ from typing import TYPE_CHECKING
 from hivora.apps.files import confined, remove_tree, tree_size
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.jobs import JobContext, JobKind
+from hivora.templates.schema import GameSaves
 
 if TYPE_CHECKING:
     from hivora.apps.service import AppService
@@ -33,6 +36,7 @@ MAX_MEMBERS = 500_000
 FREE_MARGIN = 512 * 1024**2  # never fill the disk to the last byte
 # Paper/Spigot keep the other dimensions in sibling folders: world_nether, world_the_end.
 DIMENSIONS = ("_nether", "_the_end")
+MINECRAFT = GameSaves(marker="level.dat", siblings=list(DIMENSIONS))
 
 
 class WorldNotFoundError(NotFoundError):
@@ -73,62 +77,82 @@ def valid_world_name(name: str) -> str:
     return name
 
 
-def world_dirs(data: Path, name: str) -> list[Path]:
-    """The world's folder and its dimension siblings (Paper/Spigot layout)."""
-    return [p for p in (data / name, *(data / f"{name}{s}" for s in DIMENSIONS)) if p.is_dir()]
+def world_paths(data: Path, name: str, layout: GameSaves = MINECRAFT) -> list[Path]:
+    """Everything that belongs to the world: its folder(s) or its files."""
+    if layout.by_file:
+        return sorted(p for p in data.glob(f"{name}.*") if p.is_file() and not p.is_symlink())
+    candidates = (data / name, *(data / f"{name}{s}" for s in layout.siblings))
+    return [p for p in candidates if p.is_dir()]
 
 
-def list_worlds(data: Path, active: str) -> list[World]:
+def _marker(data: Path, name: str, layout: GameSaves) -> Path:
+    return data / f"{name}{layout.marker[1:]}" if layout.by_file else data / name / layout.marker
+
+
+def list_worlds(data: Path, active: str, layout: GameSaves = MINECRAFT) -> list[World]:
     if not data.is_dir():
         return []
-    names = {
-        p.name
-        for p in data.iterdir()
-        if p.is_dir() and not p.is_symlink() and not p.name.startswith(".")
-        and (p / "level.dat").is_file()
-    }  # fmt: skip
+    if layout.by_file:
+        names = {p.name.removesuffix(layout.marker[1:]) for p in data.glob(layout.marker)
+                 if p.is_file() and not p.is_symlink()}  # fmt: skip
+    else:
+        names = {
+            p.name
+            for p in data.iterdir()
+            if p.is_dir() and not p.is_symlink() and not p.name.startswith(".")
+            and (p / layout.marker).is_file()
+        }  # fmt: skip
     worlds = [
         World(
             name=name,
-            size=sum(tree_size(p) for p in world_dirs(data, name)),
-            modified=(data / name / "level.dat").stat().st_mtime,
+            size=sum(
+                p.stat().st_size if p.is_file() else tree_size(p)
+                for p in world_paths(data, name, layout)
+            ),
+            modified=_marker(data, name, layout).stat().st_mtime,
             active=name == active,
         )
         for name in names
-        if not any(name.endswith(s) and name[: -len(s)] in names for s in DIMENSIONS)
+        if WORLD_NAME.match(name)
+        and not any(name.endswith(s) and name[: -len(s)] in names for s in layout.siblings)
     ]
     return sorted(worlds, key=lambda w: (not w.active, w.name.lower()))
 
 
-def existing_world(data: Path, name: str) -> Path:
-    path = data / valid_world_name(name)
-    if not (path / "level.dat").is_file():
+def existing_world(data: Path, name: str, layout: GameSaves = MINECRAFT) -> Path:
+    marker = _marker(data, valid_world_name(name), layout)
+    if not marker.is_file():
         raise WorldNotFoundError(f"no world named {name!r}", name=name)
-    return path
+    return data / name
 
 
-def delete_world(data: Path, name: str, root: Path) -> list[str]:
-    existing_world(data, name)
+def delete_world(data: Path, name: str, root: Path, layout: GameSaves = MINECRAFT) -> list[str]:
+    existing_world(data, name, layout)
     removed = []
-    for path in world_dirs(data, name):
-        remove_tree(path, root)
+    for path in world_paths(data, name, layout):
+        if path.is_dir():
+            remove_tree(path, root)
+        else:
+            confined(path, root).unlink()
         removed.append(path.name)
     return removed
 
 
-def _members(zf: zipfile.ZipFile) -> tuple[str, list[tuple[zipfile.ZipInfo, PurePosixPath]], int]:
+def _members(
+    zf: zipfile.ZipFile, marker: str
+) -> tuple[str, list[tuple[zipfile.ZipInfo, PurePosixPath]], int]:
     """Validate an archive; return the world's root prefix, its members and their size."""
     infos = zf.infolist()
     if len(infos) > MAX_MEMBERS:
         raise ArchiveTooLargeError("too many files in the archive", limit=MAX_MEMBERS)
     roots = [
-        i.filename.removesuffix("level.dat")
+        i.filename.removesuffix(marker)
         for i in infos
-        if not i.is_dir() and PurePosixPath(i.filename).name == "level.dat"
+        if not i.is_dir() and PurePosixPath(i.filename).name == marker
     ]
     if not roots:
-        raise InvalidArchiveError("no level.dat in the archive: not a Minecraft world")
-    # ponytail: the shallowest level.dat wins; Paper dimension folders zipped
+        raise InvalidArchiveError(f"no {marker} in the archive: not a world", marker=marker)
+    # ponytail: the shallowest marker wins; Paper dimension folders zipped
     # next to it are skipped. Import them as their own world if needed.
     root = min(roots, key=len)
     members, total = [], 0
@@ -149,7 +173,7 @@ def _members(zf: zipfile.ZipFile) -> tuple[str, list[tuple[zipfile.ZipInfo, Pure
 
 def extract_world(
     archive: Path, target: Path, *, uid: int, gid: int,
-    progress: Callable[[int], None] = lambda _: None,
+    progress: Callable[[int], None] = lambda _: None, marker: str = "level.dat",
 ) -> int:  # fmt: skip
     """Extract a world archive to `target` (which must not exist). Returns bytes written.
 
@@ -163,7 +187,7 @@ def extract_world(
     except (zipfile.BadZipFile, OSError) as exc:
         raise InvalidArchiveError(f"not a valid .zip file: {exc}") from exc
     with zf:
-        _, members, total = _members(zf)
+        _, members, total = _members(zf, marker)
         free = shutil.disk_usage(target.parent).free
         if free < total + FREE_MARGIN:
             raise NotEnoughSpaceError("not enough disk space", needed=total, free=free)
@@ -245,7 +269,11 @@ async def zip_stream(paths: list[Path], base: Path) -> AsyncIterator[bytes]:
             # Region files are already compressed: favour speed.
             with zipfile.ZipFile(Sink(), "w", zipfile.ZIP_DEFLATED, compresslevel=1) as zf:  # type: ignore[call-overload]
                 for top in paths:
-                    for dirpath, _, files in os.walk(top):
+                    # A folder world is walked; a file world is its own single entry.
+                    walked: Iterable[tuple[str, list[str], list[str]]] = (
+                        os.walk(top) if top.is_dir() else [(str(top.parent), [], [top.name])]
+                    )
+                    for dirpath, _, files in walked:
                         for f in sorted(files):
                             path = Path(dirpath, f)
                             if path.is_symlink() or f == "session.lock":
@@ -299,7 +327,13 @@ class WorldJobs:
                 f"extracting {ctx.params.get('filename') or upload.name} into {data / name}"
             )
             written = await asyncio.to_thread(
-                extract_world, upload, data / name, uid=s.puid, gid=s.pgid, progress=progress
+                extract_world,
+                upload,
+                data / name,
+                uid=s.puid,
+                gid=s.pgid,
+                progress=progress,
+                marker=ctx.params.get("marker", "level.dat"),
             )
         finally:
             upload.unlink(missing_ok=True)
@@ -310,6 +344,7 @@ class WorldJobs:
         s = self.apps.settings
         data = confined(Path(ctx.params["data"]), s.volumes_root)
         name = ctx.params["name"]
-        removed = await asyncio.to_thread(delete_world, data, name, s.volumes_root)
+        layout = GameSaves.model_validate(ctx.params.get("layout") or MINECRAFT.model_dump())
+        removed = await asyncio.to_thread(delete_world, data, name, s.volumes_root, layout)
         await ctx.log(f"removed {', '.join(removed)}")
         self.apps.bus.publish("game.world_deleted", app=ctx.app_slug, target=name)

@@ -16,7 +16,7 @@ from hivora.core.errors import (
     ValidationError,
 )
 from hivora.docker_gateway import DockerUnavailableError
-from hivora.games.minecraft import GameCommandError
+from hivora.games.engine import GameCommandError
 from hivora.games.modpacks import ModpackSourceError
 
 logger = logging.getLogger(__name__)

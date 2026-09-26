@@ -102,13 +102,21 @@ class SummaryItemOut(BaseModel):
     value: Localized
 
 
+class GameCapsOut(BaseModel):
+    players: bool
+    lists: bool
+    worlds: bool
+    world_import: bool
+    world_activate: bool
+
+
 class AppDetailOut(AppOut):
     revision: int | None
     containers: list[ContainerOut]
     ports: list[PortOut]
     volumes: list[str]
     console: ConsoleInfoOut
-    game: str | None  # game tools available (e.g. "minecraft")
+    game: GameCapsOut | None  # game tools the template declares
     started_at: datetime | None  # main container, when running
     access: dict[str, str]  # where to connect (web / game)
     summary: list[SummaryItemOut]  # template-chosen settings (type, version...)
@@ -224,12 +232,15 @@ async def app_summary(
     return items
 
 
-def game_kind(rt: RuntimeDep, template: str | None) -> str | None:
+def game_caps(rt: RuntimeDep, template: str | None) -> GameCapsOut | None:
+    from hivora.games.engine import GameTools
+
     try:
         game = rt.catalog.get(template).template.game if template else None
     except NotFoundError:
         return None
-    return game.query if game else None
+    caps = GameTools.capabilities(game)
+    return GameCapsOut(**caps) if caps else None
 
 
 def plan_out(plan: DeployPlan) -> PlanOut:
@@ -307,7 +318,7 @@ async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
                    for s in app.services for p in s.ports],
             volumes=[v.source for s in app.services for v in s.volumes],
             console=console_info(rt, template),
-            game=game_kind(rt, template),
+            game=game_caps(rt, template),
             started_at=started_at,
             access=access,
             summary=summary,

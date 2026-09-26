@@ -334,7 +334,9 @@ def test_minecraft_players_whitelist_and_ops(client: TestClient) -> None:
     wait_job(client, deployed["job"]["id"])
     app_id = deployed["app"]["id"]
     detail = client.get(f"{API}/apps/{app_id}").json()
-    assert detail["game"] == "minecraft" and detail["started_at"] is None  # not running
+    caps = ("players", "lists", "worlds", "world_import", "world_activate")
+    assert detail["game"] == dict.fromkeys(caps, True)
+    assert detail["started_at"] is None  # not running
     assert detail["summary"][0] == {"label": {"fr": "Type de serveur", "en": "Server type"},
                                     "value": "Vanilla"}  # fmt: skip
     assert detail["access"] == {"game": "203.0.113.7:25565", "game_lan": "192.168.1.10:25565"}
@@ -342,8 +344,8 @@ def test_minecraft_players_whitelist_and_ops(client: TestClient) -> None:
     runtime = client.app.state.runtime  # type: ignore[attr-defined]
     gw = runtime.gateway
     # Stopped: players unknown, commands refused.
-    assert client.get(f"{API}/apps/{app_id}/minecraft/players").json()["running"] is False
-    refused = client.post(f"{API}/apps/{app_id}/minecraft/whitelist", json={"name": "Steve"})
+    assert client.get(f"{API}/apps/{app_id}/game/players").json()["running"] is False
+    refused = client.post(f"{API}/apps/{app_id}/game/lists/whitelist", json={"name": "Steve"})
     assert refused.status_code == 409 and code(refused) == "server_not_running"
 
     gw.put(ContainerInfo(
@@ -357,29 +359,39 @@ def test_minecraft_players_whitelist_and_ops(client: TestClient) -> None:
     gw.exec_results["rcon-cli list"] = (0, "There are 1 of a max of 10 players online: Steve")
     gw.exec_results["rcon-cli whitelist add Steve"] = (0, "Added Steve to the whitelist")
     gw.exec_results["rcon-cli op Ghost"] = (0, "That player does not exist")
-    assert client.get(f"{API}/apps/{app_id}/minecraft/players").json() == {
+    assert client.get(f"{API}/apps/{app_id}/game/players").json() == {
         "running": True, "online": 1, "max": 10, "names": ["Steve"],
     }  # fmt: skip
-    added = client.post(f"{API}/apps/{app_id}/minecraft/whitelist", json={"name": "Steve"})
+    added = client.post(f"{API}/apps/{app_id}/game/lists/whitelist", json={"name": "Steve"})
     assert added.json() == {"output": "Added Steve to the whitelist"}
-    bad = client.post(f"{API}/apps/{app_id}/minecraft/whitelist", json={"name": "Steve; stop"})
+    bad = client.post(f"{API}/apps/{app_id}/game/lists/whitelist", json={"name": "Steve; stop"})
     assert bad.status_code == 422
-    ghost = client.post(f"{API}/apps/{app_id}/minecraft/ops", json={"name": "Ghost"})
+    ghost = client.post(f"{API}/apps/{app_id}/game/lists/ops", json={"name": "Ghost"})
     assert ghost.status_code == 502 and code(ghost) == "game_command_failed"
     assert ["rcon-cli", "whitelist", "add", "Steve"] in gw.exec_calls
 
     data = Path(runtime.settings.volumes_root) / "cube" / "data"
     (data / "whitelist.json").write_text(json.dumps([{"uuid": "u", "name": "Steve"}]))
     (data / "ops.json").write_text(json.dumps([{"uuid": "v", "name": "Alex", "level": 4}]))
-    access = client.get(f"{API}/apps/{app_id}/minecraft/access").json()
-    assert access == {"running": True, "whitelist_enabled": False, "whitelist": ["Steve"],
-                      "ops": [{"name": "Alex", "level": 4}]}  # fmt: skip
+    lists = client.get(f"{API}/apps/{app_id}/game/lists").json()
+    assert lists["running"] is True
+    wl, ops = lists["lists"]
+    assert (wl["id"], wl["enabled"], wl["entries"]) == (
+        "whitelist",
+        False,
+        [{"name": "Steve", "extra": None}],
+    )
+    assert (ops["id"], ops["enabled"], ops["entries"]) == (
+        "ops",
+        None,
+        [{"name": "Alex", "extra": "4"}],
+    )
 
     job = client.put(
-        f"{API}/apps/{app_id}/minecraft/whitelist-enabled", json={"enabled": True}
+        f"{API}/apps/{app_id}/game/lists/whitelist/enabled", json={"enabled": True}
     ).json()
     assert wait_job(client, job["id"])["status"] == "succeeded"
-    assert client.get(f"{API}/apps/{app_id}/minecraft/access").json()["whitelist_enabled"] is True
+    assert client.get(f"{API}/apps/{app_id}/game/lists").json()["lists"][0]["enabled"] is True
     compose = client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"]
     assert "ENABLE_WHITELIST: 'true'" in compose
 
@@ -393,7 +405,7 @@ def test_minecraft_players_whitelist_and_ops(client: TestClient) -> None:
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("Skyblock/level.dat", b"S")
         zf.writestr("Skyblock/region/r.0.0.mca", b"R" * 10)
-    url = f"{API}/apps/{app_id}/minecraft/worlds"
+    url = f"{API}/apps/{app_id}/game/worlds"
     job = client.post(url, params={"name": "skyblock", "filename": "Skyblock.zip"},
                       content=buf.getvalue())  # fmt: skip
     assert job.status_code == 202 and job.json()["kind"] == "world_import"

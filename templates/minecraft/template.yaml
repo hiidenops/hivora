@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.10.0
+  version: 1.11.0
   category: games
   tags: [minecraft, java, sandbox]
   icon:
@@ -322,10 +322,30 @@ backup:
 update:
   strategy: manual
 game:
-  query: minecraft
-  rcon_port: 25575
   # rcon-cli ships with the image and reads RCON_PASSWORD from the environment.
   console: [rcon-cli]
+  players: { command: [rcon-cli, list], format: minecraft }
+  lists:
+    - id: whitelist
+      label: { fr: Liste blanche, en: Whitelist }
+      file: whitelist.json
+      format: json_names
+      add: [rcon-cli, whitelist, add, "{name}"]
+      remove: [rcon-cli, whitelist, remove, "{name}"]
+      enabled_field: enable_whitelist
+    - id: ops
+      label: { fr: Administrateurs (op), en: Operators (op) }
+      file: ops.json
+      format: json_names
+      add: [rcon-cli, op, "{name}"]
+      remove: [rcon-cli, deop, "{name}"]
+      extra_key: level
+  saves:
+    volume: data
+    marker: level.dat
+    siblings: [_nether, _the_end]
+    active_field: level
+    flush: [rcon-cli, save-all, flush]
   commands:
     - { command: "list", description: { fr: Joueurs connectés, en: Players online } }
     - { command: "say <message>", description: { fr: Message à tous les joueurs, en: Message to every player } }

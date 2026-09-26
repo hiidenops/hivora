@@ -26,7 +26,8 @@ export type UpdatePlan = Schemas["UpdatePlanOut"];
 export type Modpack = Schemas["ModpackOut"];
 export type Integrations = Schemas["IntegrationsOut"];
 export type Players = Schemas["PlayersOut"];
-export type GameAccess = Schemas["AccessOut"];
+export type GameCaps = Schemas["GameCapsOut"];
+export type GameLists = Schemas["ListsOut"];
 export type Worlds = Schemas["WorldsOut"];
 
 /** Error returned by the backend: `code` is stable and translated by the UI. */

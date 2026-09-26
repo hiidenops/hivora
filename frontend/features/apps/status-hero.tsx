@@ -10,7 +10,7 @@ import type { AppDetail, AppStatus } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-import { usePlayers } from "../games/minecraft-panel";
+import { usePlayers } from "../games/game-panel";
 
 const TONE: Record<AppStatus, string> = {
   healthy: "bg-ok/15 text-ok ring-ok/30",
@@ -60,7 +60,7 @@ export function StatusHero({ app, status }: { app: AppDetail; status: AppStatus 
   const { t, l } = useI18n();
   const now = useNow();
   const running = ["healthy", "starting", "degraded"].includes(status);
-  const players = usePlayers(app.id, running && app.game === "minecraft");
+  const players = usePlayers(app.id, running && !!app.game?.players);
 
   let uptime: string | null = null;
   if (running && app.started_at) {

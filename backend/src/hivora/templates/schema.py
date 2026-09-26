@@ -8,7 +8,7 @@ import re
 from collections.abc import Iterator
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from hivora.templates.expressions import find_expressions
 
@@ -225,14 +225,73 @@ class GameCommand(_Strict):
     description: Localized
 
 
+def _relative(path: str) -> str:
+    """A path inside a volume: relative, no `..`, plain characters."""
+    if (
+        path.startswith("/")
+        or ".." in path.split("/")
+        or not re.fullmatch(r"[A-Za-z0-9._/-]*", path)
+    ):
+        raise ValueError(f"{path!r}: expected a relative path inside the volume")
+    return path
+
+
+RelPath = Annotated[str, AfterValidator(_relative)]
+
+
+class GamePlayers(_Strict):
+    """Who is online: a command run in the main service, or a Steam A2S query."""
+
+    command: list[str] | None = None  # e.g. ["rcon-cli", "list"]
+    format: Literal["minecraft"] | None = None  # parser of the command output
+    a2s_port: int | None = None  # container port answering A2S (must be published)
+
+    @model_validator(mode="after")
+    def _check(self) -> "GamePlayers":
+        if bool(self.command) == bool(self.a2s_port) or bool(self.command) != bool(self.format):
+            raise ValueError("players: either command + format, or a2s_port")
+        return self
+
+
+class GameList(_Strict):
+    """A player list (whitelist, admins, bans) stored in a file of the saves volume."""
+
+    id: Annotated[str, Field(pattern=FIELD_ID)]
+    label: Localized
+    file: RelPath
+    format: Literal["json_names", "lines"] = "lines"  # [{"name": ...}] or one entry per line
+    # Commands run in the running server ("{name}" is replaced); none: the file is edited.
+    add: list[str] = []
+    remove: list[str] = []
+    enabled_field: str | None = None  # boolean form field that turns the list on
+    extra_key: str | None = None  # json_names: shown next to the name (e.g. "level")
+    name_pattern: str = r"^[A-Za-z0-9_]{3,16}$"
+
+
+class GameSaves(_Strict):
+    """Worlds/saves: folders holding ``marker``, or files grouped by name (``*.ext``)."""
+
+    volume: str = "data"
+    path: RelPath = ""
+    marker: str = "level.dat"
+    siblings: list[str] = []  # suffixed folders belonging to a world (e.g. "_nether")
+    active_field: str | None = None  # form field naming the active world
+    flush: list[str] = []  # command saving the running world before a download
+
+    @property
+    def by_file(self) -> bool:
+        return self.marker.startswith("*.")
+
+
 class Game(_Strict):
-    query: Literal["a2s", "minecraft"] | None = None
     # Server console: command run (with a TTY) in the main service, e.g. ["rcon-cli"].
     console: list[str] | None = None
     commands: list[GameCommand] = []  # the console's command guide
-    rcon_port: int | None = None
+    players: GamePlayers | None = None
+    lists: list[GameList] = []
+    saves: GameSaves | None = None
     max_players: int | str | None = None
-    stop_command: str | None = None
+    stop_command: str | None = None  # graceful stop through the console
 
 
 class Defaults(_Strict):
@@ -268,6 +327,20 @@ class Template(_Strict):
             raise ValueError("duplicate form field ids")
         if unknown := set(self.summary) - set(fields):
             raise ValueError(f"summary lists unknown fields {sorted(unknown)}")
+        if self.game:
+            for ref in (
+                *(gl.enabled_field for gl in self.game.lists),
+                self.game.saves.active_field if self.game.saves else None,
+            ):
+                if ref and ref not in fields:
+                    raise ValueError(f"game: unknown form field {ref!r}")
+            main = self.services.get(self.main_service)
+            if (
+                self.game.saves
+                and main
+                and self.game.saves.volume not in {v.name for v in main.volumes}
+            ):
+                raise ValueError("game.saves: unknown volume of the main service")
         names = set(self.services)
         for name, svc in self.services.items():
             if extra := set(svc.arch) - set(self.requirements.arch):

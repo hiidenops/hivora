@@ -16,7 +16,7 @@ import { AppActions } from "@/features/apps/app-actions";
 import { AppUsage } from "@/features/apps/app-usage";
 import { StatusHero } from "@/features/apps/status-hero";
 import { ConsolePanel } from "@/features/console/console-panel";
-import { MinecraftPanel } from "@/features/games/minecraft-panel";
+import { GamePanel } from "@/features/games/game-panel";
 import { RemoveDialog } from "@/features/apps/remove-dialog";
 import { ApiError } from "@/lib/api/client";
 import { useApp, useAppCompose, useJob, useRevisions } from "@/lib/api/hooks";
@@ -98,9 +98,10 @@ function AppDetail() {
         )}
         <StatusHero app={app} status={status} />
         {["healthy", "starting", "degraded"].includes(status) && <AppUsage slug={app.slug} />}
-        {app.game === "minecraft" && (
-          <MinecraftPanel
+        {app.game && (
+          <GamePanel
             appId={app.id}
+            caps={app.game}
             running={["healthy", "starting", "degraded"].includes(status)}
             onJob={setActiveJob}
           />
