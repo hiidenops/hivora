@@ -1,6 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const PASSWORD = "correct-horse-battery";
+
+/** Everything clickable on the page shows the hand (disabled controls excepted). */
+async function expectPointerCursors(page: Page) {
+  const arrows = await page.$$eval(
+    "button:not(:disabled), a[href], select:not(:disabled), [role=tab], [role=switch]:not(:disabled), summary",
+    (els) =>
+      els
+        .filter((e) => getComputedStyle(e).cursor !== "pointer")
+        .map((e) => `${e.tagName} ${(e.textContent || e.getAttribute("aria-label") || "").trim().slice(0, 40)}`),
+  );
+  expect(arrows).toEqual([]);
+}
 
 test("first start: forced password change, deploy, remove, users", async ({ page }) => {
   // admin/admin, then the forced password change.
@@ -16,6 +28,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
   await expect(page.getByText("En direct")).toBeVisible();
+  await expectPointerCursors(page);
 
   // Catalog -> deploy wizard -> review (compose shown, secrets referenced) -> deploy.
   await page.getByRole("link", { name: "Parcourir le catalogue" }).click();
@@ -23,6 +36,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await expect(page.getByRole("heading", { name: "Déployer Vaultwarden" })).toBeVisible();
   await page.getByRole("button", { name: "Vérifier" }).click();
   await expect(page.getByText("Fichier compose généré")).toBeVisible();
+  await expectPointerCursors(page);
   await expect(page.locator("pre").first()).toContainText("${HV_SECRET_ADMIN_TOKEN:-}");
   await page.getByRole("button", { name: "Déployer", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Application en ligne" })).toBeVisible({ timeout: 20_000 });
@@ -35,6 +49,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   // Live usage: sampled every 5 s only while the page is open.
   await expect(page.getByRole("region", { name: "Consommation" })).toContainText("25,0 %", { timeout: 12_000 });
   await expect(page.locator(".xterm")).toBeVisible(); // auto-connected on a running app
+  await expectPointerCursors(page);
   await expect(page.locator(".xterm-rows")).toContainText("$ sh -c"); // fake exec echoes its command
   await page.getByRole("button", { name: "Supprimer" }).click();
   const dialog = page.getByRole("dialog");
@@ -45,6 +60,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
 
   // Changing a flagged setting (server type) erases the data: confirmed explicitly.
   await page.getByRole("link", { name: "Parcourir le catalogue" }).click();
+  await expectPointerCursors(page);
   await page.getByRole("article", { name: "Minecraft Java" }).getByRole("link", { name: "Déployer" }).click();
   await page.getByRole("switch", { name: /J'accepte le contrat de licence Minecraft/ }).check();
   await page.getByRole("button", { name: "Vérifier" }).click();
@@ -53,6 +69,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await page.getByRole("link", { name: "Voir l'application" }).click();
   await page.getByRole("link", { name: "Modifier" }).click();
   await page.getByLabel("Type de serveur", { exact: true }).selectOption("PAPER");
+  await expectPointerCursors(page);
   await page.getByRole("button", { name: "Vérifier les changements" }).click();
   await expect(page.getByText(/Changer « Type de serveur » efface tout le contenu du serveur/)).toBeVisible();
   const erase = page.getByRole("button", { name: "Effacer et appliquer" });

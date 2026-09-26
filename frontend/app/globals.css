@@ -85,8 +85,21 @@ body {
 }
 
 /* Tailwind 4 leaves the arrow on buttons: everything clickable shows the hand. */
-:where(a[href], button, [role="button"], [role="tab"], [role="switch"], select, summary,
-  label:has(input:not(:disabled)), input[type="checkbox"], input[type="radio"], input[type="file"]):not(:disabled) {
+a[href],
+button:not(:disabled),
+[role="button"],
+[role="tab"],
+[role="switch"]:not(:disabled),
+select:not(:disabled),
+summary,
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="file"]:not(:disabled) {
+  cursor: pointer;
+}
+/* Separate rule: a browser without :has() drops only this one, not the one above. */
+label:has(> input:not(:disabled)),
+label:has(> span > input:not(:disabled)) {
   cursor: pointer;
 }
 
