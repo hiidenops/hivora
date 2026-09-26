@@ -1,0 +1,107 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: counter-strike-2
+  name: Counter-Strike 2
+  version: 1.0.0
+  category: games
+  tags: [cs2, counter-strike, steam, fps]
+  icon: { steam_appid: 730 }
+  description:
+    fr: Serveur dédié Counter-Strike 2 (SteamCMD), image du panel de jeux d'OVHcloud. x86 uniquement, environ 60 Go.
+    en: Counter-Strike 2 dedicated server (SteamCMD), OVHcloud Game Panel image. x86 only, about 60 GB.
+  links:
+    site: https://www.counter-strike.net
+    doc: https://github.com/ovh/game-panel/tree/main/docker-images/counter-strike/2
+    gslt: https://steamcommunity.com/dev/managegameservers
+  maintainer: hivora
+  license: Apache-2.0 (image)
+  source: https://hub.docker.com/r/ovhcom/gamepanel-counter-strike-2
+requirements:
+  arch: [amd64]
+  memory: { min: 4Gi, recommended: 8Gi }
+  disk: { min: 60Gi }
+form:
+  basic:
+    - id: hostname
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+      pattern: "[^\"]{1,64}"
+    - id: gslt
+      group: { fr: Serveur, en: Server }
+      label: { fr: Jeton de serveur Steam (GSLT), en: Steam game server token (GSLT) }
+      type: secret
+      required: true
+      help:
+        fr: "Obligatoire pour être joignable hors du réseau local. Gratuit sur steamcommunity.com/dev/managegameservers (app 730)."
+        en: "Required to be reachable outside the local network. Free at steamcommunity.com/dev/managegameservers (app 730)."
+    - id: mode
+      group: { fr: Partie, en: Match }
+      label: { fr: Mode de jeu, en: Game mode }
+      type: select
+      default: "+game_type 0 +game_mode 1"
+      options:
+        - { value: "+game_type 0 +game_mode 0", label: { fr: Occasionnel, en: Casual } }
+        - { value: "+game_type 0 +game_mode 1", label: { fr: Compétitif, en: Competitive } }
+        - { value: "+game_type 0 +game_mode 2", label: { fr: Partie rapide (2 contre 2), en: Wingman } }
+        - { value: "+game_type 1 +game_mode 2", label: { fr: Match à mort, en: Deathmatch } }
+    - id: map
+      group: { fr: Partie, en: Match }
+      label: { fr: Carte de départ, en: Starting map }
+      type: select
+      default: de_dust2
+      options:
+        - { value: de_dust2, label: Dust II }
+        - { value: de_mirage, label: Mirage }
+        - { value: de_inferno, label: Inferno }
+        - { value: de_nuke, label: Nuke }
+        - { value: de_ancient, label: Ancient }
+        - { value: de_anubis, label: Anubis }
+        - { value: de_train, label: Train }
+    - id: max_players
+      group: { fr: Partie, en: Match }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 10
+      range: [2, 64]
+  advanced:
+    - id: update_on_start
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mettre à jour le serveur à chaque démarrage, en: Update the server on every start }
+      type: boolean
+      default: true
+services:
+  server:
+    role: main
+    image: ovhcom/gamepanel-counter-strike-2
+    tag: "1.6.0@sha256:033b94e5110c5f33d37582b2149c75db5a72b86d9ebe2777c5585c7bd2ef2dd4"
+    env:
+      CS2_START_PARAMS: '-dedicated -maxplayers {{ form.max_players }} {{ form.mode }} +map {{ form.map }} +hostname "{{ form.hostname }}" +sv_setsteamaccount {{ secret.gslt }}'
+      CS2_UPDATE_ON_START: "{{ form.update_on_start }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 27015, protocol: udp, purpose: game, exposure: public }
+      - { container: 27015, protocol: tcp, purpose: game, exposure: public }
+    volumes:
+      - { name: data, target: /data, backup: true, owner: "10001:10001" }
+    stop_grace_period: 60s
+access:
+  game: "{{ host.public_ip }}:27015"
+update:
+  strategy: manual
+game:
+  # One command per line, sent by the image script (exec in the container, no host shell).
+  console: [sh, -c, "while printf '> ' && IFS= read -r line; do [ -n \"$line\" ] && /app/send-command.sh \"$line\"; done"]
+  commands:
+    - { command: "status", description: { fr: Joueurs connectés, en: Players online } }
+    - { command: "say <message>", description: { fr: Message à tous les joueurs, en: Message to every player } }
+    - { command: "changelevel de_mirage", description: { fr: Changer de carte, en: Change map } }
+    - { command: "mp_restartgame 1", description: { fr: Relancer la partie, en: Restart the match } }
+    - { command: "kick <joueur>", description: { fr: Expulser un joueur, en: Kick a player } }
+  players: { a2s_port: 27015 }
+summary: [mode, map, max_players]
+defaults:
+  zone: gaming
+  restart: unless-stopped

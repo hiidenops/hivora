@@ -1,0 +1,106 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: garrys-mod
+  name: Garry's Mod
+  version: 1.0.0
+  category: games
+  tags: [gmod, steam, sandbox]
+  icon: { steam_appid: 4000 }
+  description:
+    fr: Serveur dédié Garry's Mod (SteamCMD, contenu Counter-Strike Source en option), image du panel de jeux d'OVHcloud. x86 uniquement.
+    en: Garry's Mod dedicated server (SteamCMD, optional Counter-Strike Source content), OVHcloud Game Panel image. x86 only.
+  links:
+    site: https://gmod.facepunch.com
+    doc: https://github.com/ovh/game-panel/tree/main/docker-images/garrys-mod
+  maintainer: hivora
+  license: Apache-2.0 (image)
+  source: https://hub.docker.com/r/ovhcom/gamepanel-garrys-mod
+requirements:
+  arch: [amd64]
+  memory: { min: 2Gi, recommended: 4Gi }
+  disk: { min: 10Gi }
+form:
+  basic:
+    - id: hostname
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+      pattern: "[^\"]{1,64}"
+    - id: max_players
+      group: { fr: Serveur, en: Server }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 16
+      range: [2, 128]
+    - id: gamemode
+      group: { fr: Partie, en: Match }
+      label: { fr: Mode de jeu, en: Game mode }
+      type: select
+      default: sandbox
+      options:
+        - { value: sandbox, label: Sandbox }
+        - { value: terrortown, label: Trouble in Terrorist Town }
+        - { value: murder, label: Murder }
+        - { value: prop_hunt, label: Prop Hunt }
+        - { value: darkrp, label: DarkRP }
+    - id: map
+      group: { fr: Partie, en: Match }
+      label: { fr: Carte de départ, en: Starting map }
+      type: string
+      default: gm_construct
+      pattern: "[A-Za-z0-9_]{1,64}"
+    - id: mount_css
+      group: { fr: Partie, en: Match }
+      label: { fr: "Installer le contenu Counter-Strike Source (textures, cartes)", en: "Install Counter-Strike Source content (textures, maps)" }
+      type: boolean
+      default: false
+  advanced:
+    - id: workshop_collection
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Collection du Workshop (identifiant), en: Workshop collection (ID) }
+      type: string
+      pattern: "[0-9]{0,20}"
+      help:
+        fr: Contenu téléchargé automatiquement par les joueurs et le serveur. Laisser vide si aucune.
+        en: Content downloaded automatically by players and the server. Leave empty for none.
+    - id: update_on_start
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mettre à jour le serveur à chaque démarrage, en: Update the server on every start }
+      type: boolean
+      default: true
+services:
+  server:
+    role: main
+    image: ovhcom/gamepanel-garrys-mod
+    tag: "1.6.0@sha256:4e3f92db6dc28cd723d6cee7c7940e1357fc60e2ff6e311bcadcb646333a2f87"
+    env:
+      GMOD_START_PARAMS: '+gamemode {{ form.gamemode }} +map {{ form.map }} +maxplayers {{ form.max_players }} +hostname "{{ form.hostname }}" +host_workshop_collection {{ form.workshop_collection | default("0") }}'
+      GMOD_MOUNT_CSS: "{{ form.mount_css }}"
+      GMOD_UPDATE_ON_START: "{{ form.update_on_start }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 27015, protocol: udp, purpose: game, exposure: public }
+    volumes:
+      - { name: data, target: /data, backup: true, owner: "10001:10001" }
+    stop_grace_period: 60s
+access:
+  game: "{{ host.public_ip }}:27015"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  # One command per line, sent by the image script (exec in the container, no host shell).
+  console: [sh, -c, "while printf '> ' && IFS= read -r line; do [ -n \"$line\" ] && /app/send-command.sh \"$line\"; done"]
+  commands:
+    - { command: "status", description: { fr: Joueurs connectés, en: Players online } }
+    - { command: "say <message>", description: { fr: Message à tous les joueurs, en: Message to every player } }
+    - { command: "changelevel gm_flatgrass", description: { fr: Changer de carte, en: Change map } }
+    - { command: "kick <joueur>", description: { fr: Expulser un joueur, en: Kick a player } }
+  players: { a2s_port: 27015 }
+summary: [gamemode, map, max_players]
+defaults:
+  zone: gaming
+  restart: unless-stopped

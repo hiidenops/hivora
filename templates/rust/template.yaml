@@ -1,0 +1,106 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: rust
+  name: Rust
+  version: 1.0.0
+  category: games
+  tags: [rust, steam, survival]
+  icon: { steam_appid: 252490 }
+  description:
+    fr: Serveur dédié Rust (SteamCMD, WebRCON, appli Rust+), image du panel de jeux d'OVHcloud. x86 uniquement.
+    en: Rust dedicated server (SteamCMD, WebRCON, Rust+ app), OVHcloud Game Panel image. x86 only.
+  links:
+    site: https://rust.facepunch.com
+    doc: https://github.com/ovh/game-panel/tree/main/docker-images/rust
+  maintainer: hivora
+  license: Apache-2.0 (image)
+  source: https://hub.docker.com/r/ovhcom/gamepanel-rust
+requirements:
+  arch: [amd64]
+  memory: { min: 8Gi, recommended: 12Gi }
+  disk: { min: 20Gi }
+form:
+  basic:
+    - id: hostname
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+      pattern: "[^\"]{1,64}"
+    - id: max_players
+      group: { fr: Serveur, en: Server }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 50
+      range: [1, 500]
+    - id: world_size
+      group: { fr: Monde, en: World }
+      label: { fr: Taille de la carte, en: Map size }
+      type: integer
+      default: 3500
+      range: [1000, 6000]
+      reset_data_on_change: true
+    - id: seed
+      group: { fr: Monde, en: World }
+      label: { fr: Graine de la carte, en: Map seed }
+      type: integer
+      default: 12345
+      range: [0, 2147483647]
+      reset_data_on_change: true
+  advanced:
+    - id: rcon_password
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mot de passe WebRCON, en: WebRCON password }
+      type: secret
+      generate: { length: 24 }
+    - id: rustplus
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Appli compagnon Rust+, en: Rust+ companion app }
+      type: boolean
+      default: true
+    - id: update_on_start
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mettre à jour le serveur à chaque démarrage, en: Update the server on every start }
+      type: boolean
+      default: true
+services:
+  server:
+    role: main
+    image: ovhcom/gamepanel-rust
+    tag: "1.6.0@sha256:b18e401ab4353dd9e2eaa5f99a5a15693bca923e4c29443007451b31e9a70d71"
+    env:
+      RUST_START_PARAMS: '+server.hostname "{{ form.hostname }}" +server.maxplayers {{ form.max_players }} +server.worldsize {{ form.world_size }} +server.seed {{ form.seed }}'
+      RUST_RCON_PASSWORD: "{{ secret.rcon_password }}"
+      RUST_RUSTPLUS_ENABLED: "{{ form.rustplus }}"
+      RUST_UPDATE_ON_START: "{{ form.update_on_start }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 28015, protocol: udp, purpose: game, exposure: public }
+      - { container: 28017, protocol: udp, purpose: query, exposure: public }
+      - { container: 28082, protocol: tcp, purpose: other, exposure: public }
+      - { container: 28016, protocol: tcp, purpose: rcon, exposure: internal }
+    volumes:
+      - { name: data, target: /data, backup: true, owner: "10001:10001" }
+    stop_grace_period: 300s
+access:
+  game: "{{ host.public_ip }}:28015"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  # One command per line, sent by the image script (exec in the container, no host shell).
+  console: [sh, -c, "while printf '> ' && IFS= read -r line; do [ -n \"$line\" ] && /app/send-command.sh \"$line\"; done"]
+  commands:
+    - { command: "status", description: { fr: Joueurs connectés, en: Players online } }
+    - { command: "say <message>", description: { fr: Message à tous les joueurs, en: Message to every player } }
+    - { command: "save", description: { fr: Sauvegarder le monde, en: Save the world } }
+    - { command: "ownerid <steamid64>", description: { fr: Donner les droits d'administrateur, en: Grant admin rights } }
+    - { command: "kick <joueur>", description: { fr: Expulser un joueur, en: Kick a player } }
+    - { command: "banid <steamid64>", description: { fr: Bannir un joueur, en: Ban a player } }
+  players: { a2s_port: 28017 }
+summary: [max_players, world_size]
+defaults:
+  zone: gaming
+  restart: unless-stopped

@@ -142,6 +142,7 @@ class VolumeMount(Base):
     target: Mapped[str] = mapped_column(String(1000))
     read_only: Mapped[bool] = mapped_column(default=False)
     backup: Mapped[bool] = mapped_column(default=False)
+    owner: Mapped[str | None] = mapped_column(String(21))  # "uid:gid", None: PUID/PGID
 
 
 class AppSecret(Base):

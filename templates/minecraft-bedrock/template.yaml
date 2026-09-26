@@ -1,0 +1,159 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: minecraft-bedrock
+  name: Minecraft Bedrock
+  version: 1.0.0
+  category: games
+  tags: [minecraft, bedrock, consoles, mobile]
+  icon:
+    url: https://minecraft.wiki/images/Grass_Block_JE7_BE6.png
+  description:
+    fr: Serveur Minecraft Bedrock Edition (mobiles, consoles, Windows), image itzg/minecraft-bedrock-server. x86 et ARM.
+    en: Minecraft Bedrock Edition server (phones, consoles, Windows), itzg/minecraft-bedrock-server image. x86 and ARM.
+  links:
+    site: https://www.minecraft.net
+    doc: https://github.com/itzg/docker-minecraft-bedrock-server
+  maintainer: hivora
+  license: Minecraft EULA
+  source: https://hub.docker.com/r/itzg/minecraft-bedrock-server
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 1Gi, recommended: 2Gi }
+  disk: { min: 2Gi }
+form:
+  basic:
+    - id: eula
+      label:
+        fr: J'accepte le contrat de licence Minecraft (https://aka.ms/MinecraftEULA)
+        en: I accept the Minecraft EULA (https://aka.ms/MinecraftEULA)
+      type: boolean
+      required: true
+    - id: server_name
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+    - id: version
+      group: { fr: Serveur, en: Server }
+      label: { fr: Version, en: Version }
+      type: string
+      default: LATEST
+      pattern: "[0-9A-Za-z._-]{2,40}"
+      reset_data_on_change: true
+      help: { fr: "LATEST, PREVIEW ou un numéro (ex. 1.21.100.6).", en: "LATEST, PREVIEW or a number (e.g. 1.21.100.6)." }
+    - id: max_players
+      group: { fr: Général, en: General }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 10
+      range: [1, 100]
+    - id: gamemode
+      group: { fr: Général, en: General }
+      label: { fr: Mode de jeu, en: Game mode }
+      type: select
+      default: survival
+      options:
+        - { value: survival, label: { fr: Survie, en: Survival } }
+        - { value: creative, label: { fr: Créatif, en: Creative } }
+        - { value: adventure, label: { fr: Aventure, en: Adventure } }
+    - id: difficulty
+      group: { fr: Général, en: General }
+      label: { fr: Difficulté, en: Difficulty }
+      type: select
+      default: normal
+      options:
+        - { value: peaceful, label: { fr: Paisible, en: Peaceful } }
+        - { value: easy, label: { fr: Facile, en: Easy } }
+        - { value: normal, label: { fr: Normale, en: Normal } }
+        - { value: hard, label: { fr: Difficile, en: Hard } }
+    - id: allow_list
+      group: { fr: Général, en: General }
+      label: { fr: Liste blanche (seuls les joueurs autorisés peuvent se connecter), en: Allow list (only allowed players can join) }
+      type: boolean
+      default: false
+    - id: level
+      group: { fr: Monde, en: World }
+      label: { fr: Monde actif, en: Active world }
+      type: string
+      default: world
+      pattern: "[A-Za-z0-9][A-Za-z0-9_-]{0,47}"
+    - id: level_type
+      group: { fr: Monde, en: World }
+      label: { fr: Type de monde (nouveau monde), en: World type (new world) }
+      type: select
+      default: DEFAULT
+      options:
+        - { value: DEFAULT, label: { fr: Normal, en: Normal } }
+        - { value: FLAT, label: { fr: Plat, en: Flat } }
+    - id: seed
+      group: { fr: Monde, en: World }
+      label: { fr: Graine du monde (nouveau monde), en: World seed (new world) }
+      type: string
+      pattern: "-?[0-9A-Za-z_ ]{0,64}"
+  advanced:
+    - id: online_mode
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Vérifier les comptes Xbox Live, en: Verify Xbox Live accounts }
+      type: boolean
+      default: true
+    - id: view_distance
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Distance de vue (chunks), en: View distance (chunks) }
+      type: integer
+      default: 32
+      range: [5, 96]
+services:
+  server:
+    role: main
+    image: itzg/minecraft-bedrock-server
+    tag: "2026.9.1@sha256:83bdd41fd0574eb71368a58b2c0b9ecfe305559056d65e83878c20aae86a0015"
+    env:
+      EULA: "{{ form.eula | upper }}"
+      VERSION: "{{ form.version }}"
+      SERVER_NAME: "{{ form.server_name }}"
+      MAX_PLAYERS: "{{ form.max_players }}"
+      GAMEMODE: "{{ form.gamemode }}"
+      DIFFICULTY: "{{ form.difficulty }}"
+      ALLOW_LIST: "{{ form.allow_list }}"
+      LEVEL_NAME: "{{ form.level }}"
+      LEVEL_TYPE: "{{ form.level_type }}"
+      LEVEL_SEED: "{{ form.seed }}"
+      ONLINE_MODE: "{{ form.online_mode }}"
+      VIEW_DISTANCE: "{{ form.view_distance }}"
+      UID: "{{ host.puid }}"
+      GID: "{{ host.pgid }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 19132, protocol: udp, purpose: game, exposure: public }
+    volumes:
+      - { name: data, target: /data, backup: true,
+          reset_keep: [allowlist.json, permissions.json] }
+    stdin_open: true  # send-command writes to the server's stdin
+    tty: true
+    stop_grace_period: 30s
+access:
+  game: "{{ host.public_ip }}:19132"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  # The server runs as PUID (under box64 on ARM). The image's send-command stops
+  # at the first unreadable /proc entry, so the same lookup runs here with errors
+  # ignored; the player name is passed as $1, never spliced into the script.
+  run_as: app
+  lists:
+    - id: allowlist
+      label: { fr: Liste blanche, en: Allow list }
+      file: allowlist.json
+      format: json_names
+      add: [bash, -c, &send 'p=$(find /proc -mindepth 2 -maxdepth 2 -name exe \( -lname "/data/bedrock_server-*" -o -lname /usr/local/bin/box64 \) -printf "%h" -quit 2>/dev/null); [ -n "$p" ] && printf "%s\n" "allowlist $0 \"$1\"" > "$p/fd/0" || { echo "error: server process not found"; exit 2; }', add, "{name}"]
+      remove: [bash, -c, *send, remove, "{name}"]
+      enabled_field: allow_list
+      name_pattern: "^[A-Za-z0-9 ]{1,16}$"
+  saves: { volume: data, path: worlds, marker: level.dat, active_field: level }
+summary: [version, gamemode, max_players]
+defaults:
+  zone: gaming
+  restart: unless-stopped

@@ -1,0 +1,113 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: valheim
+  name: Valheim
+  version: 1.0.0
+  category: games
+  tags: [valheim, steam, survival, vikings]
+  icon: { steam_appid: 892970 }
+  description:
+    fr: Serveur dédié Valheim (SteamCMD), image du panel de jeux d'OVHcloud. x86 uniquement.
+    en: Valheim dedicated server (SteamCMD), OVHcloud Game Panel image. x86 only.
+  links:
+    site: https://www.valheimgame.com
+    doc: https://github.com/ovh/game-panel/tree/main/docker-images/valheim
+  maintainer: hivora
+  license: Apache-2.0 (image)
+  source: https://hub.docker.com/r/ovhcom/gamepanel-valheim
+requirements:
+  arch: [amd64]  # SteamCMD and the Valheim server only exist for x86
+  memory: { min: 4Gi, recommended: 8Gi }
+  disk: { min: 4Gi }
+form:
+  basic:
+    - id: server_name
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+    - id: password
+      group: { fr: Serveur, en: Server }
+      label: { fr: Mot de passe pour rejoindre, en: Join password }
+      type: secret
+      required: true
+      help:
+        fr: 5 caractères minimum, différent du nom du serveur. Obligatoire pour un serveur public.
+        en: At least 5 characters, not the server name. Required for a public server.
+    - id: public
+      group: { fr: Serveur, en: Server }
+      label: { fr: Visibilité, en: Visibility }
+      type: select
+      default: "1"
+      options:
+        - { value: "1", label: { fr: Visible dans la liste des serveurs, en: Listed in the server browser } }
+        - { value: "0", label: { fr: Invisible (connexion par IP), en: Hidden (join by IP) } }
+    - id: world
+      group: { fr: Monde, en: World }
+      label: { fr: Monde actif, en: Active world }
+      type: string
+      default: Dedicated
+      pattern: "[A-Za-z0-9][A-Za-z0-9_-]{0,47}"
+      help:
+        fr: Un nom nouveau crée un monde. Se gère aussi depuis la carte Mondes.
+        en: A new name creates a world. Also managed from the Worlds card.
+  advanced:
+    - id: start_params
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Arguments de lancement, en: Launch arguments }
+      type: string
+      pattern: "[A-Za-z0-9 _.:=-]{0,200}"
+      help:
+        fr: "Ex. -crossplay (joueurs Xbox / Game Pass), -preset hard, -modifier raids none."
+        en: "E.g. -crossplay (Xbox / Game Pass players), -preset hard, -modifier raids none."
+    - id: update_on_start
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mettre à jour le serveur à chaque démarrage, en: Update the server on every start }
+      type: boolean
+      default: true
+services:
+  server:
+    role: main
+    image: ovhcom/gamepanel-valheim
+    tag: "1.6.0@sha256:bce1f53f1e25fa78994d378a1b4ed3e697c343a58311a4d865a556ca2a8517c8"
+    env:
+      VALHEIM_SERVER_NAME: "{{ form.server_name }}"
+      VALHEIM_SERVER_PASSWORD: "{{ secret.password }}"
+      VALHEIM_PUBLIC: "{{ form.public }}"
+      VALHEIM_WORLD_NAME: "{{ form.world }}"
+      VALHEIM_START_PARAMS: "{{ form.start_params }}"
+      VALHEIM_UPDATE_ON_START: "{{ form.update_on_start }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 2456, protocol: udp, purpose: game, exposure: public }
+      - { container: 2457, protocol: udp, purpose: query, exposure: public }
+    volumes:
+      - { name: data, target: /data, backup: true, owner: "10001:10001" }
+    stop_grace_period: 90s  # the world is saved on stop
+access:
+  game: "{{ host.public_ip }}:2456"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  players: { a2s_port: 2457 }
+  saves: { volume: data, path: save/worlds_local, marker: "*.fwl", active_field: world }
+  lists:
+    - id: admins
+      label: { fr: Administrateurs (SteamID64), en: Admins (SteamID64) }
+      file: save/adminlist.txt
+      name_pattern: "^[0-9]{17}$"
+    - id: permitted
+      label: { fr: Joueurs autorisés (vide = tout le monde), en: Allowed players (empty = everyone) }
+      file: save/permittedlist.txt
+      name_pattern: "^[0-9]{17}$"
+    - id: banned
+      label: { fr: Joueurs bannis, en: Banned players }
+      file: save/bannedlist.txt
+      name_pattern: "^[0-9]{17}$"
+summary: [world, public]
+defaults:
+  zone: gaming
+  restart: unless-stopped

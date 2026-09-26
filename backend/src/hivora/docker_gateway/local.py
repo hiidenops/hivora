@@ -259,10 +259,12 @@ class LocalDockerGateway(DockerGateway):
         await stream._init()
         return LocalExecSession(exec_, stream)
 
-    async def exec_run(self, container_id: str, cmd: list[str]) -> tuple[int, str]:
+    async def exec_run(
+        self, container_id: str, cmd: list[str], user: str | None = None
+    ) -> tuple[int, str]:
         container = self._docker.containers.container(container_id)
         try:
-            exec_ = await container.exec(cmd, stdout=True, stderr=True, tty=False)
+            exec_ = await container.exec(cmd, stdout=True, stderr=True, tty=False, user=user or "")
         except aiodocker.DockerError as exc:
             if exc.status == 404:
                 raise ContainerNotFoundError(container_id) from exc

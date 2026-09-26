@@ -1,0 +1,108 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: palworld
+  name: Palworld
+  version: 1.0.0
+  category: games
+  tags: [palworld, steam, survival]
+  icon: { steam_appid: 1623730 }
+  description:
+    fr: Serveur dédié Palworld, image thijsvanloef/palworld-server-docker. Fonctionne sur x86 et ARM.
+    en: Palworld dedicated server, thijsvanloef/palworld-server-docker image. Runs on x86 and ARM.
+  links:
+    site: https://www.pocketpair.jp/palworld
+    doc: https://palworld-server-docker.loef.dev
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/thijsvanloef/palworld-server-docker
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 8Gi, recommended: 16Gi }
+  disk: { min: 8Gi }
+form:
+  basic:
+    - id: server_name
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+    - id: description
+      group: { fr: Serveur, en: Server }
+      label: { fr: Description, en: Description }
+      type: string
+    - id: server_password
+      group: { fr: Serveur, en: Server }
+      label: { fr: Mot de passe pour rejoindre, en: Join password }
+      type: secret
+      help: { fr: Laisser vide pour un serveur ouvert., en: Leave empty for an open server. }
+    - id: players
+      group: { fr: Serveur, en: Server }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 16
+      range: [1, 32]
+    - id: community
+      group: { fr: Serveur, en: Server }
+      label: { fr: Visible dans la liste des serveurs communautaires, en: Listed in the community server browser }
+      type: boolean
+      default: false
+      help: { fr: Utilisez-le avec un mot de passe., en: Use it with a password. }
+  advanced:
+    - id: admin_password
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mot de passe administrateur (RCON), en: Admin password (RCON) }
+      type: secret
+      generate: { length: 24 }
+    - id: update_on_boot
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mettre à jour le serveur à chaque démarrage, en: Update the server on every start }
+      type: boolean
+      default: true
+services:
+  server:
+    role: main
+    image: thijsvanloef/palworld-server-docker
+    tag: "v2.7.3@sha256:be3ad49e373045a7b60478fd8b7f7411c1e293713dfa4733e563e798f276d688"
+    env:
+      PUID: "{{ host.puid }}"
+      PGID: "{{ host.pgid }}"
+      PORT: "8211"
+      PLAYERS: "{{ form.players }}"
+      SERVER_NAME: "{{ form.server_name }}"
+      SERVER_DESCRIPTION: "{{ form.description }}"
+      SERVER_PASSWORD: "{{ secret.server_password }}"
+      ADMIN_PASSWORD: "{{ secret.admin_password }}"
+      COMMUNITY: "{{ form.community }}"
+      RCON_ENABLED: "true"
+      RCON_PORT: "25575"
+      UPDATE_ON_BOOT: "{{ form.update_on_boot }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 8211, protocol: udp, purpose: game, exposure: public }
+      - { container: 27015, protocol: udp, purpose: query, exposure: public }
+      - { container: 25575, protocol: tcp, purpose: rcon, exposure: internal }
+    volumes:
+      - { name: data, target: /palworld, backup: true }
+    stop_grace_period: 60s
+access:
+  game: "{{ host.public_ip }}:8211"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  # rcon-cli ships with the image and is preconfigured with the admin password.
+  console: [rcon-cli]
+  commands:
+    - { command: "ShowPlayers", description: { fr: Joueurs connectés, en: Players online } }
+    - { command: "Broadcast <message>", description: { fr: Message à tous les joueurs (sans espaces), en: Message to every player (no spaces) } }
+    - { command: "Save", description: { fr: Sauvegarder le monde, en: Save the world } }
+    - { command: "KickPlayer <steamid>", description: { fr: Expulser un joueur, en: Kick a player } }
+    - { command: "BanPlayer <steamid>", description: { fr: Bannir un joueur, en: Ban a player } }
+  players: { command: [rcon-cli, ShowPlayers], format: csv }
+  saves: { volume: data, path: Pal/Saved/SaveGames/0, marker: Level.sav }
+summary: [players, community]
+defaults:
+  zone: gaming
+  restart: unless-stopped

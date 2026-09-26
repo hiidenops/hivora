@@ -554,7 +554,7 @@ def _services_from(compiled: CompiledApp) -> list[Service]:
             ],
             volumes=[
                 VolumeMount(kind=VolumeKind.BIND, source=str(v.source), target=v.target,
-                            read_only=v.read_only, backup=v.backup)
+                            read_only=v.read_only, backup=v.backup, owner=v.owner)
                 for v in plan.volumes
             ],
         ))  # fmt: skip

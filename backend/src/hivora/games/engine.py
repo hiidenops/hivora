@@ -134,7 +134,9 @@ class GameTools:
         if srv.container is None:
             raise ServerNotRunningError("the server must be running")
         async with asyncio.timeout(COMMAND_TIMEOUT_S):
-            code, out = await self.rt.gateway.exec_run(srv.container.id, cmd)
+            s = self.rt.settings
+            user = f"{s.puid}:{s.pgid}" if srv.game.run_as == "app" else None
+            code, out = await self.rt.gateway.exec_run(srv.container.id, cmd, user)
         text = clean(out)
         if code != 0 or any(f in text.lower() for f in _FAILURES):
             raise GameCommandError(text or f"{cmd[0]} exited with {code}")
@@ -162,8 +164,13 @@ class GameTools:
         if srv.container is None:
             return Players(False, None, None, [])
         if spec.command:
+            out = await self._run(srv, spec.command)
+            if spec.format == "csv":
+                rows = [r for r in out.splitlines()[1:] if r.strip()]
+                names = [r.split(",")[0].strip() for r in rows]
+                return Players(True, len(rows), None, [n for n in names if n])
             try:
-                online, maximum, names = parse_list(await self._run(srv, spec.command))
+                online, maximum, names = parse_list(out)
             except ValueError as exc:
                 raise GameCommandError(str(exc)) from exc
             return Players(True, online, maximum, names)

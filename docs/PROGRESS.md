@@ -1,6 +1,6 @@
 # Hivora — Suivi d'avancement
 
-*Dernière mise à jour : 25 septembre 2026*
+*Dernière mise à jour : 26 septembre 2026*
 
 Document de reprise : où en est le projet, ce qui a été décidé, comment relancer l'environnement et ce qui reste à faire. Référence produit : [`vision-prd-architecture.md`](vision-prd-architecture.md).
 
@@ -23,6 +23,11 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | IP publique et consommation | Adresse publique, cartes repliées, CPU/RAM/réseau par app en direct | ✅ | `19e4aa6` |
 | Minecraft C | Mondes (liste, activer, importer, télécharger, supprimer) | ✅ | voir `git log` |
 | Changement de version | Avertissement, confirmation, contenu du serveur effacé | ✅ | voir `git log` |
+| Retours tests #5 | Copie « Texte copié ! », 30 tâches, catalogue opaque, cartes indépendantes, configuration en sections, main au survol | ✅ | `26f131b` |
+| Clé CurseForge sur place | Formulaire dans le catalogue de modpacks | ✅ | `e40ce9c` |
+| Architecture | Détectée par Docker, image par architecture, vérification avant téléchargement | ✅ | `4f1bad2` |
+| Jeux génériques | Capacités déclarées par le template (joueurs, listes, mondes) | ✅ | `d2414ba` |
+| Catalogue de jeux | Valheim, Rust, Project Zomboid, CS2, Garry's Mod (OVH, x86), Palworld, Minecraft Bedrock (x86 + ARM) | ✅ | voir `git log` |
 | M6 Livraison | Image Docker, HTTPS, script d'installation | ⏳ | |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
@@ -103,7 +108,17 @@ Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en b
 3. L'API refuse ce changement sans `reset_data: true` (409 `data_reset_required`). La tâche arrête l'app, vide le volume en gardant les fichiers listés, puis redémarre ; journal de tâche et audit `app.data_reset`.
 - Tests : unitaire (refus, effacement, réglage anodin sans effacement) et e2e (changement de type de serveur).
 
-▶ **Prochaine étape** : M6 (livraison), après les modifications de contenu en cours.
+## Jeux : architecture, modèle générique, catalogue (fait, 26/09)
+
+1. **Architecture** : lue auprès de Docker au démarrage (`docker info`), affichée dans Paramètres → Système et en tête du catalogue. Un service peut déclarer une image par architecture (`arch: {arm64: {image, tag, env}}`, figées par digest). Avant le téléchargement, la tâche demande au registre les plateformes de l'image et échoue clairement si la machine n'en fait pas partie. Badges « x86 uniquement » / « ARM uniquement ».
+2. **Modèle de jeu générique** : le template déclare `game.players` (commande + format `minecraft`/`csv`, ou requête Steam A2S), `game.lists` (listes de joueurs dans un fichier, modifiées par commande ou en éditant le fichier ; `enabled_field` = interrupteur), `game.saves` (dossiers avec un fichier repère, ou fichiers groupés par nom `*.fwl`) et `run_as: app` (commandes sous PUID:PGID). Routes `/apps/{id}/game/...` ; la fiche affiche les cartes déclarées. Minecraft Java est décrit ainsi (1.11.0), sans perte.
+3. **Volumes** : `owner: "10001:10001"` pour les images à UID fixe (migration `0005`) ; `stop_grace_period` pour laisser le jeu sauvegarder.
+4. **Templates** (images du panel OVHcloud `ovhcom/gamepanel-*`, Apache-2.0, x86 uniquement) : Valheim (joueurs A2S, mondes `*.fwl`, listes admins/autorisés/bannis), Rust, Project Zomboid, Counter-Strike 2 (jeton GSLT obligatoire), Garry's Mod. Console via `/app/send-command.sh`, une commande par ligne. Multi-arch : Palworld (`thijsvanloef/palworld-server-docker`, console `rcon-cli`, joueurs `ShowPlayers`), Minecraft Bedrock (`itzg/minecraft-bedrock-server`, liste blanche, mondes).
+- **Testé en réel sur la VM ARM** : Bedrock déployé (image arm64 vérifiée), liste blanche ajout/retrait, monde téléchargé en `.zip`. Palworld : l'image arm64 démarre et installe le serveur (test interrompu, 16 Go recommandés).
+- **Non testé en réel** (pas de machine x86) : Valheim, Rust, Project Zomboid, CS2, Garry's Mod. Compilation et `docker compose config` vérifiés pour tous.
+- Corrigé grâce au test réel : le `send-command` de l'image Bedrock échoue quand il ne peut pas lire `/proc/1` ; le template fait la même recherche en ignorant ces erreurs, sous PUID.
+
+▶ **Prochaine étape** : tester les jeux Steam sur une machine x86, puis M6 (livraison). Catalogue LinuxGSM (140+ jeux) : plus tard.
 
 ## Retours traités (tour 4)
 
@@ -157,6 +172,10 @@ Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en b
 - **Licence** du projet (AGPL-3.0 ou Apache-2.0) : **non tranchée**, aucune licence déclarée pour l'instant.
 
 ## Limites connues
+
+- Jeux OVH : ports fixes (non modifiables), car le jeu annonce son port aux clients (correspondance 1:1 obligatoire).
+- Console Bedrock absente : la sortie de `send-command` ne va que dans les logs du conteneur.
+- Les ajouts/retraits dans les listes de joueurs ne passent pas par une tâche (comme avant pour Minecraft).
 
 - Détection des conflits de ports : ne voit que Docker et les apps Hivora (pas un sshd installé sur l'hôte).
 - Un code TOTP peut être réutilisé pendant sa fenêtre de validité (30 à 90 s).

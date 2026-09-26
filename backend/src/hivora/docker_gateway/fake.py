@@ -118,7 +118,9 @@ class FakeDockerGateway(DockerGateway):
         self.execs.append(session)
         return session
 
-    async def exec_run(self, container_id: str, cmd: list[str]) -> tuple[int, str]:
+    async def exec_run(
+        self, container_id: str, cmd: list[str], user: str | None = None
+    ) -> tuple[int, str]:
         await self.get_container(container_id)
         self.exec_calls.append(cmd)
         return self.exec_results.get(" ".join(cmd), (0, ""))

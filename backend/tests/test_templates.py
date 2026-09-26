@@ -233,3 +233,23 @@ def test_docker_reported_arch_wins() -> None:
         assert cat.host_arch() == "amd64"
     finally:
         cat.set_host_arch("")
+
+
+def test_every_repo_template_compiles_on_its_architectures(catalog: Catalog) -> None:
+    """Defaults + the required answers only: what a first deploy looks like."""
+    answers = {"eula": True, "password": "hunter2x", "gslt": "TOKEN"}
+    for entry in catalog.entries():
+        t = entry.template
+        ids = {f.id for f in t.form.fields}
+        form = validate_inputs(t, {k: v for k, v in answers.items() if k in ids},
+                               {"app": {"name": "Test"}})  # fmt: skip
+        app = AppContext(slug=t.metadata.slug, name="Test", revision=1)
+        for arch in t.requirements.arch:
+            host = HostInfo(lan_ip="192.168.1.10", arch=arch)
+            compiled = compile_template(t, app, host, form, Path("/srv"))
+            main = compiled.compose["services"][t.main_service]
+            assert "@sha256:" in main["image"], (t.metadata.slug, arch)
+            if t.game and t.game.players and t.game.players.a2s_port:  # query port published
+                ports = {(p.container_port, p.protocol)
+                         for s in compiled.services for p in s.ports}  # fmt: skip
+                assert (t.game.players.a2s_port, "udp") in ports, t.metadata.slug

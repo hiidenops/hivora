@@ -164,6 +164,8 @@ class VolumeSpec(_Strict):
     backup: bool = False
     read_only: bool = False
     reset_keep: list[Annotated[str, Field(pattern=r"^[A-Za-z0-9._*-]+$")]] = []  # top-level globs
+    # Fixed UID:GID of an image that cannot follow PUID/PGID (default: PUID/PGID).
+    owner: Annotated[str, Field(pattern=r"^\d{1,10}:\d{1,10}$")] | None = None
 
 
 Arch = Literal["amd64", "arm64"]
@@ -190,6 +192,8 @@ class ServiceSpec(_Strict):
     depends_on: list[str] = []
     user: str | None = None
     stdin_open: bool = False  # needed by the game server console (attach)
+    # Time to save and exit on stop before Docker kills the server (e.g. "120s").
+    stop_grace_period: Annotated[str, Field(pattern=r"^\d{1,4}s$")] | None = None
     tty: bool = False
 
     @property
@@ -243,7 +247,8 @@ class GamePlayers(_Strict):
     """Who is online: a command run in the main service, or a Steam A2S query."""
 
     command: list[str] | None = None  # e.g. ["rcon-cli", "list"]
-    format: Literal["minecraft"] | None = None  # parser of the command output
+    # Parser of the command output: Minecraft's `list`, or CSV (header, then one row per player).
+    format: Literal["minecraft", "csv"] | None = None
     a2s_port: int | None = None  # container port answering A2S (must be published)
 
     @model_validator(mode="after")
@@ -287,6 +292,9 @@ class Game(_Strict):
     # Server console: command run (with a TTY) in the main service, e.g. ["rcon-cli"].
     console: list[str] | None = None
     commands: list[GameCommand] = []  # the console's command guide
+    # Who runs players/lists/saves commands: the container's user, or PUID:PGID
+    # (a server dropped to PUID cannot be reached from root without ptrace).
+    run_as: Literal["container", "app"] = "container"
     players: GamePlayers | None = None
     lists: list[GameList] = []
     saves: GameSaves | None = None

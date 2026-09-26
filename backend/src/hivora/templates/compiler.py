@@ -58,6 +58,7 @@ class VolumePlan:
     target: str
     read_only: bool
     backup: bool
+    owner: str | None = None  # "uid:gid" of the host folder, None: PUID/PGID
 
 
 @dataclass(frozen=True, slots=True)
@@ -162,7 +163,7 @@ def compile_template(
         ports = tuple(_plan_port(name, p, ctx, host) for p in spec.ports)
         volumes = tuple(
             VolumePlan(name, v.name, volumes_root / app.slug / v.name, v.target, v.read_only,
-                       v.backup)
+                       v.backup, v.owner)
             for v in spec.volumes
         )  # fmt: skip
         svc: dict[str, Any] = {"image": spec.image_ref, "restart": template.defaults.restart}
@@ -198,6 +199,8 @@ def compile_template(
             svc["healthcheck"] = spec.healthcheck
         if spec.depends_on:
             svc["depends_on"] = list(spec.depends_on)
+        if spec.stop_grace_period:
+            svc["stop_grace_period"] = spec.stop_grace_period
         if spec.stdin_open:
             svc["stdin_open"] = True
         if spec.tty:

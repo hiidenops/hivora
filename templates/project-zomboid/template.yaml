@@ -1,0 +1,98 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: project-zomboid
+  name: Project Zomboid
+  version: 1.0.0
+  category: games
+  tags: [zomboid, steam, survival, zombies]
+  icon: { steam_appid: 108600 }
+  description:
+    fr: Serveur dédié Project Zomboid (SteamCMD), image du panel de jeux d'OVHcloud. x86 uniquement.
+    en: Project Zomboid dedicated server (SteamCMD), OVHcloud Game Panel image. x86 only.
+  links:
+    site: https://projectzomboid.com
+    doc: https://github.com/ovh/game-panel/tree/main/docker-images/project-zomboid
+  maintainer: hivora
+  license: Apache-2.0 (image)
+  source: https://hub.docker.com/r/ovhcom/gamepanel-project-zomboid
+requirements:
+  arch: [amd64]
+  memory: { min: 4Gi, recommended: 8Gi }
+  disk: { min: 8Gi }
+form:
+  basic:
+    - id: admin_username
+      group: { fr: Serveur, en: Server }
+      label: { fr: Compte administrateur, en: Admin account }
+      type: string
+      default: admin
+      pattern: "[A-Za-z0-9_]{3,32}"
+    - id: admin_password
+      group: { fr: Serveur, en: Server }
+      label: { fr: Mot de passe administrateur, en: Admin password }
+      type: secret
+      generate: { length: 20 }
+      help:
+        fr: "Se connecter en jeu avec ce compte donne les droits d'administration."
+        en: Joining with this account in game grants admin rights.
+    - id: branch
+      group: { fr: Serveur, en: Server }
+      label: { fr: Version du jeu, en: Game version }
+      type: select
+      default: ""
+      reset_data_on_change: true
+      options:
+        - { value: "", label: { fr: Stable (Build 41), en: Stable (Build 41) } }
+        - { value: unstable, label: { fr: Instable (Build 42), en: Unstable (Build 42) } }
+  advanced:
+    - id: server_config
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Nom de la configuration, en: Config name }
+      type: string
+      default: servertest
+      pattern: "[A-Za-z0-9_-]{1,32}"
+      reset_data_on_change: true
+    - id: update_on_start
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mettre à jour le serveur à chaque démarrage, en: Update the server on every start }
+      type: boolean
+      default: true
+services:
+  server:
+    role: main
+    image: ovhcom/gamepanel-project-zomboid
+    tag: "1.6.0@sha256:31d80f3b2af11e5f48be02b3942b6f48dbb98cb6bbbaf6d8adfefcbec93e8fa9"
+    env:
+      PZ_ADMIN_USERNAME: "{{ form.admin_username }}"
+      PZ_ADMIN_PASSWORD: "{{ secret.admin_password }}"
+      PZ_SERVERNAME: "{{ form.server_config }}"
+      PZ_BRANCH: "{{ form.branch }}"
+      PZ_UPDATE_ON_START: "{{ form.update_on_start }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 16261, protocol: udp, purpose: game, exposure: public }
+      - { container: 16262, protocol: udp, purpose: game, exposure: public }
+    volumes:
+      - { name: data, target: /data, backup: true, owner: "10001:10001" }
+    stop_grace_period: 120s
+access:
+  game: "{{ host.public_ip }}:16261"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  # One command per line, sent by the image script (exec in the container, no host shell).
+  console: [sh, -c, "while printf '> ' && IFS= read -r line; do [ -n \"$line\" ] && /app/send-command.sh \"$line\"; done"]
+  commands:
+    - { command: "players", description: { fr: Joueurs connectés, en: Players online } }
+    - { command: "servermsg \"<message>\"", description: { fr: Message à tous les joueurs, en: Message to every player } }
+    - { command: "save", description: { fr: Sauvegarder le monde, en: Save the world } }
+    - { command: "setaccesslevel <joueur> admin", description: { fr: Donner les droits d'administrateur, en: Grant admin rights } }
+    - { command: "kickuser <joueur>", description: { fr: Expulser un joueur, en: Kick a player } }
+    - { command: "banuser <joueur>", description: { fr: Bannir un joueur, en: Ban a player } }
+summary: [branch]
+defaults:
+  zone: gaming
+  restart: unless-stopped

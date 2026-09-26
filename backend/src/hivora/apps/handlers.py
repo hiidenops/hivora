@@ -53,7 +53,7 @@ class AppJobHandlers:
             app = await s.get(session, _app_id(ctx))
             revision = await session.get_one(AppRevision, ctx.params["revision_id"])
             secrets = await s.decrypt_secrets(session, app.id)
-            sources = [v.source for svc in app.services for v in svc.volumes]
+            sources = [(v.source, v.owner) for svc in app.services for v in svc.volumes]
             images = sorted({svc.image for svc in app.services})
         ctx.add_secrets(secrets.values())
         env = {secret_env_name(k): v for k, v in secrets.items()}
@@ -62,11 +62,12 @@ class AppJobHandlers:
             if reset := ctx.params.get("reset_volumes"):
                 await self._reset_data(ctx, app.slug, reset)
             await ctx.progress(2, "Preparing directories and files")
-            for source in sources:
-                if ensure_dir(
-                    Path(source), s.settings.volumes_root, uid=s.settings.puid, gid=s.settings.pgid
-                ):
-                    await ctx.log(f"created {source}")
+            for source, owner in sources:
+                uid, gid = (
+                    map(int, owner.split(":")) if owner else (s.settings.puid, s.settings.pgid)
+                )
+                if ensure_dir(Path(source), s.settings.volumes_root, uid=uid, gid=gid):
+                    await ctx.log(f"created {source} (owner {uid}:{gid})")
             s.runner.write(app.slug, revision.compose_yaml, env)
             await s.runner.config(app.slug, redact=secrets.values())
             async with s.runner.lock(app.slug):
