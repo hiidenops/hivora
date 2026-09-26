@@ -1,0 +1,100 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: enshrouded
+  name: Enshrouded
+  version: 1.0.0
+  category: games
+  tags: [enshrouded, steam, survival, coop]
+  icon: { steam_appid: 1203620 }
+  description:
+    fr: Serveur dédié Enshrouded (Proton), image mornedhels/enshrouded-server. x86 uniquement.
+    en: Enshrouded dedicated server (Proton), mornedhels/enshrouded-server image. x86 only.
+  links:
+    site: https://enshrouded.com
+    doc: https://github.com/mornedhels/enshrouded-server
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/mornedhels/enshrouded-server
+requirements:
+  arch: [amd64]
+  memory: { min: 8Gi, recommended: 16Gi }
+  disk: { min: 30Gi }
+form:
+  basic:
+    - id: server_name
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+    - id: slots
+      group: { fr: Serveur, en: Server }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 16
+      range: [1, 16]
+    - id: admin_password
+      group: { fr: Accès, en: Access }
+      label: { fr: Mot de passe administrateur, en: Admin password }
+      type: secret
+      generate: { length: 16 }
+      help: { fr: "Rôle « Admins » : expulser, bannir, modifier le monde.", en: "“Admins” role: kick, ban, edit the world." }
+    - id: player_password
+      group: { fr: Accès, en: Access }
+      label: { fr: Mot de passe des joueurs, en: Player password }
+      type: secret
+      help: { fr: Laisser vide pour un serveur ouvert., en: Leave empty for an open server. }
+  advanced:
+    - id: voice_chat
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Chat vocal, en: Voice chat }
+      type: boolean
+      default: true
+    - id: text_chat
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Chat écrit, en: Text chat }
+      type: boolean
+      default: true
+services:
+  server:
+    role: main
+    image: mornedhels/enshrouded-server
+    tag: "1.7.2@sha256:85978a10f88a85ab0a0aa92e9821d30424895d38bf81fe543532451219c42d0d"
+    env:
+      SERVER_NAME: "{{ form.server_name }}"
+      SERVER_SLOT_COUNT: "{{ form.slots }}"
+      SERVER_ENABLE_VOICE_CHAT: "{{ form.voice_chat }}"
+      SERVER_ENABLE_TEXT_CHAT: "{{ form.text_chat }}"
+      SERVER_ROLE_0_NAME: Admins
+      SERVER_ROLE_0_PASSWORD: "{{ secret.admin_password }}"
+      SERVER_ROLE_0_CAN_KICK_BAN: "true"
+      SERVER_ROLE_0_CAN_ACCESS_INVENTORIES: "true"
+      SERVER_ROLE_0_CAN_EDIT_WORLD: "true"
+      SERVER_ROLE_0_CAN_EDIT_BASE: "true"
+      SERVER_ROLE_0_CAN_EXTEND_BASE: "true"
+      SERVER_ROLE_1_NAME: Players
+      SERVER_ROLE_1_PASSWORD: "{{ secret.player_password }}"
+      SERVER_ROLE_1_CAN_EDIT_BASE: "true"
+      SERVER_ROLE_1_CAN_EXTEND_BASE: "true"
+      UPDATE_CRON: "*/30 * * * *"
+      UPDATE_CHECK_PLAYERS: "true"
+      PUID: "{{ host.puid }}"
+      PGID: "{{ host.pgid }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 15637, protocol: udp, purpose: game, exposure: public }
+    volumes:
+      - { name: data, target: /opt/enshrouded, backup: true }
+    stop_grace_period: 60s
+access:
+  game: "{{ host.public_ip }}:15637"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  players: { a2s_port: 15637 }
+summary: [slots]
+defaults:
+  zone: gaming
+  restart: unless-stopped

@@ -1,0 +1,75 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: factorio
+  name: Factorio
+  version: 1.0.0
+  category: games
+  tags: [factorio, factory, coop]
+  icon: { steam_appid: 427520 }
+  description:
+    fr: Serveur Factorio officiel, image factoriotools/factorio. Fonctionne sur x86 et ARM.
+    en: Official Factorio server, factoriotools/factorio image. Runs on x86 and ARM.
+  links:
+    site: https://factorio.com
+    doc: https://github.com/factoriotools/factorio-docker
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/factoriotools/factorio
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 1Gi, recommended: 4Gi }
+  disk: { min: 2Gi }
+form:
+  basic:
+    - id: version
+      group: { fr: Serveur, en: Server }
+      label: { fr: Version du jeu, en: Game version }
+      type: select
+      default: stable
+      reset_data_on_change: true
+      options:
+        - { value: stable, label: { fr: Stable (2.0.x), en: Stable (2.0.x) } }
+        - { value: latest, label: { fr: Expérimentale (2.1.x), en: Experimental (2.1.x) } }
+        - { value: "1.1", label: { fr: "1.1 (avant Space Age)", en: "1.1 (before Space Age)" } }
+      help:
+        fr: Nom, mot de passe et visibilité se règlent dans config/server-settings.json du volume « data ».
+        en: Name, password and visibility live in config/server-settings.json in the “data” volume.
+services:
+  server:
+    role: main
+    image: factoriotools/factorio
+    tag: "stable@sha256:b4951bbde08f83dbe578b9276eeb350d19ce7263b8427f0acb77dbfe70f0e321"
+    tag_select:
+      field: version
+      choices:
+        - { value: latest, tag: "latest@sha256:e91a03290ef860ee8ec1a15bd6bb63732c1c89c4cb7d80cff8d49bc642e01913" }
+        - { value: "1.1", frozen: true, tag: "1.1.110@sha256:6fb9b7bfb12fb51bf668fce7e29cb1e98053f248201e64dfee870ef73b2f31cb" }
+    env:
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 34197, protocol: udp, purpose: game, exposure: public }
+      - { container: 27015, protocol: tcp, purpose: rcon, exposure: internal }
+    volumes:
+      - { name: data, target: /factorio, backup: true, owner: "845:845" }
+    stop_grace_period: 60s
+access:
+  game: "{{ host.public_ip }}:34197"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  # The image's `rcon` sends one command per call (password read from the volume).
+  console: [sh, -c, "while printf '> ' && IFS= read -r line; do [ -n \"$line\" ] && rcon \"$line\"; done"]
+  commands:
+    - { command: "/players online", description: { fr: Joueurs connectés, en: Players online } }
+    - { command: "<message>", description: { fr: Message à tous les joueurs, en: Message to every player } }
+    - { command: "/save", description: { fr: Sauvegarder la partie, en: Save the game } }
+    - { command: "/promote <joueur>", description: { fr: Donner les droits d'administrateur, en: Grant admin rights } }
+    - { command: "/kick <joueur>", description: { fr: Expulser un joueur, en: Kick a player } }
+  saves: { volume: data, path: saves, marker: "*.zip" }
+summary: [version]
+defaults:
+  zone: gaming
+  restart: unless-stopped

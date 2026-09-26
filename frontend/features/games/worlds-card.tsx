@@ -16,7 +16,7 @@ import { ApiError, api, upload, type JobRef, type Worlds } from "@/lib/api/clien
 import { useI18n } from "@/lib/i18n";
 
 const MAX_UPLOAD = 10 * 1024 ** 3; // same cap as the backend
-const WORLD_NAME = "[A-Za-z0-9][A-Za-z0-9_\\-]{0,47}";
+const WORLD_NAME = "[A-Za-z0-9_][A-Za-z0-9_\\-]{0,47}"; // same rule as the backend
 
 /** "My World (1).zip" -> "My_World_1" */
 function nameFromFile(file: string): string {

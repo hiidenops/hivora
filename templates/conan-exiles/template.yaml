@@ -1,0 +1,97 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: conan-exiles
+  name: Conan Exiles
+  version: 1.0.0
+  category: games
+  tags: [conan, steam, survival]
+  icon: { steam_appid: 440900 }
+  description:
+    fr: Serveur dédié Conan Exiles (Wine), image indifferentbroccoli/conan-exiles-enhanced-server-docker. x86 uniquement.
+    en: Conan Exiles dedicated server (Wine), indifferentbroccoli/conan-exiles-enhanced-server-docker image. x86 only.
+  links:
+    site: https://www.conanexiles.com
+    doc: https://github.com/indifferentbroccoli/conan-exiles-enhanced-server-docker
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/indifferentbroccoli/conan-exiles-enhanced-server-docker
+requirements:
+  arch: [amd64]
+  memory: { min: 8Gi, recommended: 16Gi }
+  disk: { min: 30Gi }
+form:
+  basic:
+    - id: server_name
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+    - id: max_players
+      group: { fr: Serveur, en: Server }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 40
+      range: [1, 70]
+    - id: server_password
+      group: { fr: Accès, en: Access }
+      label: { fr: Mot de passe pour rejoindre, en: Join password }
+      type: secret
+      help: { fr: Laisser vide pour un serveur public., en: Leave empty for a public server. }
+    - id: admin_password
+      group: { fr: Accès, en: Access }
+      label: { fr: Mot de passe administrateur, en: Admin password }
+      type: secret
+      generate: { length: 20 }
+  advanced:
+    - id: mods
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mods du Workshop (identifiants séparés par des virgules), en: Workshop mods (comma-separated IDs) }
+      type: string
+      pattern: "[0-9,]{0,2000}"
+    - id: rcon_password
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mot de passe RCON, en: RCON password }
+      type: secret
+      generate: { length: 24 }
+    - id: update_on_start
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mettre à jour le serveur à chaque démarrage, en: Update the server on every start }
+      type: boolean
+      default: true
+services:
+  server:
+    role: main
+    image: indifferentbroccoli/conan-exiles-enhanced-server-docker
+    tag: "v1.0.1@sha256:5f85492de80697d4d7cd87616f3f39d9c06ee7a1018866e7bf61645526835cd5"
+    env:
+      PUID: "{{ host.puid }}"
+      PGID: "{{ host.pgid }}"
+      SERVER_NAME: "{{ form.server_name }}"
+      MAX_PLAYERS: "{{ form.max_players }}"
+      SERVER_PASSWORD: "{{ secret.server_password }}"
+      ADMIN_PASSWORD: "{{ secret.admin_password }}"
+      RCON_PASSWORD: "{{ secret.rcon_password }}"
+      MODS: "{{ form.mods }}"
+      UPDATE_ON_START: "{{ form.update_on_start }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 7777, protocol: udp, purpose: game, exposure: public }
+      - { container: 7778, protocol: udp, purpose: game, exposure: public }
+      - { container: 27015, protocol: udp, purpose: query, exposure: public }
+      - { container: 25575, protocol: tcp, purpose: rcon, exposure: internal }
+    volumes:
+      - { name: data, target: /home/steam/server-files, backup: true }
+    stop_grace_period: 120s
+access:
+  game: "{{ host.public_ip }}:7777"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  players: { a2s_port: 27015 }
+summary: [max_players]
+defaults:
+  zone: gaming
+  restart: unless-stopped

@@ -237,7 +237,7 @@ def test_docker_reported_arch_wins() -> None:
 
 def test_every_repo_template_compiles_on_its_architectures(catalog: Catalog) -> None:
     """Defaults + the required answers only: what a first deploy looks like."""
-    answers = {"eula": True, "password": "hunter2x", "gslt": "TOKEN"}
+    answers = {"eula": True, "password": "hunter2x", "gslt": "TOKEN", "cluster_token": "pds-g^x"}
     for entry in catalog.entries():
         t = entry.template
         ids = {f.id for f in t.form.fields}
@@ -267,3 +267,25 @@ def test_minecraft_version_picks_its_java(catalog: Catalog, version: str, java: 
     compiled = compile_template(t, AppContext(slug="c", name="C", revision=1), HostInfo(), form,
                                 Path("/srv"))  # fmt: skip
     assert f"-{java}@sha256:" in compiled.compose["services"]["server"]["image"]
+
+
+def test_files_become_compose_configs_with_secret_references() -> None:
+    doc = minimal(form={"basic": [{"id": "tok", "label": "t", "type": "secret"},
+                                  {"id": "name", "label": "n", "type": "string"}]},
+                  services={"web": {"image": "x", "tag": "1", "files": [
+                      {"target": "/data/cfg/token.txt", "content": "{{ secret.tok }}"},
+                      {"target": "/data/cfg/name.txt", "content": "name={{ form.name }}"},
+                  ]}})  # fmt: skip
+    t = parse_template(yaml.safe_dump(doc), require_pinned=False)
+    form = validate_inputs(t, {"tok": "s3cret", "name": "Cu$be"}, {})  # a typed $ is escaped
+    compose = compile_template(t, AppContext(slug="d", name="D", revision=1), HostInfo(), form,
+                               Path("/srv")).compose  # fmt: skip
+    assert compose["configs"] == {"web-file-0": {"content": "${HV_SECRET_TOK:-}"},
+                                  "web-file-1": {"content": "name=Cu$$be"}}  # fmt: skip
+    first = {"source": "web-file-0", "target": "/data/cfg/token.txt"}
+    assert compose["services"]["web"]["configs"][0] == first
+    assert "s3cret" not in yaml.safe_dump(compose)
+    with pytest.raises(TemplateInvalidError):
+        bad = minimal(services={"web": {"image": "x", "tag": "1", "files": [
+            {"target": "/data/../etc/passwd", "content": "x"}]}})  # fmt: skip
+        parse_template(yaml.safe_dump(bad), require_pinned=False)

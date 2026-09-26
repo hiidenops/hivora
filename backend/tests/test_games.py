@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from hivora.core.errors import ValidationError
 from hivora.games import a2s
 from hivora.games import worlds as w
 from hivora.games.engine import edit_lines, read_entries
@@ -140,3 +141,24 @@ def test_valid_game_section() -> None:
         "lists": [{"id": "admins", "label": "A", "file": "save/adminlist.txt"}],
     }), require_pinned=False)  # fmt: skip
     assert t.game and t.game.saves and t.game.saves.by_file
+
+
+def test_steam_branches_public_first_newest_next() -> None:
+    from hivora.games.steam import parse_branches
+
+    data = {"data": {"42": {"depots": {"branches": {
+        "old": {"buildid": "5", "description": "Build 41"},
+        "public": {"buildid": "9"},
+        "secret": {"buildid": "99", "pwdrequired": "1"},
+        "beta": {"buildid": "10", "description": "Unstable"},
+    }}}}}  # fmt: skip
+    assert [o["value"] for o in parse_branches("42", data)] == ["public", "beta", "old"]
+    assert parse_branches("42", data)[1]["label"] == "beta — Unstable"
+
+
+def test_factorio_autosaves_are_listed(tmp_path: Path) -> None:
+    layout = GameSaves(marker="*.zip")
+    (tmp_path / "_autosave1.zip").write_bytes(b"PK")
+    assert [w_.name for w_ in w.list_worlds(tmp_path, "", layout)] == ["_autosave1"]
+    with pytest.raises(ValidationError):
+        w.valid_world_name("../x")

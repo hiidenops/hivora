@@ -1,0 +1,62 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: sons-of-the-forest
+  name: Sons of the Forest
+  version: 1.0.0
+  category: games
+  tags: [sotf, steam, survival, coop]
+  icon: { steam_appid: 1326470 }
+  description:
+    fr: Serveur dédié Sons of the Forest (Wine), image jammsen/sons-of-the-forest-dedicated-server. x86 uniquement.
+    en: Sons of the Forest dedicated server (Wine), jammsen/sons-of-the-forest-dedicated-server image. x86 only.
+  links:
+    site: https://sonsoftheforest.com
+    doc: https://github.com/jammsen/docker-sons-of-the-forest-dedicated-server
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/jammsen/sons-of-the-forest-dedicated-server
+requirements:
+  arch: [amd64]
+  memory: { min: 8Gi, recommended: 16Gi }
+  disk: { min: 12Gi }
+form:
+  basic:
+    - id: update_on_start
+      group: { fr: Serveur, en: Server }
+      label: { fr: Mettre à jour le serveur à chaque démarrage, en: Update the server on every start }
+      type: boolean
+      default: true
+      help:
+        fr: Nom, mot de passe, joueurs max et difficulté se règlent dans game/userdata/dedicatedserver.cfg du volume « data ».
+        en: Name, password, max players and difficulty live in game/userdata/dedicatedserver.cfg in the “data” volume.
+services:
+  server:
+    role: main
+    image: jammsen/sons-of-the-forest-dedicated-server
+    tag: "latest@sha256:b90796016c632565d5f2c103c9eb407cb3f749c391bee6830db0e23c1fe90ad4"
+    env:
+      PUID: "{{ host.puid }}"
+      PGID: "{{ host.pgid }}"
+      ALWAYS_UPDATE_ON_START: "{{ form.update_on_start }}"
+      SKIP_NETWORK_ACCESSIBILITY_TEST: "true"
+      FILTER_SHADER_AND_MESH_AND_WINE_DEBUG: "true"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 8766, protocol: udp, purpose: game, exposure: public }
+      - { container: 27016, protocol: udp, purpose: query, exposure: public }
+      - { container: 9700, protocol: udp, purpose: game, exposure: public }
+    volumes:
+      - { name: data, target: /sonsoftheforest, backup: true }
+    stop_grace_period: 60s
+access:
+  game: "{{ host.public_ip }}:8766"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  players: { a2s_port: 27016 }
+defaults:
+  zone: gaming
+  restart: unless-stopped

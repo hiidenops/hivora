@@ -121,7 +121,8 @@ class FormField(_Strict):
     # Secret left empty -> value of this global secret setting (declarative).
     from_setting: Literal["curseforge_api_key"] | None = None
     # Choices fetched by Hivora from a known source (rendered as a list).
-    options_from: Literal["minecraft_versions"] | None = None
+    options_from: Literal["minecraft_versions", "steam_branches"] | None = None
+    options_param: Annotated[str, Field(pattern=r"^\d{1,10}$")] | None = None  # e.g. Steam app id
     # Text fields: insertable lines shown next to the field (e.g. properties).
     suggestions: list["Suggestion"] = []
     # Changing this value on an existing app wipes its volumes (e.g. a game
@@ -132,6 +133,8 @@ class FormField(_Strict):
     def _check(self) -> "FormField":
         if self.type == "select" and not self.options:
             raise ValueError(f"select field {self.id!r} needs options")
+        if (self.options_from == "steam_branches") != bool(self.options_param):
+            raise ValueError(f"field {self.id!r}: steam_branches needs options_param (app id)")
         if (self.generate or self.from_setting) and self.type != "secret":
             raise ValueError(
                 f"only secret fields can be generated or taken from a setting ({self.id!r})"
@@ -192,6 +195,7 @@ class TagChoice(_Strict):
     tag: str
     value: str | None = None  # this exact value
     below: str | None = None  # versions lower than this one (choices go in ascending order)
+    frozen: bool = False  # a deliberately old version: skipped by the freshness check
 
     @model_validator(mode="after")
     def _one_rule(self) -> "TagChoice":
@@ -218,6 +222,22 @@ class TagSelect(_Strict):
         return None
 
 
+class FileSpec(_Strict):
+    """A file placed in the container at start (Compose ``configs``, read-only).
+
+    Its content may use expressions, secrets included (resolved from ``.env``).
+    """
+
+    target: Annotated[str, Field(pattern=r"^/[A-Za-z0-9._/ -]+$")]
+    content: str
+
+    @model_validator(mode="after")
+    def _no_parent(self) -> "FileSpec":
+        if ".." in self.target.split("/"):
+            raise ValueError(f"{self.target!r}: no '..' in a file target")
+        return self
+
+
 class ServiceSpec(_Strict):
     role: Literal["main", "database", "cache", "sidecar"] = "main"
     image: str
@@ -225,6 +245,7 @@ class ServiceSpec(_Strict):
     env: dict[str, str | int | bool] = {}
     arch: dict[Arch, ArchVariant] = {}
     tag_select: TagSelect | None = None  # default: ``tag``
+    files: list[FileSpec] = []
     ports: list[PortSpec] = []
     volumes: list[VolumeSpec] = []
     command: str | list[str] | None = None

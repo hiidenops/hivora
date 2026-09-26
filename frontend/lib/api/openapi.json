@@ -4271,7 +4271,7 @@
             "required": false,
             "schema": {
               "default": 0,
-              "maximum": 50,
+              "maximum": 400,
               "minimum": 0,
               "title": "Page",
               "type": "integer"
@@ -4353,6 +4353,54 @@
           }
         },
         "summary": "Minecraft Versions",
+        "tags": [
+          "options"
+        ]
+      }
+    },
+    "/api/v1/options/steam_branches": {
+      "get": {
+        "description": "Choices for `options_from: steam_branches` (``options_param``: the server's app id).",
+        "operationId": "steam_branches_api_v1_options_steam_branches_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "param",
+            "required": true,
+            "schema": {
+              "pattern": "^\\d{1,10}$",
+              "title": "Param",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OptionOut"
+                  },
+                  "title": "Response Steam Branches Api V1 Options Steam Branches Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Steam Branches",
         "tags": [
           "options"
         ]

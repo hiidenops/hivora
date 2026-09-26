@@ -1,0 +1,78 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: satisfactory
+  name: Satisfactory
+  version: 1.0.0
+  category: games
+  tags: [satisfactory, steam, factory, coop]
+  icon: { steam_appid: 526870 }
+  description:
+    fr: Serveur dédié Satisfactory, image wolveix/satisfactory-server. x86 uniquement.
+    en: Satisfactory dedicated server, wolveix/satisfactory-server image. x86 only.
+  links:
+    site: https://www.satisfactorygame.com
+    doc: https://github.com/wolveix/satisfactory-server
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/wolveix/satisfactory-server
+requirements:
+  arch: [amd64]
+  memory: { min: 12Gi, recommended: 16Gi }
+  disk: { min: 20Gi }
+form:
+  basic:
+    - id: max_players
+      group: { fr: Serveur, en: Server }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 4
+      range: [1, 16]
+      help:
+        fr: Le nom et le mot de passe administrateur se définissent depuis le jeu, à la première connexion au serveur.
+        en: The server name and admin password are set from the game, on first connection to the server.
+    - id: experimental
+      group: { fr: Serveur, en: Server }
+      label: { fr: Version du jeu, en: Game version }
+      type: select
+      default: "false"
+      reset_data_on_change: true
+      options:
+        - { value: "false", label: { fr: Stable (public), en: Stable (public) } }
+        - { value: "true", label: { fr: Expérimentale (experimental), en: Experimental } }
+  advanced:
+    - id: autosaves
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Sauvegardes automatiques conservées, en: Autosaves kept }
+      type: integer
+      default: 5
+      range: [1, 50]
+services:
+  server:
+    role: main
+    image: wolveix/satisfactory-server
+    tag: "v1.9.10@sha256:e103700ae6ae4c50f19dac80eadb2a805c5b885e179ae2a40850e967bf189efd"
+    env:
+      MAXPLAYERS: "{{ form.max_players }}"
+      STEAMBETA: "{{ form.experimental }}"
+      AUTOSAVENUM: "{{ form.autosaves }}"
+      PUID: "{{ host.puid }}"
+      PGID: "{{ host.pgid }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 7777, protocol: udp, purpose: game, exposure: public }
+      - { container: 7777, protocol: tcp, purpose: game, exposure: public }
+      - { container: 8888, protocol: tcp, purpose: game, exposure: public }
+    volumes:
+      - { name: data, target: /config, backup: true }
+    stop_grace_period: 60s
+access:
+  game: "{{ host.public_ip }}:7777"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+summary: [experimental, max_players]
+defaults:
+  zone: gaming
+  restart: unless-stopped

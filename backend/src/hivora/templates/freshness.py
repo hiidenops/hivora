@@ -31,7 +31,7 @@ def pins(catalog: Catalog) -> list[Pin]:
         for svc in entry.template.services.values():
             choices = svc.tag_select.choices if svc.tag_select else []
             refs = [(svc.image, svc.tag), *((v.image, v.tag) for v in svc.arch.values()),
-                    *((svc.image, c.tag) for c in choices)]  # fmt: skip
+                    *((svc.image, c.tag) for c in choices if not c.frozen)]  # fmt: skip
             for image, ref in refs:
                 tag, _, digest = ref.partition("@")
                 out.append(Pin(entry.slug, image, tag, digest))

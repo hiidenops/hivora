@@ -1,0 +1,64 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: dont-starve-together
+  name: Don't Starve Together
+  version: 1.0.0
+  category: games
+  tags: [dst, klei, steam, survival]
+  icon: { steam_appid: 322330 }
+  description:
+    fr: Serveur dédié Don't Starve Together (LinuxGSM, image reconstruite chaque semaine). x86 uniquement.
+    en: Don't Starve Together dedicated server (LinuxGSM, image rebuilt weekly). x86 only.
+  links:
+    site: https://www.klei.com/games/dont-starve-together
+    doc: https://docs.linuxgsm.com/game-servers/dont-starve-together
+    token: https://accounts.klei.com/account/game/servers?game=DontStarveTogether
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/gameservermanagers/gameserver
+requirements:
+  arch: [amd64]
+  memory: { min: 2Gi, recommended: 4Gi }
+  disk: { min: 4Gi }
+form:
+  basic:
+    - id: cluster_token
+      group: { fr: Serveur, en: Server }
+      label: { fr: Jeton de serveur Klei, en: Klei server token }
+      type: secret
+      required: true
+      help:
+        fr: "Obligatoire. Gratuit sur accounts.klei.com → Jeux → Serveurs DST (commence par « pds-g^ »). Nom, mot de passe et mode de jeu se règlent ensuite dans .klei/DoNotStarveTogether/Cluster_1/cluster.ini du volume « data »."
+        en: "Required. Free at accounts.klei.com → Games → DST servers (starts with “pds-g^”). Name, password and game mode are then set in .klei/DoNotStarveTogether/Cluster_1/cluster.ini in the “data” volume."
+services:
+  server:
+    role: main
+    image: gameservermanagers/gameserver
+    tag: "dst@sha256:07c568043ebb8f0d847235dfb8b0277347fd2339a6dcad9158f22abc48975894"
+    env:
+      UID: "{{ host.puid }}"
+      GID: "{{ host.pgid }}"
+      TZ: "{{ host.timezone }}"
+    files:
+      # LinuxGSM installs with this token instead of asking for it.
+      - target: /data/.klei/DoNotStarveTogether/Cluster_1/cluster_token.txt
+        content: "{{ secret.cluster_token }}"
+    ports:
+      - { container: 10999, protocol: udp, purpose: game, exposure: public }
+      - { container: 8766, protocol: udp, purpose: game, exposure: public }
+      - { container: 27016, protocol: udp, purpose: query, exposure: public }
+    volumes:
+      - { name: data, target: /data, backup: true }
+    stop_grace_period: 300s  # the world is saved on stop, up to a few minutes
+access:
+  game: "{{ host.public_ip }}:10999"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  players: { a2s_port: 27016 }
+defaults:
+  zone: gaming
+  restart: unless-stopped

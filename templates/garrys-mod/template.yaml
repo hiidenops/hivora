@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: garrys-mod
   name: Garry's Mod
-  version: 1.0.0
+  version: 1.1.0
   category: games
   tags: [gmod, steam, sandbox]
   icon: { steam_appid: 4000 }
@@ -28,6 +28,16 @@ form:
       type: string
       default: "{{ app.name }}"
       pattern: "[^\"]{1,64}"
+    - id: branch
+      group: { fr: Serveur, en: Server }
+      label: { fr: Version du jeu (branche Steam), en: Game version (Steam branch) }
+      type: string
+      default: x86-64
+      options_from: steam_branches
+      options_param: "4020"
+      pattern: "[A-Za-z0-9._-]{1,64}"
+      reset_data_on_change: true
+      help: { fr: "x86-64 = 64 bits (conseillé), public = 32 bits.", en: "x86-64 = 64-bit (advised), public = 32-bit." }
     - id: max_players
       group: { fr: Serveur, en: Server }
       label: { fr: Joueurs max, en: Max players }
@@ -77,6 +87,7 @@ services:
     tag: "1.6.0@sha256:4e3f92db6dc28cd723d6cee7c7940e1357fc60e2ff6e311bcadcb646333a2f87"
     env:
       GMOD_START_PARAMS: '+gamemode {{ form.gamemode }} +map {{ form.map }} +maxplayers {{ form.max_players }} +hostname "{{ form.hostname }}" +host_workshop_collection {{ form.workshop_collection | default("0") }}'
+      GMOD_BRANCH: "{{ form.branch }}"
       GMOD_MOUNT_CSS: "{{ form.mount_css }}"
       GMOD_UPDATE_ON_START: "{{ form.update_on_start }}"
       TZ: "{{ host.timezone }}"
@@ -100,7 +111,7 @@ game:
     - { command: "changelevel gm_flatgrass", description: { fr: Changer de carte, en: Change map } }
     - { command: "kick <joueur>", description: { fr: Expulser un joueur, en: Kick a player } }
   players: { a2s_port: 27015 }
-summary: [gamemode, map, max_players]
+summary: [branch, gamemode, map]
 defaults:
   zone: gaming
   restart: unless-stopped

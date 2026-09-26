@@ -1,0 +1,76 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: v-rising
+  name: V Rising
+  version: 1.0.0
+  category: games
+  tags: [vrising, steam, survival, vampires]
+  icon: { steam_appid: 1604030 }
+  description:
+    fr: Serveur dédié V Rising (Wine), image trueosiris/vrising. x86 uniquement.
+    en: V Rising dedicated server (Wine), trueosiris/vrising image. x86 only.
+  links:
+    site: https://playvrising.com
+    doc: https://github.com/TrueOsiris/docker-vrising
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/trueosiris/vrising
+requirements:
+  arch: [amd64]
+  memory: { min: 4Gi, recommended: 8Gi }
+  disk: { min: 10Gi }
+form:
+  basic:
+    - id: server_name
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+    - id: branch
+      group: { fr: Serveur, en: Server }
+      label: { fr: Version du jeu (branche Steam), en: Game version (Steam branch) }
+      type: string
+      default: public
+      options_from: steam_branches
+      options_param: "1829350"
+      pattern: "[A-Za-z0-9._-]{1,64}"
+      reset_data_on_change: true
+    - id: world
+      group: { fr: Monde, en: World }
+      label: { fr: Nom de la sauvegarde, en: Save name }
+      type: string
+      default: world1
+      pattern: "[A-Za-z0-9][A-Za-z0-9_-]{0,47}"
+      help:
+        fr: Mot de passe, règles et nombre de joueurs se règlent dans ServerHostSettings.json et ServerGameSettings.json du volume « data ».
+        en: Password, rules and player count live in ServerHostSettings.json and ServerGameSettings.json in the “data” volume.
+services:
+  server:
+    role: main
+    image: trueosiris/vrising
+    tag: "2026-04-23-1036@sha256:9356f98ad56139cccf4cfc7a62331d02e4216e8156d990792f5050252405bc7d"
+    env:
+      SERVERNAME: "{{ form.server_name }}"
+      WORLDNAME: "{{ form.world }}"
+      BRANCH: "{{ form.branch }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 9876, protocol: udp, purpose: game, exposure: public }
+      - { container: 9877, protocol: udp, purpose: query, exposure: public }
+    volumes:
+      - { name: server, target: /mnt/vrising/server }
+      - { name: data, target: /mnt/vrising/persistentdata, backup: true }
+    stop_grace_period: 60s
+access:
+  game: "{{ host.public_ip }}:9876"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  players: { a2s_port: 9877 }
+summary: [branch, world]
+defaults:
+  zone: gaming
+  restart: unless-stopped

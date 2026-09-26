@@ -1,0 +1,93 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: core-keeper
+  name: Core Keeper
+  version: 1.0.1
+  category: games
+  tags: [corekeeper, steam, sandbox, coop]
+  icon: { steam_appid: 1621690 }
+  description:
+    fr: Serveur dédié Core Keeper, image escaping/core-keeper-dedicated. Fonctionne sur x86 et ARM.
+    en: Core Keeper dedicated server, escaping/core-keeper-dedicated image. Runs on x86 and ARM.
+  links:
+    site: https://store.steampowered.com/app/1621690
+    doc: https://github.com/escapingnetwork/core-keeper-dedicated
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/escaping/core-keeper-dedicated
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 2Gi, recommended: 4Gi }
+  disk: { min: 4Gi }
+form:
+  basic:
+    - id: world_name
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+    - id: password
+      group: { fr: Serveur, en: Server }
+      label: { fr: Mot de passe pour rejoindre, en: Join password }
+      type: secret
+      generate: { length: 16 }
+      help: { fr: 28 caractères maximum., en: 28 characters at most. }
+    - id: max_players
+      group: { fr: Serveur, en: Server }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 10
+      range: [1, 100]
+    - id: world_mode
+      group: { fr: Monde, en: World }
+      label: { fr: Mode du monde (nouveau monde), en: World mode (new world) }
+      type: select
+      default: "0"
+      options:
+        - { value: "0", label: { fr: Normal, en: Normal } }
+        - { value: "1", label: { fr: Difficile, en: Hard } }
+        - { value: "2", label: { fr: Créatif, en: Creative } }
+        - { value: "4", label: { fr: Détente, en: Casual } }
+    - id: world_seed
+      group: { fr: Monde, en: World }
+      label: { fr: Graine (nouveau monde), en: Seed (new world) }
+      type: string
+      pattern: "[0-9]{0,10}"
+services:
+  server:
+    role: main
+    image: escaping/core-keeper-dedicated
+    tag: "v2.8.1@sha256:87fa7925596264e1460cb6c7c128e9d39ac5445206e04e587993b5d4afa7c90f"
+    arch:
+      # SteamCMD's self-update breaks under box64: download with DepotDownloader instead.
+      arm64:
+        image: escaping/core-keeper-dedicated
+        tag: "v2.8.1@sha256:87fa7925596264e1460cb6c7c128e9d39ac5445206e04e587993b5d4afa7c90f"
+        env: { USE_DEPOT_DOWNLOADER: "true" }
+    env:
+      WORLD_NAME: "{{ form.world_name }}"
+      PASSWORD: "{{ secret.password }}"
+      MAX_PLAYERS: "{{ form.max_players }}"
+      WORLD_MODE: "{{ form.world_mode }}"
+      WORLD_SEED: "{{ form.world_seed }}"
+      SERVER_PORT: "27015"  # direct connection (IP + password) instead of Steam relay
+      PUID: "{{ host.puid }}"
+      PGID: "{{ host.pgid }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 27015, protocol: udp, purpose: game, exposure: public }
+    volumes:
+      - { name: files, target: /home/steam/core-keeper-dedicated }
+      - { name: data, target: /home/steam/core-keeper-data, backup: true }
+    stop_grace_period: 60s
+access:
+  game: "{{ host.public_ip }}:27015"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+summary: [world_mode, max_players]
+defaults:
+  zone: gaming
+  restart: unless-stopped

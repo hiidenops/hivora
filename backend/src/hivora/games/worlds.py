@@ -29,7 +29,7 @@ from hivora.templates.schema import GameSaves
 if TYPE_CHECKING:
     from hivora.apps.service import AppService
 
-WORLD_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,47}$")
+WORLD_NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_-]{0,47}$")  # Factorio: _autosave1
 MAX_UPLOAD = 10 * 1024**3  # the .zip as sent
 MAX_EXTRACTED = 30 * 1024**3  # its content: stops zip bombs
 MAX_MEMBERS = 500_000

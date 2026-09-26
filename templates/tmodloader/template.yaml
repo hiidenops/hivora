@@ -1,0 +1,129 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: tmodloader
+  name: Terraria (tModLoader)
+  version: 1.0.0
+  category: games
+  tags: [terraria, tmodloader, mods, steam]
+  icon: { steam_appid: 1281930 }
+  description:
+    fr: Serveur Terraria moddé avec tModLoader et le Workshop Steam, image jacobsmile/tmodloader1.4. x86 uniquement.
+    en: Modded Terraria server with tModLoader and the Steam Workshop, jacobsmile/tmodloader1.4 image. x86 only.
+  links:
+    site: https://www.tmodloader.net
+    doc: https://github.com/JACOBSMILE/tmodloader1.4
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/jacobsmile/tmodloader1.4
+requirements:
+  arch: [amd64]
+  memory: { min: 2Gi, recommended: 4Gi }
+  disk: { min: 4Gi }
+form:
+  basic:
+    - id: version
+      group: { fr: Serveur, en: Server }
+      label: { fr: Version de tModLoader, en: tModLoader version }
+      type: select
+      default: stable
+      reset_data_on_change: true
+      options:
+        - { value: stable, label: { fr: Stable (la plus récente), en: Stable (latest) } }
+        - { value: preview, label: { fr: Aperçu (v2026.08.2.2), en: Preview (v2026.08.2.2) } }
+        - { value: legacy, label: { fr: "Terraria 1.4.3 (v2022.09.48.1)", en: "Terraria 1.4.3 (v2022.09.48.1)" } }
+    - id: password
+      group: { fr: Serveur, en: Server }
+      label: { fr: Mot de passe pour rejoindre, en: Join password }
+      type: secret
+      required: true
+      help: { fr: "« N/A » pour un serveur sans mot de passe.", en: "“N/A” for a server without password." }
+    - id: max_players
+      group: { fr: Serveur, en: Server }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 8
+      range: [1, 255]
+    - id: motd
+      group: { fr: Serveur, en: Server }
+      label: { fr: Message d'accueil, en: Message of the day }
+      type: string
+      default: "{{ app.name }}"
+    - id: mods
+      group: { fr: Mods, en: Mods }
+      label: { fr: Mods du Workshop (identifiants séparés par des virgules), en: Workshop mods (comma-separated IDs) }
+      type: string
+      pattern: "[0-9,]{0,2000}"
+      help:
+        fr: "Téléchargés et activés au démarrage. Ex. 2824688072,2824688266 (Calamity)."
+        en: "Downloaded and enabled on start. E.g. 2824688072,2824688266 (Calamity)."
+    - id: world
+      group: { fr: Monde, en: World }
+      label: { fr: Monde actif, en: Active world }
+      type: string
+      default: world
+      pattern: "[A-Za-z0-9][A-Za-z0-9_-]{0,47}"
+    - id: size
+      group: { fr: Monde, en: World }
+      label: { fr: Taille (nouveau monde), en: Size (new world) }
+      type: select
+      default: "2"
+      options:
+        - { value: "1", label: { fr: Petit, en: Small } }
+        - { value: "2", label: { fr: Moyen, en: Medium } }
+        - { value: "3", label: { fr: Grand, en: Large } }
+    - id: difficulty
+      group: { fr: Monde, en: World }
+      label: { fr: Difficulté (nouveau monde), en: Difficulty (new world) }
+      type: select
+      default: "0"
+      options:
+        - { value: "0", label: { fr: Classique, en: Classic } }
+        - { value: "1", label: { fr: Expert, en: Expert } }
+        - { value: "2", label: { fr: Maître, en: Master } }
+        - { value: "3", label: { fr: Voyage, en: Journey } }
+services:
+  server:
+    role: main
+    image: jacobsmile/tmodloader1.4
+    tag: "latest@sha256:49fed6568d092cb762468705c427601807193ecf25d93905bf3d0fcd00fc9a04"
+    tag_select:
+      field: version
+      choices:
+        - { value: preview, tag: "v2026.08.2.2@sha256:13318c2db8267b198e5348de3890e866f75594bff46e5020147dd39934842136" }
+        - { value: legacy, frozen: true, tag: "v2022.09.48.1@sha256:26b3a23ec3b5bf67ea1336b3d5de68c8e7052fd755727e70393a01b9b90f436e" }
+    env:
+      TMOD_PASS: "{{ secret.password }}"
+      TMOD_MAXPLAYERS: "{{ form.max_players }}"
+      TMOD_MOTD: "{{ form.motd }}"
+      TMOD_WORLDNAME: "{{ form.world }}"
+      TMOD_WORLDSIZE: "{{ form.size }}"
+      TMOD_DIFFICULTY: "{{ form.difficulty }}"
+      TMOD_AUTODOWNLOAD: "{{ form.mods }}"
+      TMOD_ENABLEDMODS: "{{ form.mods }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 7777, protocol: tcp, purpose: game, exposure: public }
+    volumes:
+      - { name: data, target: /data, backup: true }
+    stop_grace_period: 60s
+access:
+  game: "{{ host.public_ip }}:7777"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  # The image's `inject` sends one command to the server console per call.
+  console: [sh, -c, "while printf '> ' && IFS= read -r line; do [ -n \"$line\" ] && inject \"$line\"; done"]
+  commands:
+    - { command: "playing", description: { fr: Joueurs connectés, en: Players online } }
+    - { command: "say <message>", description: { fr: Message à tous les joueurs, en: Message to every player } }
+    - { command: "save", description: { fr: Sauvegarder le monde, en: Save the world } }
+    - { command: "kick <joueur>", description: { fr: Expulser un joueur, en: Kick a player } }
+    - { command: "ban <joueur>", description: { fr: Bannir un joueur, en: Ban a player } }
+  saves: { volume: data, path: tModLoader/Worlds, marker: "*.wld", active_field: world }
+summary: [version, world, max_players]
+defaults:
+  zone: gaming
+  restart: unless-stopped

@@ -1,0 +1,121 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: ark-survival-ascended
+  name: "ARK: Survival Ascended"
+  version: 1.0.0
+  category: games
+  tags: [ark, asa, steam, survival, dinosaurs]
+  icon: { steam_appid: 2399830 }
+  description:
+    fr: "Serveur dédié ARK: Survival Ascended (Proton), image acekorneya/asa_server. x86 uniquement, 16 Go de RAM conseillés."
+    en: "ARK: Survival Ascended dedicated server (Proton), acekorneya/asa_server image. x86 only, 16 GB of RAM advised."
+  links:
+    site: https://survivetheark.com
+    doc: https://github.com/Acekorneya/Ark-Survival-Ascended-Server
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/acekorneya/asa_server
+requirements:
+  arch: [amd64]
+  memory: { min: 12Gi, recommended: 16Gi }
+  disk: { min: 30Gi }
+form:
+  basic:
+    - id: session_name
+      group: { fr: Serveur, en: Server }
+      label: { fr: Nom du serveur, en: Server name }
+      type: string
+      default: "{{ app.name }}"
+      pattern: "[A-Za-z0-9 _-]{1,60}"
+    - id: map
+      group: { fr: Serveur, en: Server }
+      label: { fr: Carte, en: Map }
+      type: select
+      default: TheIsland
+      reset_data_on_change: true
+      options:
+        - { value: TheIsland, label: The Island }
+        - { value: ScorchedEarth, label: Scorched Earth }
+        - { value: TheCenter, label: The Center }
+        - { value: Aberration, label: Aberration }
+        - { value: Extinction, label: Extinction }
+        - { value: Astraeos, label: Astraeos }
+        - { value: Ragnarok, label: Ragnarok }
+        - { value: Valguero, label: Valguero }
+        - { value: LostColony, label: Lost Colony }
+    - id: max_players
+      group: { fr: Serveur, en: Server }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 20
+      range: [1, 127]
+    - id: server_password
+      group: { fr: Accès, en: Access }
+      label: { fr: Mot de passe pour rejoindre, en: Join password }
+      type: secret
+      help: { fr: Lettres et chiffres uniquement ; vide = serveur ouvert., en: Letters and digits only; empty = open server. }
+    - id: admin_password
+      group: { fr: Accès, en: Access }
+      label: { fr: Mot de passe administrateur, en: Admin password }
+      type: secret
+      generate: { length: 20 }
+  advanced:
+    - id: mods
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mods CurseForge (identifiants séparés par des virgules), en: CurseForge mods (comma-separated IDs) }
+      type: string
+      pattern: "[0-9,]{0,2000}"
+    - id: battleye
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Anti-triche BattlEye, en: BattlEye anti-cheat }
+      type: boolean
+      default: false
+    - id: custom_args
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Arguments de lancement, en: Launch arguments }
+      type: string
+      pattern: "[A-Za-z0-9 _=.-]{0,300}"
+      help:
+        fr: "Ex. -ForceRespawnDinos. Si le serveur s'arrête au démarrage : sysctl -w vm.max_map_count=262144 sur l'hôte."
+        en: "E.g. -ForceRespawnDinos. If the server stops at start: sysctl -w vm.max_map_count=262144 on the host."
+services:
+  server:
+    role: main
+    image: acekorneya/asa_server
+    tag: "2_1_latest@sha256:64a836b2e5f74f8bc4d9ef8e2e64580e09c7ef9764faad6c4e13fa4e304fd92d"
+    env:
+      PUID: "{{ host.puid }}"
+      PGID: "{{ host.pgid }}"
+      SESSION_NAME: "{{ form.session_name }}"
+      MAP_NAME: "{{ form.map }}"
+      MAX_PLAYERS: "{{ form.max_players }}"
+      SERVER_PASSWORD: "{{ secret.server_password }}"
+      SERVER_ADMIN_PASSWORD: "{{ secret.admin_password }}"
+      MOD_IDS: "{{ form.mods }}"
+      BATTLEEYE: "{{ form.battleye | upper }}"
+      CUSTOM_SERVER_ARGS: "{{ form.custom_args }}"
+      RCON_ENABLED: "TRUE"
+      RCON_PORT: "27020"
+      ASA_PORT: "7777"
+      UPDATE_SERVER: "TRUE"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 7777, protocol: udp, purpose: game, exposure: public }
+      - { container: 7777, protocol: tcp, purpose: game, exposure: public }
+      - { container: 27020, protocol: tcp, purpose: rcon, exposure: internal }
+    volumes:
+      - { name: shootergame, target: "/usr/games/.wine/drive_c/POK/Steam/steamapps/common/ARK Survival Ascended Dedicated Server/ShooterGame", backup: true }
+      - { name: server, target: "/usr/games/.wine/drive_c/POK/Steam/steamapps/common/ARK Survival Ascended Dedicated Server" }
+      - { name: cluster, target: /usr/games/.wine/drive_c/POK/Steam/steamapps/common/ShooterGame, backup: true }
+    stop_grace_period: 180s
+access:
+  game: "{{ host.public_ip }}:7777"
+backup:
+  volumes: [shootergame, cluster]
+update:
+  strategy: manual
+summary: [map, max_players]
+defaults:
+  zone: gaming
+  restart: unless-stopped

@@ -1,0 +1,83 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: 7-days-to-die
+  name: 7 Days to Die
+  version: 1.0.0
+  category: games
+  tags: [7dtd, steam, survival, zombies]
+  icon: { steam_appid: 251570 }
+  description:
+    fr: Serveur dédié 7 Days to Die (LinuxGSM), image vinanrra/7dtd-server. x86 uniquement.
+    en: 7 Days to Die dedicated server (LinuxGSM), vinanrra/7dtd-server image. x86 only.
+  links:
+    site: https://7daystodie.com
+    doc: https://github.com/vinanrra/Docker-7DaysToDie
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/vinanrra/7dtd-server
+requirements:
+  arch: [amd64]
+  memory: { min: 8Gi, recommended: 12Gi }
+  disk: { min: 20Gi }
+form:
+  basic:
+    - id: branch
+      group: { fr: Serveur, en: Server }
+      label: { fr: Version du jeu (branche Steam), en: Game version (Steam branch) }
+      type: string
+      default: public
+      options_from: steam_branches
+      options_param: "294420"
+      pattern: "[A-Za-z0-9._-]{1,64}"
+      reset_data_on_change: true
+      help:
+        fr: Nom, mot de passe et réglages de partie se règlent dans serverfiles/sdtdserver.xml du volume « serverfiles ».
+        en: Name, password and game settings live in serverfiles/sdtdserver.xml in the “serverfiles” volume.
+  advanced:
+    - id: backups
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Sauvegarde quotidienne (LinuxGSM), en: Daily backup (LinuxGSM) }
+      type: select
+      default: "NO"
+      options:
+        - { value: "NO", label: { fr: Désactivée, en: "Off" } }
+        - { value: "YES", label: { fr: "Activée (5 h du matin, 7 conservées)", en: "On (5 AM, 7 kept)" } }
+services:
+  server:
+    role: main
+    image: vinanrra/7dtd-server
+    tag: "v0.9.3@sha256:75d1193fb2470687ee8748f27482524c170f6cbca110e15f48db8d8ff48f15ca"
+    env:
+      START_MODE: "1"
+      VERSION: "{{ form.branch }}"
+      PUID: "{{ host.puid }}"
+      PGID: "{{ host.pgid }}"
+      TimeZone: "{{ host.timezone }}"
+      BACKUP: "{{ form.backups }}"
+      BACKUP_HOUR: "5"
+      BACKUP_MAX: "7"
+      MONITOR: "YES"
+    ports:
+      - { container: 26900, protocol: tcp, purpose: game, exposure: public }
+      - { container: 26900, protocol: udp, purpose: game, exposure: public }
+      - { container: 26901, protocol: udp, purpose: game, exposure: public }
+      - { container: 26902, protocol: udp, purpose: game, exposure: public }
+    volumes:
+      - { name: saves, target: /home/sdtdserver/.local/share/7DaysToDie, backup: true }
+      - { name: config, target: /home/sdtdserver/lgsm/config-lgsm/sdtdserver, backup: true }
+      - { name: serverfiles, target: /home/sdtdserver/serverfiles }
+      - { name: backups, target: /home/sdtdserver/lgsm/backup }
+    stop_grace_period: 120s
+access:
+  game: "{{ host.public_ip }}:26900"
+backup:
+  volumes: [saves, config]
+update:
+  strategy: manual
+game:
+  players: { a2s_port: 26900 }
+summary: [branch]
+defaults:
+  zone: gaming
+  restart: unless-stopped

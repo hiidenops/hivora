@@ -28,6 +28,8 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Architecture | Détectée par Docker, image par architecture, vérification avant téléchargement | ✅ | `4f1bad2` |
 | Jeux génériques | Capacités déclarées par le template (joueurs, listes, mondes) | ✅ | `d2414ba` |
 | Catalogue de jeux | Valheim, Rust, Project Zomboid, CS2, Garry's Mod (OVH, x86), Palworld (x86 + ARM) | ✅ | voir `git log` |
+| Images à jour et versions | Contrôle hebdomadaire des images, version → image (Java de Minecraft), branches Steam en direct | ✅ | `eada91b` |
+| 12 jeux de plus | Enshrouded, V Rising, Sons of the Forest, 7 Days to Die, Satisfactory, Terraria, tModLoader, Factorio, Don't Starve Together, Core Keeper, ARK: Survival Ascended, Conan Exiles | ✅ | voir `git log` |
 | M6 Livraison | Image Docker, HTTPS, script d'installation | ⏳ | |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
@@ -118,7 +120,21 @@ Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en b
 - **Non testé en réel** (pas de machine x86) : Valheim, Rust, Project Zomboid, CS2, Garry's Mod. Compilation et `docker compose config` vérifiés pour tous.
 - `run_as: app` (commandes de jeu sous PUID:PGID) vient du test réel de Bedrock : un serveur passé sous PUID n'est pas joignable depuis root sans ptrace.
 
-▶ **Prochaine étape** : tester les jeux Steam sur une machine x86, puis M6 (livraison). Catalogue LinuxGSM (140+ jeux) : plus tard.
+## Catalogue à jour, versions au choix, 12 jeux de plus (fait, 26/09)
+
+1. **Images toujours à jour** : `backend/scripts/check_images.py` compare chaque image figée au plus récent tag de même forme sur Docker Hub (`2026.9.2-java25` n'est comparé qu'aux `-java25` ; un tag mobile comme `latest` ou `stable`, à son digest du jour). GitHub Actions le lance chaque lundi (`.github/workflows/images.yml`) et échoue si une image est en retard. Les versions volontairement anciennes sont marquées `frozen`.
+2. **Changer de version quand on veut** :
+   - `tag_select` : un champ du formulaire choisit le tag d'image (valeur exacte ou plage `below`). Minecraft Java prend le bon Java selon la version (8 avant 1.17, 17 avant 1.20.5, 21 avant 26, sinon 25). Factorio (stable, expérimentale, 1.1), Terraria (dernière, 1.4.4.9), tModLoader (stable, aperçu, 1.4.3).
+   - `options_from: steam_branches` : la liste des branches Steam est lue en direct (api.steamcmd.net, cache 1 h) pour Project Zomboid (public = Build 42, legacy41 = Build 41), Garry's Mod, V Rising et 7 Days to Die.
+   - Tout changement de version efface le contenu du serveur après confirmation (règle déjà en place).
+3. **`files`** : un template peut placer un fichier dans le conteneur (Compose `configs`, secrets résolus depuis `.env`), utilisé pour le jeton Klei de Don't Starve Together.
+4. **Modpacks** : CurseForge par défaut (le catalogue le plus fourni), pagination jusqu'à 10 000 résultats.
+5. **12 jeux** (sources vérifiées le 26/09) : Enshrouded (`mornedhels`), V Rising (`trueosiris`), Sons of the Forest (`jammsen`), 7 Days to Die (`vinanrra`), Satisfactory (`wolveix`), Terraria (`ryshe`, x86 + ARM), tModLoader (`jacobsmile`), Factorio (`factoriotools`, x86 + ARM), Don't Starve Together (LinuxGSM `gameservermanagers/gameserver:dst`), Core Keeper (`escaping`, x86 + ARM), ARK: Survival Ascended (`acekorneya`), Conan Exiles (`indifferentbroccoli`). DayZ écarté (compte Steam propriétaire du jeu obligatoire). Images DST dédiées écartées (2022, ou sans documentation).
+- **Testé en réel sur la VM ARM** : Terraria (monde créé, passage 1.4.5.8 → 1.4.4.9 avec effacement confirmé), Factorio (volume en 845:845, `rcon`, sauvegarde listée), Core Keeper (session démarrée ; sur ARM l'image doit télécharger avec DepotDownloader, déclaré par architecture). Corrigé grâce au test : les noms de monde peuvent commencer par `_` (`_autosave1` de Factorio).
+- **Non testé en réel** (x86 uniquement) : les autres jeux. Compilation, `docker compose config` et fraîcheur des images vérifiés pour tous.
+- À savoir : plusieurs jeux se règlent ensuite dans un fichier du volume (V Rising, Sons of the Forest, 7 Days to Die, Factorio, DST), le formulaire le signale. Factorio n'apparaît dans la liste publique qu'avec un compte factorio.com (connexion par IP sans).
+
+▶ **Prochaine étape** : tester les jeux x86 sur une machine x86, puis M6 (livraison). Catalogue LinuxGSM générique (140+ jeux) : non fait (ports inconnus avant installation, contraire à la règle des digests figés).
 
 ## Retours traités (tour 4)
 

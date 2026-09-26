@@ -1,0 +1,96 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: terraria
+  name: Terraria
+  version: 1.0.0
+  category: games
+  tags: [terraria, sandbox, 2d]
+  icon: { steam_appid: 105600 }
+  description:
+    fr: Serveur Terraria officiel (vanilla), image ryshe/terraria. Fonctionne sur x86 et ARM.
+    en: Official Terraria server (vanilla), ryshe/terraria image. Runs on x86 and ARM.
+  links:
+    site: https://terraria.org
+    doc: https://github.com/ryansheehan/terraria
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/ryshe/terraria
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 1Gi, recommended: 2Gi }
+  disk: { min: 1Gi }
+form:
+  basic:
+    - id: version
+      group: { fr: Serveur, en: Server }
+      label: { fr: Version du jeu, en: Game version }
+      type: select
+      default: latest
+      reset_data_on_change: true
+      options:
+        - { value: latest, label: { fr: "Dernière (1.4.5.x)", en: "Latest (1.4.5.x)" } }
+        - { value: "1.4.4.9", label: "1.4.4.9" }
+      help:
+        fr: Les joueurs doivent avoir exactement la même version que le serveur.
+        en: Players must run exactly the same version as the server.
+    - id: max_players
+      group: { fr: Serveur, en: Server }
+      label: { fr: Joueurs max, en: Max players }
+      type: integer
+      default: 8
+      range: [1, 255]
+    - id: password
+      group: { fr: Serveur, en: Server }
+      label: { fr: Mot de passe pour rejoindre, en: Join password }
+      type: secret
+      help: { fr: Laisser vide pour un serveur ouvert., en: Leave empty for an open server. }
+    - id: world
+      group: { fr: Monde, en: World }
+      label: { fr: Monde actif, en: Active world }
+      type: string
+      default: world
+      pattern: "[A-Za-z0-9][A-Za-z0-9_-]{0,47}"
+      help: { fr: Un nom nouveau crée un monde., en: A new name creates a world. }
+    - id: size
+      group: { fr: Monde, en: World }
+      label: { fr: Taille (nouveau monde), en: Size (new world) }
+      type: select
+      default: "2"
+      options:
+        - { value: "1", label: { fr: Petit, en: Small } }
+        - { value: "2", label: { fr: Moyen, en: Medium } }
+        - { value: "3", label: { fr: Grand, en: Large } }
+services:
+  server:
+    role: main
+    image: ryshe/terraria
+    tag: "vanilla-latest@sha256:3ece8ceb88c11e47bc490d4e17849e89f5343722142fca506fbde9a7ab04a677"
+    tag_select:
+      field: version
+      choices:
+        - { value: "1.4.4.9", frozen: true, tag: "vanilla-1.4.4.9@sha256:b7a7051aef25483b701b0b84cc691081514f77f817ec3416c4dcdd69cd609a1d" }
+    command: [-port, "7777", -maxplayers, "{{ form.max_players }}", -password, "{{ secret.password }}",
+              -world, "/root/.local/share/Terraria/Worlds/{{ form.world }}.wld", -autocreate, "{{ form.size }}"]
+    env:
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 7777, protocol: tcp, purpose: game, exposure: public }
+    volumes:
+      - { name: worlds, target: /root/.local/share/Terraria/Worlds, backup: true }
+      - { name: config, target: /config }
+    stdin_open: true
+    tty: true
+    stop_grace_period: 30s
+access:
+  game: "{{ host.public_ip }}:7777"
+backup:
+  volumes: [worlds]
+update:
+  strategy: manual
+game:
+  saves: { volume: worlds, marker: "*.wld", active_field: world }
+summary: [version, world, max_players]
+defaults:
+  zone: gaming
+  restart: unless-stopped

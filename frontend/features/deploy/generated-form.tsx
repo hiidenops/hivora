@@ -21,6 +21,7 @@ export interface FieldDef {
   generate?: { length: number };
   showIf?: Record<string, unknown>;
   options_from?: string; // choices fetched from /options/<source>
+  options_param?: string; // e.g. the Steam app id
   suggestions?: { value: string; description: Localized }[];
   group?: Localized; // section title, shared by consecutive fields
 }
@@ -131,6 +132,7 @@ export function GeneratedForm({
         <DynamicSelect
           id={id}
           source={f.options_from}
+          param={f.options_param}
           value={values[f.id] === undefined ? "" : String(values[f.id])}
           onChange={(v) => onChange(f.id, v)}
           invalid={!!error}
@@ -260,6 +262,7 @@ export function withLine(text: string, line: string): string {
 function DynamicSelect({
   id,
   source,
+  param,
   value,
   onChange,
   invalid,
@@ -267,6 +270,7 @@ function DynamicSelect({
 }: {
   id: string;
   source: string;
+  param?: string;
   value: string;
   onChange: (v: string) => void;
   invalid: boolean;
@@ -274,8 +278,11 @@ function DynamicSelect({
 }) {
   const { advanced } = useSession();
   const { data } = useQuery({
-    queryKey: ["options", source, advanced],
-    queryFn: () => api<{ value: string; label: string }[]>(`/options/${source}`, { query: { snapshots: String(advanced) } }),
+    queryKey: ["options", source, param, advanced],
+    queryFn: () =>
+      api<{ value: string; label: string }[]>(`/options/${source}`, {
+        query: param ? { param } : { snapshots: String(advanced) },
+      }),
     staleTime: 3_600_000,
   });
   // The current value stays selectable even if the list does not offer it (yet).

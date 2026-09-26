@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from hivora.games.engine import GameTools
 from hivora.games.minecraft import MinecraftVersions
 from hivora.games.modpacks import Loader, Source
+from hivora.games.steam import SteamBranches
 from hivora.jobs import Job
 from hivora.system.secrets import SecretSetting
 from hivora.templates.icons import MEDIA_TYPES
@@ -195,9 +196,16 @@ class OptionOut(BaseModel):
 
 
 _versions = MinecraftVersions()
+_branches = SteamBranches()
 
 
 @options_router.get("/minecraft_versions")
 async def minecraft_versions(_: Viewer, snapshots: bool = False) -> list[OptionOut]:
     """Choices for fields declaring `options_from: minecraft_versions`."""
     return [OptionOut(**o) for o in await _versions.options(snapshots=snapshots)]
+
+
+@options_router.get("/steam_branches")
+async def steam_branches(_: Viewer, param: str = Query(pattern=r"^\d{1,10}$")) -> list[OptionOut]:
+    """Choices for `options_from: steam_branches` (``options_param``: the server's app id)."""
+    return [OptionOut(**o) for o in await _branches.options(param)]

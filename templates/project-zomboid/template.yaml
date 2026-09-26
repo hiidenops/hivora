@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: project-zomboid
   name: Project Zomboid
-  version: 1.0.0
+  version: 1.1.0
   category: games
   tags: [zomboid, steam, survival, zombies]
   icon: { steam_appid: 108600 }
@@ -38,13 +38,16 @@ form:
         en: Joining with this account in game grants admin rights.
     - id: branch
       group: { fr: Serveur, en: Server }
-      label: { fr: Version du jeu, en: Game version }
-      type: select
-      default: ""
+      label: { fr: Version du jeu (branche Steam), en: Game version (Steam branch) }
+      type: string
+      default: public
+      options_from: steam_branches
+      options_param: "380870"
+      pattern: "[A-Za-z0-9._-]{1,64}"
       reset_data_on_change: true
-      options:
-        - { value: "", label: { fr: Stable (Build 41), en: Stable (Build 41) } }
-        - { value: unstable, label: { fr: Instable (Build 42), en: Unstable (Build 42) } }
+      help:
+        fr: "public = Build 42 (actuel), legacy41 = Build 41."
+        en: "public = Build 42 (current), legacy41 = Build 41."
   advanced:
     - id: server_config
       group: { fr: Avancé, en: Advanced }
