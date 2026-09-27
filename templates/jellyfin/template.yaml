@@ -1,0 +1,54 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: jellyfin
+  name: Jellyfin
+  version: 1.0.0
+  category: media
+  tags: [media, streaming, movies, music]
+  icon: { url: "https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/branding/SVG/icon-transparent.svg" }
+  description:
+    fr: Serveur multimédia libre pour regarder films, séries et musique sur tous vos écrans.
+    en: Free media server to watch movies, shows and music on all your screens.
+  links:
+    site: https://jellyfin.org
+    doc: https://jellyfin.org/docs/
+  maintainer: hivora
+  license: GPL-2.0 (image)
+  source: https://hub.docker.com/r/jellyfin/jellyfin
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 1Gi, recommended: 2Gi }
+  disk: { min: 2Gi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8096
+      help:
+        fr: "Déposez vos fichiers dans le volume « media » (/srv/hivora/<app>/media) ; l'assistant se lance à la première visite."
+        en: "Put your files in the “media” volume (/srv/hivora/<app>/media); the setup wizard runs on the first visit."
+services:
+  server:
+    role: main
+    image: jellyfin/jellyfin
+    tag: "10.11.11@sha256:aefb67e6a7ff1debdd154a78a7bbb780fd0c873d8639210a7f6a2016ad2b35db"
+    user: "{{ host.puid }}:{{ host.pgid }}"
+    env:
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 8096, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: config, target: /config, backup: true }
+      - { name: cache, target: /cache }
+      - { name: media, target: /media }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [config]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

@@ -1,0 +1,50 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: uptime-kuma
+  name: Uptime Kuma
+  version: 1.0.0
+  category: services
+  tags: [monitoring, uptime, status]
+  icon: { url: "https://raw.githubusercontent.com/louislam/uptime-kuma/master/public/icon.png" }
+  description:
+    fr: Surveille vos sites et serveurs, alerte en cas de panne et publie des pages de statut.
+    en: Watches your sites and servers, alerts on outages and publishes status pages.
+  links:
+    site: https://uptime.kuma.pet
+    doc: https://github.com/louislam/uptime-kuma/wiki
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/louislam/uptime-kuma
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 128Mi, recommended: 512Mi }
+  disk: { min: 500Mi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 3001
+      help: { fr: Le compte administrateur se crée à la première visite., en: The admin account is created on the first visit. }
+services:
+  server:
+    role: main
+    image: louislam/uptime-kuma
+    tag: "2.5.5@sha256:c74379ac4509ce2d2c2633f509e67003ee2e45b6e995c5e43fc101f45a0e1fbe"
+    env:
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 3001, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: data, target: /app/data, backup: true }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+defaults:
+  zone: administration
+  restart: unless-stopped

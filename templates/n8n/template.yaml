@@ -1,0 +1,52 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: n8n
+  name: n8n
+  version: 1.0.0
+  category: development
+  tags: [automation, workflows, integrations]
+  icon: { url: "https://raw.githubusercontent.com/n8n-io/n8n/master/assets/n8n-logo.png" }
+  description:
+    fr: Automatisez vos tâches en reliant vos services entre eux par des scénarios visuels.
+    en: Automate your tasks by wiring your services together with visual workflows.
+  links:
+    site: https://n8n.io
+    doc: https://docs.n8n.io
+  maintainer: hivora
+  license: Sustainable Use License (image)
+  source: https://hub.docker.com/r/n8nio/n8n
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 256Mi, recommended: 1Gi }
+  disk: { min: 1Gi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 5678
+      help: { fr: Le compte propriétaire se crée à la première visite., en: The owner account is created on the first visit. }
+services:
+  server:
+    role: main
+    image: n8nio/n8n
+    tag: "2.41.3@sha256:fdce8f852ac7abbb2f31a53170bc3c2eeec45c37c0692a99f2d6c11b3822cd98"
+    env:
+      GENERIC_TIMEZONE: "{{ host.timezone }}"
+      TZ: "{{ host.timezone }}"
+      N8N_SECURE_COOKIE: "false"  # plain HTTP on the local network
+      WEBHOOK_URL: "http://{{ host.lan_ip }}:{{ form.web_port }}/"
+    ports:
+      - { container: 5678, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: data, target: /home/node/.n8n, backup: true, owner: "1000:1000" }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

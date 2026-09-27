@@ -34,6 +34,7 @@ class TemplateDetail(TemplateSummary):
     form: dict[str, Any]
     services: list[str]
     manifest: str  # raw YAML, for the advanced mode
+    default_zone: str | None  # zone slug the template suggests (pre-selected if it exists)
 
 
 def icon_url(rt: Runtime, slug: str) -> str | None:
@@ -68,7 +69,7 @@ async def get_template(slug: str, _: Viewer, rt: RuntimeDep) -> TemplateDetail:
         **summary(rt, entry).model_dump(), links=t.metadata.links,
         requirements=t.requirements.model_dump(exclude_none=True),
         form=t.form.model_dump(by_alias=True, exclude_none=True),
-        services=list(t.services), manifest=entry.manifest,
+        services=list(t.services), manifest=entry.manifest, default_zone=t.defaults.zone,
     )  # fmt: skip
 
 

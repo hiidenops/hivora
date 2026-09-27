@@ -201,6 +201,12 @@ def compile_template(
             svc["healthcheck"] = spec.healthcheck
         if spec.depends_on:
             svc["depends_on"] = list(spec.depends_on)
+        if spec.cap_add:
+            svc["cap_add"] = list(spec.cap_add)
+        if spec.sysctls:
+            svc["sysctls"] = dict(spec.sysctls)
+        if spec.shm_size:
+            svc["shm_size"] = spec.shm_size
         if spec.files:
             svc["configs"] = []
             for i, f in enumerate(spec.files):

@@ -1,0 +1,98 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: nextcloud
+  name: Nextcloud
+  version: 1.0.0
+  category: productivity
+  tags: [cloud, files, calendar, contacts]
+  icon: { url: "https://raw.githubusercontent.com/nextcloud/server/master/core/img/logo/logo.svg" }
+  description:
+    fr: Votre cloud personnel (fichiers, agenda, contacts), avec PostgreSQL et Redis.
+    en: Your personal cloud (files, calendar, contacts), with PostgreSQL and Redis.
+  links:
+    site: https://nextcloud.com
+    doc: https://docs.nextcloud.com
+  maintainer: hivora
+  license: AGPL-3.0 (image)
+  source: https://hub.docker.com/_/nextcloud
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 1Gi, recommended: 2Gi }
+  disk: { min: 5Gi }
+form:
+  basic:
+    - id: admin_user
+      group: { fr: Accès, en: Access }
+      label: { fr: Identifiant administrateur, en: Admin username }
+      type: string
+      default: admin
+      pattern: "[A-Za-z0-9_.-]{3,40}"
+    - id: admin_password
+      group: { fr: Accès, en: Access }
+      label: { fr: Mot de passe administrateur, en: Admin password }
+      type: secret
+      required: true
+    - id: domain
+      group: { fr: Accès, en: Access }
+      label: { fr: Adresse d'accès (domaine ou IP), en: Access address (domain or IP) }
+      type: string
+      default: "{{ host.lan_ip }}"
+      pattern: "[A-Za-z0-9.: -]{3,300}"
+      help: { fr: "Plusieurs adresses possibles, séparées par des espaces.", en: "Several addresses allowed, separated by spaces." }
+  advanced:
+    - id: web_port
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8084
+    - id: db_password
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mot de passe de la base de données, en: Database password }
+      type: secret
+      generate: { length: 32 }
+services:
+  app:
+    role: main
+    image: nextcloud
+    tag: "35.0.1-apache@sha256:276547e033df451770dbf9c0065929e5ea179a613b1884bd3fa807ba1c2703e7"
+    env:
+      POSTGRES_HOST: db
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: "{{ secret.db_password }}"
+      REDIS_HOST: redis
+      NEXTCLOUD_ADMIN_USER: "{{ form.admin_user }}"
+      NEXTCLOUD_ADMIN_PASSWORD: "{{ secret.admin_password }}"
+      NEXTCLOUD_TRUSTED_DOMAINS: "{{ form.domain }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: html, target: /var/www/html, backup: true }
+    depends_on: [db, redis]
+    stop_grace_period: 30s
+  db:
+    role: database
+    image: postgres
+    tag: "17.11@sha256:d74eeac9a635390a49bc21bd49fccd973de707e2a53a76ac49b552b8712ec46f"
+    track: minor
+    env:
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: "{{ secret.db_password }}"
+    volumes:
+      - { name: db, target: /var/lib/postgresql/data, backup: true }
+  redis:
+    role: cache
+    image: redis
+    tag: "8.10.2@sha256:d5ac52db24d4e70566fe9944f22cf5bdc2bc739b05c0f426335161ea6c23f3b3"
+    track: minor
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [html, db]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

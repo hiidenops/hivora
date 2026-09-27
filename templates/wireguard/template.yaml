@@ -1,0 +1,94 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: wireguard
+  name: WireGuard (wg-easy)
+  version: 1.0.0
+  category: network
+  tags: [vpn, wireguard, network, remote-access]
+  icon: { url: "https://raw.githubusercontent.com/wg-easy/wg-easy/master/src/public/apple-touch-icon.png" }
+  description:
+    fr: VPN WireGuard avec interface web (wg-easy) pour accéder à votre réseau et à vos serveurs depuis l'extérieur.
+    en: WireGuard VPN with a web interface (wg-easy) to reach your network and servers from outside.
+  links:
+    site: https://wg-easy.github.io/wg-easy
+    doc: https://wg-easy.github.io/wg-easy/latest/
+  maintainer: hivora
+  license: AGPL-3.0 (image)
+  source: https://github.com/wg-easy/wg-easy/pkgs/container/wg-easy
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 64Mi, recommended: 128Mi }
+  disk: { min: 100Mi }
+form:
+  basic:
+    - id: host
+      group: { fr: Accès, en: Access }
+      label: { fr: Adresse publique du serveur, en: Server public address }
+      type: string
+      required: true
+      default: "{{ host.public_ip }}"
+      pattern: "[A-Za-z0-9.:-]{3,253}"
+      help:
+        fr: IP publique ou nom de domaine que les clients utiliseront. Ouvrez le port UDP 51820 sur votre box.
+        en: Public IP or domain name clients will use. Open UDP port 51820 on your router.
+    - id: admin_password
+      group: { fr: Accès, en: Access }
+      label: { fr: Mot de passe de l'interface web (compte admin), en: Web interface password (admin account) }
+      type: secret
+      required: true
+      help: { fr: 12 caractères minimum., en: At least 12 characters. }
+    - id: allowed_ips
+      group: { fr: Réseau VPN, en: VPN network }
+      label: { fr: Trafic envoyé dans le VPN, en: Traffic sent through the VPN }
+      type: string
+      default: "0.0.0.0/0"
+      pattern: "[0-9./, ]{9,300}"
+      help:
+        fr: "0.0.0.0/0 = tout le trafic des clients. Pour n'accéder qu'à votre réseau local : par ex. 192.168.1.0/24."
+        en: "0.0.0.0/0 = all client traffic. To reach only your local network: e.g. 192.168.1.0/24."
+    - id: dns
+      group: { fr: Réseau VPN, en: VPN network }
+      label: { fr: DNS des clients, en: Client DNS }
+      type: string
+      default: "1.1.1.1,9.9.9.9"
+      pattern: "[0-9a-fA-F.:, ]{7,200}"
+  advanced:
+    - id: web_port
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Port de l'interface web, en: Web interface port }
+      type: port
+      default: 51821
+services:
+  server:
+    role: main
+    image: ghcr.io/wg-easy/wg-easy
+    tag: "15.4.0@sha256:0e7bc9d34e86ddcaa92bc700d4d7dc9b33291dbc07ac8d13382f7c2095f949ec"
+    env:
+      INIT_ENABLED: "true"
+      INIT_USERNAME: admin
+      INIT_PASSWORD: "{{ secret.admin_password }}"
+      INIT_HOST: "{{ form.host }}"
+      INIT_PORT: "51820"
+      INIT_DNS: "{{ form.dns }}"
+      INIT_IPV4_CIDR: "10.8.0.0/24"
+      INIT_ALLOWED_IPS: "{{ form.allowed_ips }}"
+      INSECURE: "true"  # web UI over plain HTTP on the local network
+      DISABLE_IPV6: "true"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 51820, protocol: udp, purpose: game, exposure: public }
+      - { container: 51821, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: data, target: /etc/wireguard, backup: true }
+    cap_add: [NET_ADMIN]
+    sysctls: { net.ipv4.ip_forward: 1, net.ipv4.conf.all.src_valid_mark: 1 }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+defaults:
+  zone: administration
+  restart: unless-stopped

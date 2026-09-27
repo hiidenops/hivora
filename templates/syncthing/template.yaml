@@ -1,0 +1,54 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: syncthing
+  name: Syncthing
+  version: 1.0.0
+  category: productivity
+  tags: [sync, files, backup]
+  icon: { url: "https://raw.githubusercontent.com/syncthing/syncthing/main/assets/logo-only.svg" }
+  description:
+    fr: Synchronise vos dossiers entre vos appareils, en direct et chiffré, sans cloud.
+    en: Syncs your folders between your devices, directly and encrypted, without a cloud.
+  links:
+    site: https://syncthing.net
+    doc: https://docs.syncthing.net
+  maintainer: hivora
+  license: MPL-2.0 (image)
+  source: https://hub.docker.com/r/syncthing/syncthing
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 128Mi, recommended: 256Mi }
+  disk: { min: 500Mi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port de l'interface, en: Interface port }
+      type: port
+      default: 8384
+      help: { fr: "Définissez un mot de passe dans l'interface (Actions → Paramètres → Interface).", en: "Set a password in the interface (Actions → Settings → GUI)." }
+services:
+  server:
+    role: main
+    image: syncthing/syncthing
+    tag: "2.1.5@sha256:397aa00b92b48d65540ea3ae3cbf271b87bdccbe07a0b7bd7d2debc3a7b29138"
+    env:
+      PUID: "{{ host.puid }}"
+      PGID: "{{ host.pgid }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 8384, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+      - { container: 22000, protocol: tcp, purpose: other, exposure: lan }
+      - { container: 22000, protocol: udp, purpose: other, exposure: lan }
+      - { container: 21027, protocol: udp, purpose: other, exposure: lan }
+    volumes:
+      - { name: data, target: /var/syncthing, backup: true }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

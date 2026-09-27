@@ -1913,6 +1913,17 @@
             "title": "Compatible",
             "type": "boolean"
           },
+          "default_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Zone"
+          },
           "description": {
             "anyOf": [
               {
@@ -2006,7 +2017,8 @@
           "requirements",
           "form",
           "services",
-          "manifest"
+          "manifest",
+          "default_zone"
         ],
         "title": "TemplateDetail",
         "type": "object"

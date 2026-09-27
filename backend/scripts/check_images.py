@@ -15,7 +15,22 @@ HUB = "https://hub.docker.com/v2/repositories/{repo}/tags?page_size=100&ordering
 PAGES = 5  # the 500 most recent tags
 
 
+def published_ghcr(image: str) -> dict[str, str]:
+    """ghcr.io: tag names only (moving tags there cannot be compared, versioned ones can)."""
+    repo = image.removeprefix("ghcr.io/")
+    token_url = f"https://ghcr.io/token?scope=repository:{repo}:pull"
+    with urllib.request.urlopen(token_url, timeout=30) as r:
+        token = json.load(r)["token"]
+    req = urllib.request.Request(f"https://ghcr.io/v2/{repo}/tags/list?n=10000",
+                                 headers={"Authorization": f"Bearer {token}"})  # fmt: skip
+    with urllib.request.urlopen(req, timeout=30) as r:  # noqa: S310
+        return dict.fromkeys(json.load(r).get("tags") or [], "")
+
+
 def published(image: str) -> dict[str, str]:
+    if image.startswith("ghcr.io/"):
+        return published_ghcr(image)
+    image = image.removeprefix("docker.io/")
     repo = image if "/" in image else f"library/{image}"
     tags: dict[str, str] = {}
     url: str | None = HUB.format(repo=repo)
@@ -38,7 +53,8 @@ def main() -> int:
     cache: dict[str, dict[str, str]] = {}
     findings: list[Finding] = []
     for pin in pins(catalog):
-        if "." in pin.image.split("/")[0]:  # ghcr.io, quay.io...: not checked
+        host = pin.image.split("/")[0]
+        if "." in host and host not in ("ghcr.io", "docker.io"):  # quay.io...: not checked
             print(f"skip   {pin.template}: {pin.image} (not on Docker Hub)")
             continue
         tags = cache.setdefault(pin.image, published(pin.image))

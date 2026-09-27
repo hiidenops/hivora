@@ -1,0 +1,51 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: home-assistant
+  name: Home Assistant
+  version: 1.0.0
+  category: services
+  tags: [domotique, home-automation, smart-home]
+  icon: { url: "https://raw.githubusercontent.com/home-assistant/frontend/dev/public/static/icons/favicon-192x192.png" }
+  description:
+    fr: Domotique libre pour piloter et automatiser vos objets connectés, en local.
+    en: Open home automation to control and automate your connected devices, locally.
+  links:
+    site: https://www.home-assistant.io
+    doc: https://www.home-assistant.io/docs/
+  maintainer: hivora
+  license: Apache-2.0 (image)
+  source: https://github.com/home-assistant/core/pkgs/container/home-assistant
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 512Mi, recommended: 2Gi }
+  disk: { min: 2Gi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8123
+      help:
+        fr: "La découverte automatique des appareils (mDNS, Bluetooth) est limitée hors réseau hôte : ajoutez les appareils par leur adresse IP."
+        en: "Automatic device discovery (mDNS, Bluetooth) is limited outside host networking: add devices by IP address."
+services:
+  server:
+    role: main
+    image: ghcr.io/home-assistant/home-assistant
+    tag: "2026.9.3@sha256:d8922685169707fd91e8b9729902d975f06157d005e422874d201e0261dda196"
+    env:
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 8123, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: config, target: /config, backup: true }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [config]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

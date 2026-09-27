@@ -1,0 +1,87 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: immich
+  name: Immich
+  version: 1.0.0
+  category: media
+  tags: [photos, videos, backup, google-photos]
+  icon: { url: "https://raw.githubusercontent.com/immich-app/immich/main/design/immich-logo.svg" }
+  description:
+    fr: Sauvegarde et galerie de photos et vidéos (alternative à Google Photos), avec reconnaissance des visages.
+    en: Photo and video backup and gallery (Google Photos alternative), with face recognition.
+  links:
+    site: https://immich.app
+    doc: https://immich.app/docs/overview/introduction
+  maintainer: hivora
+  license: AGPL-3.0 (image)
+  source: https://github.com/immich-app/immich/pkgs/container/immich-server
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 4Gi, recommended: 6Gi }
+  disk: { min: 10Gi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 2283
+      help: { fr: Le compte administrateur se crée à la première visite., en: The admin account is created on the first visit. }
+  advanced:
+    - id: db_password
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mot de passe de la base de données, en: Database password }
+      type: secret
+      generate: { length: 32 }
+# The official compose (v3.2.2 release), with its vendor-pinned database and cache.
+services:
+  server:
+    role: main
+    image: ghcr.io/immich-app/immich-server
+    tag: "v3.2.2@sha256:79cc1623323d5894922686d8743b4780181428f98eecbfb58ce12c41ef02d1ea"
+    env: &immich
+      DB_HOSTNAME: database
+      DB_USERNAME: postgres
+      DB_PASSWORD: "{{ secret.db_password }}"
+      DB_DATABASE_NAME: immich
+      REDIS_HOSTNAME: redis
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 2283, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: library, target: /data, backup: true }
+    depends_on: [redis, database]
+  machine-learning:
+    role: sidecar
+    image: ghcr.io/immich-app/immich-machine-learning
+    tag: "v3.2.2@sha256:60dfcf266a9ef3b7376f5678e8c980d4fb61db5fc48c078fe8a326ab1535d60d"
+    env: *immich
+    volumes:
+      - { name: model-cache, target: /cache }
+  redis:
+    role: cache
+    image: docker.io/valkey/valkey
+    tag: "9@sha256:70739f85ad2ee01a726a965584a0f94895f01b0c60b3cc8b0aeef11eaa6888cf"
+    frozen: true
+  database:
+    role: database
+    image: ghcr.io/immich-app/postgres
+    tag: "14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23"
+    frozen: true
+    env:
+      POSTGRES_PASSWORD: "{{ secret.db_password }}"
+      POSTGRES_USER: postgres
+      POSTGRES_DB: immich
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - { name: postgres, target: /var/lib/postgresql/data, backup: true }
+    shm_size: 128mb
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [library, postgres]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

@@ -237,7 +237,14 @@ def test_docker_reported_arch_wins() -> None:
 
 def test_every_repo_template_compiles_on_its_architectures(catalog: Catalog) -> None:
     """Defaults + the required answers only: what a first deploy looks like."""
-    answers = {"eula": True, "password": "hunter2x", "gslt": "TOKEN", "cluster_token": "pds-g^x"}
+    answers = {
+        "host": "vpn.example.org",
+        "eula": True,
+        "password": "hunter2x",
+        "gslt": "TOKEN",
+        "cluster_token": "pds-g^x",
+        "admin_password": "correct-horse-12",
+    }
     for entry in catalog.entries():
         t = entry.template
         ids = {f.id for f in t.form.fields}

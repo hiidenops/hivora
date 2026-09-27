@@ -41,6 +41,12 @@ function Deploy() {
   const [result, setResult] = useState<{ appId: number; jobId: number } | null>(null);
   const [finished, setFinished] = useState<string | null>(null);
 
+  // The zone the template suggests (e.g. Administration for a VPN), when it exists.
+  useEffect(() => {
+    const suggested = template?.default_zone;
+    if (suggested && zones?.some((z) => z.slug === suggested)) setZone((z) => z || suggested);
+  }, [template, zones]);
+
   useEffect(() => {
     if (!template) return;
     // Links (e.g. the modpack catalog) may prefill non-secret fields and the name.

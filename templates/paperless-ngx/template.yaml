@@ -1,0 +1,92 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: paperless-ngx
+  name: Paperless-ngx
+  version: 1.0.0
+  category: productivity
+  tags: [documents, ocr, archive, paperless]
+  icon: { url: "https://raw.githubusercontent.com/paperless-ngx/paperless-ngx/dev/src-ui/src/icon-192.png" }
+  description:
+    fr: Numérise, reconnaît (OCR) et classe vos documents papier pour les retrouver en un instant.
+    en: Scans, recognises (OCR) and files your paper documents so you find them instantly.
+  links:
+    site: https://docs.paperless-ngx.com
+    doc: https://docs.paperless-ngx.com
+  maintainer: hivora
+  license: GPL-3.0 (image)
+  source: https://github.com/paperless-ngx/paperless-ngx/pkgs/container/paperless-ngx
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 1Gi, recommended: 2Gi }
+  disk: { min: 2Gi }
+form:
+  basic:
+    - id: admin_user
+      group: { fr: Accès, en: Access }
+      label: { fr: Identifiant administrateur, en: Admin username }
+      type: string
+      default: admin
+      pattern: "[A-Za-z0-9_.-]{3,40}"
+    - id: admin_password
+      group: { fr: Accès, en: Access }
+      label: { fr: Mot de passe administrateur, en: Admin password }
+      type: secret
+      required: true
+    - id: ocr_language
+      group: { fr: Documents, en: Documents }
+      label: { fr: Langue des documents (OCR), en: Document language (OCR) }
+      type: select
+      default: fra+eng
+      options:
+        - { value: fra+eng, label: { fr: Français et anglais, en: French and English } }
+        - { value: fra, label: { fr: Français, en: French } }
+        - { value: eng, label: { fr: Anglais, en: English } }
+        - { value: deu, label: { fr: Allemand, en: German } }
+  advanced:
+    - id: web_port
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8010
+    - id: secret_key
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Clé secrète, en: Secret key }
+      type: secret
+      generate: { length: 48 }
+services:
+  server:
+    role: main
+    image: ghcr.io/paperless-ngx/paperless-ngx
+    tag: "3.2.1@sha256:5fa76604a81df6945086e0837b14b56543d137e8ce4f311cc5d9ebe907e74e79"
+    env:
+      PAPERLESS_REDIS: "redis://broker:6379"
+      PAPERLESS_SECRET_KEY: "{{ secret.secret_key }}"
+      PAPERLESS_ADMIN_USER: "{{ form.admin_user }}"
+      PAPERLESS_ADMIN_PASSWORD: "{{ secret.admin_password }}"
+      PAPERLESS_OCR_LANGUAGE: "{{ form.ocr_language }}"
+      PAPERLESS_URL: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+      PAPERLESS_TIME_ZONE: "{{ host.timezone }}"
+      USERMAP_UID: "{{ host.puid }}"
+      USERMAP_GID: "{{ host.pgid }}"
+    ports:
+      - { container: 8000, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: data, target: /usr/src/paperless/data, backup: true }
+      - { name: media, target: /usr/src/paperless/media, backup: true }
+      - { name: export, target: /usr/src/paperless/export }
+      - { name: consume, target: /usr/src/paperless/consume }
+    depends_on: [broker]
+  broker:
+    role: cache
+    image: redis
+    tag: "8.10.2@sha256:d5ac52db24d4e70566fe9944f22cf5bdc2bc739b05c0f426335161ea6c23f3b3"
+    track: minor
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [data, media]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

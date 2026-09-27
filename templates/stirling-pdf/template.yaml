@@ -1,0 +1,60 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: stirling-pdf
+  name: Stirling PDF
+  version: 1.0.0
+  category: productivity
+  tags: [pdf, documents, ocr]
+  icon: { url: "https://raw.githubusercontent.com/Stirling-Tools/Stirling-PDF/main/docs/stirling.png" }
+  description:
+    fr: Boîte à outils PDF dans le navigateur (fusionner, découper, convertir, OCR…), sans envoyer vos fichiers ailleurs.
+    en: PDF toolbox in the browser (merge, split, convert, OCR…), without sending your files anywhere.
+  links:
+    site: https://www.stirling.com
+    doc: https://docs.stirlingpdf.com
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/stirlingtools/stirling-pdf
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 512Mi, recommended: 2Gi }
+  disk: { min: 2Gi }
+form:
+  basic:
+    - id: login
+      group: { fr: Accès, en: Access }
+      label: { fr: Exiger une connexion, en: Require sign-in }
+      type: boolean
+      default: false
+      help:
+        fr: "Compte par défaut : admin / stirling, à changer à la première connexion."
+        en: "Default account: admin / stirling, to change on first sign-in."
+  advanced:
+    - id: web_port
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8081
+services:
+  server:
+    role: main
+    image: stirlingtools/stirling-pdf
+    tag: "3.0.0@sha256:66b6edb8ee62e307a8b335166e8931a6e65b39c9bf73b5e517fbfe9c613ba221"
+    env:
+      SECURITY_ENABLELOGIN: "{{ form.login }}"
+      LANGS: fr_FR
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 8080, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: configs, target: /configs, backup: true }
+      - { name: tessdata, target: /usr/share/tessdata }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [configs]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

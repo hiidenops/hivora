@@ -1,0 +1,54 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: filebrowser
+  name: File Browser
+  version: 1.0.0
+  category: productivity
+  tags: [files, web, share]
+  icon: { url: "https://raw.githubusercontent.com/filebrowser/filebrowser/master/frontend/public/img/logo.svg" }
+  description:
+    fr: Gestionnaire de fichiers dans le navigateur pour parcourir, envoyer et partager vos fichiers.
+    en: File manager in the browser to browse, upload and share your files.
+  links:
+    site: https://filebrowser.org
+    doc: https://filebrowser.org
+  maintainer: hivora
+  license: Apache-2.0 (image)
+  source: https://hub.docker.com/r/filebrowser/filebrowser
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 64Mi, recommended: 128Mi }
+  disk: { min: 100Mi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8082
+      help:
+        fr: "Identifiant « admin » ; le mot de passe initial est généré au premier démarrage et écrit dans les journaux du conteneur. Les fichiers sont dans le volume « files »."
+        en: "Username “admin”; the initial password is generated on first start and written to the container logs. Files live in the “files” volume."
+services:
+  server:
+    role: main
+    image: filebrowser/filebrowser
+    tag: "v2.63.23@sha256:a469ea076d4a1b4b1d86a41d130f2f536cd9da996a2b1fb39c0d7635f9d89b9a"
+    user: "{{ host.puid }}:{{ host.pgid }}"
+    env:
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: files, target: /srv, backup: true }
+      - { name: database, target: /database, backup: true }
+      - { name: config, target: /config }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [files, database]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

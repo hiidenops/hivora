@@ -1618,6 +1618,8 @@ export interface components {
             category: string;
             /** Compatible */
             compatible: boolean;
+            /** Default Zone */
+            default_zone: string | null;
             /** Description */
             description: string | {
                 [key: string]: string;

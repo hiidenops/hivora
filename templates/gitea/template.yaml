@@ -1,0 +1,56 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: gitea
+  name: Gitea
+  version: 1.0.0
+  category: development
+  tags: [git, code, forge]
+  icon: { url: "https://raw.githubusercontent.com/go-gitea/gitea/main/assets/logo.svg" }
+  description:
+    fr: Forge Git légère (dépôts, tickets, revues de code), à héberger chez soi.
+    en: Lightweight Git forge (repositories, issues, code review) to self-host.
+  links:
+    site: https://about.gitea.com
+    doc: https://docs.gitea.com
+  maintainer: hivora
+  license: MIT (image)
+  source: https://hub.docker.com/r/gitea/gitea
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 256Mi, recommended: 512Mi }
+  disk: { min: 1Gi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 3002
+      help: { fr: L'installation se termine à la première visite (SQLite par défaut)., en: Setup finishes on the first visit (SQLite by default). }
+    - id: ssh_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port SSH (git clone), en: SSH port (git clone) }
+      type: port
+      default: 2222
+services:
+  server:
+    role: main
+    image: gitea/gitea
+    tag: "1.27.3-rootless@sha256:1c17ecaead42eb3b5391553d8708103a4beb0e86edf5b9ebc1eb269c318845f2"
+    env:
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 3000, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+      - { container: 2222, host: "{{ form.ssh_port }}", purpose: other, exposure: lan }
+    volumes:
+      - { name: data, target: /var/lib/gitea, backup: true, owner: "1000:1000" }
+      - { name: config, target: /etc/gitea, backup: true, owner: "1000:1000" }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [data, config]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

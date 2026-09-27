@@ -1,0 +1,55 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: adguard-home
+  name: AdGuard Home
+  version: 1.0.0
+  category: network
+  tags: [dns, adblock, privacy, network]
+  icon: { url: "https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/client/public/assets/apple-touch-icon-180x180.png" }
+  description:
+    fr: Serveur DNS qui bloque publicités et traqueurs pour tous les appareils du réseau.
+    en: DNS server that blocks ads and trackers for every device on the network.
+  links:
+    site: https://adguard.com/adguard-home/overview.html
+    doc: https://github.com/AdguardTeam/AdGuardHome/wiki
+  maintainer: hivora
+  license: GPL-3.0 (image)
+  source: https://hub.docker.com/r/adguard/adguardhome
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 64Mi, recommended: 256Mi }
+  disk: { min: 200Mi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port de l'interface, en: Interface port }
+      type: port
+      default: 3000
+      help:
+        fr: "À la première visite, l'assistant demande le port de l'interface : gardez 3000 (le port 80 n'est pas publié). Le port DNS 53 doit être libre sur l'hôte."
+        en: "On the first visit, the wizard asks for the interface port: keep 3000 (port 80 is not published). DNS port 53 must be free on the host."
+services:
+  server:
+    role: main
+    image: adguard/adguardhome
+    tag: "v0.107.79@sha256:aba9e3bf0613be3ba3755e1fc311b126e2c24bec25e18b6483894a88283074f0"
+    env:
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 53, protocol: udp, purpose: other, exposure: lan }
+      - { container: 53, protocol: tcp, purpose: other, exposure: lan }
+      - { container: 3000, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: work, target: /opt/adguardhome/work }
+      - { name: conf, target: /opt/adguardhome/conf, backup: true }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [conf]
+update:
+  strategy: manual
+defaults:
+  zone: administration
+  restart: unless-stopped

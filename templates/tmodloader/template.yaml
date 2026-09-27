@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: tmodloader
   name: Terraria (tModLoader)
-  version: 1.0.0
+  version: 1.0.1
   category: games
   tags: [terraria, tmodloader, mods, steam]
   icon: { steam_appid: 1281930 }
@@ -86,7 +86,7 @@ services:
   server:
     role: main
     image: jacobsmile/tmodloader1.4
-    tag: "latest@sha256:49fed6568d092cb762468705c427601807193ecf25d93905bf3d0fcd00fc9a04"
+    tag: "latest@sha256:75ff618585a8009f0e73a706d22d35f1ed469da01558b6b1a4daf5251986d330"
     tag_select:
       field: version
       choices:

@@ -17,6 +17,7 @@ class Pin:
     image: str
     tag: str  # without the digest
     digest: str
+    track: str = "all"  # "minor": same major version only
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,12 +30,14 @@ def pins(catalog: Catalog) -> list[Pin]:
     out = []
     for entry in catalog.entries():
         for svc in entry.template.services.values():
+            if svc.frozen:
+                continue
             choices = svc.tag_select.choices if svc.tag_select else []
             refs = [(svc.image, svc.tag), *((v.image, v.tag) for v in svc.arch.values()),
                     *((svc.image, c.tag) for c in choices if not c.frozen)]  # fmt: skip
             for image, ref in refs:
                 tag, _, digest = ref.partition("@")
-                out.append(Pin(entry.slug, image, tag, digest))
+                out.append(Pin(entry.slug, image, tag, digest, svc.track))
     return out
 
 
@@ -62,6 +65,9 @@ def newer(pin: Pin, published: dict[str, str]) -> Finding | None:
         current = published.get(pin.tag)
         return Finding(pin, pin.tag) if current and current != pin.digest else None
     same_shape = [t for t in published if pattern.match(t)]
+    if pin.track == "minor":
+        major = version_key(pin.tag)[:1]
+        same_shape = [t for t in same_shape if version_key(t)[:1] == major]
     best = max(same_shape, key=version_key, default=pin.tag)
     if version_key(best) > version_key(pin.tag):
         return Finding(pin, best)

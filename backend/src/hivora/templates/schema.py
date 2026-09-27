@@ -246,6 +246,16 @@ class ServiceSpec(_Strict):
     arch: dict[Arch, ArchVariant] = {}
     tag_select: TagSelect | None = None  # default: ``tag``
     files: list[FileSpec] = []
+    # Narrow grants for network tools (WireGuard); never `privileged` (CLAUDE.md).
+    cap_add: list[Literal["NET_ADMIN"]] = []
+    sysctls: dict[
+        Literal["net.ipv4.ip_forward", "net.ipv4.conf.all.src_valid_mark"], Literal[0, 1]
+    ] = {}
+    shm_size: Annotated[str, Field(pattern=r"^\d{1,5}[mg]b$")] | None = None
+    # Freshness check (scripts/check_images.py): "minor" keeps the major version
+    # (a database upgrade needs a migration); frozen: pinned by the app's own vendor.
+    track: Literal["all", "minor"] = "all"
+    frozen: bool = False
     ports: list[PortSpec] = []
     volumes: list[VolumeSpec] = []
     command: str | list[str] | None = None
