@@ -13,6 +13,7 @@ import { readPref, writePref } from "@/lib/prefs";
 import { RealtimeProvider, useConnected } from "@/lib/realtime";
 import { cn } from "@/lib/utils";
 
+import { Brand } from "./brand";
 import { ShelfCat } from "./shelf-cat";
 
 const LEVEL: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
@@ -89,11 +90,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <RealtimeProvider enabled>
         <div className="flex min-h-screen flex-col md:flex-row">
           <aside className="relative z-10 flex shrink-0 flex-col gap-1 border-b bg-sidebar p-3 shadow-md md:sticky md:top-0 md:h-screen md:w-56 md:overflow-x-hidden md:overflow-y-auto md:border-b-0 md:border-r">
-            <Link href="/" className="mb-3 flex items-center gap-2 px-2 text-lg font-semibold">
-              <span className="btn-solid grid size-7 place-items-center rounded-md font-mono text-sm text-primary-foreground [--btn:var(--primary)]">
-                H
-              </span>
-              {t("app.name")}
+            <Link href="/" aria-label={t("app.name")} className="mb-4 rounded-md px-2 py-3">
+              <Brand />
             </Link>
             <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
               {NAV.filter((n) => session.can(n.role)).map((n) => {

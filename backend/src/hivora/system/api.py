@@ -16,6 +16,7 @@ router = APIRouter(tags=["system"])
 class Health(BaseModel):
     status: str
     version: str
+    first_start: bool  # admin/admin still unchanged: the login page shows the hint
 
 
 class SystemInfo(BaseModel):
@@ -26,9 +27,9 @@ class SystemInfo(BaseModel):
 
 
 @router.get("/health")
-async def health() -> Health:
-    """Public: used by the container healthcheck."""
-    return Health(status="ok", version=__version__)
+async def health(rt: RuntimeDep) -> Health:
+    """Public: used by the container healthcheck and the login page."""
+    return Health(status="ok", version=__version__, first_start=await rt.auth.first_start())
 
 
 @router.get("/info")

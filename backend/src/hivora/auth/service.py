@@ -119,6 +119,14 @@ class AuthService:
         self._console_ok: dict[int, datetime] = {}
 
     # --- bootstrap ------------------------------------------------------------
+    async def first_start(self) -> bool:
+        """True while the only account is the initial admin/admin, not yet changed."""
+        async with self.sessions() as session:
+            users = (await session.scalars(select(User).limit(2))).all()
+        return (
+            len(users) == 1 and users[0].username == DEFAULT_ADMIN and users[0].must_change_password
+        )
+
     async def ensure_initial_admin(self) -> bool:
         """First start: create admin/admin, which must change its password."""
         async with self.sessions() as session, session.begin():

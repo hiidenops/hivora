@@ -1,13 +1,16 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+import { Brand } from "@/components/brand";
+import { EnteringScreen } from "@/components/entering-screen";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, api } from "@/lib/api/client";
 import { useLogin } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 
@@ -15,7 +18,13 @@ export default function LoginPage() {
   const { t, errorMessage } = useI18n();
   const router = useRouter();
   const login = useLogin();
+  // The admin/admin hint only while that initial account is still unchanged.
+  const { data: health } = useQuery({
+    queryKey: ["health"],
+    queryFn: () => api<{ first_start: boolean }>("/system/health"),
+  });
   const [needTotp, setNeedTotp] = useState(false);
+  const [entering, setEntering] = useState(false);
 
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -27,7 +36,12 @@ export default function LoginPage() {
         totp_code: needTotp ? String(f.get("totp") ?? "") : undefined,
       },
       {
-        onSuccess: (me) => router.replace(me.must_change_password ? "/change-password/" : "/"),
+        onSuccess: (me) => {
+          // A short transition, even when nothing has to load: entering feels smooth.
+          setEntering(true);
+          const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          setTimeout(() => router.replace(me.must_change_password ? "/change-password/" : "/"), reduced ? 150 : 900);
+        },
         onError: (err) => {
           if (err instanceof ApiError && err.code === "totp_required") setNeedTotp(true);
         },
@@ -37,14 +51,14 @@ export default function LoginPage() {
 
   const error = login.error instanceof ApiError && login.error.code === "totp_required" ? null : login.error;
 
+  if (entering) return <EnteringScreen />;
+
   return (
     <main className="grid min-h-screen place-items-center p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <div className="mb-2 grid size-10 place-items-center rounded-lg bg-primary font-mono text-lg text-primary-foreground">
-            H
-          </div>
-          <CardTitle className="text-xl">{t("login.title")}</CardTitle>
+        <CardHeader className="items-center gap-5 text-center">
+          <Brand large />
+          <CardTitle className="text-lg">{t("login.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4" onSubmit={submit}>
@@ -66,7 +80,7 @@ export default function LoginPage() {
             <Button type="submit" disabled={login.isPending}>
               {t("login.submit")}
             </Button>
-            <p className="text-xs text-muted-foreground">{t("login.defaultHint")}</p>
+            {health?.first_start && <p className="text-xs text-muted-foreground">{t("login.defaultHint")}</p>}
           </form>
         </CardContent>
       </Card>

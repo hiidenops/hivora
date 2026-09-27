@@ -452,3 +452,10 @@ def test_public_address_override(client: TestClient) -> None:
     assert runtime.public_address.current() == "mc.example.org"  # manual wins over the env IP
     client.put(f"{API}/system/integrations/public-address", json={"address": ""})
     assert runtime.public_address.current() == "203.0.113.7"
+
+
+def test_health_says_first_start_until_admin_changes_password(client: TestClient) -> None:
+    health = client.get(f"{API}/system/health").json()
+    assert health["status"] == "ok" and health["first_start"] is True
+    admin(client)  # admin/admin, then the forced password change
+    assert client.get(f"{API}/system/health").json()["first_start"] is False
