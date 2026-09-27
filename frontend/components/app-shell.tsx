@@ -13,6 +13,8 @@ import { readPref, writePref } from "@/lib/prefs";
 import { RealtimeProvider, useConnected } from "@/lib/realtime";
 import { cn } from "@/lib/utils";
 
+import { ShelfCat } from "./shelf-cat";
+
 const LEVEL: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
 
 interface Session {
@@ -113,6 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               })}
             </nav>
             <div className="mt-auto hidden flex-col gap-3 px-2 pt-6 md:flex">
+              <ShelfCat />
               <label className="flex items-center gap-2 text-sm">
                 <Switch checked={advanced} onChange={(e) => session.setAdvanced(e.target.checked)} />
                 {t("nav.advanced")}

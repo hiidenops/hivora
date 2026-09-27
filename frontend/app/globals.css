@@ -255,3 +255,93 @@ label:has(> span > input:not(:disabled)) {
     transition-duration: 1ms !important;
   }
 }
+
+/* ---- Shelf cat (components/shelf-cat.tsx) ----
+   One 32 s loop: walk right, lie down (loaf), turn, walk left, stretch.
+   --walk (1 walking, 0 lying down) is animated by the path and drives the legs
+   and posture; --step swings the legs around the hip. Hover: the cat stops and
+   pricks its ears. Coordinates below are in the SVG's own units (view-box). */
+@property --walk { syntax: "<number>"; inherits: true; initial-value: 1; }
+@property --step { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --bob { syntax: "<number>"; inherits: false; initial-value: 0; }
+
+.cat-track {
+  position: relative;
+  height: 28px;
+  container-type: inline-size;
+  border-bottom: 1px solid var(--border);
+  color: color-mix(in oklch, var(--muted-foreground), transparent 10%);
+}
+.cat {
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  overflow: visible;
+  fill: currentColor;
+  animation: cat-path 32s linear infinite;
+}
+.cat-body {
+  transform-box: view-box;
+  transform-origin: 18px 16px;
+  animation: cat-bob 0.45s ease-in-out infinite alternate;
+  /* Lying down: the body settles onto the shelf, legs fold under it. */
+  transform: translateY(calc(var(--bob) * var(--walk) * 0.45px + (1 - var(--walk)) * 4.6px));
+}
+.cat-leg {
+  stroke: currentColor;
+  stroke-width: 2.4px;
+  stroke-linecap: round;
+  transform-box: fill-box;
+  transform-origin: 50% 0; /* the hip, hidden inside the body */
+  animation: cat-step 0.45s ease-in-out infinite alternate;
+}
+.cat-b { animation-delay: -0.45s; }
+.cat-far { opacity: 0.55; }
+.cat-leg { transform: rotate(calc(var(--step) * var(--walk) * 22deg)) scaleY(calc(1 - (1 - var(--walk)) * 0.62)); }
+.cat-tail {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2px;
+  stroke-linecap: round;
+  transform-box: view-box;
+  transform-origin: 9px 11.4px;
+  animation: cat-tail 2.2s ease-in-out infinite alternate;
+  /* Resting: the tail lies along the shelf instead of standing up. */
+  scale: 1 calc(1 - (1 - var(--walk)) * 0.55);
+}
+.cat-head {
+  transform-box: view-box;
+  transform-origin: 26px 10px;
+  transform: rotate(calc((1 - var(--walk)) * -6deg)); /* chin slightly down when resting */
+}
+.cat-ears { transform-box: fill-box; transform-origin: 50% 100%; transition: transform 0.25s var(--ease-spring); }
+.cat-eye { fill: var(--sidebar); transform-box: fill-box; transform-origin: center; animation: cat-blink 5.5s infinite; }
+.cat-collar { fill: none; stroke: var(--primary); stroke-width: 1.3px; stroke-linecap: round; }
+
+.cat-track:hover .cat,
+.cat-track:hover .cat * { animation-play-state: paused; }
+.cat-track:hover .cat-ears { transform: scale(1.18) translateY(-0.4px); }
+
+@keyframes cat-path {
+  0% { transform: translateX(0) scaleX(1); --walk: 1; }
+  33% { transform: translateX(calc(100cqw - 36px)) scaleX(1); --walk: 1; }
+  36%, 46% { transform: translateX(calc(100cqw - 36px)) scaleX(1); --walk: 0; }
+  48% { transform: translateX(calc(100cqw - 36px)) scaleX(-1); --walk: 0; }
+  50% { transform: translateX(calc(100cqw - 36px)) scaleX(-1); --walk: 1; }
+  83% { transform: translateX(0) scaleX(-1); --walk: 1; }
+  86% { transform: translateX(0) scaleX(-1.08); --walk: 1; } /* stretch */
+  89%, 96% { transform: translateX(0) scaleX(-1); --walk: 0; }
+  98% { transform: translateX(0) scaleX(1); --walk: 0; }
+  100% { transform: translateX(0) scaleX(1); --walk: 1; }
+}
+@keyframes cat-step { from { --step: -1; } to { --step: 1; } }
+@keyframes cat-bob { from { --bob: -1; } to { --bob: 1; } }
+@keyframes cat-tail { from { transform: rotate(-10deg); } to { transform: rotate(12deg); } }
+@keyframes cat-blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.1); } }
+
+/* Less motion asked: the cat lies down and sleeps. */
+@media (prefers-reduced-motion: reduce) {
+  .cat, .cat * { animation: none !important; }
+  .cat { --walk: 0; }
+  .cat-eye { transform: scaleY(0.12); }
+}
