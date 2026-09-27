@@ -241,7 +241,7 @@ export function GamePanel({
   onJob: (jobId: number) => void;
 }) {
   return (
-    <div className="grid items-start gap-4 lg:col-span-2 xl:grid-cols-3">
+    <div className="stagger grid items-start gap-4 lg:col-span-2 xl:grid-cols-3">
       {caps.players && <PlayersCard appId={appId} running={running} />}
       {caps.lists && <ListsCard appId={appId} onJob={onJob} />}
       {caps.worlds && (

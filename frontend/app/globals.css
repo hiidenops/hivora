@@ -4,25 +4,32 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Light palette; the dark one only redefines tokens. Honey accent (hive). */
+/* Light palette: warm stone, not paper white (less glare). The dark one only
+   redefines tokens. Honey accent (hive). Text contrast >= 4.5:1 (WCAG AA). */
 :root {
-  --background: oklch(0.985 0.004 85);
-  --foreground: oklch(0.21 0.02 60);
-  --card: oklch(1 0 0);
-  --muted: oklch(0.955 0.008 85);
-  --muted-foreground: oklch(0.5 0.02 60);
-  --border: oklch(0.9 0.012 85);
-  --input: oklch(0.88 0.012 85);
+  --background: oklch(0.93 0.012 80);
+  --foreground: oklch(0.19 0.02 60);
+  --card: oklch(0.965 0.008 80);
+  --muted: oklch(0.9 0.014 80);
+  --muted-foreground: oklch(0.47 0.022 60);
+  --border: oklch(0.84 0.016 80);
+  --input: oklch(0.8 0.018 80);
   --primary: oklch(0.72 0.15 70);
   --primary-foreground: oklch(0.2 0.03 60);
-  --destructive: oklch(0.58 0.2 27);
+  --destructive: oklch(0.55 0.2 27);
   --ring: oklch(0.72 0.15 70);
-  --ok: oklch(0.62 0.15 150);
-  --info: oklch(0.6 0.13 240);
-  --warn: oklch(0.72 0.15 70);
-  --danger: oklch(0.58 0.2 27);
-  --idle: oklch(0.62 0.01 60);
-  --grid: oklch(0.72 0.03 70 / 0.35);
+  --ok: oklch(0.5 0.14 150);
+  --info: oklch(0.5 0.13 240);
+  --warn: oklch(0.55 0.14 65);
+  --danger: oklch(0.52 0.2 27);
+  --idle: oklch(0.55 0.01 60);
+  --grid: oklch(0.6 0.04 70 / 0.2);
+  --field: oklch(0.945 0.01 80);
+  /* Depth: warm shadows and a light edge on raised surfaces. */
+  --shadow-color: oklch(0.35 0.04 60 / 0.16);
+  --shadow-strong: oklch(0.3 0.05 60 / 0.24);
+  --highlight: oklch(1 0 0 / 0.7);
+  --sidebar: oklch(0.955 0.01 80);
   --chart-1: #df911a;
   --chart-2: #1a89c5;
 }
@@ -41,6 +48,13 @@
   --info: oklch(0.7 0.12 240);
   --idle: oklch(0.6 0.01 60);
   --grid: oklch(0.78 0.05 75 / 0.14);
+  --warn: oklch(0.72 0.15 70);
+  --danger: oklch(0.58 0.2 27);
+  --shadow-color: oklch(0 0 0 / 0.35);
+  --shadow-strong: oklch(0 0 0 / 0.55);
+  --highlight: oklch(1 0 0 / 0.06);
+  --sidebar: oklch(0.19 0.011 60);
+  --field: oklch(0.19 0.01 60);
   --chart-1: #c98212;
   --chart-2: #1a89c5;
   color-scheme: dark;
@@ -49,6 +63,13 @@
 @theme inline {
   --font-sans: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+  /* One easing family everywhere: fast start, soft landing; a light spring for pops. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --shadow-xs: 0 1px 2px var(--shadow-color);
+  --shadow-sm: 0 1px 2px var(--shadow-color), 0 2px 6px -2px var(--shadow-color);
+  --shadow-md: 0 2px 4px -1px var(--shadow-color), 0 8px 20px -8px var(--shadow-strong);
+  --shadow-lg: 0 4px 8px -2px var(--shadow-color), 0 18px 40px -12px var(--shadow-strong);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -65,6 +86,7 @@
   --color-warn: var(--warn);
   --color-danger: var(--danger);
   --color-idle: var(--idle);
+  --color-sidebar: var(--sidebar);
 }
 
 body {
@@ -110,7 +132,7 @@ label:has(> span > input:not(:disabled)) {
 
 /* ---- Motion: short, purposeful, and off when the user asks for less. ---- */
 @keyframes hv-enter {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
   to { opacity: 1; transform: none; }
 }
 @keyframes hv-fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -136,17 +158,27 @@ label:has(> span > input:not(:disabled)) {
   to { background-position: 28px 0; }
 }
 
-@utility animate-enter { animation: hv-enter 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@utility animate-enter { animation: hv-enter 420ms var(--ease-out) both; }
+/* Children appear one after another (cards of a page, form sections). */
+@utility stagger {
+  & > * { animation: hv-enter 460ms var(--ease-out) both; }
+  & > *:nth-child(2) { animation-delay: 50ms; }
+  & > *:nth-child(3) { animation-delay: 100ms; }
+  & > *:nth-child(4) { animation-delay: 150ms; }
+  & > *:nth-child(5) { animation-delay: 200ms; }
+  & > *:nth-child(6) { animation-delay: 250ms; }
+  & > *:nth-child(n + 7) { animation-delay: 300ms; }
+}
 @utility animate-overlay {
   &[data-state="open"] { animation: hv-fade-in 180ms ease-out; }
   &[data-state="closed"] { animation: hv-fade-out 140ms ease-in; }
 }
 @utility animate-dialog {
-  &[data-state="open"] { animation: hv-pop-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  &[data-state="open"] { animation: hv-pop-in 320ms var(--ease-spring); }
   &[data-state="closed"] { animation: hv-pop-out 140ms ease-in; }
 }
 @utility animate-menu {
-  &[data-state="open"] { animation: hv-menu-in 140ms ease-out; }
+  &[data-state="open"] { animation: hv-menu-in 220ms var(--ease-out); }
 }
 @utility skeleton {
   border-radius: 0.5rem;
@@ -161,14 +193,58 @@ label:has(> span > input:not(:disabled)) {
   background-size: 28px 28px;
   animation: hv-stripes 0.8s linear infinite;
 }
-/* Interactive cards lift slightly on hover. */
 @utility stroke-grid { stroke: var(--grid); }
+
+/* ---- Depth ---- */
+/* Raised surface (cards, panels): layered warm shadow + a light top edge. */
+@utility surface {
+  background-color: var(--card);
+  box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-sm);
+}
+/* Interactive cards lift on hover, the shadow grows with them. */
 @utility card-interactive {
-  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  transition: transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out), border-color 260ms var(--ease-out);
   &:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
     border-color: color-mix(in oklch, var(--primary), transparent 45%);
-    box-shadow: 0 8px 24px -12px color-mix(in oklch, var(--foreground), transparent 75%);
+    box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-lg);
+  }
+}
+/* Buttons: rise on hover, press down on click (--btn is the face colour). */
+@utility btn-3d {
+  transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out),
+    background-color 200ms var(--ease-out), border-color 200ms var(--ease-out), filter 200ms var(--ease-out);
+  &:hover { transform: translateY(-1px); }
+  &:active { transform: translateY(1px) scale(0.985); transition-duration: 70ms; }
+}
+/* Solid (primary, destructive): gradient face, inner light, coloured glow. */
+@utility btn-solid {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--btn), white 20%), var(--btn) 55%,
+    color-mix(in srgb, var(--btn), black 8%));
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.4), inset 0 -1px 0 oklch(0 0 0 / 0.14),
+    0 1px 2px var(--shadow-color), 0 4px 10px -4px color-mix(in oklch, var(--btn), transparent 40%);
+  &:hover {
+    filter: saturate(1.1) brightness(1.03);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.45), inset 0 -1px 0 oklch(0 0 0 / 0.14),
+      0 2px 4px var(--shadow-color), 0 10px 22px -8px color-mix(in oklch, var(--btn), transparent 25%);
+  }
+  &:active { box-shadow: inset 0 2px 5px oklch(0 0 0 / 0.22), 0 1px 1px var(--shadow-color); }
+}
+/* Outline: a raised card-coloured key. */
+@utility btn-raised {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--card), white 35%), var(--card));
+  box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-xs);
+  &:hover { border-color: color-mix(in oklch, var(--primary), var(--input) 55%); box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-md); }
+  &:active { box-shadow: inset 0 1px 3px var(--shadow-color); }
+}
+/* Text fields sit slightly into the page; focus shows a soft honey halo. */
+@utility field {
+  background-color: var(--field);
+  box-shadow: inset 0 1px 2px var(--shadow-color);
+  transition: border-color 200ms var(--ease-out), box-shadow 200ms var(--ease-out), background-color 200ms var(--ease-out);
+  &:focus-visible {
+    background-color: var(--card);
+    box-shadow: inset 0 1px 2px var(--shadow-color), 0 0 0 3px color-mix(in oklch, var(--ring), transparent 70%);
   }
 }
 

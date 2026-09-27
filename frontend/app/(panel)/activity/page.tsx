@@ -82,7 +82,7 @@ export default function ActivityPage() {
   return (
     <>
       <PageHeader title={t("activity.title")} />
-      <div className="grid gap-4">
+      <div className="stagger grid gap-4">
         <section aria-label={t("metrics.title")}>
           <HostCharts />
         </section>

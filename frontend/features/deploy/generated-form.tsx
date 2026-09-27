@@ -212,7 +212,7 @@ export function GeneratedForm({
   };
 
   return (
-    <div className="grid items-start gap-4 xl:grid-cols-2">
+    <div className="stagger grid items-start gap-4 xl:grid-cols-2">
       {sections.map((sec, i) => {
         const wide = sec.fields.some((f) => f.type === "text");
         const body = (
@@ -226,7 +226,7 @@ export function GeneratedForm({
         );
         if (!sec.title) {
           return (
-            <div key={i} className="rounded-lg border bg-card p-4 shadow-xs xl:col-span-2">
+            <div key={i} className="rounded-lg border surface p-4 xl:col-span-2">
               {body}
             </div>
           );
@@ -236,7 +236,7 @@ export function GeneratedForm({
           <section
             key={i}
             aria-labelledby={headingId}
-            className={`grid gap-4 rounded-lg border bg-card p-4 shadow-xs ${wide ? "xl:col-span-2" : ""}`}
+            className={`grid gap-4 rounded-lg border surface p-4 ${wide ? "xl:col-span-2" : ""}`}
           >
             <h3 id={headingId} className="text-sm font-semibold">
               {sec.title}

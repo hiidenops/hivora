@@ -86,14 +86,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     <SessionContext.Provider value={session}>
       <RealtimeProvider enabled>
         <div className="flex min-h-screen flex-col md:flex-row">
-          <aside className="flex shrink-0 flex-col gap-1 border-b bg-card p-3 md:sticky md:top-0 md:h-screen md:w-56 md:overflow-y-auto md:border-b-0 md:border-r">
+          <aside className="relative z-10 flex shrink-0 flex-col gap-1 border-b bg-sidebar p-3 shadow-md md:sticky md:top-0 md:h-screen md:w-56 md:overflow-x-hidden md:overflow-y-auto md:border-b-0 md:border-r">
             <Link href="/" className="mb-3 flex items-center gap-2 px-2 text-lg font-semibold">
-              <span className="grid size-7 place-items-center rounded-md bg-primary font-mono text-sm text-primary-foreground">
+              <span className="btn-solid grid size-7 place-items-center rounded-md font-mono text-sm text-primary-foreground [--btn:var(--primary)]">
                 H
               </span>
               {t("app.name")}
             </Link>
-            <nav className="flex gap-1 overflow-x-auto md:flex-col">
+            <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
               {NAV.filter((n) => session.can(n.role)).map((n) => {
                 const active = n.href === "/" ? pathname === "/" : pathname.startsWith(n.href);
                 return (
@@ -101,8 +101,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                     key={n.href}
                     href={n.href}
                     className={cn(
-                      "flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-colors",
-                      active ? "bg-muted font-medium" : "text-muted-foreground hover:bg-muted",
+                      "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-[background-color,color,box-shadow,translate] duration-200 ease-(--ease-out)",
+                      active
+                        ? "surface font-medium before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary"
+                        : "text-muted-foreground hover:translate-x-0.5 hover:bg-muted hover:text-foreground",
                     )}
                   >
                     <n.icon className="size-4 shrink-0" /> {t(n.label)}

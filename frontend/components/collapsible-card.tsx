@@ -35,20 +35,25 @@ export function CollapsibleCard({
         onClick={toggle}
         aria-expanded={open}
         aria-controls={bodyId}
-        className="flex w-full items-center justify-between gap-3 rounded-t-xl p-5 text-left transition-colors hover:bg-muted/40"
+        className="flex w-full items-center justify-between gap-3 rounded-t-xl p-5 text-left transition-colors duration-200 hover:bg-muted/50"
       >
         <span className="flex items-center gap-2 font-semibold leading-tight">{title}</span>
         <span className="flex items-center gap-3">
           {aside}
-          <ChevronDown className={cn("size-4 transition-transform duration-200", !open && "-rotate-90")} aria-hidden />
+          <ChevronDown className={cn("size-4 transition-transform duration-300 ease-(--ease-out)", !open && "-rotate-90")} aria-hidden />
         </span>
       </button>
       {/* grid-rows 0fr <-> 1fr animates the height without measuring it */}
       <div
         id={bodyId}
-        className={cn("grid transition-[grid-template-rows] duration-200 ease-out", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}
+        className={cn("grid transition-[grid-template-rows] duration-[420ms] ease-(--ease-out)", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}
       >
-        <div className="overflow-hidden">
+        <div
+          className={cn(
+            "overflow-hidden transition-[opacity,translate] duration-[420ms] ease-(--ease-out)",
+            open ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0",
+          )}
+        >
           <CardContent>{children}</CardContent>
         </div>
       </div>

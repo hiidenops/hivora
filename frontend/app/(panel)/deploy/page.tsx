@@ -89,7 +89,7 @@ function Deploy() {
       />
       {step === "form" && (
         <div className="grid gap-4">
-          <div className="grid gap-4 rounded-lg border bg-card p-4 shadow-xs sm:grid-cols-2">
+          <div className="grid gap-4 rounded-lg border surface p-4 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="app-name">{t("deploy.name")}</Label>
               <Input id="app-name" value={name} maxLength={100} onChange={(e) => setName(e.target.value)} />
@@ -109,7 +109,7 @@ function Deploy() {
           <GeneratedForm fields={basic} values={values} errors={fieldErrors} onChange={setValue} appName={name} />
           {advancedFields.length > 0 && (
             <details open={advanced || advancedFields.some((f) => fieldErrors[f.id])}>
-              <summary className="rounded-lg border bg-card px-4 py-3 text-sm font-medium shadow-xs">
+              <summary className="surface rounded-lg border px-4 py-3 text-sm font-medium transition-shadow duration-200 hover:shadow-md">
                 {t("deploy.advanced")}
               </summary>
               <div className="mt-4">

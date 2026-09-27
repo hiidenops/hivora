@@ -29,6 +29,18 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
   await expect(page.getByText("En direct")).toBeVisible();
   await expectPointerCursors(page);
+  // Hovering the menu never makes it scroll (Windows shows real scrollbars).
+  for (const link of await page.locator("aside nav a").all()) {
+    await link.hover();
+    const scrolls = await page.locator("aside, aside *").evaluateAll((els) =>
+      els.filter((e) => {
+        const s = getComputedStyle(e);
+        return (e.scrollWidth > e.clientWidth && ["auto", "scroll"].includes(s.overflowX)) ||
+          (e.scrollHeight > e.clientHeight && ["auto", "scroll"].includes(s.overflowY));
+      }).length,
+    );
+    expect(scrolls).toBe(0);
+  }
 
   // Catalog -> deploy wizard -> review (compose shown, secrets referenced) -> deploy.
   await page.getByRole("link", { name: "Parcourir le catalogue" }).click();

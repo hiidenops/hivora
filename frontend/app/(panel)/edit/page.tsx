@@ -87,7 +87,7 @@ function Edit() {
           />
           {advancedFields.length > 0 && (
             <details open={advanced || advancedFields.some((f) => fieldErrors[f.id])}>
-              <summary className="rounded-lg border bg-card px-4 py-3 text-sm font-medium shadow-xs">
+              <summary className="surface rounded-lg border px-4 py-3 text-sm font-medium transition-shadow duration-200 hover:shadow-md">
                 {t("deploy.advanced")}
               </summary>
               <div className="mt-4">

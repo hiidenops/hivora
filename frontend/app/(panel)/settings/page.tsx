@@ -66,8 +66,8 @@ export default function SettingsPage() {
           </Button>
         }
       />
-      <div className="grid max-w-3xl gap-4">
-        <Card>
+      <div className="stagger grid items-start gap-4 xl:grid-cols-2">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>{t("settings.account")}</CardTitle>
           </CardHeader>
@@ -104,22 +104,25 @@ export default function SettingsPage() {
             </label>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("password.title")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PasswordForm />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("settings.totp")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TotpCard />
-          </CardContent>
-        </Card>
+        {/* Two stacks, so a short card never leaves a hole next to a tall one. */}
+        <div className="grid gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("password.title")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PasswordForm />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("settings.totp")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TotpCard />
+            </CardContent>
+          </Card>
+        </div>
         {can("admin") && (
           <Card>
             <CardHeader>
@@ -132,7 +135,7 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         )}
-        <Card>
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>{t("settings.sessions")}</CardTitle>
           </CardHeader>
@@ -141,7 +144,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
         {system && (
-          <Card>
+          <Card className="xl:col-span-2">
             <CardHeader>
               <CardTitle>{t("settings.system")}</CardTitle>
             </CardHeader>

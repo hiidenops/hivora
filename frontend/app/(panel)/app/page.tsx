@@ -82,7 +82,7 @@ function AppDetail() {
           </>
         }
       />
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <div className="stagger grid items-start gap-4 lg:grid-cols-2">
         {activeJob && (
           <Card className="animate-enter lg:col-span-2">
             <CardHeader>

@@ -74,7 +74,7 @@ export function ModpackBrowser() {
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-3 shadow-xs">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border surface p-3">
         <div role="tablist" aria-label={t("modpacks.source")} className="inline-flex rounded-md border bg-card p-0.5">
           {(["curseforge", "modrinth"] as Source[]).map((s) => (
             <button
@@ -84,7 +84,7 @@ export function ModpackBrowser() {
               onClick={() => setSource(s)}
               className={cn(
                 "rounded px-3 py-1.5 text-sm transition-colors",
-                source === s ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                source === s ? "btn-solid text-primary-foreground [--btn:var(--primary)]" : "text-muted-foreground hover:bg-muted",
               )}
             >
               {s === "modrinth" ? "Modrinth" : "CurseForge"}
@@ -127,7 +127,7 @@ export function ModpackBrowser() {
 
       {noKey ? (
         can("admin") ? (
-          <div className="grid max-w-2xl gap-4 rounded-lg border border-warn/50 bg-card p-4 shadow-xs">
+          <div className="grid max-w-2xl gap-4 rounded-lg border border-warn/50 surface p-4">
             <p className="text-sm">
               {t("modpacks.noKeyAdmin")}{" "}
               <a href="https://console.curseforge.com/" target="_blank" rel="noreferrer" className="underline">
