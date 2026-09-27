@@ -22,6 +22,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/custom": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deploy Custom */
+        post: operations["deploy_custom_api_v1_apps_custom_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/custom/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Plan Custom
+         * @description Preview the compose generated for a free image. Nothing is written.
+         */
+        post: operations["plan_custom_api_v1_apps_custom_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/images/inspect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inspect Image
+         * @description What the registry says about an image: pre-fills the free image form.
+         */
+        get: operations["inspect_image_api_v1_apps_images_inspect_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/plan": {
         parameters: {
             query?: never;
@@ -1146,6 +1203,72 @@ export interface components {
             /** State */
             state: string;
         };
+        /** CustomEnvIn */
+        CustomEnvIn: {
+            /** Key */
+            key: string;
+            /**
+             * Secret
+             * @default false
+             */
+            secret: boolean;
+            /**
+             * Value
+             * @default
+             */
+            value: string;
+        };
+        /**
+         * CustomIn
+         * @description Any registry image: Docker Hub (nginx, grafana/grafana:12), ghcr.io/…
+         */
+        CustomIn: {
+            /**
+             * Env
+             * @default []
+             */
+            env: components["schemas"]["CustomEnvIn"][];
+            /** Image */
+            image: string;
+            /** Name */
+            name: string;
+            /**
+             * Ports
+             * @default []
+             */
+            ports: components["schemas"]["CustomPortIn"][];
+            /**
+             * Volumes
+             * @default []
+             */
+            volumes: string[];
+            /** Zone */
+            zone?: string | null;
+        };
+        /** CustomPortIn */
+        CustomPortIn: {
+            /** Container */
+            container: number;
+            /**
+             * Exposure
+             * @default lan
+             * @enum {string}
+             */
+            exposure: "lan" | "public" | "internal";
+            /** Host */
+            host: number;
+            /**
+             * Protocol
+             * @default tcp
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+            /**
+             * Web
+             * @default false
+             */
+            web: boolean;
+        };
         /** DeployIn */
         DeployIn: {
             /**
@@ -1220,6 +1343,25 @@ export interface components {
             net_tx_bps: number;
             /** Ts */
             ts: number;
+        };
+        /** ImageOut */
+        ImageOut: {
+            /** Compatible */
+            compatible: boolean;
+            /** Digest */
+            digest: string;
+            /** Env */
+            env: components["schemas"]["CustomEnvIn"][];
+            /** Name */
+            name: string;
+            /** Platforms */
+            platforms: string[];
+            /** Ports */
+            ports: components["schemas"]["CustomPortIn"][];
+            /** Tag */
+            tag: string;
+            /** Volumes */
+            volumes: string[];
         };
         /** IntegrationsOut */
         IntegrationsOut: {
@@ -1869,6 +2011,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeployOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deploy_custom_api_v1_apps_custom_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_custom_api_v1_apps_custom_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inspect_image_api_v1_apps_images_inspect_get: {
+        parameters: {
+            query: {
+                ref: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageOut"];
                 };
             };
             /** @description Validation Error */

@@ -34,6 +34,7 @@ from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import Purpose, Sealed, SecretBox
 from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
+from hivora.images.registry import Registry
 from hivora.jobs import Job, JobKind, JobQueue
 from hivora.state import StateStore, app_key
 from hivora.system.secrets import SecretSetting, SecretSettings
@@ -49,6 +50,9 @@ from hivora.templates import (
     host_arch,
     validate_inputs,
 )
+from hivora.templates.catalog import CUSTOM_SOURCE, TemplateInvalidError
+from hivora.templates.custom import CustomApp, CustomEnv, CustomPort
+from hivora.templates.custom import manifest as custom_manifest
 from hivora.templates.models import TemplateVersion
 from hivora.zones import Zone, get_zone, zone_network
 
@@ -151,8 +155,10 @@ class AppService:
         secret_settings: SecretSettings | None = None,
         public_address: Callable[[], str | None] | None = None,
         gateway: DockerGateway | None = None,  # registry lookups (image platforms)
+        registry: Registry | None = None,
     ) -> None:
         self.gateway = gateway
+        self.registry = registry or Registry()
         self.settings = settings
         self.sessions = sessions
         self.catalog = catalog
@@ -392,6 +398,43 @@ class AppService:
         self.jobs.wake()
         self.bus.publish("app.updated", app=app.slug, revision=upd.number, job=job.id)
         return job
+
+    # --- free images (any registry image, through a generated template) -------
+    async def custom_request(
+        self, name: str, image: str, zone: str | None, ports: list[CustomPort],
+        volumes: list[str], env: list[CustomEnv],
+    ) -> DeployRequest:  # fmt: skip
+        """Read the image from its registry, pin it, generate its template."""
+        arch = host_arch()
+        info = await self.registry.inspect(image, arch)
+        if arch not in info.platforms:
+            raise UnsupportedArchitectureError(
+                f"{info.ref.name}:{info.ref.tag} has no {arch} build", arch=arch,
+                platforms=info.platforms,
+            )  # fmt: skip
+        spec = CustomApp(slugify(name), name, info.ref.name, f"{info.ref.tag}@{info.digest}",
+                         info.platforms, ports, volumes, env)  # fmt: skip
+        try:
+            text = custom_manifest(spec, version=f"1.0.{int(self.clock.now().timestamp())}")
+            entry = self.catalog.add_custom(text)
+        except (ValueError, TemplateInvalidError) as exc:
+            raise ValidationError(str(exc)[:300]) from exc
+        inputs: dict[str, Any] = {f"env_{i}": e.value for i, e in enumerate(env)}
+        inputs |= {f"port_{i}": p.host for i, p in enumerate(ports)}
+        return DeployRequest(entry.slug, name, inputs, zone=zone)
+
+    async def load_custom_templates(self) -> None:
+        """Templates generated for free images live in the database: register them."""
+        async with self.sessions() as session:
+            rows = await session.scalars(
+                select(TemplateVersion.manifest).where(TemplateVersion.source == CUSTOM_SOURCE)
+                .order_by(TemplateVersion.created_at)
+            )  # fmt: skip
+            for text in rows:
+                try:
+                    self.catalog.add_custom(text)
+                except TemplateInvalidError:  # pragma: no cover - written by us
+                    continue
 
     async def move_zone(self, app_id: int, zone_slug: str | None) -> Job:
         """Put the app in another zone (or none): a new revision joins the zone's network."""

@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWindow, ArrowLeft, Gamepad2 } from "lucide-react";
+import { AppWindow, ArrowLeft, Container, Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
@@ -171,7 +171,19 @@ function Catalog() {
   if (kind === "apps") {
     return (
       <>
-        <PageHeader title={t("catalog.home.apps")} actions={back} />
+        <PageHeader
+          title={t("catalog.home.apps")}
+          actions={
+            <>
+              <Button variant="outline" asChild>
+                <Link href="/custom/">
+                  <Container /> {t("custom.open")}
+                </Link>
+              </Button>
+              {back}
+            </>
+          }
+        />
         <AppsCatalog kind="apps" />
       </>
     );

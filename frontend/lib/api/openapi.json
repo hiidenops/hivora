@@ -517,6 +517,136 @@
         "title": "ContainerOut",
         "type": "object"
       },
+      "CustomEnvIn": {
+        "properties": {
+          "key": {
+            "maxLength": 128,
+            "title": "Key",
+            "type": "string"
+          },
+          "secret": {
+            "default": false,
+            "title": "Secret",
+            "type": "boolean"
+          },
+          "value": {
+            "default": "",
+            "maxLength": 4096,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "CustomEnvIn",
+        "type": "object"
+      },
+      "CustomIn": {
+        "description": "Any registry image: Docker Hub (nginx, grafana/grafana:12), ghcr.io/\u2026",
+        "properties": {
+          "env": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CustomEnvIn"
+            },
+            "maxItems": 100,
+            "title": "Env",
+            "type": "array"
+          },
+          "image": {
+            "maxLength": 300,
+            "title": "Image",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "title": "Name",
+            "type": "string"
+          },
+          "ports": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CustomPortIn"
+            },
+            "maxItems": 20,
+            "title": "Ports",
+            "type": "array"
+          },
+          "volumes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Volumes",
+            "type": "array"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          }
+        },
+        "required": [
+          "name",
+          "image"
+        ],
+        "title": "CustomIn",
+        "type": "object"
+      },
+      "CustomPortIn": {
+        "properties": {
+          "container": {
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Container",
+            "type": "integer"
+          },
+          "exposure": {
+            "default": "lan",
+            "enum": [
+              "lan",
+              "public",
+              "internal"
+            ],
+            "title": "Exposure",
+            "type": "string"
+          },
+          "host": {
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Host",
+            "type": "integer"
+          },
+          "protocol": {
+            "default": "tcp",
+            "enum": [
+              "tcp",
+              "udp"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          },
+          "web": {
+            "default": false,
+            "title": "Web",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "container",
+          "host"
+        ],
+        "title": "CustomPortIn",
+        "type": "object"
+      },
       "DeployIn": {
         "properties": {
           "inputs": {
@@ -707,6 +837,66 @@
           "net_tx_bps"
         ],
         "title": "HostSampleOut",
+        "type": "object"
+      },
+      "ImageOut": {
+        "properties": {
+          "compatible": {
+            "title": "Compatible",
+            "type": "boolean"
+          },
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
+          "env": {
+            "items": {
+              "$ref": "#/components/schemas/CustomEnvIn"
+            },
+            "title": "Env",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "platforms": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Platforms",
+            "type": "array"
+          },
+          "ports": {
+            "items": {
+              "$ref": "#/components/schemas/CustomPortIn"
+            },
+            "title": "Ports",
+            "type": "array"
+          },
+          "tag": {
+            "title": "Tag",
+            "type": "string"
+          },
+          "volumes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Volumes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "tag",
+          "digest",
+          "platforms",
+          "compatible",
+          "ports",
+          "volumes",
+          "env"
+        ],
+        "title": "ImageOut",
         "type": "object"
       },
       "IntegrationsOut": {
@@ -2609,6 +2799,133 @@
           }
         },
         "summary": "Deploy",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/custom": {
+      "post": {
+        "operationId": "deploy_custom_api_v1_apps_custom_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deploy Custom",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/custom/plan": {
+      "post": {
+        "description": "Preview the compose generated for a free image. Nothing is written.",
+        "operationId": "plan_custom_api_v1_apps_custom_plan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Custom",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/images/inspect": {
+      "get": {
+        "description": "What the registry says about an image: pre-fills the free image form.",
+        "operationId": "inspect_image_api_v1_apps_images_inspect_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ref",
+            "required": true,
+            "schema": {
+              "maxLength": 300,
+              "title": "Ref",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Inspect Image",
         "tags": [
           "apps"
         ]

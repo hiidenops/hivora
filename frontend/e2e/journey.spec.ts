@@ -100,6 +100,10 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await page.getByLabel("Mot de passe temporaire", { exact: true }).fill("temporary-pass-1");
   await page.getByRole("dialog").getByRole("button", { name: "Ajouter un utilisateur" }).click();
   await expect(page.getByRole("button", { name: "Actions pour lea" })).toBeVisible();
+  await page.getByRole("button", { name: "Actions pour lea" }).click();
+  await expect(page.getByRole("menuitem", { name: "Réinitialiser le mot de passe" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toBeHidden();
 
   // Language switch.
   await page.getByRole("link", { name: "Paramètres" }).click();

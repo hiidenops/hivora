@@ -493,3 +493,60 @@ def test_zones_share_a_network_and_apps_move_between_them(client: TestClient) ->
     assert "hivora-zone-jeux-entre-amis" not in [n.name for n in gw.networks]
     admin_zone = client.delete(f"{API}/zones/administration")
     assert admin_zone.status_code == 409
+
+
+def test_free_image_deploys_like_a_template_app(client: TestClient) -> None:
+    import yaml
+
+    from hivora.images.registry import ImageInfo, parse_ref
+    from hivora.templates.catalog import host_arch
+
+    class FakeRegistry:
+        async def inspect(self, text: str, arch: str) -> ImageInfo:
+            ref = parse_ref(text)
+            archs = ["riscv64"] if "odd" in text else ["amd64", "arm64"]
+            env = {"GF_PATHS_DATA": "/var/lib/grafana"}
+            return ImageInfo(
+                ref, "sha256:" + "a" * 64, archs, [(3000, "tcp")], [env["GF_PATHS_DATA"]], env
+            )
+
+    admin(client)
+    rt = client.app.state.runtime  # type: ignore[attr-defined]
+    rt.apps.registry = FakeRegistry()
+    seen = client.get(f"{API}/apps/images/inspect", params={"ref": "grafana/grafana:12.2.0"}).json()
+    assert seen["name"] == "grafana/grafana" and seen["compatible"] is True
+    assert seen["ports"][0]["container"] == 3000 and seen["volumes"] == ["/var/lib/grafana"]
+
+    body = {
+        "name": "Grafana", "image": "grafana/grafana:12.2.0",
+        "ports": [{"container": 3000, "host": 3300, "web": True}],
+        "volumes": ["/var/lib/grafana"],
+        "env": [{"key": "GF_SECURITY_ADMIN_PASSWORD", "value": "s3cret-pass", "secret": True},
+                {"key": "GF_LOG_LEVEL", "value": "warn"}],
+    }  # fmt: skip
+    assert client.post(f"{API}/apps/custom/plan", json=body).status_code == 200
+    deployed = client.post(f"{API}/apps/custom", json=body).json()
+    assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
+    app_id = deployed["app"]["id"]
+    compose = yaml.safe_load(client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"])
+    svc = compose["services"]["app"]
+    assert svc["image"] == "grafana/grafana:12.2.0@sha256:" + "a" * 64
+    assert svc["environment"]["GF_LOG_LEVEL"] == "warn"
+    assert svc["environment"]["GF_SECURITY_ADMIN_PASSWORD"].startswith("${HV_SECRET_")
+    assert "s3cret-pass" not in yaml.safe_dump(compose)
+    assert client.get(f"{API}/apps/{app_id}").json()["access"]["web"].endswith(":3300")
+
+    # Editable later, like any app; and found again after a restart.
+    settings = client.get(f"{API}/apps/{app_id}/settings").json()
+    assert settings["values"]["port_0"] == 3300
+    rt.catalog._custom.clear()
+    import asyncio
+
+    asyncio.run(rt.apps.load_custom_templates())
+    assert client.get(f"{API}/apps/{app_id}/settings").status_code == 200
+
+    odd = client.post(f"{API}/apps/custom", json={**body, "name": "Odd", "image": "odd/image"})
+    assert odd.status_code == 422 and code(odd) == "unsupported_architecture"
+    bad = client.post(f"{API}/apps/custom", json={**body, "name": "Bad", "volumes": ["../etc"]})
+    assert bad.status_code == 422
+    assert host_arch() in ("amd64", "arm64")

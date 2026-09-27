@@ -19,6 +19,7 @@ from hivora.templates.schema import Template
 logger = logging.getLogger(__name__)
 
 TEMPLATE_FILE = "template.yaml"
+CUSTOM_SOURCE = "custom"
 _ARCH = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}
 
 
@@ -75,6 +76,15 @@ def parse_template(manifest: str, *, require_pinned: bool) -> Template:
 class Catalog:
     def __init__(self) -> None:
         self._entries: dict[str, CatalogEntry] = {}
+        self._custom: dict[str, CatalogEntry] = {}  # free images: resolvable, never listed
+
+    def add_custom(self, manifest: str) -> CatalogEntry:
+        """Register a template generated for a free image (pinned by digest)."""
+        template = parse_template(manifest, require_pinned=True)
+        entry = CatalogEntry(template, manifest, hashlib.sha256(manifest.encode()).hexdigest(),
+                             CUSTOM_SOURCE)  # fmt: skip
+        self._custom[template.metadata.slug] = entry
+        return entry
 
     def load_directory(self, directory: Path, *, source: str = "official") -> list[str]:
         """Load every template; invalid ones are logged and skipped. Returns errors."""
@@ -98,7 +108,7 @@ class Catalog:
 
     def get(self, slug: str) -> CatalogEntry:
         try:
-            return self._entries[slug]
+            return self._entries.get(slug) or self._custom[slug]
         except KeyError:
             raise TemplateNotFoundError(slug) from None
 
