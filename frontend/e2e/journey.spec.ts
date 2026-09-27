@@ -44,6 +44,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
 
   // Catalog -> deploy wizard -> review (compose shown, secrets referenced) -> deploy.
   await page.getByRole("link", { name: "Parcourir le catalogue" }).click();
+  await page.getByRole("link", { name: /^Applications/ }).click();
   await page.getByRole("article", { name: "Vaultwarden" }).getByRole("link", { name: "Déployer" }).click();
   await expect(page.getByRole("heading", { name: "Déployer Vaultwarden" })).toBeVisible();
   await page.getByRole("button", { name: "Vérifier" }).click();
@@ -73,6 +74,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   // Changing a flagged setting (server type) erases the data: confirmed explicitly.
   await page.getByRole("link", { name: "Parcourir le catalogue" }).click();
   await expectPointerCursors(page);
+  await page.getByRole("link", { name: /^Jeux/ }).click();
   await page.getByRole("article", { name: "Minecraft Java" }).getByRole("link", { name: "Déployer" }).click();
   await page.getByRole("switch", { name: /J'accepte le contrat de licence Minecraft/ }).check();
   await page.getByRole("button", { name: "Vérifier" }).click();

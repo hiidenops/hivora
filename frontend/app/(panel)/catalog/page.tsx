@@ -1,5 +1,6 @@
 "use client";
 
+import { AppWindow, ArrowLeft, Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
@@ -16,7 +17,47 @@ import { useSystemInfo, useTemplates } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-function AppsCatalog() {
+type Kind = "games" | "apps";
+const isGame = (category: string) => category === "games";
+
+/** Landing: two big doors, each showing real icons from its side of the catalog. */
+function CatalogHome() {
+  const { t } = useI18n();
+  const { data: templates } = useTemplates();
+  const doors: { kind: Kind; icon: typeof Gamepad2 }[] = [
+    { kind: "games", icon: Gamepad2 },
+    { kind: "apps", icon: AppWindow },
+  ];
+  return (
+    <div className="stagger grid gap-5 md:grid-cols-2">
+      {doors.map(({ kind, icon: Icon }) => {
+        const items = (templates ?? []).filter((tp) => isGame(tp.category) === (kind === "games"));
+        return (
+          <Link
+            key={kind}
+            href={`/catalog/?kind=${kind}`}
+            className="surface card-interactive grid min-h-64 content-between gap-8 rounded-2xl border p-8"
+          >
+            <div className="flex -space-x-3">
+              {items.slice(0, 6).map((tp) => (
+                <AppIcon key={tp.slug} src={tp.icon_url} name={tp.name} className="size-14 rounded-xl ring-4 ring-card" />
+              ))}
+            </div>
+            <div className="grid gap-2">
+              <h2 className="flex items-center gap-3 text-3xl font-semibold tracking-tight">
+                <Icon className="size-7 text-warn" /> {t(`catalog.home.${kind}` as MessageKey)}
+              </h2>
+              <p className="text-muted-foreground">{t(`catalog.home.${kind}.text` as MessageKey)}</p>
+              <p className="text-sm font-medium">{t("catalog.count", { n: items.length })}</p>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+function AppsCatalog({ kind }: { kind: Kind }) {
   const { t, l } = useI18n();
   const { can } = useSession();
   const { data: templates, isPending } = useTemplates();
@@ -24,8 +65,12 @@ function AppsCatalog() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
 
-  const categories = useMemo(() => ["all", ...new Set((templates ?? []).map((tp) => tp.category))], [templates]);
-  const visible = (templates ?? []).filter((tp) => {
+  const ofKind = useMemo(
+    () => (templates ?? []).filter((tp) => isGame(tp.category) === (kind === "games")),
+    [templates, kind],
+  );
+  const categories = useMemo(() => ["all", ...new Set(ofKind.map((tp) => tp.category))], [ofKind]);
+  const visible = ofKind.filter((tp) => {
     const q = query.trim().toLowerCase();
     const text = `${tp.name} ${l(tp.description)} ${tp.tags.join(" ")}`.toLowerCase();
     return (category === "all" || tp.category === category) && (!q || text.includes(q));
@@ -105,17 +150,42 @@ function AppsCatalog() {
 function Catalog() {
   const { t } = useI18n();
   const router = useRouter();
-  const tab = useSearchParams().get("tab") === "modpacks" ? "modpacks" : "apps";
+  const params = useSearchParams();
+  const tab = params.get("tab") === "modpacks" ? "modpacks" : "apps";
+  const kind = tab === "modpacks" ? "games" : params.get("kind");
+  if (kind !== "games" && kind !== "apps") {
+    return (
+      <>
+        <PageHeader title={t("catalog.title")} />
+        <CatalogHome />
+      </>
+    );
+  }
+  const back = (
+    <Button variant="outline" asChild>
+      <Link href="/catalog/">
+        <ArrowLeft /> {t("catalog.backHome")}
+      </Link>
+    </Button>
+  );
+  if (kind === "apps") {
+    return (
+      <>
+        <PageHeader title={t("catalog.home.apps")} actions={back} />
+        <AppsCatalog kind="apps" />
+      </>
+    );
+  }
   return (
     <>
-      <PageHeader title={t("catalog.title")} />
+      <PageHeader title={t("catalog.home.games")} actions={back} />
       <div role="tablist" className="mb-5 flex gap-1 rounded-lg border surface p-1">
         {(["apps", "modpacks"] as const).map((k) => (
           <button
             key={k}
             role="tab"
             aria-selected={tab === k}
-            onClick={() => router.replace(k === "apps" ? "/catalog/" : "/catalog/?tab=modpacks")}
+            onClick={() => router.replace(k === "apps" ? "/catalog/?kind=games" : "/catalog/?tab=modpacks")}
             className={cn(
               "relative overflow-hidden rounded-md px-4 py-2 text-sm transition-colors duration-200",
               tab === k
@@ -123,11 +193,11 @@ function Catalog() {
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            {t(k === "apps" ? "catalog.tab.apps" : "catalog.tab.modpacks")}
+            {t(k === "apps" ? "catalog.tab.servers" : "catalog.tab.modpacks")}
           </button>
         ))}
       </div>
-      {tab === "apps" ? <AppsCatalog /> : <ModpackBrowser />}
+      {tab === "apps" ? <AppsCatalog kind="games" /> : <ModpackBrowser />}
     </>
   );
 }
