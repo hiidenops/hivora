@@ -120,6 +120,38 @@ export const useTemplate = (slug: string) =>
   });
 export const useZones = () => useQuery({ queryKey: keys.zones, queryFn: () => api<Zone[]>("/zones") });
 
+/** Create (no slug) or edit a zone. */
+export function useSaveZone(slug?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; color: string; network_mode: string }) =>
+      api<Zone>(slug ? `/zones/${slug}` : "/zones", { method: slug ? "PUT" : "POST", body }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.zones });
+      void qc.invalidateQueries({ queryKey: keys.apps });
+    },
+  });
+}
+
+export function useDeleteZone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (slug: string) => api<void>(`/zones/${slug}`, { method: "DELETE" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.zones }),
+  });
+}
+
+export function useMoveZone(appId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (zone: string | null) => api<JobRef>(`/apps/${appId}/zone`, { method: "PUT", body: { zone } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.app(appId) });
+      void qc.invalidateQueries({ queryKey: keys.zones });
+    },
+  });
+}
+
 export const useJobs = (appId?: number) =>
   useQuery({
     queryKey: appId ? [...keys.jobs, { appId }] : keys.jobs,

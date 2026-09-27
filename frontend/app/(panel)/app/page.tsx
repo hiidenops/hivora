@@ -18,6 +18,7 @@ import { StatusHero } from "@/features/apps/status-hero";
 import { ConsolePanel } from "@/features/console/console-panel";
 import { GamePanel } from "@/features/games/game-panel";
 import { RemoveDialog } from "@/features/apps/remove-dialog";
+import { ZoneSelect } from "@/features/zones/zone-select";
 import { ApiError } from "@/lib/api/client";
 import { useApp, useAppCompose, useJob, useRevisions } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
@@ -61,6 +62,7 @@ function AppDetail() {
         }
         actions={
           <>
+            {can("operator") && app.template && <ZoneSelect appId={app.id} zoneId={app.zone_id} onJob={setActiveJob} />}
             <AppActions id={app.id} status={status} onJob={setActiveJob} />
             {can("operator") && app.template && (
               <Button variant="outline" size="sm" asChild>

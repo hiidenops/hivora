@@ -17,6 +17,7 @@ AUDITED_PREFIXES = (
     "auth.",
     "user.",
     "app.",
+    "zone.",
     "job.finished",
     "jobs.cleared",
     "console.",

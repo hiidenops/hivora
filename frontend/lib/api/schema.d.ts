@@ -369,6 +369,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/{app_id}/zone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Move Zone
+         * @description New revision in the target zone (joins its network if it shares one).
+         */
+        put: operations["move_zone_api_v1_apps__app_id__zone_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit": {
         parameters: {
             query?: never;
@@ -701,7 +721,7 @@ export interface paths {
         };
         /**
          * Health
-         * @description Public: used by the container healthcheck.
+         * @description Public: used by the container healthcheck and the login page.
          */
         get: operations["health_api_v1_system_health_get"];
         put?: never;
@@ -929,8 +949,30 @@ export interface paths {
         /** Zones */
         get: operations["zones_api_v1_zones_get"];
         put?: never;
-        post?: never;
+        /** Create */
+        post: operations["create_api_v1_zones_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/zones/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Edit
+         * @description A network change redeploys the zone's apps (one job each).
+         */
+        put: operations["edit_api_v1_zones__slug__put"];
+        post?: never;
+        /** Delete */
+        delete: operations["delete_api_v1_zones__slug__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1157,6 +1199,8 @@ export interface components {
         };
         /** Health */
         Health: {
+            /** First Start */
+            first_start: boolean;
             /** Status */
             status: string;
             /** Version */
@@ -1744,6 +1788,8 @@ export interface components {
         };
         /** ZoneOut */
         ZoneOut: {
+            /** Apps */
+            apps: number;
             /** Color */
             color: string;
             /** Icon */
@@ -1757,6 +1803,20 @@ export interface components {
             network_mode: components["schemas"]["NetworkMode"];
             /** Slug */
             slug: string;
+        };
+        /** ZoneIn */
+        hivora__apps__api__ZoneIn: {
+            /** Zone */
+            zone: string | null;
+        };
+        /** ZoneIn */
+        hivora__zones__api__ZoneIn: {
+            /** Color */
+            color: string;
+            /** Name */
+            name: string;
+            /** @default none */
+            network_mode: components["schemas"]["NetworkMode"];
         };
     };
     responses: never;
@@ -2516,6 +2576,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_zone_api_v1_apps__app_id__zone_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["hivora__apps__api__ZoneIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {
@@ -3545,6 +3640,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ZoneOut"][];
+                };
+            };
+        };
+    };
+    create_api_v1_zones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["hivora__zones__api__ZoneIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_api_v1_zones__slug__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["hivora__zones__api__ZoneIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_api_v1_zones__slug__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

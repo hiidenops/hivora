@@ -199,6 +199,23 @@ class LocalDockerGateway(DockerGateway):
         info = await self._get_json("version")
         return str(info.get("Version", "unknown"))
 
+    async def ensure_network(self, name: str, labels: dict[str, str]) -> bool:
+        if any(n.name == name for n in await self.list_networks()):
+            return False
+        await self._docker.networks.create({"Name": name, "Driver": "bridge", "Labels": labels})
+        return True
+
+    async def remove_network(self, name: str) -> bool:
+        try:
+            await self._docker.networks.get(name)
+        except aiodocker.DockerError:
+            return False
+        try:
+            await (await self._docker.networks.get(name)).delete()
+        except aiodocker.DockerError:  # still in use: keep it
+            return False
+        return True
+
     async def architecture(self) -> str:
         return str((await self._get_json("info")).get("Architecture", ""))
 

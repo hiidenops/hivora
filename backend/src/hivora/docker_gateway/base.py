@@ -84,6 +84,14 @@ class DockerGateway(ABC):
     async def list_networks(self) -> list[NetworkInfo]: ...
 
     @abstractmethod
+    async def ensure_network(self, name: str, labels: dict[str, str]) -> bool:
+        """Create a bridge network if missing. True if created."""
+
+    @abstractmethod
+    async def remove_network(self, name: str) -> bool:
+        """Remove a network if it exists and nothing uses it. True if removed."""
+
+    @abstractmethod
     async def architecture(self) -> str:
         """The Engine's CPU architecture as reported by Docker (e.g. ``x86_64``)."""
 

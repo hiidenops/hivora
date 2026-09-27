@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import yaml
 from sqlalchemy import update
 
 from hivora.apps.files import empty_dir, ensure_dir, remove_tree
@@ -59,6 +60,7 @@ class AppJobHandlers:
         env = {secret_env_name(k): v for k, v in secrets.items()}
         try:
             await self._check_platforms(ctx, images)
+            await self._zone_network(ctx, revision.compose_yaml)
             if reset := ctx.params.get("reset_volumes"):
                 await self._reset_data(ctx, app.slug, reset)
             await ctx.progress(2, "Preparing directories and files")
@@ -123,6 +125,16 @@ class AppJobHandlers:
         async with s.sessions() as session, session.begin():
             await session.delete(await s.get(session, _app_id(ctx)))
         s.bus.publish("app.removed", app=slug, data_removed=remove_data)
+
+    async def _zone_network(self, ctx: JobContext, compose_yaml: str) -> None:
+        """The zone's shared network is external to the project: create it first."""
+        networks = (yaml.safe_load(compose_yaml) or {}).get("networks") or {}
+        for net in networks.values():
+            if net.get("external") and self.s.gateway is not None:
+                if await self.s.gateway.ensure_network(
+                    net["name"], {"io.hivora.zone-network": "1"}
+                ):
+                    await ctx.log(f"created network {net['name']}")
 
     async def _check_platforms(self, ctx: JobContext, images: list[str]) -> None:
         """Refuse early and clearly an image with no build for this machine."""

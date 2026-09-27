@@ -459,3 +459,37 @@ def test_health_says_first_start_until_admin_changes_password(client: TestClient
     assert health["status"] == "ok" and health["first_start"] is True
     admin(client)  # admin/admin, then the forced password change
     assert client.get(f"{API}/system/health").json()["first_start"] is False
+
+
+def test_zones_share_a_network_and_apps_move_between_them(client: TestClient) -> None:
+    import yaml
+
+    admin(client)
+    gw = client.app.state.runtime.gateway  # type: ignore[attr-defined]
+    bad = client.post(f"{API}/zones", json={"name": "Jeux", "color": "red"})
+    assert bad.status_code == 422
+    zone = client.post(f"{API}/zones", json={"name": "Jeux entre amis", "color": "#d97706",
+                                             "network_mode": "shared"}).json()  # fmt: skip
+    assert zone["slug"] == "jeux-entre-amis" and zone["apps"] == 0
+
+    body = {"template": "vaultwarden", "name": "vw", "zone": zone["slug"]}
+    deployed = client.post(f"{API}/apps", json=body).json()
+    assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
+    app_id = deployed["app"]["id"]
+    compose = yaml.safe_load(client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"])
+    assert compose["networks"]["zone"] == {"name": "hivora-zone-jeux-entre-amis", "external": True}
+    assert compose["services"]["server"]["networks"] == ["default", "zone"]
+    assert "hivora-zone-jeux-entre-amis" in [n.name for n in gw.networks]
+
+    refused = client.delete(f"{API}/zones/{zone['slug']}")
+    assert refused.status_code == 409 and code(refused) == "zone_not_empty"
+    assert client.get(f"{API}/zones").json()[-1]["apps"] == 1
+
+    moved = client.put(f"{API}/apps/{app_id}/zone", json={"zone": None}).json()
+    assert wait_job(client, moved["id"])["status"] == "succeeded"
+    compose = yaml.safe_load(client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"])
+    assert "networks" not in compose
+    assert client.delete(f"{API}/zones/{zone['slug']}").status_code == 204
+    assert "hivora-zone-jeux-entre-amis" not in [n.name for n in gw.networks]
+    admin_zone = client.delete(f"{API}/zones/administration")
+    assert admin_zone.status_code == 409

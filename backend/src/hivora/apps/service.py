@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.files import tree_size
@@ -50,7 +50,7 @@ from hivora.templates import (
     validate_inputs,
 )
 from hivora.templates.models import TemplateVersion
-from hivora.zones import Zone, get_zone
+from hivora.zones import Zone, get_zone, zone_network
 
 LABEL_COMPOSE_SERVICE = "com.docker.compose.service"
 
@@ -224,8 +224,9 @@ class AppService:
     ) -> DeployPlan:
         inputs = await self._with_setting_fallbacks(entry, inputs)
         app_ctx = AppContext(
-            slug=slug, name=name, revision=revision, zone=zone.slug if zone else None
-        )
+            slug=slug, name=name, revision=revision, zone=zone.slug if zone else None,
+            zone_network=zone_network(zone),
+        )  # fmt: skip
         host = self.host
         defaults_ctx = build_context(app_ctx, host, FormValues(), list(entry.template.services))
         form = validate_inputs(entry.template, inputs, defaults_ctx)
@@ -391,6 +392,38 @@ class AppService:
         self.jobs.wake()
         self.bus.publish("app.updated", app=app.slug, revision=upd.number, job=job.id)
         return job
+
+    async def move_zone(self, app_id: int, zone_slug: str | None) -> Job:
+        """Put the app in another zone (or none): a new revision joins the zone's network."""
+        async with self.sessions() as session, session.begin():
+            app = await self.get(session, app_id)
+            zone = await get_zone(session, zone_slug) if zone_slug else None
+            app.zone_id = zone.id if zone else None
+        async with self.sessions() as session:
+            values = (await self.current_settings(session, app_id)).values
+        job = await self.update(app_id, values)
+        self.bus.publish("app.zone_changed", app=app.slug, zone=zone_slug)
+        return job
+
+    @staticmethod
+    async def apps_per_zone(session: AsyncSession) -> dict[int, int]:
+        rows = await session.execute(
+            select(Application.zone_id, func.count()).group_by(Application.zone_id)
+        )
+        return {zid: n for zid, n in rows if zid is not None}
+
+    async def redeploy_zone(self, zone_id: int) -> list[Job]:
+        """A zone's network changed: every app in it gets a new revision."""
+        async with self.sessions() as session:
+            ids = list(
+                await session.scalars(select(Application.id).where(Application.zone_id == zone_id))
+            )
+        jobs = []
+        for app_id in ids:
+            async with self.sessions() as session:
+                values = (await self.current_settings(session, app_id)).values
+            jobs.append(await self.update(app_id, values))
+        return jobs
 
     async def _entry_of(self, session: AsyncSession, app: Application) -> CatalogEntry:
         slug = await session.scalar(

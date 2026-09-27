@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Boxes, LayoutGrid, LogOut, Settings, Users } from "lucide-react";
+import { Activity, Boxes, LayoutGrid, LogOut, Network, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
@@ -36,6 +36,7 @@ export function useSession(): Session {
 const NAV: { href: string; label: MessageKey; icon: typeof LayoutGrid; role: Role }[] = [
   { href: "/", label: "nav.dashboard", icon: LayoutGrid, role: "viewer" },
   { href: "/catalog/", label: "nav.catalog", icon: Boxes, role: "viewer" },
+  { href: "/zones/", label: "nav.zones", icon: Network, role: "viewer" },
   { href: "/activity/", label: "nav.activity", icon: Activity, role: "viewer" },
   { href: "/users/", label: "nav.users", icon: Users, role: "admin" },
   { href: "/settings/", label: "nav.settings", icon: Settings, role: "viewer" },

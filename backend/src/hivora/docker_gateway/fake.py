@@ -77,6 +77,19 @@ class FakeDockerGateway(DockerGateway):
     async def ping(self) -> str:
         return "fake"
 
+    async def ensure_network(self, name: str, labels: dict[str, str]) -> bool:
+        if any(n.name == name for n in self.networks):
+            return False
+        self.networks.append(
+            NetworkInfo(id=name, name=name, driver="bridge", internal=False, labels=labels)
+        )
+        return True
+
+    async def remove_network(self, name: str) -> bool:
+        before = len(self.networks)
+        self.networks = [n for n in self.networks if n.name != name]
+        return len(self.networks) < before
+
     async def architecture(self) -> str:
         return self.arch
 

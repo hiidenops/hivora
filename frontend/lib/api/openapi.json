@@ -650,6 +650,10 @@
       },
       "Health": {
         "properties": {
+          "first_start": {
+            "title": "First Start",
+            "type": "boolean"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -661,7 +665,8 @@
         },
         "required": [
           "status",
-          "version"
+          "version",
+          "first_start"
         ],
         "title": "Health",
         "type": "object"
@@ -2429,6 +2434,10 @@
       },
       "ZoneOut": {
         "properties": {
+          "apps": {
+            "title": "Apps",
+            "type": "integer"
+          },
           "color": {
             "title": "Color",
             "type": "string"
@@ -2471,9 +2480,54 @@
           "color",
           "icon",
           "network_mode",
-          "is_system"
+          "is_system",
+          "apps"
         ],
         "title": "ZoneOut",
+        "type": "object"
+      },
+      "hivora__apps__api__ZoneIn": {
+        "properties": {
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          }
+        },
+        "required": [
+          "zone"
+        ],
+        "title": "ZoneIn",
+        "type": "object"
+      },
+      "hivora__zones__api__ZoneIn": {
+        "properties": {
+          "color": {
+            "maxLength": 7,
+            "title": "Color",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "title": "Name",
+            "type": "string"
+          },
+          "network_mode": {
+            "$ref": "#/components/schemas/NetworkMode",
+            "default": "none"
+          }
+        },
+        "required": [
+          "name",
+          "color"
+        ],
+        "title": "ZoneIn",
         "type": "object"
       }
     }
@@ -3613,6 +3667,59 @@
         ]
       }
     },
+    "/api/v1/apps/{app_id}/zone": {
+      "put": {
+        "description": "New revision in the target zone (joins its network if it shares one).",
+        "operationId": "move_zone_api_v1_apps__app_id__zone_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/hivora__apps__api__ZoneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Zone",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
     "/api/v1/audit": {
       "delete": {
         "description": "Empty the trail, leaving one entry that says who emptied it and when.",
@@ -4408,7 +4515,7 @@
     },
     "/api/v1/system/health": {
       "get": {
-        "description": "Public: used by the container healthcheck.",
+        "description": "Public: used by the container healthcheck and the login page.",
         "operationId": "health_api_v1_system_health_get",
         "responses": {
           "200": {
@@ -4973,6 +5080,131 @@
           }
         },
         "summary": "Zones",
+        "tags": [
+          "zones"
+        ]
+      },
+      "post": {
+        "operationId": "create_api_v1_zones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/hivora__zones__api__ZoneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "zones"
+        ]
+      }
+    },
+    "/api/v1/zones/{slug}": {
+      "delete": {
+        "operationId": "delete_api_v1_zones__slug__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete",
+        "tags": [
+          "zones"
+        ]
+      },
+      "put": {
+        "description": "A network change redeploys the zone's apps (one job each).",
+        "operationId": "edit_api_v1_zones__slug__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/hivora__zones__api__ZoneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZoneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit",
         "tags": [
           "zones"
         ]

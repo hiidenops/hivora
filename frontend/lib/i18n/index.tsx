@@ -5,13 +5,17 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { ApiError } from "@/lib/api/client";
 import { readPref, writePref } from "@/lib/prefs";
 
-import { en } from "./en";
 import { fr, type MessageKey } from "./fr";
 
 export type Lang = "fr" | "en";
 export type { MessageKey };
 export const LANGS: Lang[] = ["fr", "en"];
-const dictionaries: Record<Lang, Record<MessageKey, string>> = { fr, en };
+type Dict = Record<MessageKey, string>;
+// French ships with every page; English is fetched only when chosen (bundle budget).
+const loaders: Record<Lang, () => Promise<Dict>> = {
+  fr: async () => fr,
+  en: async () => (await import("./en")).en,
+};
 
 type Vars = Record<string, string | number>;
 /** Text from templates: plain, or one string per language. */
@@ -39,18 +43,27 @@ function detect(): Lang {
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("fr");
-  useEffect(() => setLangState(detect()), []);
+  const [dict, setDict] = useState<Dict>(fr);
+  const switchTo = useCallback((next: Lang) => {
+    void loaders[next]().then((d) => {
+      setDict(d);
+      setLangState(next);
+    });
+  }, []);
+  useEffect(() => switchTo(detect()), [switchTo]);
   useEffect(() => {
     document.documentElement.lang = lang;
   }, [lang]);
 
-  const setLang = useCallback((next: Lang) => {
-    writePref("lang", next);
-    setLangState(next);
-  }, []);
+  const setLang = useCallback(
+    (next: Lang) => {
+      writePref("lang", next);
+      switchTo(next);
+    },
+    [switchTo],
+  );
 
   const value = useMemo<I18n>(() => {
-    const dict = dictionaries[lang];
     const t = (key: MessageKey, vars?: Vars) => interpolate(dict[key] ?? key, vars);
     const l = (text: Localized | null | undefined) =>
       !text ? "" : typeof text === "string" ? text : (text[lang] ?? text.en ?? Object.values(text)[0] ?? "");
@@ -65,7 +78,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       return t("error.generic", { message: error instanceof Error ? error.message : String(error) });
     };
     return { lang, setLang, t, l, errorMessage };
-  }, [lang, setLang]);
+  }, [lang, dict, setLang]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

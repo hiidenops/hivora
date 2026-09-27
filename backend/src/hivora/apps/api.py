@@ -375,6 +375,16 @@ async def restart(app_id: int, _: Operator, rt: RuntimeDep) -> JobRef:
     return job_ref(await rt.apps.restart(app_id))
 
 
+class ZoneIn(BaseModel):
+    zone: str | None  # zone slug; None: no zone
+
+
+@router.put("/{app_id}/zone", status_code=202)
+async def move_zone(app_id: int, body: ZoneIn, _: Operator, rt: RuntimeDep) -> JobRef:
+    """New revision in the target zone (joins its network if it shares one)."""
+    return job_ref(await rt.apps.move_zone(app_id, body.zone))
+
+
 @router.get("/{app_id}/removal-plan")
 async def removal_plan(app_id: int, _: Operator, rt: RuntimeDep) -> RemovalPlanOut:
     p = await rt.apps.removal_plan(app_id)
