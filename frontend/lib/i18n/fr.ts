@@ -30,6 +30,10 @@ export const fr = {
   "login.password": "Mot de passe",
   "login.totp": "Code de vérification (ou code de récupération)",
   "login.submit": "Se connecter",
+  "login.entering": "Ouverture du panel…",
+  "notFound.title": "Cette page n'existe pas",
+  "notFound.text": "L'adresse est peut-être mal tapée, ou la page a été déplacée.",
+  "notFound.back": "Retour au tableau de bord",
   "login.defaultHint": "Premier démarrage : identifiant « admin », mot de passe « admin ». Vous devrez le changer immédiatement.",
 
   "password.title": "Changer le mot de passe",

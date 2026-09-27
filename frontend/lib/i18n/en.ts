@@ -31,6 +31,10 @@ export const en: Record<MessageKey, string> = {
   "login.password": "Password",
   "login.totp": "Verification code (or recovery code)",
   "login.submit": "Sign in",
+  "login.entering": "Opening the panel…",
+  "notFound.title": "This page does not exist",
+  "notFound.text": "The address may be mistyped, or the page has moved.",
+  "notFound.back": "Back to the dashboard",
   "login.defaultHint": "First start: username “admin”, password “admin”. You will have to change it right away.",
 
   "password.title": "Change password",

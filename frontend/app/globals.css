@@ -345,3 +345,8 @@ label:has(> span > input:not(:disabled)) {
   .cat { --walk: 0; }
   .cat-eye { transform: scaleY(0.12); }
 }
+
+/* Post-login transition (components/entering-screen.tsx): fade in, bar fills. */
+@keyframes hv-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.entering { animation: hv-fade-in 200ms var(--ease-out) both; }
+.entering-bar { transform-origin: left; animation: hv-fill 850ms var(--ease-out) both; }
