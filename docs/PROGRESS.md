@@ -157,6 +157,7 @@ Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en b
   - CI `image.yml` : build amd64, budgets vérifiés (image < 200 Mo sur disque, RAM au repos < 150 Mo, HTTPS sain), publication amd64 + arm64 sur `ghcr.io/hiidenops/hivora` à chaque tag `v*`.
   - uvicorn sans extras (`websockets` seul) ; mypy des tests remis au vert.
   - Reste : débit réseau de l'hôte vu depuis le conteneur (monter `/proc` de l'hôte), panel joignable seulement par le VPN, domaine public + Let's Encrypt.
+- **Corrections (lot A)** : valeurs par défaut pouvant citer d'autres champs (`{{ form.web_port }}`, évaluées en dernier) — Vaultwarden 1.3.0 : `DOMAIN` suit le port web ; **codes TOTP à usage unique** (dernier pas de 30 s accepté mémorisé par utilisateur) ; **clé pré-partagée WireGuard** par client (chiffrée, migration `0010`, régénérée avec les clés ; les clients existants en reçoivent une : configuration à réimporter). Testé en réel (handshake avec PSK).
 - **Logs en direct** (F-13) : carte « Logs » de la fiche (opérateur, chargée à la demande, flux seulement carte ouverte) : canal WS `logs.open`/`logs.close` (4 flux max par onglet), tous les conteneurs de l'app suivis, liste relue toutes les 2 s (redémarrage, recréation : reprise depuis la dernière ligne, sans doublon), lignes groupées toutes les 250 ms (500 max, le surplus est compté), secrets de l'app masqués. Filtre par service, recherche, suivi automatique, vider. Téléchargement `GET /apps/{id}/logs` (10 000 lignes par conteneur, fusionnées par heure, audit `app.logs_downloaded`). Testé en réel (Vaultwarden, redémarrage suivi).
 
 ▶ **Prochaine étape** : publier une première version (tag `v0.1.0` → image sur ghcr.io), l'installer sur une machine x86 et y tester les jeux x86. Catalogue LinuxGSM générique (140+ jeux) : non fait (ports inconnus avant installation, contraire à la règle des digests figés).
@@ -218,7 +219,6 @@ Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en b
 - Les ajouts/retraits dans les listes de joueurs ne passent pas par une tâche (comme avant pour Minecraft).
 
 - Détection des conflits de ports : ne voit que Docker et les apps Hivora (pas un sshd installé sur l'hôte).
-- Un code TOTP peut être réutilisé pendant sa fenêtre de validité (30 à 90 s).
 - Métriques : en mémoire (1 h), pas encore d'historique 24 h persisté. Dans le conteneur Hivora (M6), le débit réseau de l'hôte exigera `/proc` de l'hôte monté en lecture seule.
 - Console : panneau sur la fiche d'app ; le tiroir persistant multi-onglets (F-24, ⌘K, raccourci Ctrl+²) reste à faire.
 - Journal d'audit : pas encore de filtres ni de recherche.

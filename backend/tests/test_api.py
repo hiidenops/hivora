@@ -97,19 +97,18 @@ def test_totp_and_recovery_codes(client: TestClient) -> None:
         "recovery_codes"
     ]
     assert len(codes) == 10
+    auth = client.app.state.runtime.auth  # type: ignore[attr-defined]
     with client.websocket_connect("/ws") as ws:  # consoles need a fresh TOTP (15 min)
         ws.send_json({"op": "console.open", "id": "x", "app": 1, "kind": "shell"})
         assert ws.receive_json()["code"] == "totp_required"
-        ws.send_json(
-            {
-                "op": "console.open",
-                "id": "x",
-                "app": 1,
-                "kind": "shell",
-                "totp_code": pyotp.TOTP(secret).now(),
-            }
-        )
+        opening = {"op": "console.open", "id": "x", "app": 1, "kind": "shell",
+                   "totp_code": pyotp.TOTP(secret).now()}  # fmt: skip
+        ws.send_json(opening)  # the code that just confirmed the enrollment: used
+        assert ws.receive_json()["code"] == "invalid_credentials"
+        auth._totp_used.clear()  # as if the next 30 s step had come
+        ws.send_json(opening)
         assert ws.receive_json()["code"] == "app_not_found"  # past the TOTP gate
+    auth._totp_used.clear()
 
     with other_user(client) as other:
         r = other.post(f"{API}/auth/login", json={"username": "admin", "password": STRONG})

@@ -119,6 +119,18 @@ class VpnTools:
     def _seal(self, app_id: int, private: str, public: str) -> Sealed:
         return self.rt.box.seal(Purpose.VPN, private, _context(app_id, public))
 
+    def _set_psk(self, peer: VpnPeer) -> None:
+        sealed = self.rt.box.seal(
+            Purpose.VPN, wg.preshared(), _context(peer.app_id, "psk:" + peer.public_key)
+        )
+        peer.psk_nonce, peer.psk = sealed.nonce, sealed.ciphertext
+
+    def _psk(self, peer: VpnPeer) -> str | None:
+        if peer.psk is None or peer.psk_nonce is None:
+            return None
+        return self.rt.box.open(Purpose.VPN, Sealed(peer.psk_nonce, peer.psk),
+                                _context(peer.app_id, "psk:" + peer.public_key))  # fmt: skip
+
     def _private(self, peer: VpnPeer) -> str:
         sealed = Sealed(peer.private_nonce, peer.private_key)
         return self.rt.box.open(Purpose.VPN, sealed, _context(peer.app_id, peer.public_key))
@@ -150,6 +162,9 @@ class VpnTools:
                 used.add(c.address)
             else:
                 moved.append(c)
+        for c in clients:
+            if c.psk is None:  # clients made before preshared keys: one now (config to re-import)
+                self._set_psk(c)
         if moved:  # placeholders first: the (app, address) pair stays unique at each step
             for p in moved:
                 p.address = f"-{id(p)}"
@@ -200,7 +215,8 @@ class VpnTools:
         subnet, _ = vpn.network()
         active = [c for c in clients if self._active(c)]
         text = wg.server_conf(self._private(server), subnet, server.address, s.port, s.interface,
-                              [wg.Peer(c.name, c.address, c.public_key) for c in active],
+                              [wg.Peer(c.name, c.address, c.public_key, self._psk(c))
+                               for c in active],
                               vpn.acl)  # fmt: skip
         subnets = await self._zone_subnets(vpn)
         acl = wg.acl_script(s.interface, [self._access(c, vpn, subnets) for c in active],
@@ -296,6 +312,7 @@ class VpnTools:
                            allowed_ips=allowed_ips or None, public_key=public,
                            routing="custom" if allowed_ips else "default",
                            private_nonce=sealed.nonce, private_key=sealed.ciphertext)  # fmt: skip
+            self._set_psk(peer)
             self._apply(peer, changes)
             session.add(peer)
             await session.flush()
@@ -356,6 +373,7 @@ class VpnTools:
             sealed = self._seal(vpn.app_id, private, public)
             peer.public_key = public
             peer.private_nonce, peer.private_key = sealed.nonce, sealed.ciphertext
+            self._set_psk(peer)
             await session.flush()
             await self._sync(session, vpn)
         self.rt.bus.publish("vpn.client_renewed", app=vpn.slug, target=peer.name)
@@ -380,8 +398,10 @@ class VpnTools:
                 allowed = ", ".join(peer.allowed_ips or []) or default
             else:
                 allowed = default
-            text = wg.client_conf(self._private(peer), peer.address, vpn.value(s.dns_field),
-                                  server.public_key, endpoint, allowed)  # fmt: skip
+            text = wg.client_conf(
+                self._private(peer), peer.address, vpn.value(s.dns_field),
+                server.public_key, endpoint, allowed, self._psk(peer),
+            )  # fmt: skip
         self.rt.bus.publish("vpn.config_downloaded", app=vpn.slug, target=peer.name)
         return text
 

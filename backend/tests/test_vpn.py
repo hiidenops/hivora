@@ -100,6 +100,8 @@ def test_vpn_clients_and_linked_zones(client: Any, tmp_path: Path) -> None:
     cfg = client.get(f"{API}/apps/{app_id}/vpn/clients/{laptop}/config").text
     assert "Endpoint = vpn.example.org:51820" in cfg and "AllowedIPs = 192.168.1.0/24" in cfg
     assert "Address = 10.8.0.3/32" in cfg and "DNS = 1.1.1.1,9.9.9.9" in cfg
+    psk = next(line for line in cfg.splitlines() if line.startswith("PresharedKey = "))
+    assert len(psk.split(" = ")[1]) == 44 and psk in conf.read_text()  # both ends agree
     qr = client.get(f"{API}/apps/{app_id}/vpn/clients/{laptop}/qrcode")
     assert qr.status_code == 200 and qr.text.startswith("<svg")
 

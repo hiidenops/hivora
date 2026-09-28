@@ -91,13 +91,18 @@ def validate_inputs(
     values: dict[str, Any] = {}
     secret_values: dict[str, str] = {}
 
-    for f in template.form.fields:
+    # Defaults citing other fields ("http://{{ host.lan_ip }}:{{ form.web_port }}") come last.
+    def cites_form(f: FormField) -> bool:
+        return isinstance(f.default, str) and "form." in f.default
+
+    for f in sorted(template.form.fields, key=cites_form):
         raw = inputs.get(f.id)
         if raw is None or raw == "":
             if f.type == "secret" and f.generate:
                 secret_values[f.id] = generate_secret(f.generate.length)
                 continue
-            raw = render(f.default, context) if isinstance(f.default, str) else f.default
+            ctx = {**context, "form": values} if cites_form(f) else context
+            raw = render(f.default, ctx) if isinstance(f.default, str) else f.default
         if raw is None or raw == "":
             if f.required and _visible(f, values):
                 errors[f.id] = "required"

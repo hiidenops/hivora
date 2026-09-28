@@ -26,7 +26,7 @@ from hivora.crypto.totp import (
     hash_recovery_code,
     match_recovery_code,
     provisioning_uri,
-    verify_totp,
+    totp_step,
 )
 
 logger = logging.getLogger(__name__)
@@ -113,6 +113,9 @@ class AuthService:
         self.sessions = sessions
         self.box = box
         self.bus = bus
+        # ponytail: last TOTP step accepted per user, in memory (a restart reopens at
+        # most the 90 s window); a column if that ever matters.
+        self._totp_used: dict[int, int] = {}
         self.clock = clock or SystemClock()
         self.limiter = LoginRateLimiter(self.clock)
         # session id -> until when consoles are allowed without a new TOTP code
@@ -187,8 +190,16 @@ class AuthService:
         self.bus.publish("auth.login", user_id=user.id, username=user.username, ip=ip)
         return LoginResult(user, record, token)
 
+    def _accept_totp(self, user: User, code: str) -> bool:
+        """A valid code not used before (replay of an observed code refused)."""
+        step = totp_step(self._totp_secret(user), code, self.clock.now())
+        if step is None or step <= self._totp_used.get(user.id, -1):
+            return False
+        self._totp_used[user.id] = step
+        return True
+
     def _check_second_factor(self, user: User, code: str) -> bool:
-        if verify_totp(self._totp_secret(user), code, self.clock.now()):
+        if self._accept_totp(user, code):
             return True
         index = match_recovery_code(code, user.recovery_codes)
         if index is None:
@@ -266,7 +277,7 @@ class AuthService:
             user = await self._user(session, user_id)
             if user.totp_enabled or user.totp_ciphertext is None:
                 raise ConflictError("no TOTP enrollment in progress")
-            if not verify_totp(self._totp_secret(user), code, self.clock.now()):
+            if not self._accept_totp(user, code):
                 raise InvalidCredentialsError("invalid TOTP code")
             codes = generate_recovery_codes()
             user.recovery_codes = [hash_recovery_code(c) for c in codes]

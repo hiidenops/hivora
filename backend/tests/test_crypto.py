@@ -17,6 +17,7 @@ from hivora.crypto.totp import (
     generate_totp_secret,
     hash_recovery_code,
     match_recovery_code,
+    totp_step,
     verify_totp,
 )
 
@@ -37,6 +38,8 @@ def test_totp_accepts_adjacent_steps_only() -> None:
     assert verify_totp(secret, code, now + timedelta(seconds=30))
     assert not verify_totp(secret, code, now + timedelta(minutes=5))
     assert not verify_totp(secret, "abc123", now)
+    step = totp_step(secret, code, now)
+    assert step is not None and totp_step(secret, code, now + timedelta(seconds=30)) == step
 
 
 def test_recovery_codes() -> None:

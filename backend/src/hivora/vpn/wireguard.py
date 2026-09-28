@@ -6,6 +6,7 @@ database and applies it live (`wg syncconf`), so no API or web UI is needed.
 
 import base64
 import ipaddress
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -25,6 +26,11 @@ def keypair() -> tuple[str, str]:
             base64.b64encode(key.public_key().public_bytes_raw()).decode())  # fmt: skip
 
 
+def preshared() -> str:
+    """`wg genpsk`: 32 random bytes, base64."""
+    return base64.b64encode(os.urandom(32)).decode()
+
+
 def public_of(private: str) -> str:
     key = X25519PrivateKey.from_private_bytes(base64.b64decode(private))
     return base64.b64encode(key.public_key().public_bytes_raw()).decode()
@@ -35,6 +41,7 @@ class Peer:
     name: str
     address: str  # e.g. 10.8.0.2
     public_key: str
+    psk: str | None = None
 
 
 def network(subnet: str, server_ip: str = "") -> tuple[ipaddress.IPv4Network, str]:
@@ -71,18 +78,22 @@ def server_conf(private: str, subnet: str, address: str, port: int, iface: str,
         f" -j {CHAIN}; iptables -F {CHAIN}; iptables -X {CHAIN}",
     ]
     for p in peers:
-        lines += ["", f"# {p.name}", "[Peer]", f"PublicKey = {p.public_key}",
-                  f"AllowedIPs = {p.address}/32"]  # fmt: skip
+        lines += ["", f"# {p.name}", "[Peer]", f"PublicKey = {p.public_key}"]
+        if p.psk:
+            lines.append(f"PresharedKey = {p.psk}")
+        lines.append(f"AllowedIPs = {p.address}/32")
     return "\n".join(lines) + "\n"
 
 
 def client_conf(private: str, address: str, dns: str, server_public: str, endpoint: str,
-                allowed_ips: str) -> str:  # fmt: skip
+                allowed_ips: str, psk: str | None = None) -> str:  # fmt: skip
     lines = ["[Interface]", f"PrivateKey = {private}", f"Address = {address}/32"]
     if dns:
         lines.append(f"DNS = {dns}")
-    lines += ["", "[Peer]", f"PublicKey = {server_public}", f"AllowedIPs = {allowed_ips}",
-              f"Endpoint = {endpoint}", "PersistentKeepalive = 25"]  # fmt: skip
+    lines += ["", "[Peer]", f"PublicKey = {server_public}"]
+    if psk:
+        lines.append(f"PresharedKey = {psk}")
+    lines += [f"AllowedIPs = {allowed_ips}", f"Endpoint = {endpoint}", "PersistentKeepalive = 25"]
     return "\n".join(lines) + "\n"
 
 

@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: vaultwarden
   name: Vaultwarden
-  version: 1.2.0
+  version: 1.3.0
   category: productivity
   tags: [passwords, bitwarden, security]
   icon:
@@ -27,10 +27,10 @@ form:
       label: { fr: "Adresse d'accès (URL complète)", en: Access address (full URL) }
       type: url
       required: true
-      default: 'http://{{ host.lan_ip | default("localhost") }}:8080'
+      default: 'http://{{ host.lan_ip | default("localhost") }}:{{ form.web_port }}'
       help:
-        fr: Les clients Bitwarden exigent HTTPS, sauf sur localhost. Utilisez l'URL finale derrière votre proxy.
-        en: Bitwarden clients require HTTPS except on localhost. Use the final URL behind your proxy.
+        fr: "Vide : http://<IP locale>:<port web>. Les clients Bitwarden exigent HTTPS, sauf sur localhost : utilisez l'URL finale derrière votre proxy."
+        en: "Empty: http://<local IP>:<web port>. Bitwarden clients require HTTPS except on localhost: use the final URL behind your proxy."
     - id: signups_allowed
       label: { fr: Autoriser les inscriptions, en: Allow sign-ups }
       type: boolean

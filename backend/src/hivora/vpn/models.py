@@ -32,3 +32,6 @@ class VpnPeer(Base):
     public_key: Mapped[str] = mapped_column(String(44))
     private_nonce: Mapped[bytes] = mapped_column(LargeBinary)
     private_key: Mapped[bytes] = mapped_column(LargeBinary)
+    # Preshared key (extra symmetric layer), sealed like the private key; clients only.
+    psk_nonce: Mapped[bytes | None] = mapped_column(LargeBinary)
+    psk: Mapped[bytes | None] = mapped_column(LargeBinary)
