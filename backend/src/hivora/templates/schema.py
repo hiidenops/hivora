@@ -370,9 +370,12 @@ class Vpn(_Strict):
     volume: str  # main-service volume holding the config
     config: str = "wg_confs/wg0.conf"  # path of the server config inside that volume
     interface: str = "wg0"
-    port: int = 51820  # published UDP port, used in client configs
+    port: int = 51820  # UDP port WireGuard listens on in the container
     subnet: str = "10.8.0.0/24"
     endpoint_field: str  # form field: public address clients connect to
+    port_field: str | None = None  # form field: published UDP port (default: `port`)
+    subnet_field: str | None = None  # form field: VPN network (default: `subnet`)
+    server_ip_field: str | None = None  # form field: server address (default: first host)
     dns_field: str | None = None  # form field: DNS given to clients
     allowed_ips_field: str | None = None  # form field: default traffic sent through the VPN
     zones_field: str | None = None  # form field: zone slugs whose networks the VPN joins
@@ -427,11 +430,12 @@ class Template(_Strict):
         if unknown := set(self.summary) - set(fields):
             raise ValueError(f"summary lists unknown fields {sorted(unknown)}")
         if self.vpn:
-            refs = (self.vpn.endpoint_field, self.vpn.dns_field, self.vpn.allowed_ips_field,
-                    self.vpn.zones_field)  # fmt: skip
+            v = self.vpn
+            refs = (v.endpoint_field, v.dns_field, v.allowed_ips_field, v.zones_field,
+                    v.port_field, v.subnet_field, v.server_ip_field)  # fmt: skip
             if missing := [r for r in refs if r and r not in fields]:
                 raise ValueError(f"vpn: unknown form fields {missing}")
-            vols = {v.name for v in self.services[self.main_service].volumes}
+            vols = {vol.name for vol in self.services[self.main_service].volumes}
             if self.vpn.volume not in vols:
                 raise ValueError("vpn.volume: not a volume of the main service")
         if self.game:

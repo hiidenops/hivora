@@ -38,21 +38,32 @@ class Peer:
     public_key: str
 
 
-def server_address(subnet: str) -> str:
-    return str(next(ipaddress.ip_network(subnet).hosts()))
+def network(subnet: str, server_ip: str = "") -> tuple[ipaddress.IPv4Network, str]:
+    """The VPN network and the server's address in it (default: its first address).
+
+    Raises ValueError when the network or the address is unusable.
+    """
+    net = ipaddress.ip_network(subnet, strict=True)
+    if not isinstance(net, ipaddress.IPv4Network) or net.prefixlen > 30:
+        raise ValueError("an IPv4 network of at least 4 addresses is needed")
+    server = ipaddress.ip_address(server_ip) if server_ip else next(net.hosts())
+    if server not in set(net.hosts()):
+        raise ValueError("the server address is not a host of the VPN network")
+    return net, str(server)
 
 
 def free_address(subnet: str, used: set[str]) -> str | None:
-    hosts = list(ipaddress.ip_network(subnet).hosts())[1:]  # the first one is the server's
+    hosts = ipaddress.ip_network(subnet).hosts()
     return next((str(ip) for ip in hosts if str(ip) not in used), None)
 
 
-def server_conf(private: str, subnet: str, port: int, iface: str, peers: list[Peer]) -> str:
+def server_conf(private: str, subnet: str, address: str, port: int, iface: str,
+                peers: list[Peer]) -> str:  # fmt: skip
     prefix = ipaddress.ip_network(subnet).prefixlen
     lines = [
         "# Written by Hivora: edits here are replaced on the next change.",
         "[Interface]",
-        f"Address = {server_address(subnet)}/{prefix}",
+        f"Address = {address}/{prefix}",
         f"ListenPort = {port}",
         f"PrivateKey = {private}",
         f"PostUp = {NAT.format(op='-A', subnet=subnet, iface=iface)}",

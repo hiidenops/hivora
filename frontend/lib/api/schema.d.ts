@@ -1283,6 +1283,8 @@ export interface components {
         };
         /** ClientIn */
         ClientIn: {
+            /** Address */
+            address?: string | null;
             /** Allowed Ips */
             allowed_ips?: string[] | null;
             /** Name */
@@ -1290,6 +1292,8 @@ export interface components {
         };
         /** ClientUpdateIn */
         ClientUpdateIn: {
+            /** Address */
+            address?: string | null;
             /** Allowed Ips */
             allowed_ips?: string[] | null;
             /**
@@ -2079,8 +2083,14 @@ export interface components {
         VpnOut: {
             /** Clients */
             clients: components["schemas"]["VpnClientOut"][];
+            /** Default Allowed Ips */
+            default_allowed_ips: string;
             /** Running */
             running: boolean;
+            /** Server Address */
+            server_address: string;
+            /** Subnet */
+            subnet: string;
             /** Zones */
             zones: string[];
         };

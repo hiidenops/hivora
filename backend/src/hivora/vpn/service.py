@@ -5,7 +5,10 @@ app's volume and applies it live by exec (`wg syncconf`): no API, no web UI.
 """
 
 import asyncio
+import ipaddress
+import logging
 import os
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -13,7 +16,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hivora.core.errors import ConflictError, NotFoundError
+from hivora.apps.models import Application
+from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.crypto.cipher import Purpose, Sealed
 from hivora.docker_gateway import ContainerInfo
 from hivora.jobs import Job
@@ -21,6 +25,8 @@ from hivora.runtime import Runtime
 from hivora.templates.schema import Vpn
 from hivora.vpn import wireguard as wg
 from hivora.vpn.models import VpnPeer
+
+logger = logging.getLogger(__name__)
 
 # ponytail: one lock for every VPN (peer changes are rare); per-app locks if that ever matters
 _LOCK = asyncio.Lock()
@@ -42,6 +48,14 @@ class VpnApplyError(ConflictError):
     code = "vpn_apply_failed"
 
 
+class VpnNetworkError(ValidationError):
+    code = "vpn_bad_network"
+
+
+class VpnAddressError(ValidationError):
+    code = "vpn_bad_address"
+
+
 @dataclass(frozen=True, slots=True)
 class _Vpn:
     app_id: int
@@ -58,6 +72,20 @@ class _Vpn:
 
     def value(self, field: str | None, default: str = "") -> str:
         return str(self.values.get(field or "") or default)
+
+    def network(self) -> tuple[str, str]:
+        """(subnet, server address) from the advanced settings, validated."""
+        s = self.spec
+        try:
+            net, server = wg.network(self.value(s.subnet_field, s.subnet),
+                                     self.value(s.server_ip_field))  # fmt: skip
+        except ValueError as exc:
+            raise VpnNetworkError(f"invalid VPN addressing: {exc}") from None
+        return str(net), server
+
+    @property
+    def endpoint_port(self) -> str:
+        return self.value(self.spec.port_field, str(self.spec.port))
 
 
 def _context(app_id: int, public_key: str) -> str:
@@ -89,28 +117,69 @@ class VpnTools:
         return self.rt.box.open(Purpose.VPN, sealed, _context(peer.app_id, peer.public_key))
 
     async def _peers(self, session: AsyncSession, vpn: _Vpn) -> tuple[VpnPeer, list[VpnPeer]]:
-        """The server's key pair (created on first use) and the clients."""
+        """The server's key pair (created on first use) and the clients.
+
+        Follows the addressing settings: the server takes its configured address,
+        clients outside the network (or on the server's address) are renumbered.
+        """
+        subnet, server_ip = vpn.network()
         rows = list(await session.scalars(
             select(VpnPeer).where(VpnPeer.app_id == vpn.app_id).order_by(VpnPeer.id)
         ))  # fmt: skip
         server = next((p for p in rows if p.server), None)
+        clients = [p for p in rows if not p.server]
         if server is None:
             private, public = wg.keypair()
             sealed = self._seal(vpn.app_id, private, public)
             server = VpnPeer(app_id=vpn.app_id, server=True, name="server", public_key=public,
-                             address=wg.server_address(vpn.spec.subnet), enabled=True,
+                             address=server_ip, enabled=True,
                              private_nonce=sealed.nonce, private_key=sealed.ciphertext)  # fmt: skip
             session.add(server)
+        hosts = {str(h) for h in ipaddress.ip_network(subnet).hosts()}
+        used = {server_ip}
+        moved = [server] if server.address != server_ip else []
+        for c in clients:
+            if c.address in hosts and c.address not in used:
+                used.add(c.address)
+            else:
+                moved.append(c)
+        if moved:  # placeholders first: the (app, address) pair stays unique at each step
+            for p in moved:
+                p.address = f"-{id(p)}"
             await session.flush()
-        return server, [p for p in rows if not p.server]
+            for p in moved:
+                address = server_ip if p is server else wg.free_address(subnet, used)
+                if address is None:
+                    raise VpnFullError("no address left in the VPN network")
+                p.address = address
+                used.add(address)
+        await session.flush()
+        return server, clients
 
-    async def _sync(self, session: AsyncSession, vpn: _Vpn) -> None:
-        """Rewrite the server config from the database, then apply it if the VPN runs."""
+    def _check_address(self, vpn: _Vpn, address: str, taken: set[str]) -> None:
+        subnet, _ = vpn.network()
+        try:
+            ok = ipaddress.ip_address(address) in set(ipaddress.ip_network(subnet).hosts())
+        except ValueError:
+            ok = False
+        if not ok or address in taken:
+            raise VpnAddressError("address outside the VPN network or already used",
+                                  field="address", address=address[:45])  # fmt: skip
+
+    async def _sync(self, session: AsyncSession, vpn: _Vpn, *, if_changed: bool = False) -> None:
+        """Rewrite the server config from the database, then apply it if the VPN runs.
+
+        ``if_changed``: only when the file differs (settings changed, file edited or lost).
+        """
         server, clients = await self._peers(session, vpn)
         s = vpn.spec
-        text = wg.server_conf(self._private(server), s.subnet, s.port, s.interface, [
+        subnet, _ = vpn.network()
+        text = wg.server_conf(self._private(server), subnet, server.address, s.port, s.interface, [
             wg.Peer(c.name, c.address, c.public_key) for c in clients if c.enabled
         ])  # fmt: skip
+        with suppress(OSError):
+            if if_changed and vpn.host_config.read_text() == text:
+                return
         vpn.host_config.parent.mkdir(parents=True, exist_ok=True)
         tmp = vpn.host_config.with_suffix(".tmp")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)  # holds a private key
@@ -119,13 +188,24 @@ class VpnTools:
         tmp.replace(vpn.host_config)
         if vpn.container is None:
             return  # the image brings it up on start
+        # Same address: peers applied live. New addressing: the interface is rebuilt.
+        # ponytail: the old network's NAT rule stays until the container restarts (harmless)
         i, c = s.interface, vpn.config
+        inet = f"inet {server.address}/{ipaddress.ip_network(subnet).prefixlen} "
         code, out = await self.rt.gateway.exec_run(vpn.container.id, ["sh", "-c", (
-            f"if wg show {i} >/dev/null 2>&1; then wg-quick strip {c} > /tmp/{i}.conf"
-            f" && wg syncconf {i} /tmp/{i}.conf; else wg-quick up {c}; fi"
+            f"if wg show {i} >/dev/null 2>&1; then"
+            f" if ip -4 -o addr show {i} | grep -qF '{inet}'; then"
+            f" wg-quick strip {c} > /tmp/{i}.conf && wg syncconf {i} /tmp/{i}.conf;"
+            f" else ip link del {i} && wg-quick up {c}; fi;"
+            f" else wg-quick up {c}; fi"
         )])  # fmt: skip
         if code != 0:
             raise VpnApplyError("WireGuard refused the configuration", output=out[-500:])
+
+    async def sync(self, app_id: int) -> None:
+        vpn = await self._vpn(app_id)
+        async with _LOCK, self.rt.sessions() as session, session.begin():
+            await self._sync(session, vpn)
 
     async def _client(self, session: AsyncSession, vpn: _Vpn, cid: int) -> VpnPeer:
         peer = await session.get(VpnPeer, cid)
@@ -138,6 +218,8 @@ class VpnTools:
         stats: dict[str, wg.PeerStats] = {}
         async with _LOCK, self.rt.sessions() as session, session.begin():
             _, clients = await self._peers(session, vpn)
+            with suppress(VpnApplyError):  # listing still works; the next change reports it
+                await self._sync(session, vpn, if_changed=True)
             if vpn.container is not None:
                 cmd = ["wg", "show", vpn.spec.interface, "dump"]
                 code, out = await self.rt.gateway.exec_run(vpn.container.id, cmd)
@@ -146,19 +228,26 @@ class VpnTools:
                     code, out = await self.rt.gateway.exec_run(vpn.container.id, cmd)
                 stats = wg.parse_dump(out) if code == 0 else {}
         none = wg.PeerStats(None, 0, 0)
-        return {"running": vpn.container is not None, "zones": vpn.zones, "clients": [{
+        subnet, server_ip = vpn.network()
+        return {"running": vpn.container is not None, "zones": vpn.zones, "subnet": subnet,
+                "server_address": server_ip,
+                "default_allowed_ips": vpn.value(vpn.spec.allowed_ips_field, "0.0.0.0/0"),
+                "clients": [{
             "id": c.id, "name": c.name, "address": c.address, "enabled": c.enabled,
             "allowed_ips": c.allowed_ips, "public_key": c.public_key,
             "latest_handshake": stats.get(c.public_key, none).latest_handshake,
             "rx": stats.get(c.public_key, none).rx, "tx": stats.get(c.public_key, none).tx,
         } for c in clients]}  # fmt: skip
 
-    async def create(self, app_id: int, name: str, allowed_ips: list[str] | None) -> int:
+    async def create(self, app_id: int, name: str, allowed_ips: list[str] | None,
+                     address: str | None = None) -> int:  # fmt: skip
         vpn = await self._vpn(app_id)
         async with _LOCK, self.rt.sessions() as session, session.begin():
             server, clients = await self._peers(session, vpn)
             used = {server.address, *(c.address for c in clients)}
-            address = wg.free_address(vpn.spec.subnet, used)
+            if address:
+                self._check_address(vpn, address, used)
+            address = address or wg.free_address(vpn.network()[0], used)
             if address is None:
                 raise VpnFullError("no address left in the VPN network")
             private, public = wg.keypair()
@@ -173,10 +262,16 @@ class VpnTools:
         return peer.id
 
     async def update(self, app_id: int, cid: int, *, enabled: bool | None,
-                     allowed_ips: list[str] | None, clear_allowed: bool) -> None:  # fmt: skip
+                     allowed_ips: list[str] | None, clear_allowed: bool,
+                     address: str | None = None) -> None:  # fmt: skip
         vpn = await self._vpn(app_id)
         async with _LOCK, self.rt.sessions() as session, session.begin():
+            server, clients = await self._peers(session, vpn)
             peer = await self._client(session, vpn, cid)
+            if address and address != peer.address:
+                taken = {server.address, *(c.address for c in clients if c is not peer)}
+                self._check_address(vpn, address, taken)
+                peer.address = address
             if enabled is not None:
                 peer.enabled = enabled
             if allowed_ips is not None or clear_allowed:
@@ -215,7 +310,8 @@ class VpnTools:
             peer = await self._client(session, vpn, cid)
             s = vpn.spec
             host = vpn.value(s.endpoint_field)
-            endpoint = f"[{host}]:{s.port}" if ":" in host else f"{host}:{s.port}"
+            port = vpn.endpoint_port
+            endpoint = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
             allowed = ", ".join(peer.allowed_ips or []) or vpn.value(
                 s.allowed_ips_field, "0.0.0.0/0"
             )
@@ -242,3 +338,22 @@ class VpnTools:
         job = await self.rt.apps.update(app_id, inputs)
         self.rt.bus.publish("vpn.zones_changed", app=vpn.slug, zones=zones)
         return job
+
+
+async def follow_deploys(rt: Runtime) -> None:
+    """After each deploy or settings change of a VPN, rewrite and apply its config."""
+    async with rt.bus.subscribe("app.deployed") as sub:
+        async for event in sub:
+            # ponytail: fixed wait for the state to see the new container (< 2 s budget)
+            await asyncio.sleep(3)
+            try:
+                async with rt.sessions() as session:
+                    app_id = await session.scalar(
+                        select(Application.id).where(Application.slug == event.payload["app"])
+                    )
+                if app_id is not None:
+                    await VpnTools(rt).sync(app_id)
+            except NotAVpnError:
+                pass
+            except Exception:
+                logger.exception("VPN config not applied after deploy", extra=event.payload)

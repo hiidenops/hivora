@@ -20,26 +20,28 @@ type Client = components["schemas"]["VpnClientOut"];
 
 const ips = (text: string) => text.split(/[\s,]+/).filter(Boolean);
 
-function AllowedIps({ appId, client, onSaved }: { appId: number; client: Client; onSaved: () => void }) {
+function ClientNetwork({ appId, client, defaultIps, onSaved }: { appId: number; client: Client; defaultIps: string; onSaved: () => void }) {
   const { t, errorMessage } = useI18n();
+  const [address, setAddress] = useState(client.address ?? "");
   const [text, setText] = useState((client.allowed_ips ?? []).join(", "));
   const save = useMutation({
     mutationFn: () =>
       api(`/apps/${appId}/vpn/clients/${client.id}`, {
         method: "PUT",
-        body: text.trim() ? { allowed_ips: ips(text) } : { clear_allowed_ips: true },
+        body: { ...(text.trim() ? { allowed_ips: ips(text) } : { clear_allowed_ips: true }), address: address.trim() || null },
       }),
     onSuccess: onSaved,
   });
   return (
     <form
-      className="flex gap-2"
+      className="flex flex-wrap gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         save.mutate();
       }}
     >
-      <Input aria-label={t("vpn.allowedIps")} className="h-8 font-mono text-xs" placeholder={t("vpn.defaultIps")} value={text} onChange={(e) => setText(e.target.value)} />
+      <Input aria-label={t("vpn.address")} title={t("vpn.address")} className="h-8 w-32 font-mono text-xs" value={address} maxLength={15} onChange={(e) => setAddress(e.target.value)} />
+      <Input aria-label={t("vpn.allowedIps")} title={t("vpn.allowedIps")} className="h-8 min-w-48 flex-1 font-mono text-xs" placeholder={t("vpn.defaultIps", { ips: defaultIps })} value={text} onChange={(e) => setText(e.target.value)} />
       <Button type="submit" size="sm" variant="outline" disabled={save.isPending}>
         {t("common.save")}
       </Button>
@@ -90,6 +92,11 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
         {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
         {data && !data.running && <p className="text-sm text-muted-foreground">{t("vpn.stopped")}</p>}
         {data && (
+          <p className="text-sm text-muted-foreground">
+            {t("vpn.addressing", { subnet: data.subnet, gateway: data.server_address })}
+          </p>
+        )}
+        {data && (
           <>
             <form onSubmit={add} className="flex flex-wrap gap-2">
               <Input aria-label={t("vpn.clientName")} className="w-56" placeholder={t("vpn.clientName")} value={name} maxLength={32} pattern="[A-Za-z0-9 _.\-]+" required onChange={(e) => setName(e.target.value)} />
@@ -107,7 +114,10 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
                       <Switch
                         aria-label={t("vpn.enabled", { name: c.name })}
                         checked={c.enabled}
-                        onChange={(e) => act.mutate(() => api(`/apps/${appId}/vpn/clients/${c.id}`, { method: "PUT", body: { enabled: e.target.checked } }))}
+                        onChange={(e) => {
+                          const enabled = e.target.checked; // read now: React restores the controlled input before the mutation runs
+                          act.mutate(() => api(`/apps/${appId}/vpn/clients/${c.id}`, { method: "PUT", body: { enabled } }));
+                        }}
                       />
                       <span className="font-medium">{c.name}</span>
                       <span className="font-mono text-xs text-muted-foreground">{c.address}</span>
@@ -152,7 +162,7 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
                         </Button>
                       </span>
                     </div>
-                    <AllowedIps appId={appId} client={c} onSaved={refresh} />
+                    <ClientNetwork key={`${c.address}|${(c.allowed_ips ?? []).join()}`} appId={appId} client={c} defaultIps={data.default_allowed_ips} onSaved={refresh} />
                     {c.public_key && <p className="truncate font-mono text-xs text-muted-foreground">{t("vpn.publicKey")} {c.public_key}</p>}
                   </li>
                 ))}

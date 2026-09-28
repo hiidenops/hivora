@@ -11,12 +11,20 @@ def test_keys_configs_and_dump() -> None:
     assert len(private) == len(public) == 44 and wg.public_of(private) == public
 
     peers = [wg.Peer("phone", "10.8.0.2", "PUB2")]
-    conf = wg.server_conf("PRIV", "10.8.0.0/24", 51820, "wg0", peers)
+    conf = wg.server_conf("PRIV", "10.8.0.0/24", "10.8.0.1", 51820, "wg0", peers)
     assert "Address = 10.8.0.1/24" in conf and "ListenPort = 51820" in conf
     assert "-s 10.8.0.0/24 -j MASQUERADE" in conf  # every interface: LAN and zone networks
     assert "# phone\n[Peer]\nPublicKey = PUB2\nAllowedIPs = 10.8.0.2/32" in conf
 
     assert wg.free_address("10.8.0.0/24", {"10.8.0.1", "10.8.0.2"}) == "10.8.0.3"
+    assert wg.network("10.9.0.0/24", "10.9.0.254") == (wg.ipaddress.ip_network("10.9.0.0/24"),
+                                                       "10.9.0.254")  # fmt: skip
+    for bad in (("10.9.0.0/31", ""), ("10.9.0.0/24", "10.8.0.1"), ("10.9.0.1/24", "")):
+        try:
+            wg.network(*bad)
+            raise AssertionError(bad)
+        except ValueError:
+            pass
     assert wg.free_address("10.8.0.0/30", {"10.8.0.1", "10.8.0.2"}) is None
 
     dump = "PRIV\tPUB\t51820\toff\nPUB2\t(none)\t1.2.3.4:5\t10.8.0.2/32\t1700000000\t10\t20\t25\n"
@@ -97,3 +105,22 @@ def test_vpn_clients_and_linked_zones(client: Any, tmp_path: Path) -> None:
     assert client.get(f"{API}/apps/{app_id}/vpn").json()["zones"] == ["jeux"]
     refused = client.put(f"{API}/apps/{app_id}/vpn/zones", json={"zones": ["solo"]})
     assert refused.status_code == 422
+
+    # Addressing: a client picks its IP, then a new network renumbers what no longer fits.
+    gw.exec_results.clear()
+    moved = client.put(f"{API}/apps/{app_id}/vpn/clients/{laptop}", json={"address": "10.8.0.50"})
+    assert moved.status_code == 204 and "AllowedIPs = 10.8.0.50/32" in conf.read_text()
+    taken = client.put(f"{API}/apps/{app_id}/vpn/clients/{laptop}", json={"address": "10.8.0.1"})
+    assert taken.status_code == 422 and code(taken) == "vpn_bad_address"
+    settings = client.get(f"{API}/apps/{app_id}/settings").json()["values"]
+    new_net = {**settings, "vpn_subnet": "10.9.0.0/24", "vpn_server_ip": "10.9.0.254",
+               "vpn_port": 51999}  # fmt: skip
+    job = client.put(f"{API}/apps/{app_id}/settings", json={"inputs": new_net}).json()
+    assert wait_job(client, job["id"])["status"] == "succeeded"
+    vpn = client.get(f"{API}/apps/{app_id}/vpn").json()
+    assert (vpn["subnet"], vpn["server_address"]) == ("10.9.0.0/24", "10.9.0.254")
+    assert vpn["clients"][0]["address"] == "10.9.0.1"
+    text = conf.read_text()
+    assert "Address = 10.9.0.254/24" in text and "-s 10.9.0.0/24 -j MASQUERADE" in text
+    cfg = client.get(f"{API}/apps/{app_id}/vpn/clients/{laptop}/config").text
+    assert "Endpoint = vpn.example.org:51999" in cfg

@@ -374,6 +374,18 @@
       },
       "ClientIn": {
         "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 45,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
           "allowed_ips": {
             "anyOf": [
               {
@@ -405,6 +417,18 @@
       },
       "ClientUpdateIn": {
         "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 45,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
           "allowed_ips": {
             "anyOf": [
               {
@@ -2737,9 +2761,21 @@
             "title": "Clients",
             "type": "array"
           },
+          "default_allowed_ips": {
+            "title": "Default Allowed Ips",
+            "type": "string"
+          },
           "running": {
             "title": "Running",
             "type": "boolean"
+          },
+          "server_address": {
+            "title": "Server Address",
+            "type": "string"
+          },
+          "subnet": {
+            "title": "Subnet",
+            "type": "string"
           },
           "zones": {
             "items": {
@@ -2751,6 +2787,9 @@
         },
         "required": [
           "running",
+          "subnet",
+          "server_address",
+          "default_allowed_ips",
           "clients",
           "zones"
         ],

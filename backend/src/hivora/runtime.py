@@ -60,6 +60,7 @@ class Runtime:
     public_address: PublicAddress
     app_metrics: AppMetrics
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
+    _vpn_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     consoles: "ConsoleManager" = field(init=False)
 
     def __post_init__(self) -> None:
@@ -136,6 +137,9 @@ class Runtime:
         except Exception:
             logger.warning("Docker did not report its architecture; using the local one")
         await self.state.start()
+        from hivora.vpn.service import follow_deploys  # needs Runtime itself
+
+        self._vpn_task = asyncio.create_task(follow_deploys(self), name="vpn-follow")
         await self.jobs.start()
 
     async def _warm_icons(self) -> None:
@@ -145,8 +149,9 @@ class Runtime:
             logger.exception("icon cache warm-up failed")
 
     async def stop(self) -> None:
-        if self._icons_task:
-            self._icons_task.cancel()
+        for task in (self._icons_task, self._vpn_task):
+            if task:
+                task.cancel()
         await self.jobs.stop()
         await self.metrics.stop()
         await self.public_address.stop()

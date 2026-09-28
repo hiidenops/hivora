@@ -25,6 +25,9 @@ class VpnClientOut(BaseModel):
 
 class VpnOut(BaseModel):
     running: bool
+    subnet: str  # VPN network, e.g. 10.8.0.0/24
+    server_address: str  # the WireGuard gateway
+    default_allowed_ips: str  # traffic sent through the VPN when a client sets none
     clients: list[VpnClientOut]
     zones: list[str]  # zones whose networks the VPN reaches
 
@@ -32,12 +35,14 @@ class VpnOut(BaseModel):
 class ClientIn(BaseModel):
     name: str = Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9 _.-]+$")
     allowed_ips: list[str] | None = Field(default=None, max_length=32)
+    address: str | None = Field(default=None, max_length=45)  # None: next free address
 
 
 class ClientUpdateIn(BaseModel):
     enabled: bool | None = None
     allowed_ips: list[str] | None = Field(default=None, max_length=32)
     clear_allowed_ips: bool = False  # back to the VPN's default
+    address: str | None = Field(default=None, max_length=45)
 
 
 class ZonesIn(BaseModel):
@@ -67,14 +72,16 @@ async def overview(app_id: int, _: Operator, rt: RuntimeDep) -> VpnOut:
 @router.post("/{app_id}/vpn/clients", status_code=201)
 async def create(app_id: int, body: ClientIn, _: Operator, rt: RuntimeDep) -> dict[str, int]:
     _check_ips(body.allowed_ips)
-    return {"id": await VpnTools(rt).create(app_id, body.name, body.allowed_ips)}
+    return {"id": await VpnTools(rt).create(app_id, body.name, body.allowed_ips, body.address)}
 
 
 @router.put("/{app_id}/vpn/clients/{cid}", status_code=204)
 async def update(app_id: int, cid: int, body: ClientUpdateIn, _: Operator, rt: RuntimeDep) -> None:
     _check_ips(body.allowed_ips)
-    await VpnTools(rt).update(app_id, cid, enabled=body.enabled, allowed_ips=body.allowed_ips,
-                              clear_allowed=body.clear_allowed_ips)  # fmt: skip
+    await VpnTools(rt).update(
+        app_id, cid, enabled=body.enabled, allowed_ips=body.allowed_ips,
+        clear_allowed=body.clear_allowed_ips, address=body.address,
+    )  # fmt: skip
 
 
 @router.delete("/{app_id}/vpn/clients/{cid}", status_code=204)
