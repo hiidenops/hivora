@@ -77,3 +77,19 @@ def test_frozen_clock() -> None:
     clock = FrozenClock(t0)
     clock.advance(timedelta(minutes=5))
     assert clock.now() == t0 + timedelta(minutes=5)
+
+
+def test_self_signed_certificate_created_once(tmp_path: Path) -> None:
+    from cryptography import x509
+
+    from hivora.__main__ import self_signed
+
+    cert, key = self_signed(tmp_path / "tls", ["localhost", "192.168.1.10", ""])
+    assert key.stat().st_mode & 0o077 == 0
+    parsed = x509.load_pem_x509_certificate(cert.read_bytes())
+    san = parsed.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+    assert "localhost" in san.get_values_for_type(x509.DNSName)
+    assert [str(ip) for ip in san.get_values_for_type(x509.IPAddress)] == ["192.168.1.10"]
+    before = cert.read_bytes()
+    self_signed(tmp_path / "tls", ["other"])  # kept: the user may have put their own
+    assert cert.read_bytes() == before

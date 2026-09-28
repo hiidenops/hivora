@@ -1,0 +1,22 @@
+# Hivora with Docker Compose (alternative to install.sh). Adjust HIVORA_HOST_LAN_IP,
+# HIVORA_TIMEZONE and the published address, then: docker compose up -d
+# The data and volume folders are mounted at the same path inside and outside:
+# the compose files Hivora generates use host paths.
+services:
+  hivora:
+    image: ghcr.io/hiidenops/hivora:latest
+    container_name: hivora
+    restart: unless-stopped
+    ports:
+      - "8443:8443"  # e.g. "192.168.1.10:8443:8443" to listen on the LAN address only
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/hivora/data:/opt/hivora/data
+      - /srv/hivora:/srv/hivora
+    environment:
+      HIVORA_HOST_LAN_IP: "192.168.1.10"
+      HIVORA_TIMEZONE: "Europe/Paris"
+      HIVORA_PUID: "1000"
+      HIVORA_PGID: "1000"
+    labels:
+      io.hivora.self: "true"

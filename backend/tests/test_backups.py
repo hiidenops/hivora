@@ -67,7 +67,7 @@ def test_backup_restore_schedule_and_retention(client: Any) -> None:
     deployed = client.post(f"{API}/apps", json=body).json()
     assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
     app_id = deployed["app"]["id"]
-    rt = client.app.state.runtime  # type: ignore[attr-defined]
+    rt = client.app.state.runtime
     data = rt.settings.volumes_root / "coffre" / "data"
     data.mkdir(parents=True, exist_ok=True)
     (data / "db.sqlite3").write_text("first")

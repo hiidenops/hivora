@@ -76,7 +76,7 @@ class Runtime:
         settings: Settings,
         *,
         gateway: DockerGateway | None = None,
-        compose_cmd: Sequence[str] = ("docker", "compose"),
+        compose_cmd: Sequence[str] | None = None,
         compose_env: dict[str, str] | None = None,
         clock: Clock | None = None,
     ) -> "Runtime":
@@ -97,7 +97,8 @@ class Runtime:
 
             gateway = LocalDockerGateway()
         state = StateService(gateway, bus)
-        runner = ComposeRunner(settings.apps_dir, compose_cmd=compose_cmd, env=compose_env)
+        runner = ComposeRunner(settings.apps_dir, compose_cmd=compose_cmd or settings.compose_cmd,
+                               env=compose_env)  # fmt: skip
         jobs = JobQueue(sessions, bus, clock=clock, workers=settings.job_workers)
         secrets = SecretSettings(sessions, box, bus)
         public_address = PublicAddress(sessions, settings.host_public_ip)

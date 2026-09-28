@@ -37,7 +37,7 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Logs en direct | Tous les conteneurs d'une app, filtre par service, recherche, téléchargement | ✅ | voir `git log` |
 | Mise à jour et retour arrière | Nouvelle version du template ou de l'image en un clic, restaurer une révision | ✅ | voir `git log` |
 | Sauvegardes | À la demande ou planifiées, rétention, restauration, téléchargement | ✅ | voir `git log` |
-| M6 Livraison | Image Docker, HTTPS, script d'installation | ⏳ | |
+| M6 Livraison | Image Docker, HTTPS, script d'installation, budgets en CI | ✅ | voir `git log` |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
 | Minecraft, partie A | Horodatage des graphiques, « Modifier les réglages » (révisions), types de serveur et modpacks, propriétés | ✅ | voir `git log` |
@@ -45,7 +45,6 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Minecraft, partie B | Joueurs connectés, liste blanche (on/off + ajout/retrait), admins | ✅ | voir `git log` |
 | Fiche d'app et réglages | Carte d'état, cartes repliables, versions en liste, propriétés disponibles | ✅ | voir `git log` |
 | Minecraft, partie C | Gestion des mondes | ⏳ proposé | — |
-| M6 Livraison | Image Docker, HTTPS, script d'installation, budgets CI, 3 templates | ⏳ à lancer | — |
 
 Tests : 110 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Playwright, contrôle du budget bundle. Tout passe.
 
@@ -151,9 +150,16 @@ Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en b
 - Plus tard (V3) : WireGuard en passerelle d'une zone.
 - **Mise à jour en un clic** (F-20) : `GET /apps/{id}/upgrade` compare la version du template de l'app au catalogue, ou, pour une image libre, le digest du tag dans son registre (cache 10 min) ; bandeau « Nouvelle version disponible » sur la fiche → dialogue (diff, conflits, avertissement d'effacement) → nouvelle révision avec les mêmes réglages (image libre : template re-figé sur le nouveau digest). **Retour arrière** : chaque révision garde sa version de template (migration `0008`) ; « Restaurer » (fiche, mode avancé, liste des révisions) recompile ses réglages avec cette version, en nouvelle révision. Minecraft 1.13.0 : lignes du sondage RCON masquées des logs en direct (`logs.hide`).
 - **Sauvegardes** (module `backups`, migration `0009`) : archive `tar.gz` des volumes marqués `backup` dans `<data>/backups/<slug>/`, tâches `backup` / `backup_restore` dans la file de l'app (arrêt pendant la copie si demandé, relance ensuite), planification quotidienne / hebdomadaire / toutes les N heures à l'heure locale (`HIVORA_TIMEZONE`), vérifiée chaque minute, rétention des N dernières automatiques (les manuelles restent), restauration (contenu des volumes remplacé, propriétaires gardés, archive hors volumes refusée), téléchargement ; archives supprimées avec l'app si ses données le sont. Carte « Sauvegardes » sur la fiche. Testé en réel (Vaultwarden en marche : arrêt, archive, relance ; restauration). À venir : copie vers un stockage externe (S3, SFTP).
+- **Livraison (M6)** :
+  - `Dockerfile` (racine) : 3 étapes figées par digest (Node → export statique, Python + uv → venv verrouillé, runtime `python:3.13-alpine`), Compose v2 **autonome** (`docker/compose-bin`, `HIVORA_COMPOSE_CMD='["docker-compose"]'`, pas de CLI Docker), `python -m hivora`, healthcheck. Mesuré sur ARM : **174 Mo sur disque, ~51 Mo à télécharger, 88 Mo de RAM au repos**.
+  - **HTTPS par défaut** (`HIVORA_TLS`, `HIVORA_PORT`=8443) : certificat auto-signé ECDSA créé au premier démarrage dans `<data>/tls/` (SAN : localhost, nom d'hôte, IP LAN/publique), jamais écrasé (remplaçable par le sien). `HIVORA_TLS=false` derrière un proxy.
+  - `deploy/install.sh` (brouillon de get.hivora.io) : Linux amd64/arm64, root, installe Docker si absent (confirmation, `--yes`), Engine ≥ 24, détecte IP LAN / fuseau / PUID, `docker run` avec les 3 montages au même chemin, écoute sur l'IP LAN par défaut (`--bind`), attend « healthy », affiche l'URL ; relancer = mise à jour (données gardées). `deploy/compose.yaml` en alternative.
+  - CI `image.yml` : build amd64, budgets vérifiés (image < 200 Mo sur disque, RAM au repos < 150 Mo, HTTPS sain), publication amd64 + arm64 sur `ghcr.io/hiidenops/hivora` à chaque tag `v*`.
+  - uvicorn sans extras (`websockets` seul) ; mypy des tests remis au vert.
+  - Reste : débit réseau de l'hôte vu depuis le conteneur (monter `/proc` de l'hôte), panel joignable seulement par le VPN, domaine public + Let's Encrypt.
 - **Logs en direct** (F-13) : carte « Logs » de la fiche (opérateur, chargée à la demande, flux seulement carte ouverte) : canal WS `logs.open`/`logs.close` (4 flux max par onglet), tous les conteneurs de l'app suivis, liste relue toutes les 2 s (redémarrage, recréation : reprise depuis la dernière ligne, sans doublon), lignes groupées toutes les 250 ms (500 max, le surplus est compté), secrets de l'app masqués. Filtre par service, recherche, suivi automatique, vider. Téléchargement `GET /apps/{id}/logs` (10 000 lignes par conteneur, fusionnées par heure, audit `app.logs_downloaded`). Testé en réel (Vaultwarden, redémarrage suivi).
 
-▶ **Prochaine étape** : tester les jeux x86 sur une machine x86, puis M6 (livraison). Catalogue LinuxGSM générique (140+ jeux) : non fait (ports inconnus avant installation, contraire à la règle des digests figés).
+▶ **Prochaine étape** : publier une première version (tag `v0.1.0` → image sur ghcr.io), l'installer sur une machine x86 et y tester les jeux x86. Catalogue LinuxGSM générique (140+ jeux) : non fait (ports inconnus avant installation, contraire à la règle des digests figés).
 
 ## Retours traités (tour 4)
 

@@ -6,7 +6,7 @@ from helpers import API, admin, code, wait_job
 from hivora.images.registry import ImageInfo, parse_ref
 
 
-def compose_of(client: Any, app_id: int) -> dict[str, Any]:
+def compose_of(client: Any, app_id: int) -> Any:
     return yaml.safe_load(client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"])
 
 
@@ -21,7 +21,7 @@ def test_template_upgrade_and_restore(client: Any) -> None:
     assert client.get(f"{API}/apps/{app_id}/upgrade").json()["available"] is False
 
     # The app was deployed from an older version of the template.
-    rt = client.app.state.runtime  # type: ignore[attr-defined]
+    rt = client.app.state.runtime
     with sqlite3.connect(rt.settings.db_path) as db:
         db.execute("UPDATE template_version SET version = '0.0.1' WHERE slug = 'vaultwarden'")
     status = client.get(f"{API}/apps/{app_id}/upgrade").json()
@@ -58,7 +58,7 @@ def test_free_image_upgrade_follows_the_registry(client: Any) -> None:
             return ImageInfo(parse_ref(text), digests[-1], ["amd64", "arm64"], [(80, "tcp")])
 
     admin(client)
-    rt = client.app.state.runtime  # type: ignore[attr-defined]
+    rt = client.app.state.runtime
     rt.apps.registry = FakeRegistry()
     body = {"name": "Web", "image": "nginx:1.29", "ports": [{"container": 80, "host": 8088}]}
     deployed = client.post(f"{API}/apps/custom", json=body).json()

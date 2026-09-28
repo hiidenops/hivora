@@ -31,6 +31,16 @@ class Settings(BaseSettings):
 
     job_workers: int = 2
 
+    # How to run Compose v2: the docker CLI plugin, or the standalone binary
+    # (the Hivora image ships only that: HIVORA_COMPOSE_CMD='["docker-compose"]').
+    compose_cmd: list[str] = ["docker", "compose"]
+
+    # HTTPS (the image's default): a self-signed certificate is created in
+    # <data>/tls/ on first start unless one is already there. False: plain HTTP
+    # (behind a reverse proxy that terminates TLS).
+    tls: bool = True
+    port: int = 8443
+
     session_idle_hours: int = 12
     session_max_days: int = 30
     # Development over plain HTTP only: drops the Secure cookie flag.

@@ -1,0 +1,70 @@
+name: Image
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build (amd64, loaded for the checks)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: hivora:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Budget — image under 200 MB on disk
+        run: |
+          size=$(docker run --rm --entrypoint sh hivora:ci -c 'du -sxm / 2>/dev/null | tail -1' | cut -f1)
+          echo "image: ${size} MB"
+          test "$size" -lt 200
+
+      - name: Budget — RAM at rest under 150 MB, healthy over HTTPS
+        run: |
+          sudo mkdir -p /opt/hivora/data /srv/hivora
+          docker run -d --name hivora -p 8443:8443 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /opt/hivora/data:/opt/hivora/data -v /srv/hivora:/srv/hivora hivora:ci
+          for i in $(seq 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' hivora)" = healthy ] && break
+            sleep 2
+          done
+          docker inspect -f '{{.State.Health.Status}}' hivora | grep -qx healthy || { docker logs hivora; exit 1; }
+          curl -skf https://127.0.0.1:8443/api/v1/system/health
+          sleep 30
+          mem=$(docker stats --no-stream --format '{{.MemUsage}}' hivora | awk '{print $1}')
+          echo "RAM at rest: $mem"
+          python3 -c "import re,sys; v,u=re.match(r'([\d.]+)(\w+)','$mem').groups(); mb=float(v)*{'KiB':1/1024,'MiB':1,'GiB':1024}[u]; sys.exit(mb>=150)"
+
+      - name: Publish (tags only; amd64 + arm64)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha

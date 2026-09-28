@@ -1,3 +1,4 @@
+import ipaddress
 import time
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,7 @@ def test_keys_configs_and_dump() -> None:
     assert "# phone\n[Peer]\nPublicKey = PUB2\nAllowedIPs = 10.8.0.2/32" in conf
 
     assert wg.free_address("10.8.0.0/24", {"10.8.0.1", "10.8.0.2"}) == "10.8.0.3"
-    assert wg.network("10.9.0.0/24", "10.9.0.254") == (wg.ipaddress.ip_network("10.9.0.0/24"),
+    assert wg.network("10.9.0.0/24", "10.9.0.254") == (ipaddress.ip_network("10.9.0.0/24"),
                                                        "10.9.0.254")  # fmt: skip
     for bad in (("10.9.0.0/31", ""), ("10.9.0.0/24", "10.8.0.1"), ("10.9.0.1/24", "")):
         try:
@@ -30,7 +31,8 @@ def test_keys_configs_and_dump() -> None:
 
     dump = "PRIV\tPUB\t51820\toff\nPUB2\t(none)\t1.2.3.4:5\t10.8.0.2/32\t1700000000\t10\t20\t25\n"
     stats = wg.parse_dump(dump, 1_700_000_060)["PUB2"]
-    assert (stats.rx, stats.tx) == (10, 20) and stats.latest_handshake.startswith("2023-11-14")
+    assert (stats.rx, stats.tx) == (10, 20)
+    assert (stats.latest_handshake or "").startswith("2023-11-14")
     assert stats.online and stats.endpoint == "1.2.3.4:5"
     assert not wg.parse_dump(dump, 1_700_000_500)["PUB2"].online
     assert (
@@ -73,7 +75,7 @@ def test_vpn_clients_and_linked_zones(client: Any, tmp_path: Path) -> None:
     assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
     app_id = deployed["app"]["id"]
     assert client.get(f"{API}/apps/{app_id}").json()["vpn"] is True
-    runtime = client.app.state.runtime  # type: ignore[attr-defined]
+    runtime = client.app.state.runtime
     conf = runtime.settings.volumes_root / "vpn" / "config" / "wg_confs" / "wg0.conf"
 
     # Stopped: the config is written anyway, the image brings it up on start.

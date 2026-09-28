@@ -43,7 +43,7 @@ def test_live_logs_and_download(client: Any) -> None:
     assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
     app_id = deployed["app"]["id"]
 
-    runtime = client.app.state.runtime  # type: ignore[attr-defined]
+    runtime = client.app.state.runtime
     gw = runtime.gateway
     gw.logs_by_container["v1"] = [
         "2026-09-28T10:00:02.000000000Z second",

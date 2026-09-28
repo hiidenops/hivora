@@ -5,7 +5,8 @@ description = "Docker control panel for homelab and game servers"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
-    "uvicorn[standard]>=0.32",
+    "uvicorn>=0.32",
+    "websockets>=13",  # the /ws endpoint (uvicorn extras like uvloop are not needed)
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "sqlalchemy>=2.0",
