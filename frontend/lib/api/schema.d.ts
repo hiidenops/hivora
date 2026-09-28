@@ -300,6 +300,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/{app_id}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download
+         * @description Logs of the app's containers as text (last ``tail`` lines each), secrets masked.
+         */
+        get: operations["download_api_v1_apps__app_id__logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{app_id}/removal-plan": {
         parameters: {
             query?: never;
@@ -345,6 +365,43 @@ export interface paths {
         get: operations["list_revisions_api_v1_apps__app_id__revisions_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/revisions/{number}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plan Restore */
+        post: operations["plan_restore_api_v1_apps__app_id__revisions__number__plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/revisions/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore
+         * @description A new revision with that revision's settings and template version.
+         */
+        post: operations["restore_api_v1_apps__app_id__revisions__number__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -420,6 +477,47 @@ export interface paths {
         put?: never;
         /** Stop */
         post: operations["stop_api_v1_apps__app_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/upgrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Upgrade Status
+         * @description Newer template version, or newer image for a free image (asks its registry).
+         */
+        get: operations["upgrade_status_api_v1_apps__app_id__upgrade_get"];
+        put?: never;
+        /**
+         * Upgrade
+         * @description Same settings, newest template (or image): a new revision.
+         */
+        post: operations["upgrade_api_v1_apps__app_id__upgrade_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/upgrade/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plan Upgrade */
+        post: operations["plan_upgrade_api_v1_apps__app_id__upgrade_plan_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1271,6 +1369,14 @@ export interface components {
          * @enum {string}
          */
         AppStatus: "healthy" | "starting" | "degraded" | "stopped" | "error" | "missing";
+        /** ApplyIn */
+        ApplyIn: {
+            /**
+             * Reset Data
+             * @default false
+             */
+            reset_data: boolean;
+        };
         /** AuditOut */
         AuditOut: {
             /** Action */
@@ -1831,6 +1937,10 @@ export interface components {
         ResetOut: {
             /** Fields */
             fields: string[];
+            /** Labels */
+            labels: (string | {
+                [key: string]: string;
+            })[];
             /** Size */
             size: number;
             /** Volumes */
@@ -1853,6 +1963,8 @@ export interface components {
             };
             /** Number */
             number: number;
+            /** Restorable */
+            restorable: boolean;
             status: components["schemas"]["RevisionStatus"];
         };
         /**
@@ -2046,6 +2158,20 @@ export interface components {
             volumes: string[];
             /** Zone */
             zone: string | null;
+        };
+        /** UpgradeOut */
+        UpgradeOut: {
+            /** Available */
+            available: boolean;
+            /** Current */
+            current: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "template" | "image";
+            /** Latest */
+            latest: string;
         };
         /** UserCreateIn */
         UserCreateIn: {
@@ -2831,6 +2957,40 @@ export interface operations {
             };
         };
     };
+    download_api_v1_apps__app_id__logs_get: {
+        parameters: {
+            query?: {
+                service?: string | null;
+                tail?: number;
+            };
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     removal_plan_api_v1_apps__app_id__removal_plan_get: {
         parameters: {
             query?: never;
@@ -2911,6 +3071,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevisionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_restore_api_v1_apps__app_id__revisions__number__plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_api_v1_apps__app_id__revisions__number__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
                 };
             };
             /** @description Validation Error */
@@ -3074,6 +3302,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upgrade_status_api_v1_apps__app_id__upgrade_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpgradeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upgrade_api_v1_apps__app_id__upgrade_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_upgrade_api_v1_apps__app_id__upgrade_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdatePlanOut"];
                 };
             };
             /** @description Validation Error */

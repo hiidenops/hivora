@@ -1,13 +1,15 @@
 """Application commands. Every mutation is recorded as intent, then run as a job."""
 
 import difflib
+import hashlib
 import re
 import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
+import yaml
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -34,7 +36,7 @@ from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import Purpose, Sealed, SecretBox
 from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
-from hivora.images.registry import Registry
+from hivora.images.registry import ImageInfo, Registry
 from hivora.jobs import Job, JobKind, JobQueue
 from hivora.state import StateStore, app_key
 from hivora.system.secrets import SecretSetting, SecretSettings
@@ -50,7 +52,7 @@ from hivora.templates import (
     host_arch,
     validate_inputs,
 )
-from hivora.templates.catalog import CUSTOM_SOURCE, TemplateInvalidError
+from hivora.templates.catalog import CUSTOM_SOURCE, TemplateInvalidError, parse_template
 from hivora.templates.custom import CustomApp, CustomEnv, CustomPort
 from hivora.templates.custom import manifest as custom_manifest
 from hivora.templates.models import TemplateVersion
@@ -109,6 +111,18 @@ class DataResetRequiredError(ConflictError):
     code = "data_reset_required"
 
 
+class RevisionNotRestorableError(ConflictError):
+    code = "revision_not_restorable"
+
+
+@dataclass(frozen=True, slots=True)
+class UpgradeStatus:
+    kind: Literal["template", "image"]  # newer template version / newer free-image digest
+    current: str
+    latest: str
+    available: bool
+
+
 @dataclass(frozen=True, slots=True)
 class AppSettings:
     app: Application
@@ -159,6 +173,7 @@ class AppService:
     ) -> None:
         self.gateway = gateway
         self.registry = registry or Registry()
+        self._inspected: dict[str, tuple[float, ImageInfo]] = {}
         self.settings = settings
         self.sessions = sessions
         self.catalog = catalog
@@ -309,16 +324,19 @@ class AppService:
         return AppSettings(app, entry, values, sorted(secrets))
 
     async def plan_update(
-        self, session: AsyncSession, app_id: int, inputs: dict[str, Any]
-    ) -> UpdatePlan:
+        self, session: AsyncSession, app_id: int, inputs: dict[str, Any],
+        entry: CatalogEntry | None = None,
+    ) -> UpdatePlan:  # fmt: skip
         """Preview a settings change: new compose, its diff, port conflicts.
 
-        Secret fields left empty keep their current value.
+        Secret fields left empty keep their current value. ``entry``: another
+        template version (upgrade, restore); default: the catalog's.
         """
         app = await self.get(session, app_id)
-        entry = await self._entry_of(session, app)
+        entry = entry or await self._entry_of(session, app)
         current = await self.decrypt_secrets(session, app.id)
-        kept = {k: v for k, v in current.items() if not inputs.get(k)}
+        fields = {f.id for f in entry.template.form.fields}
+        kept = {k: v for k, v in current.items() if not inputs.get(k) and k in fields}
         latest = await self._latest_revision(session, app.id)
         number = (latest.number if latest else 0) + 1
         zone = await session.get(Zone, app.zone_id) if app.zone_id else None
@@ -352,9 +370,12 @@ class AppService:
         size = sum(tree_size(Path(p)) for p in reset_volumes)
         return UpdatePlan(plan, number, diff, reset_fields, reset_volumes, size)
 
-    async def update(self, app_id: int, inputs: dict[str, Any], *, reset_data: bool = False) -> Job:
+    async def update(
+        self, app_id: int, inputs: dict[str, Any], *, reset_data: bool = False,
+        entry: CatalogEntry | None = None, event: str = "app.updated",
+    ) -> Job:  # fmt: skip
         async with self.sessions() as session, session.begin():
-            upd = await self.plan_update(session, app_id, inputs)
+            upd = await self.plan_update(session, app_id, inputs, entry)
             plan = upd.plan
             if upd.reset_fields and not reset_data:
                 raise DataResetRequiredError(
@@ -385,6 +406,7 @@ class AppService:
             revision = AppRevision(
                 app_id=app.id, number=upd.number, inputs=plan.form.values,
                 compose_yaml=plan.compiled.compose_yaml, diff_from_previous=upd.diff,
+                template_version_id=version.id,
                 created_at=self.clock.now(), status=RevisionStatus.PENDING,
             )  # fmt: skip
             session.add(revision)
@@ -399,7 +421,102 @@ class AppService:
                 | ({"reset_volumes": upd.reset_volumes} if upd.reset_fields else {}),
             )
         self.jobs.wake()
-        self.bus.publish("app.updated", app=app.slug, revision=upd.number, job=job.id)
+        self.bus.publish(event, app=app.slug, revision=upd.number, job=job.id)
+        return job
+
+    # --- upgrade to the newest template / image, restore a revision ---------
+    async def upgrade_status(self, session: AsyncSession, app_id: int) -> UpgradeStatus:
+        """Is a newer template version (or, for a free image, a newer image) available?"""
+        app = await self.get(session, app_id)
+        current = await session.get(TemplateVersion, app.template_version_id)
+        entry = await self._entry_of(session, app)
+        if current is None:  # pragma: no cover - every template app has one
+            raise ConflictError("this app has no template version", slug=app.slug)
+        if entry.source != CUSTOM_SOURCE:
+            latest = entry.template.metadata.version
+            return UpgradeStatus("template", current.version, latest, latest != current.version)
+        svc = entry.template.services[entry.template.main_service]
+        tag, _, digest = svc.tag.partition("@")
+        info = await self._inspect_cached(f"{svc.image}:{tag}")
+        return UpgradeStatus("image", f"{tag}@{digest[:19]}", f"{tag}@{info.digest[:19]}",
+                             info.digest != digest)  # fmt: skip
+
+    async def _inspect_cached(self, ref: str) -> ImageInfo:
+        # ponytail: in-memory 10 min cache per image, enough for a page refreshed often
+        now = self.clock.now().timestamp()
+        hit = self._inspected.get(ref)
+        if hit and now - hit[0] < 600:
+            return hit[1]
+        info = await self.registry.inspect(ref, host_arch())
+        self._inspected[ref] = (now, info)
+        return info
+
+    async def _upgrade_entry(self, session: AsyncSession, app: Application) -> CatalogEntry:
+        """The entry an upgrade applies: the catalog's, or the free image re-pinned."""
+        entry = await self._entry_of(session, app)
+        if entry.source != CUSTOM_SOURCE:
+            return entry
+        doc = yaml.safe_load(entry.manifest)
+        svc = doc["services"][entry.template.main_service]
+        tag = str(svc["tag"]).partition("@")[0]
+        self._inspected.pop(f"{svc['image']}:{tag}", None)  # applying: ask the registry again
+        info = await self._inspect_cached(f"{svc['image']}:{tag}")
+        svc["tag"] = f"{tag}@{info.digest}"
+        previous = int(str(doc["metadata"]["version"]).rsplit(".", 1)[-1])
+        now = int(self.clock.now().timestamp())
+        doc["metadata"]["version"] = f"1.0.{max(now, previous + 1)}"  # always a new version
+        text = yaml.safe_dump(doc, sort_keys=False, allow_unicode=True)
+        return CatalogEntry(parse_template(text, require_pinned=True), text,
+                            hashlib.sha256(text.encode()).hexdigest(), CUSTOM_SOURCE)  # fmt: skip
+
+    async def plan_upgrade(self, session: AsyncSession, app_id: int) -> UpdatePlan:
+        app = await self.get(session, app_id)
+        entry = await self._upgrade_entry(session, app)
+        values = (await self.current_settings(session, app_id)).values
+        return await self.plan_update(session, app_id, values, entry)
+
+    async def upgrade(self, app_id: int, *, reset_data: bool = False) -> Job:
+        async with self.sessions() as session:
+            app = await self.get(session, app_id)
+            entry = await self._upgrade_entry(session, app)
+            values = (await self.current_settings(session, app_id)).values
+        job = await self.update(app_id, values, reset_data=reset_data, entry=entry,
+                                event="app.upgraded")  # fmt: skip
+        if entry.source == CUSTOM_SOURCE:
+            self.catalog.add_custom(entry.manifest)  # the new pin becomes the app's template
+        return job
+
+    async def _revision_entry(self, session: AsyncSession, app_id: int,
+                              number: int) -> tuple[AppRevision, CatalogEntry]:  # fmt: skip
+        rev = await session.scalar(
+            select(AppRevision).where(AppRevision.app_id == app_id, AppRevision.number == number)
+        )
+        if rev is None:
+            raise NotFoundError("no such revision", revision=number)
+        if rev.template_version_id is None:
+            raise RevisionNotRestorableError("this revision predates restore support",
+                                             revision=number)  # fmt: skip
+        tv = await session.get_one(TemplateVersion, rev.template_version_id)
+        try:
+            template = parse_template(tv.manifest, require_pinned=False)
+        except TemplateInvalidError as exc:
+            raise RevisionNotRestorableError("its template no longer loads",
+                                             revision=number) from exc  # fmt: skip
+        return rev, CatalogEntry(template, tv.manifest, tv.checksum, tv.source)
+
+    async def plan_restore(self, session: AsyncSession, app_id: int, number: int) -> UpdatePlan:
+        rev, entry = await self._revision_entry(session, app_id, number)
+        return await self.plan_update(session, app_id, dict(rev.inputs), entry)
+
+    async def restore(self, app_id: int, number: int, *, reset_data: bool = False) -> Job:
+        """A new revision with the settings and template version of revision ``number``."""
+        async with self.sessions() as session:
+            rev, entry = await self._revision_entry(session, app_id, number)
+            inputs = dict(rev.inputs)
+        job = await self.update(app_id, inputs, reset_data=reset_data, entry=entry,
+                                event="app.restored")  # fmt: skip
+        if entry.source == CUSTOM_SOURCE:
+            self.catalog.add_custom(entry.manifest)  # that pin is the app's template again
         return job
 
     # --- free images (any registry image, through a generated template) -------
@@ -530,6 +647,7 @@ class AppService:
             revision = AppRevision(
                 app_id=app.id, number=1, inputs=plan.form.values,
                 compose_yaml=plan.compiled.compose_yaml, created_at=self.clock.now(),
+                template_version_id=version.id,
                 status=RevisionStatus.PENDING,
             )  # fmt: skip
             session.add(revision)

@@ -24,6 +24,8 @@ import { ZoneSelect } from "@/features/zones/zone-select";
 // Only VPN apps need it: loaded on demand (page budget).
 const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.VpnCard));
 const LogsCard = dynamic(() => import("@/features/logs/logs-card").then((m) => m.LogsCard));
+const UpgradeBanner = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.UpgradeBanner));
+const RestoreButton = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.RestoreButton));
 import { ApiError } from "@/lib/api/client";
 import { useApp, useAppCompose, useJob, useRevisions } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
@@ -104,6 +106,7 @@ function AppDetail() {
           </Card>
         )}
         <StatusHero app={app} status={status} />
+        {can("operator") && app.template && <UpgradeBanner appId={app.id} onJob={setActiveJob} />}
         {["healthy", "starting", "degraded"].includes(status) && <AppUsage slug={app.slug} />}
         {app.game && (
           <GamePanel
@@ -160,11 +163,17 @@ function AppDetail() {
               <CardContent>
                 <ul className="divide-y text-sm">
                   {revisions?.map((r) => (
-                    <li key={r.id} className="flex justify-between py-2">
-                      <span className="font-mono">#{r.number}</span>
-                      <span className="text-xs text-muted-foreground">
+                    <li key={r.id} className="flex items-center justify-between gap-2 py-2">
+                      <span className="font-mono">
+                        #{r.number}
+                        {r.number === app.revision && <span className="ml-2 font-sans text-xs text-muted-foreground">{t("restore.current")}</span>}
+                      </span>
+                      <span className="ml-auto text-xs text-muted-foreground">
                         {r.status} · {new Date(r.created_at).toLocaleString(lang)}
                       </span>
+                      {can("operator") && r.restorable && r.number !== app.revision && (
+                        <RestoreButton appId={app.id} number={r.number} onJob={setActiveJob} />
+                      )}
                     </li>
                   ))}
                 </ul>

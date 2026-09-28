@@ -302,6 +302,17 @@
         "title": "AppStatus",
         "type": "string"
       },
+      "ApplyIn": {
+        "properties": {
+          "reset_data": {
+            "default": false,
+            "title": "Reset Data",
+            "type": "boolean"
+          }
+        },
+        "title": "ApplyIn",
+        "type": "object"
+      },
       "AuditOut": {
         "properties": {
           "action": {
@@ -2016,6 +2027,29 @@
             "title": "Fields",
             "type": "array"
           },
+          "labels": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "propertyNames": {
+                    "enum": [
+                      "fr",
+                      "en"
+                    ]
+                  },
+                  "type": "object"
+                }
+              ]
+            },
+            "title": "Labels",
+            "type": "array"
+          },
           "size": {
             "title": "Size",
             "type": "integer"
@@ -2030,6 +2064,7 @@
         },
         "required": [
           "fields",
+          "labels",
           "volumes",
           "size"
         ],
@@ -2068,6 +2103,10 @@
             "title": "Number",
             "type": "integer"
           },
+          "restorable": {
+            "title": "Restorable",
+            "type": "boolean"
+          },
           "status": {
             "$ref": "#/components/schemas/RevisionStatus"
           }
@@ -2078,7 +2117,8 @@
           "status",
           "inputs",
           "created_at",
-          "applied_at"
+          "applied_at",
+          "restorable"
         ],
         "title": "RevisionOut",
         "type": "object"
@@ -2631,6 +2671,38 @@
           "reset"
         ],
         "title": "UpdatePlanOut",
+        "type": "object"
+      },
+      "UpgradeOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "current": {
+            "title": "Current",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "template",
+              "image"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "latest": {
+            "title": "Latest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "current",
+          "latest",
+          "available"
+        ],
+        "title": "UpgradeOut",
         "type": "object"
       },
       "UserCreateIn": {
@@ -4039,6 +4111,76 @@
         ]
       }
     },
+    "/api/v1/apps/{app_id}/logs": {
+      "get": {
+        "description": "Logs of the app's containers as text (last ``tail`` lines each), secrets masked.",
+        "operationId": "download_api_v1_apps__app_id__logs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 63,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tail",
+            "required": false,
+            "schema": {
+              "default": 10000,
+              "maximum": 200000,
+              "minimum": 1,
+              "title": "Tail",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download",
+        "tags": [
+          "logs"
+        ]
+      }
+    },
     "/api/v1/apps/{app_id}/removal-plan": {
       "get": {
         "operationId": "removal_plan_api_v1_apps__app_id__removal_plan_get",
@@ -4164,6 +4306,119 @@
           }
         },
         "summary": "List Revisions",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/revisions/{number}/plan": {
+      "post": {
+        "operationId": "plan_restore_api_v1_apps__app_id__revisions__number__plan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Restore",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/revisions/{number}/restore": {
+      "post": {
+        "description": "A new revision with that revision's settings and template version.",
+        "operationId": "restore_api_v1_apps__app_id__revisions__number__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore",
         "tags": [
           "apps"
         ]
@@ -4394,6 +4649,142 @@
           }
         },
         "summary": "Stop",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/upgrade": {
+      "get": {
+        "description": "Newer template version, or newer image for a free image (asks its registry).",
+        "operationId": "upgrade_status_api_v1_apps__app_id__upgrade_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpgradeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upgrade Status",
+        "tags": [
+          "apps"
+        ]
+      },
+      "post": {
+        "description": "Same settings, newest template (or image): a new revision.",
+        "operationId": "upgrade_api_v1_apps__app_id__upgrade_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upgrade",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/upgrade/plan": {
+      "post": {
+        "operationId": "plan_upgrade_api_v1_apps__app_id__upgrade_plan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Upgrade",
         "tags": [
           "apps"
         ]

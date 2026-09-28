@@ -86,6 +86,8 @@ class AppRevision(Base):
     number: Mapped[int]
     inputs: Mapped[dict[str, Any]] = mapped_column(JSON)  # secrets excluded
     compose_yaml: Mapped[str] = mapped_column(Text)  # exact artefact applied
+    # Template version it was compiled from (restoring recompiles with it); None: older rows.
+    template_version_id: Mapped[int | None] = mapped_column(ForeignKey("template_version.id"))
     diff_from_previous: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None]
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)

@@ -137,6 +137,18 @@ class RevisionOut(BaseModel):
     inputs: dict[str, Any]
     created_at: datetime
     applied_at: datetime | None
+    restorable: bool  # compiled from a known template version
+
+
+class UpgradeOut(BaseModel):
+    kind: Literal["template", "image"]
+    current: str  # template version, or tag@digest for a free image
+    latest: str
+    available: bool
+
+
+class ApplyIn(BaseModel):
+    reset_data: bool = False  # confirms erasing the data when the change requires it
 
 
 class SettingsOut(BaseModel):
@@ -154,6 +166,7 @@ class SettingsIn(BaseModel):
 
 class ResetOut(BaseModel):
     fields: list[str]
+    labels: list[Localized]  # of those fields, in the applied template
     volumes: list[str]
     size: int
 
@@ -440,6 +453,7 @@ async def list_revisions(app_id: int, _: Viewer, rt: RuntimeDep) -> list[Revisio
                 inputs=r.inputs,
                 created_at=r.created_at,
                 applied_at=r.applied_at,
+                restorable=r.template_version_id is not None,
             )
             for r in rows
         ]
@@ -493,8 +507,10 @@ async def get_settings(app_id: int, _: Operator, rt: RuntimeDep) -> SettingsOut:
 
 
 def update_plan_out(upd: UpdatePlan) -> UpdatePlanOut:
+    fields = {f.id: f.label for f in upd.plan.entry.template.form.fields}
     reset = (
-        ResetOut(fields=upd.reset_fields, volumes=sorted(upd.reset_volumes), size=upd.reset_size)
+        ResetOut(fields=upd.reset_fields, labels=[fields[f] for f in upd.reset_fields],
+                 volumes=sorted(upd.reset_volumes), size=upd.reset_size)
         if upd.reset_fields else None
     )  # fmt: skip
     return UpdatePlanOut(**plan_out(upd.plan).model_dump(), revision=upd.number, diff=upd.diff,
@@ -514,3 +530,36 @@ async def plan_settings(
 async def update_settings(app_id: int, body: SettingsIn, _: Operator, rt: RuntimeDep) -> JobRef:
     """New revision from these inputs, applied by a job (secrets left empty are kept)."""
     return job_ref(await rt.apps.update(app_id, body.inputs, reset_data=body.reset_data))
+
+
+@router.get("/{app_id}/upgrade")
+async def upgrade_status(app_id: int, _: Viewer, rt: RuntimeDep) -> UpgradeOut:
+    """Newer template version, or newer image for a free image (asks its registry)."""
+    async with rt.sessions() as session:
+        st = await rt.apps.upgrade_status(session, app_id)
+    return UpgradeOut(kind=st.kind, current=st.current, latest=st.latest, available=st.available)
+
+
+@router.post("/{app_id}/upgrade/plan")
+async def plan_upgrade(app_id: int, _: Operator, rt: RuntimeDep) -> UpdatePlanOut:
+    async with rt.sessions() as session:
+        return update_plan_out(await rt.apps.plan_upgrade(session, app_id))
+
+
+@router.post("/{app_id}/upgrade", status_code=202)
+async def upgrade(app_id: int, body: ApplyIn, _: Operator, rt: RuntimeDep) -> JobRef:
+    """Same settings, newest template (or image): a new revision."""
+    return job_ref(await rt.apps.upgrade(app_id, reset_data=body.reset_data))
+
+
+@router.post("/{app_id}/revisions/{number}/plan")
+async def plan_restore(app_id: int, number: int, _: Operator, rt: RuntimeDep) -> UpdatePlanOut:
+    async with rt.sessions() as session:
+        return update_plan_out(await rt.apps.plan_restore(session, app_id, number))
+
+
+@router.post("/{app_id}/revisions/{number}/restore", status_code=202)
+async def restore(app_id: int, number: int, body: ApplyIn, _: Operator,
+                  rt: RuntimeDep) -> JobRef:  # fmt: skip
+    """A new revision with that revision's settings and template version."""
+    return job_ref(await rt.apps.restore(app_id, number, reset_data=body.reset_data))
