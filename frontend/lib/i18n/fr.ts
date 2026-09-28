@@ -249,6 +249,7 @@ export const fr = {
   "fw.node.ufwOn": "UFW actif · {n} règle(s)",
   "fw.node.ufwOff": "UFW inactif",
   "fw.node.f2b": "fail2ban · {n} IP bannie(s)",
+  "app.vpnOnly": "via le VPN : clients VPN seulement",
   "vpn.title": "Clients VPN",
   "vpn.stopped": "Le VPN est arrêté : les changements s'appliqueront à son démarrage.",
   "vpn.clientName": "Nom du client (ex. téléphone)",

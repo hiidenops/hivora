@@ -70,7 +70,8 @@ export function StatusHero({ app, status }: { app: AppDetail; status: AppStatus 
     const m = minutes % 60;
     uptime = d ? t("duration.dh", { d, h }) : h ? t("duration.hm", { h, m: String(m).padStart(2, "0") }) : t("duration.m", { m });
   }
-  const address = app.access.game ?? app.access.web;
+  const viaVpn = !app.access.game && !app.access.web ? (app.access.game_vpn ?? app.access.web_vpn) : undefined;
+  const address = app.access.game ?? app.access.web ?? viaVpn;
   const lan = app.access.game ? app.access.game_lan : app.access.web_lan;
   // Reaching a public port from the Internet needs a port forward on the router.
   const forwarded = app.ports.filter((p) => p.exposure === "public" && p.host_port).map((p) => p.host_port);
@@ -98,6 +99,7 @@ export function StatusHero({ app, status }: { app: AppDetail; status: AppStatus 
                 <CopyAddress value={address} />
               )}
               {lan && <span className="text-sm text-muted-foreground">{t("app.lanAddress", { address: lan })}</span>}
+              {viaVpn && <span className="text-sm text-ok">{t("app.vpnOnly")}</span>}
               {players.data?.running && players.data.online !== null && (
                 <span className="inline-flex items-center gap-1.5 text-sm">
                   <Users className="size-4 text-muted-foreground" />

@@ -250,6 +250,7 @@ export const en: Record<MessageKey, string> = {
   "fw.node.ufwOn": "UFW on · {n} rule(s)",
   "fw.node.ufwOff": "UFW off",
   "fw.node.f2b": "fail2ban · {n} banned IP(s)",
+  "app.vpnOnly": "through the VPN: VPN clients only",
   "vpn.title": "VPN clients",
   "vpn.stopped": "The VPN is stopped: changes apply when it starts.",
   "vpn.clientName": "Client name (e.g. phone)",

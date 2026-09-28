@@ -89,6 +89,9 @@ def test_put_an_app_behind_the_vpn(client: Any) -> None:
         p["target"] == 25565 for p in server.get("ports", [])
     )
 
+    access = client.get(f"{API}/apps/{mc_id}").json()["access"]
+    assert "game" not in access and "game_lan" not in access  # no host address any more
+
     # 2. The VPN joins its network.
     job = client.put(f"{API}/apps/{vpn_id}/vpn/zones", json={"zones": ["@cube"]}).json()
     assert wait_job(client, job["id"])["status"] == "succeeded"

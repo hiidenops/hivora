@@ -336,18 +336,36 @@ class AppService:
             return {}
         ctx = AppContext(slug=app.slug, name=app.name, revision=latest.number)
         form = FormValues(dict(latest.inputs))
+        overrides = Overrides.model_validate(latest.overrides or {})
         host = self.host
-        access = compile_template(
-            entry.template, ctx, host, form, self.settings.volumes_root
-        ).access
+        compiled = compile_template(entry.template, ctx, host, form, self.settings.volumes_root,
+                                    overrides)  # fmt: skip
+        access = dict(compiled.access)
         # Same addresses on the local network, when they differ (e.g. public IP vs LAN).
         lan_host = HostInfo(**{**vars_of_host(host), "public_ip": None})
         local = compile_template(
-            entry.template, ctx, lan_host, form, self.settings.volumes_root
+            entry.template, ctx, lan_host, form, self.settings.volumes_root, overrides
         ).access
         for key, value in local.items():
             if access.get(key) != value:
                 access[f"{key}_lan"] = value
+        # A port no longer published (advanced settings) has no host address; behind a
+        # VPN, the app is reached at its own address on its network, by VPN clients.
+        published = {p.host_port for svc in compiled.services for p in svc.ports if p.host_port}
+        unpublished = {
+            key: m.group(1) for key, value in access.items()
+            if (m := re.search(r":(\d{1,5})(?:/|$)", value)) and int(m.group(1)) not in published
+        }  # fmt: skip
+        for key in unpublished:
+            access.pop(key)
+        if unpublished and await self.vpns_reaching(session, app.slug):
+            ip = next((ip for c in self.state.containers() if app_key(c) == app.slug
+                       for net, ip in zip(c.networks, c.ips, strict=False)
+                       if net == f"{app.slug}_default"), None)  # fmt: skip
+            if ip:
+                for key, port in unpublished.items():
+                    if not key.endswith("_lan"):
+                        access[f"{key}_vpn"] = f"{ip}:{port}"
         return access
 
     # --- settings (new revision) --------------------------------------------
