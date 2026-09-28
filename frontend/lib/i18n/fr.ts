@@ -247,6 +247,7 @@ export const fr = {
   "fw.forwards": "Redirections Docker (ports publiés)",
   "fw.noForward": "Aucun port publié.",
   "fw.node.open": "{n} port(s) joignable(s) : {ports}",
+  "fw.pickBypassed": "Port publié par Docker : UFW ne le filtre pas. Fermez-le dans l'app (exposition) ou mettez-la derrière le VPN.",
   "fw.noRule": "Aucune règle.",
   "fw.action": "Action",
   "fw.allow": "Autoriser",

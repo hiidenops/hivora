@@ -248,6 +248,7 @@ export const en: Record<MessageKey, string> = {
   "fw.forwards": "Docker forwards (published ports)",
   "fw.noForward": "No published port.",
   "fw.node.open": "{n} reachable port(s): {ports}",
+  "fw.pickBypassed": "Port published by Docker: UFW does not filter it. Close it in the app (exposure) or put the app behind the VPN.",
   "fw.noRule": "No rule.",
   "fw.action": "Action",
   "fw.allow": "Allow",

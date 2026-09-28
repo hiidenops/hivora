@@ -174,3 +174,34 @@ def test_open_ports_routes_and_jail_settings(client: Any) -> None:
     assert write[:2] == ["sh", "-c"] and write[2].endswith(JAIL_FILE) and "maxretry = 3" in write[4]
     assert "$1" in write[2] and "maxretry" not in write[2]  # the content is data, not shell code
     assert reload == ["fail2ban-client", "reload"]
+
+
+ADDED = """Added user rules (see 'ufw status' for running firewall):
+ufw limit 22/tcp
+ufw allow from 192.168.1.0/24 to any port 8443 proto tcp
+ufw deny 53
+ufw allow OpenSSH
+"""
+
+
+def test_rules_stay_visible_while_ufw_is_off(client: Any) -> None:
+    from hivora.hostfw.service import parse_ufw_added
+
+    rules = parse_ufw_added(ADDED + "ufw allow 80; reboot\n")
+    assert [(r.number, r.to, r.action, r.source) for r in rules] == [
+        (1, "22/tcp", "LIMIT", "Anywhere"), (2, "8443/tcp", "ALLOW", "192.168.1.0/24"),
+        (3, "53", "DENY", "Anywhere"), (4, "OpenSSH", "ALLOW", "Anywhere"),
+    ]  # fmt: skip
+
+    admin(client)
+    gw = client.app.state.runtime.gateway
+    client.put(f"{API}/host-firewall/agent", json={"enabled": True})
+    gw.exec_results[host("ufw", "status", "verbose")] = (0, "Status: inactive\n")
+    gw.exec_results[host("ufw", "show", "added")] = (0, ADDED)
+    st = client.get(f"{API}/host-firewall", params={"fresh": True}).json()
+    assert not st["ufw_active"] and len(st["ufw_rules"]) == 4
+    assert client.delete(f"{API}/host-firewall/ufw/rules/2").status_code == 200
+    assert gw.exec_calls[-1][len(HOST):] == [
+        "ufw", "--force", "delete", "allow", "from", "192.168.1.0/24", "to", "any", "port", "8443",
+        "proto", "tcp",
+    ]  # fmt: skip

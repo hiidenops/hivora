@@ -9,6 +9,7 @@ says so rather than presenting UFW as a protection for the apps.
 
 import asyncio
 import ipaddress
+import itertools
 import json
 import re
 from dataclasses import dataclass, field
@@ -26,6 +27,7 @@ TIMEOUT_S = 30
 JAIL = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 CACHE_S = 20
 LABELS = {"io.hivora.self": "true", "io.hivora.agent": "host"}
+ACTIONS = ("allow", "deny", "reject", "limit")
 RULE = re.compile(r"^\[\s*(\d+)\]\s+(.+?)\s{2,}(ALLOW|DENY|REJECT|LIMIT)(?: (IN|OUT|FWD))?\s+(.+)$")
 
 
@@ -43,6 +45,7 @@ class UfwRule:
     to: str
     action: str
     source: str
+    spec: tuple[str, ...] = ()  # inactive UFW: the rule itself, deleted by its text
 
 
 @dataclass
@@ -73,6 +76,29 @@ def parse_ufw_numbered(text: str) -> list[UfwRule]:
         if m:
             action = m.group(3) + (f" {m.group(4)}" if m.group(4) else "")
             rules.append(UfwRule(int(m.group(1)), m.group(2).strip(), action, m.group(5).strip()))
+    return rules
+
+
+SPEC_TOKEN = re.compile(r"^[\w./:,-]+$")
+
+
+def parse_ufw_added(text: str) -> list[UfwRule]:
+    """``ufw show added`` (rules kept while UFW is off): "ufw allow from 10.0.0.0/8 to any
+    port 80 proto tcp". Numbered here for display only: deleted by their text."""
+    rules: list[UfwRule] = []
+    for line in text.splitlines():
+        spec = tuple(line.split()[1:])
+        if not line.startswith("ufw ") or not spec or spec[0] not in ACTIONS:
+            continue
+        if not all(SPEC_TOKEN.match(t) for t in spec):
+            continue
+        after = dict(itertools.pairwise(spec))  # "port" -> "80", "from" -> ...
+        to = after.get("port") or next((t for t in spec[1:] if t not in ("in", "out")), "")
+        if (proto := after.get("proto")) and "/" not in to:
+            to += f"/{proto}"
+        source = after.get("from", "any")
+        rules.append(UfwRule(len(rules) + 1, to, spec[0].upper(),
+                             "Anywhere" if source == "any" else source, spec))  # fmt: skip
     return rules
 
 
@@ -147,8 +173,12 @@ class HostFirewall:
             st.ufw_active = "Status: active" in out
             m = re.search(r"Default:\s*(.+)", out)
             st.ufw_defaults = m.group(1).strip() if m else ""
-            _, numbered = await self._run(["ufw", "status", "numbered"], check=False)
-            st.ufw_rules = parse_ufw_numbered(numbered)
+            if st.ufw_active:
+                _, numbered = await self._run(["ufw", "status", "numbered"], check=False)
+                st.ufw_rules = parse_ufw_numbered(numbered)
+            else:  # "status numbered" lists nothing while off: show the rules kept
+                _, added = await self._run(["ufw", "show", "added"], check=False)
+                st.ufw_rules = parse_ufw_added(added)
         code, out = await self._run(["fail2ban-client", "status"], check=False)
         st.fail2ban_installed = code != 127 and "not found" not in out.lower()
         st.fail2ban_running = code == 0 and "Jail list" in out
@@ -183,9 +213,11 @@ class HostFirewall:
 
     async def ufw_delete(self, number: int) -> str:
         st = await self.state(fresh=True)
-        if not any(r.number == number for r in st.ufw_rules):
+        rule = next((r for r in st.ufw_rules if r.number == number), None)
+        if rule is None:
             raise ValidationError("no such rule", field="number")
-        argv = ["ufw", "--force", "delete", str(number)]
+        # Inactive: numbers are ours, not UFW's (it counts IPv6 copies), so delete by text.
+        argv = ["ufw", "--force", "delete", *(rule.spec or [str(number)])]
         return await self._change("hostfw.ufw_rule_deleted", argv, target=str(number))
 
     async def ufw_enable(self, on: bool, *, keep_ssh: bool = True) -> str:

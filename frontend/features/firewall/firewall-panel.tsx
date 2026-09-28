@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,13 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
   const [code, setCode] = useState("");
   const [rule, setRule] = useState({ action: "allow", port: "", protocol: "tcp", source: "any" });
   const [keepSsh, setKeepSsh] = useState(true);
+  const sourceRef = useRef<HTMLInputElement>(null);
+  // From the open ports list: fill the rule form, the source is left to choose.
+  const pick = (action: string, port: number, protocol: string) => {
+    setRule({ action, port: String(port), protocol, source: "any" });
+    sourceRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    sourceRef.current?.focus();
+  };
   const [ban, setBan] = useState<Record<string, string>>({});
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: KEY });
@@ -169,7 +176,7 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
                         <option value="udp">UDP</option>
                         <option value="any">TCP + UDP</option>
                       </select>
-                      <Input className="h-9 w-44 font-mono text-xs" placeholder={t("fw.source")} value={rule.source} onChange={(e) => setRule({ ...rule, source: e.target.value })} aria-label={t("fw.source")} />
+                      <Input ref={sourceRef} className="h-9 w-44 font-mono text-xs" placeholder={t("fw.source")} value={rule.source} onChange={(e) => setRule({ ...rule, source: e.target.value })} aria-label={t("fw.source")} />
                       <Button type="submit" size="sm" disabled={act.isPending}>
                         {t("fw.addRule")}
                       </Button>
@@ -218,7 +225,7 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
               </section>
             </>
           )}
-          {full && on && <OpenPorts />}
+          {full && on && <OpenPorts onPick={data.ufw_installed ? pick : undefined} />}
           {full && on && data.fail2ban_running && <JailSettings act={(f) => act.mutate(f)} />}
           {full && on && <Routes />}
           {isFetching && <p className="text-xs text-muted-foreground">{t("common.loading")}</p>}
@@ -232,7 +239,7 @@ const box = "surface grid gap-2 rounded-lg border p-3";
 const th = "px-2 py-1 text-left font-medium text-muted-foreground";
 
 /** What listens on the host right now, and whether it is reachable from outside. */
-function OpenPorts() {
+function OpenPorts({ onPick }: { onPick?: (action: string, port: number, protocol: string) => void }) {
   const { t } = useI18n();
   const { data, error } = useQuery({ queryKey: [...KEY, "listening"], queryFn: () => api<Listening[]>("/host-firewall/listening"), refetchInterval: 5000 });
   return (
@@ -248,6 +255,7 @@ function OpenPorts() {
               <th className={th}>{t("fw.address")}</th>
               <th className={th}>{t("fw.process")}</th>
               <th className={th}>{t("fw.reach")}</th>
+              {onPick && <th className={th} />}
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -259,6 +267,20 @@ function OpenPorts() {
                 <td className="px-2 py-1">{p.address}</td>
                 <td className="px-2 py-1">{p.app ? t("fw.dockerApp", { app: p.app }) : p.process || "—"}</td>
                 <td className={`px-2 py-1 font-sans ${UFW_TONE[p.ufw]}`}>{t(`fw.reach.${p.ufw}`)}</td>
+                {onPick && (
+                  <td className="whitespace-nowrap px-2 py-1 text-right font-sans">
+                    {p.ufw !== "local" && (
+                      <>
+                        <Button size="sm" variant="ghost" disabled={p.ufw === "bypassed"} title={p.ufw === "bypassed" ? t("fw.pickBypassed") : undefined} onClick={() => onPick("allow", p.port, p.protocol)}>
+                          {t("fw.allow")}
+                        </Button>
+                        <Button size="sm" variant="ghost" disabled={p.ufw === "bypassed"} title={p.ufw === "bypassed" ? t("fw.pickBypassed") : undefined} onClick={() => onPick("deny", p.port, p.protocol)}>
+                          {t("fw.deny")}
+                        </Button>
+                      </>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
