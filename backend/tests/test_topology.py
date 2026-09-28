@@ -111,4 +111,10 @@ def test_put_an_app_behind_the_vpn(client: Any) -> None:
                            json={"zones": ["@nope"]})) == "validation_error"  # fmt: skip
     job = client.put(f"{API}/apps/{vpn_id}/vpn/zones", json={"zones": []}).json()
     assert wait_job(client, job["id"])["status"] == "succeeded"
+    graph = client.get(f"{API}/topology").json()
+    cube = next(n for n in graph["nodes"] if n["key"] == f"app:{mc_id}")
+    assert {"override": "none", "default": "public"}.items() <= next(
+        p for p in cube["ports"] if p["container"] == 25565
+    ).items()
+    assert any(a["code"] == "unreachable" and a["app"] == "cube" for a in graph["alerts"])
     assert client.delete(f"{API}/apps/{mc_id}").status_code == 202

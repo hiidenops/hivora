@@ -12,7 +12,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from hivora.apps.models import Application, Exposure, Origin
+from hivora.apps.models import Application, AppRevision, Exposure, Origin
 from hivora.runtime import Runtime
 from hivora.state import app_key
 from hivora.templates.catalog import host_arch
@@ -52,12 +52,29 @@ async def build(rt: Runtime) -> Graph:
             for row in await session.scalars(select(TopologyLayout))
         }
         vpn_reach: dict[int, list[str]] = {}
+        overridden: dict[int, dict[tuple[str, str], str]] = {}
+        template_ports: dict[int, dict[tuple[str, int, str], str]] = {}
         for app in apps:
             template = templates.get(app.template_version_id or -1)
             try:
-                vpn = rt.catalog.get(template).template.vpn if template else None
+                spec = rt.catalog.get(template).template if template else None
             except Exception:  # template gone from the catalog
-                vpn = None
+                spec = None
+            vpn = spec.vpn if spec else None
+            if spec:
+                template_ports[app.id] = {(name, p.container, p.protocol): p.exposure
+                                          for name, svc in spec.services.items()
+                                          for p in svc.ports}  # fmt: skip
+            latest = await session.scalar(
+                select(AppRevision).where(AppRevision.app_id == app.id)
+                .order_by(AppRevision.number.desc()).limit(1)
+            )  # fmt: skip
+            if latest and latest.overrides:
+                overridden[app.id] = {
+                    (name, key): value
+                    for name, svc in (latest.overrides.get("services") or {}).items()
+                    for key, value in (svc.get("publish") or {}).items()
+                }  # fmt: skip
             if vpn and vpn.zones_field:
                 values = (await rt.apps.current_settings(session, app.id)).values
                 vpn_reach[app.id] = [z for z in str(values.get(vpn.zones_field) or "").split(",")
@@ -96,10 +113,14 @@ async def build(rt: Runtime) -> Graph:
         key = f"app:{app.id}"
         template = templates.get(app.template_version_id or -1)
         status = rt.state.store.app(app.slug).status.value
+        overrides, defaults = overridden.get(app.id, {}), template_ports.get(app.id, {})
         ports = [  # unpublished ones too (port: the container's): they can be opened again
             {"port": p.host_port or p.container_port, "container": p.container_port,
              "protocol": p.protocol, "service": svc.name,
-             "exposure": p.exposure.value if p.host_port else "internal"}
+             "exposure": p.exposure.value if p.host_port else "internal",
+             # what the advanced settings force, and what the template does by itself
+             "override": overrides.get((svc.name, f"{p.container_port}/{p.protocol}")),
+             "default": defaults.get((svc.name, p.container_port, p.protocol))}
             for svc in app.services for p in svc.ports
         ]  # fmt: skip
         parent = zone_key.get(app.zone_id or -1, NO_ZONE)
@@ -127,6 +148,13 @@ async def build(rt: Runtime) -> Graph:
                 "target": key, "app": app.name,
                 "ports": ", ".join(f"{p['port']}/{p['protocol']}" for p in public),
             })  # fmt: skip
+        closed = [
+            p for p in ports if p["override"] == "none" and p["default"] not in (None, "internal")
+        ]
+        if closed and app.slug not in behind:  # closed by hand, no VPN to go through
+            names = ", ".join(f"{p['container']}/{p['protocol']}" for p in closed)
+            graph.alerts.append({"level": "warn", "code": "unreachable", "target": key,
+                                 "app": app.name, "ports": names})  # fmt: skip
         if parent == NO_ZONE and app.origin is not Origin.ADOPTED:
             graph.alerts.append({"level": "info", "code": "no_zone", "target": key,
                                  "app": app.name})  # fmt: skip

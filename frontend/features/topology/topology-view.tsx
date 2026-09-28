@@ -49,7 +49,7 @@ function download(name: string, href: string) {
   a.click();
 }
 
-type Port = { port: number; container: number; protocol: string; exposure: string; service: string };
+type Port = { port: number; container: number; protocol: string; exposure: string; service: string; override?: string | null; default?: string | null };
 
 function Inspector({ node, graph, onClose, canEdit, onChanged, changes, onChange, openFirewall }: {
   node: GNode; graph: Graph; onClose: () => void; canEdit: boolean; onChanged: () => void; changes: Change[]; onChange: (c: Change) => void; openFirewall: () => void;
@@ -106,8 +106,9 @@ function Inspector({ node, graph, onClose, canEdit, onChanged, changes, onChange
                       aria-label={t("topology.exposureOf", { port: key })}
                       className="h-7 rounded border bg-card px-1 text-xs"
                       value={pending?.exposure ?? current}
-                      onChange={(e) => onChange({ kind: "expose", appId: Number(node.id), app: String(node.label), service: p.service, port: key, exposure: e.target.value as "public" | "lan" | "none" })}
+                      onChange={(e) => onChange({ kind: "expose", appId: Number(node.id), app: String(node.label), service: p.service, port: key, exposure: e.target.value as "public" | "lan" | "none" | "default" })}
                     >
+                      {p.override && <option value="default">{t("topology.exposure.default", { exposure: t(`topology.exposure.${p.default ?? "internal"}` as "topology.exposure.lan") })}</option>}
                       <option value="public">{t("topology.exposure.public")}</option>
                       <option value="lan">{t("topology.exposure.lan")}</option>
                       <option value="none">{t("topology.exposure.none")}</option>
@@ -288,6 +289,16 @@ function Canvas() {
     const vpn = a?.vpn ? a : b?.vpn ? b : null;
     const other = vpn === a ? b : a;
     // From a VPN to an app or a zone: a real change (the VPN joins its network).
+    // Between the Internet and an app: open again what was closed (the template's own exposure).
+    const inet = a?.type === "internet" ? b : b?.type === "internet" ? a : null;
+    if (inet) {
+      if (inet.type !== "app") return window.alert(t("topology.noEffect"));
+      const closed = (inet.ports as Port[]).filter((p) => p.override === "none" && p.default && p.default !== "internal");
+      if (!closed.length) return window.alert(t("topology.nothingClosed", { app: String(inet.label) }));
+      for (const p of closed)
+        onChange({ kind: "expose", appId: Number(inet.id), app: String(inet.label), service: p.service, port: `${p.container}/${p.protocol}`, exposure: "default" });
+      return;
+    }
     if (vpn && other && (other.type === "app" || (other.type === "zone" && other.slug))) {
       const target = other.type === "app" ? `@${other.slug}` : String(other.slug);
       onChange({ kind: "reach", vpnId: Number(vpn.id), vpn: String(vpn.label), target, targetLabel: String(other.label), on: true });
@@ -296,6 +307,8 @@ function Canvas() {
           onChange({ kind: "expose", appId: Number(other.id), app: String(other.label), service: p.service, port: `${p.container}/${p.protocol}`, exposure: "none" });
       return;
     }
+    // A drawn link only makes sense with a declared item (router, firewall, note...).
+    if (a?.type !== "declared" && b?.type !== "declared") return window.alert(t("topology.noEffect"));
     void api("/topology/edges", { method: "POST", body: { source: c.source, target: c.target, label: "" } }).then(refresh);
   };
   const apply = async () => {
@@ -403,7 +416,7 @@ function Canvas() {
                   {c.kind === "move"
                     ? t("topology.change.move", { app: c.app, zone: c.zoneLabel })
                     : c.kind === "expose"
-                      ? t("topology.change.expose", { app: c.app, port: c.port, exposure: t(`topology.exposure.${c.exposure}` as "topology.exposure.lan") })
+                      ? t("topology.change.expose", { app: c.app, port: c.port, exposure: c.exposure === "default" ? t("topology.exposure.reopen") : t(`topology.exposure.${c.exposure}` as "topology.exposure.lan") })
                       : t(c.on ? "topology.change.reach" : "topology.change.unreach", { vpn: c.vpn, target: c.targetLabel })}
                 </span>
                 <button className="text-muted-foreground hover:text-foreground" aria-label={t("overrides.remove")} onClick={() => setChanges((l) => l.filter((x) => changeKey(x) !== changeKey(c)))}>

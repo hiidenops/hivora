@@ -3,7 +3,7 @@ import { api, type JobRef } from "@/lib/api/client";
 /** A change prepared on the topology, applied later as app revisions (or discarded). */
 export type Change =
   | { kind: "move"; appId: number; app: string; zone: string | null; zoneLabel: string }
-  | { kind: "expose"; appId: number; app: string; service: string; port: string; exposure: "public" | "lan" | "none" }
+  | { kind: "expose"; appId: number; app: string; service: string; port: string; exposure: "public" | "lan" | "none" | "default" }
   | { kind: "reach"; vpnId: number; vpn: string; target: string; targetLabel: string; on: boolean };
 
 export const changeKey = (c: Change) =>
@@ -37,7 +37,10 @@ export async function applyChanges(changes: Change[]): Promise<{ jobs: number[];
       const services = { ...(s.overrides.services ?? {}) };
       for (const c of list) {
         const svc = { ...(services[c.service] ?? {}) };
-        svc.publish = { ...(svc.publish ?? {}), [c.port]: c.exposure };
+        const publish = { ...(svc.publish ?? {}) };
+        if (c.exposure === "default") delete publish[c.port]; // back to what the template does
+        else publish[c.port] = c.exposure;
+        svc.publish = publish;
         services[c.service] = svc;
       }
       return api<JobRef>(`/apps/${appId}/settings`, { method: "PUT", body: { inputs: s.values, overrides: { services } } });
