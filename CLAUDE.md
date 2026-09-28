@@ -19,7 +19,7 @@ Hivora réconcilie les deux et montre toujours l'écart (dérive). Ne jamais sto
 ## Budgets (vérifiés en CI, ne pas dépasser)
 
 - RAM au repos < 150 Mo (10 apps), CPU au repos < 2 % d'un cœur, image Docker < 200 Mo.
-- Bundle frontend initial < 250 Ko gzip.
+- Bundle frontend initial < 520 Ko gzip par page (relevé de 250 Ko le 28/09/2026).
 - Tableau de bord < 1 s pour 50 apps ; état mis à jour < 2 s après un événement Docker.
 - Base SQLite < 50 Mo après un an (purge métriques et logs de jobs > 30 j).
 

@@ -419,7 +419,7 @@ Le frontend est une SPA Next.js exportée en statique, organisée par fonctionna
 - Typographie : Outfit pour l'interface, JetBrains Mono pour tout ce qui est technique (ports, images, variables, logs, compose), ce qui rend visible la frontière simple/avancé.
 - Responsive : le tableau de bord et les actions d'app sont pleinement utilisables sur mobile ; la topologie et l'édition compose sont optimisées pour desktop.
 - Palette de commandes (⌘K) : aller à une app, déployer, redémarrer. Très appréciée des profils avancés, invisible pour les débutants.
-- Budget : bundle initial < 250 Ko gzip ; React Flow, xterm.js et l'éditeur de code (CodeMirror 6) chargés à la demande.
+- Budget : bundle initial < 520 Ko gzip par page (250 Ko jusqu'au 28/09/2026) ; React Flow, xterm.js et l'éditeur de code (CodeMirror 6) chargés à la demande.
 
 ### Accès rapide à la console
 

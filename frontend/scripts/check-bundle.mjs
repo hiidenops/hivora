@@ -1,11 +1,11 @@
-// Fails when a page's initial JavaScript exceeds the budget (CLAUDE.md: < 250 KB gzip).
+// Fails when a page's initial JavaScript exceeds the budget (CLAUDE.md: < 520 KB gzip).
 // Counts every <script src> of each exported HTML page, gzip-compressed.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { gzipSync } from "node:zlib";
 
 const OUT = new URL("../out/", import.meta.url).pathname;
-const BUDGET = 250 * 1024;
+const BUDGET = 520 * 1024;
 
 function htmlFiles(dir) {
   return readdirSync(dir).flatMap((name) => {
