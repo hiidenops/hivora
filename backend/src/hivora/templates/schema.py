@@ -363,6 +363,16 @@ class GameSaves(_Strict):
         return self.marker.startswith("*.")
 
 
+class Vpn(_Strict):
+    """A VPN Hivora manages through its API (clients, allowed IPs, zones reached)."""
+
+    provider: Literal["wg-easy"]
+    api_port: int  # container port of the API / web UI
+    username: str
+    password_secret: str  # secret form field holding that account's password
+    zones_field: str | None = None  # form field: zone slugs whose networks the VPN joins
+
+
 class Game(_Strict):
     # Server console: command run (with a TTY) in the main service, e.g. ["rcon-cli"].
     console: list[str] | None = None
@@ -393,6 +403,7 @@ class Template(_Strict):
     backup: Backup | None = None
     update: Update | None = None
     game: Game | None = None
+    vpn: Vpn | None = None
     defaults: Defaults = Defaults()
     # Form fields highlighted on the app page (e.g. server type, version, memory).
     summary: list[str] = []
@@ -410,6 +421,14 @@ class Template(_Strict):
             raise ValueError("duplicate form field ids")
         if unknown := set(self.summary) - set(fields):
             raise ValueError(f"summary lists unknown fields {sorted(unknown)}")
+        if self.vpn:
+            if (
+                fields.get(self.vpn.password_secret, None) is None
+                or fields[self.vpn.password_secret].type != "secret"
+            ):
+                raise ValueError("vpn.password_secret must name a secret field")
+            if self.vpn.zones_field and self.vpn.zones_field not in fields:
+                raise ValueError("vpn.zones_field: unknown form field")
         if self.game:
             for ref in (
                 *(gl.enabled_field for gl in self.game.lists),

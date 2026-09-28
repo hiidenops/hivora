@@ -1,6 +1,7 @@
 "use client";
 
 import { Pencil } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -19,6 +20,9 @@ import { ConsolePanel } from "@/features/console/console-panel";
 import { GamePanel } from "@/features/games/game-panel";
 import { RemoveDialog } from "@/features/apps/remove-dialog";
 import { ZoneSelect } from "@/features/zones/zone-select";
+
+// Only VPN apps need it: loaded on demand (page budget).
+const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.VpnCard));
 import { ApiError } from "@/lib/api/client";
 import { useApp, useAppCompose, useJob, useRevisions } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
@@ -108,6 +112,7 @@ function AppDetail() {
             onJob={setActiveJob}
           />
         )}
+        {app.vpn && can("operator") && <VpnCard appId={app.id} onJob={setActiveJob} />}
         {can("operator") && (
           <ConsolePanel app={app} running={["healthy", "starting", "degraded"].includes(status)} />
         )}

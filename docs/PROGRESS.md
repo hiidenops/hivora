@@ -1,6 +1,6 @@
 # Hivora — Suivi d'avancement
 
-*Dernière mise à jour : 26 septembre 2026*
+*Dernière mise à jour : 28 septembre 2026*
 
 Document de reprise : où en est le projet, ce qui a été décidé, comment relancer l'environnement et ce qui reste à faire. Référence produit : [`vision-prd-architecture.md`](vision-prd-architecture.md).
 
@@ -30,6 +30,10 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Catalogue de jeux | Valheim, Rust, Project Zomboid, CS2, Garry's Mod (OVH, x86), Palworld (x86 + ARM) | ✅ | voir `git log` |
 | Images à jour et versions | Contrôle hebdomadaire des images, version → image (Java de Minecraft), branches Steam en direct | ✅ | `eada91b` |
 | 12 jeux de plus | Enshrouded, V Rising, Sons of the Forest, 7 Days to Die, Satisfactory, Terraria, tModLoader, Factorio, Don't Starve Together, Core Keeper, ARK: Survival Ascended, Conan Exiles | ✅ | voir `git log` |
+| Zones | Créer, modifier, supprimer ; réseau « reliées entre elles » ; déplacer une app | ✅ | `cd0c3fc` |
+| 13 applications | WireGuard, Stirling PDF, Uptime Kuma, AdGuard, Jellyfin, Immich, Paperless, Nextcloud, Home Assistant, Gitea, Syncthing, File Browser, n8n | ✅ | `7389764` |
+| Image Docker libre | N'importe quelle image de registre, gérée comme les autres apps | ✅ | `921d41c` |
+| WireGuard géré | Clients, IP autorisées, clés, QR code, zones accessibles | ✅ | voir `git log` |
 | M6 Livraison | Image Docker, HTTPS, script d'installation | ⏳ | |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
@@ -133,6 +137,15 @@ Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en b
 - **Testé en réel sur la VM ARM** : Terraria (monde créé, passage 1.4.5.8 → 1.4.4.9 avec effacement confirmé), Factorio (volume en 845:845, `rcon`, sauvegarde listée), Core Keeper (session démarrée ; sur ARM l'image doit télécharger avec DepotDownloader, déclaré par architecture). Corrigé grâce au test : les noms de monde peuvent commencer par `_` (`_autosave1` de Factorio).
 - **Non testé en réel** (x86 uniquement) : les autres jeux. Compilation, `docker compose config` et fraîcheur des images vérifiés pour tous.
 - À savoir : plusieurs jeux se règlent ensuite dans un fichier du volume (V Rising, Sons of the Forest, 7 Days to Die, Factorio, DST), le formulaire le signale. Factorio n'apparaît dans la liste publique qu'avec un compte factorio.com (connexion par IP sans).
+
+## Réseau et applications (fait, 27–28/09)
+
+- **Zones** : page Zones (couleur, réseau, applications), réseau `hivora-zone-<slug>` créé par Hivora pour les zones « Reliées entre elles », déplacement d'une app (nouvelle révision). Le mode réseau ne change pas l'accès depuis l'extérieur (ports publiés).
+- **Applications** : 13 templates multi-arch ; `cap_add` / `sysctls` en liste blanche (WireGuard), `shm_size`, `track: minor` et `frozen` pour le contrôle de fraîcheur (ghcr.io lu aussi) ; zone suggérée présélectionnée au déploiement.
+- **Image libre** : Catalogue → Applications → « Déployer une image Docker » ; lue dans son registre (digest, plateformes, ports, volumes, variables), template généré (variables et ports modifiables ensuite), figé par digest, rechargé au démarrage.
+- **WireGuard géré** (module `vpn`, section de template `vpn`) : carte « Clients VPN » sur la fiche (ajout, activation, IP autorisées, QR code, configuration, nouvelles clés = client recréé, suppression) et « Zones accessibles » (le conteneur rejoint les réseaux de zone, NAT sur toutes les interfaces via l'API wg-easy). Testé en réel sur ARM ; corrigé grâce au test : wg-easy 15.4 exige tous les champs du client (`firewallIps`).
+- Budget pages : menu Radix remplacé par un menu maison (−17 Ko sur /users), dictionnaire anglais chargé à la demande, carte VPN chargée à la demande.
+- Plus tard (V3) : WireGuard en passerelle d'une zone.
 
 ▶ **Prochaine étape** : tester les jeux x86 sur une machine x86, puis M6 (livraison). Catalogue LinuxGSM générique (140+ jeux) : non fait (ports inconnus avant installation, contraire à la règle des digests figés).
 

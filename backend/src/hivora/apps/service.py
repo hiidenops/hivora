@@ -232,6 +232,7 @@ class AppService:
         app_ctx = AppContext(
             slug=slug, name=name, revision=revision, zone=zone.slug if zone else None,
             zone_network=zone_network(zone),
+            extra_networks=await self._vpn_networks(session, entry, inputs),
         )  # fmt: skip
         host = self.host
         defaults_ctx = build_context(app_ctx, host, FormValues(), list(entry.template.services))
@@ -467,6 +468,22 @@ class AppService:
                 values = (await self.current_settings(session, app_id)).values
             jobs.append(await self.update(app_id, values))
         return jobs
+
+    async def _vpn_networks(
+        self, session: AsyncSession, entry: CatalogEntry, inputs: dict[str, Any]
+    ) -> tuple[str, ...]:
+        """A VPN reaching zones joins their networks (only "linked together" zones have one)."""
+        vpn = entry.template.vpn
+        if not vpn or not vpn.zones_field:
+            return ()
+        names = []
+        for slug in (s for s in str(inputs.get(vpn.zones_field) or "").split(",") if s):
+            name = zone_network(await get_zone(session, slug))
+            if name is None:
+                raise ValidationError("this zone does not link its apps: no network to reach",
+                                      field=vpn.zones_field, zone=slug)  # fmt: skip
+            names.append(name)
+        return tuple(names)
 
     async def _entry_of(self, session: AsyncSession, app: Application) -> CatalogEntry:
         slug = await session.scalar(

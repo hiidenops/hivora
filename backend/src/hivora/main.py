@@ -21,6 +21,7 @@ from hivora.realtime.ws import router as ws_router
 from hivora.runtime import Runtime
 from hivora.system.api import router as system_router
 from hivora.templates.api import router as templates_router
+from hivora.vpn.api import router as vpn_router
 from hivora.web import errors
 from hivora.zones.api import router as zones_router
 
@@ -59,6 +60,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
     ):  # fmt: skip
         app.include_router(router, prefix=f"{API_PREFIX}{prefix}")
     app.include_router(game_router, prefix=f"{API_PREFIX}/apps")
+    app.include_router(vpn_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(options_router, prefix=f"{API_PREFIX}/options")
     app.include_router(ws_router)
     return app

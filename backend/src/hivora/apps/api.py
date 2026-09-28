@@ -119,6 +119,7 @@ class AppDetailOut(AppOut):
     volumes: list[str]
     console: ConsoleInfoOut
     game: GameCapsOut | None  # game tools the template declares
+    vpn: bool  # a VPN Hivora manages (clients, zones reached)
     started_at: datetime | None  # main container, when running
     access: dict[str, str]  # where to connect (web / game)
     summary: list[SummaryItemOut]  # template-chosen settings (type, version...)
@@ -232,6 +233,13 @@ async def app_summary(
         option = next((o for o in f.options or [] if o.value == value), None)
         items.append(SummaryItemOut(label=f.label, value=option.label if option else str(value)))
     return items
+
+
+def has_vpn(rt: RuntimeDep, template: str | None) -> bool:
+    try:
+        return bool(template and rt.catalog.get(template).template.vpn)
+    except NotFoundError:
+        return False
 
 
 def game_caps(rt: RuntimeDep, template: str | None) -> GameCapsOut | None:
@@ -395,6 +403,7 @@ async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
             volumes=[v.source for s in app.services for v in s.volumes],
             console=console_info(rt, template),
             game=game_caps(rt, template),
+            vpn=has_vpn(rt, template),
             started_at=started_at,
             access=access,
             summary=summary,

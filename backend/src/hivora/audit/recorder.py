@@ -18,6 +18,7 @@ AUDITED_PREFIXES = (
     "user.",
     "app.",
     "zone.",
+    "vpn.",
     "job.finished",
     "jobs.cleared",
     "console.",

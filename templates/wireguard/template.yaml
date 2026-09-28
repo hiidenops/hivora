@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: wireguard
   name: WireGuard (wg-easy)
-  version: 1.0.0
+  version: 1.1.0
   category: network
   tags: [vpn, wireguard, network, remote-access]
   icon: { url: "https://raw.githubusercontent.com/wg-easy/wg-easy/master/src/public/apple-touch-icon.png" }
@@ -54,6 +54,14 @@ form:
       default: "1.1.1.1,9.9.9.9"
       pattern: "[0-9a-fA-F.:, ]{7,200}"
   advanced:
+    - id: vpn_zones
+      group: { fr: Zones accessibles, en: Zones reached }
+      label: { fr: Zones accessibles par le VPN, en: Zones reached through the VPN }
+      type: string
+      pattern: "[a-z0-9,-]{0,500}"
+      help:
+        fr: "Se règle depuis la carte VPN de la fiche. Seules les zones « Reliées entre elles » ont un réseau à rejoindre."
+        en: "Set from the VPN card on the app page. Only “Linked together” zones have a network to join."
     - id: web_port
       group: { fr: Avancé, en: Advanced }
       label: { fr: Port de l'interface web, en: Web interface port }
@@ -85,6 +93,12 @@ services:
     sysctls: { net.ipv4.ip_forward: 1, net.ipv4.conf.all.src_valid_mark: 1 }
 access:
   web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+vpn:
+  provider: wg-easy
+  api_port: 51821
+  username: admin
+  password_secret: admin_password
+  zones_field: vpn_zones
 backup:
   volumes: [data]
 update:

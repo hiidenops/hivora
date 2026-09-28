@@ -1,9 +1,6 @@
 """HTTP API: authentication, roles, CSRF, users, deploy flow, WebSocket, audit."""
 
-import os
-import sys
 import time
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -11,35 +8,6 @@ import pyotp
 import pytest
 from fastapi.testclient import TestClient
 from helpers import API, STRONG, admin, code, login, other_user, wait_job
-
-from hivora.core.config import Settings
-from hivora.docker_gateway.fake import FakeDockerGateway
-from hivora.main import create_app
-from hivora.runtime import Runtime
-
-FAKE = [sys.executable, str(Path(__file__).parent / "fake_compose.py")]
-
-
-@pytest.fixture
-def client(tmp_path: Path) -> Iterator[TestClient]:
-    settings = Settings(
-        data_dir=tmp_path / "data",
-        volumes_root=tmp_path / "srv",
-        catalog_dir=Path(__file__).parents[2] / "templates",
-        dev_insecure_cookies=True,
-        puid=os.getuid(),
-        pgid=os.getgid(),
-        host_lan_ip="192.168.1.10",
-        host_public_ip="203.0.113.7",
-    )
-    runtime = Runtime.build(
-        settings,
-        gateway=FakeDockerGateway(),
-        compose_cmd=FAKE,
-        compose_env={"FAKE_COMPOSE_MODE": "leak"},
-    )
-    with TestClient(create_app(runtime=runtime)) as c:
-        yield c
 
 
 def test_initial_admin_must_change_password(client: TestClient) -> None:
@@ -324,7 +292,6 @@ def test_curseforge_key_setting_and_fallback(client: TestClient) -> None:
 
 def test_minecraft_players_whitelist_and_ops(client: TestClient) -> None:
     import json
-    from pathlib import Path
 
     from hivora.docker_gateway import ContainerInfo, ContainerState
 
