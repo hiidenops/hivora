@@ -59,7 +59,7 @@ export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): {
           type: "app",
           parentId: z.key,
           position: pos(a.key, PAD + (j % COLS) * (APP_W + GAP), HEADER + Math.floor(j / COLS) * (appH + GAP)),
-          data: { ...a, level },
+          data: { ...a, level, zoneColor: z.color },
           style: { width: APP_W },
         });
       });

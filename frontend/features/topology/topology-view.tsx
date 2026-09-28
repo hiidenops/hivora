@@ -6,10 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Background,
   Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
-  getNodesBounds,
   getViewportForBounds,
   useEdgesState,
   useNodesState,
@@ -19,7 +17,7 @@ import {
   type Node,
 } from "@xyflow/react";
 import { toPng } from "html-to-image";
-import { Download, FileJson, LayoutTemplate, Plus, Trash2, X } from "lucide-react";
+import { Check, Download, FileJson, LayoutTemplate, ListChecks, Plus, Trash2, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -250,7 +248,8 @@ function Canvas() {
   const [firewallOpen, setFirewallOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<{ jobs: number[]; errors: string[] } | null>(null);
-  const { getIntersectingNodes } = useReactFlow();
+  const { getIntersectingNodes, getNodesBounds } = useReactFlow();
+  const [showPending, setShowPending] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const refresh = () => qc.invalidateQueries({ queryKey: KEY });
@@ -351,9 +350,9 @@ function Canvas() {
     const bounds = getNodesBounds(nodes);
     const w = Math.ceil(bounds.width + 160);
     const h = Math.ceil(bounds.height + 160);
-    const vp = getViewportForBounds(bounds, w, h, 0.2, 2, 80);
+    const vp = getViewportForBounds(bounds, w, h, 0.5, 2, 0.05);
     const bg = getComputedStyle(document.body).backgroundColor;
-    const url = await toPng(viewport, { backgroundColor: bg, width: w, height: h, style: { width: `${w}px`, height: `${h}px`, transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` } });
+    const url = await toPng(viewport, { backgroundColor: bg, width: w, height: h, pixelRatio: 2, style: { width: `${w}px`, height: `${h}px`, transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` } });
     download("hivora-topology.png", url);
   };
   const exportJson = () => {
@@ -388,6 +387,19 @@ function Canvas() {
           </Button>
         )}
         <span className="ml-auto flex gap-1">
+          {changes.length > 0 && (
+            <span className="mr-2 flex gap-1 rounded-md border border-warn/60 bg-warn/10 p-0.5">
+              <Button size="sm" variant="ghost" aria-expanded={showPending} title={t("topology.pending", { n: changes.length })} aria-label={t("topology.pending", { n: changes.length })} onClick={() => setShowPending((v) => !v)}>
+                <ListChecks /> {changes.length}
+              </Button>
+              <Button size="sm" disabled={applying} title={t("topology.apply", { n: changes.length })} onClick={() => void apply()}>
+                <Check /> {applying ? t("common.loading") : t("topology.applyShort")}
+              </Button>
+              <Button size="sm" variant="ghost" title={t("topology.discard")} aria-label={t("topology.discard")} onClick={() => setChanges([])}>
+                <Undo2 />
+              </Button>
+            </span>
+          )}
           {canEdit && (
             <Button size="sm" variant="ghost" title={t("topology.resetLayout")} aria-label={t("topology.resetLayout")} onClick={() => window.confirm(t("topology.resetConfirm")) && void api("/topology/layout", { method: "PUT", body: { positions: {} } }).then(refresh)}>
               <LayoutTemplate />
@@ -465,41 +477,32 @@ function Canvas() {
         >
           <Background gap={24} />
           <Controls showInteractive={false} />
-          <MiniMap pannable zoomable className="!hidden md:!block" />
         </ReactFlow>
+        {changes.length > 0 && showPending && (
+          <section aria-label={t("topology.pending", { n: changes.length })} className="surface absolute left-3 top-3 z-10 grid max-h-[60%] w-80 gap-2 overflow-auto rounded-lg border p-3 text-xs shadow-lg">
+            <p className="font-medium">{t("topology.pending", { n: changes.length })}</p>
+            <ul className="grid gap-1">
+              {changes.map((c) => (
+                <li key={changeKey(c)} className="flex items-center justify-between gap-2">
+                  <span>
+                    {c.kind === "move"
+                      ? t("topology.change.move", { app: c.app, zone: c.zoneLabel })
+                      : c.kind === "expose"
+                        ? t("topology.change.expose", { app: c.app, port: c.port, exposure: c.exposure === "default" ? t("topology.exposure.reopen") : t(`topology.exposure.${c.exposure}` as "topology.exposure.lan") })
+                        : t(c.on ? "topology.change.reach" : "topology.change.unreach", { vpn: c.vpn, target: c.targetLabel })}
+                  </span>
+                  <button className="text-muted-foreground hover:text-foreground" aria-label={t("overrides.remove")} onClick={() => setChanges((l) => l.filter((x) => changeKey(x) !== changeKey(c)))}>
+                    <X className="size-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="text-muted-foreground">{t("topology.pendingHelp")}</p>
+          </section>
+        )}
         {node && graph && <Inspector key={node.key} node={node} graph={graph} canEdit={canEdit} changes={changes} onChange={onChange} openFirewall={() => setFirewallOpen(true)} onClose={() => setSelected(null)} onChanged={() => void refresh()} />}
         {firewallOpen && <FirewallDialog open={firewallOpen} onOpenChange={setFirewallOpen} onChanged={() => void refresh()} />}
       </div>
-      {changes.length > 0 && (
-        <section aria-label={t("topology.pending", { n: changes.length })} className="grid gap-2 rounded-lg border border-warn/50 bg-warn/10 p-3 text-sm">
-          <p className="font-medium">{t("topology.pending", { n: changes.length })}</p>
-          <ul className="grid gap-1">
-            {changes.map((c) => (
-              <li key={changeKey(c)} className="flex items-center justify-between gap-2">
-                <span>
-                  {c.kind === "move"
-                    ? t("topology.change.move", { app: c.app, zone: c.zoneLabel })
-                    : c.kind === "expose"
-                      ? t("topology.change.expose", { app: c.app, port: c.port, exposure: c.exposure === "default" ? t("topology.exposure.reopen") : t(`topology.exposure.${c.exposure}` as "topology.exposure.lan") })
-                      : t(c.on ? "topology.change.reach" : "topology.change.unreach", { vpn: c.vpn, target: c.targetLabel })}
-                </span>
-                <button className="text-muted-foreground hover:text-foreground" aria-label={t("overrides.remove")} onClick={() => setChanges((l) => l.filter((x) => changeKey(x) !== changeKey(c)))}>
-                  <X className="size-4" />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs text-muted-foreground">{t("topology.pendingHelp")}</p>
-          <div className="flex gap-2">
-            <Button size="sm" disabled={applying} onClick={() => void apply()}>
-              {applying ? t("common.loading") : t("topology.apply", { n: changes.length })}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setChanges([])}>
-              {t("topology.discard")}
-            </Button>
-          </div>
-        </section>
-      )}
       {result && (
         <Alert tone={result.errors.length ? "danger" : "info"}>
           {result.errors.length ? result.errors.join(" · ") : t("topology.applied", { n: result.jobs.length })}

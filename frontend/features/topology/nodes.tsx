@@ -45,12 +45,12 @@ const DOT: Record<AppStatus, string> = { healthy: "bg-ok", starting: "bg-info an
 
 export function AppNode({ data, selected }: NodeProps) {
   const { t } = useI18n();
-  const d = data as { label: string; slug: string; status: AppStatus; icon_url: string | null; ports: Port[]; level: string; vpn: boolean };
+  const d = data as { label: string; slug: string; status: AppStatus; icon_url: string | null; ports: Port[]; level: string; vpn: boolean; zoneColor?: string | null };
   const status = useLiveStatus(d.slug, d.status);
   // Published ports always show (how the app is reached); internal ones only at "all".
   const ports = d.level === "all" ? d.ports : d.ports.filter((p) => p.exposure !== "internal");
   return (
-    <div className={cn("rounded-md border bg-card px-2 py-1.5 shadow-sm", selected && "ring-2 ring-ring", status === "error" && "border-danger")}>
+    <div className={cn("rounded-md border border-l-4 bg-card px-2 py-1.5 shadow-sm", selected && "ring-2 ring-ring", status === "error" && "border-danger")} style={{ borderLeftColor: d.zoneColor ?? "var(--muted-foreground)" }}>
       {handles}
       <div className="flex items-center gap-1.5" title={t(`status.${status}`)}>
         <AppIcon src={d.icon_url} name={d.label} className="size-5 rounded" />

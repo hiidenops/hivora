@@ -204,6 +204,7 @@ export const en: Record<MessageKey, string> = {
   "topology.pending": "{n} pending change(s)",
   "topology.pendingHelp": "Nothing is applied yet. “Apply” creates revisions (the apps involved restart); “Discard” forgets everything.",
   "topology.apply": "Apply all ({n})",
+  "topology.applyShort": "Apply",
   "topology.discard": "Discard changes",
   "topology.applyConfirm": "Apply these changes? The apps involved will restart.",
   "topology.applied": "{n} job(s) started: follow them in Activity.",

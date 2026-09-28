@@ -203,6 +203,7 @@ export const fr = {
   "topology.pending": "{n} modification(s) en attente",
   "topology.pendingHelp": "Rien n'est encore appliqué. « Appliquer » crée des révisions (les apps concernées redémarrent) ; « Annuler » oublie tout.",
   "topology.apply": "Tout appliquer ({n})",
+  "topology.applyShort": "Appliquer",
   "topology.discard": "Annuler les modifications",
   "topology.applyConfirm": "Appliquer ces modifications ? Les apps concernées vont redémarrer.",
   "topology.applied": "{n} tâche(s) lancée(s) : suivez-les dans Activité.",
