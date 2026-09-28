@@ -47,6 +47,8 @@ export function AppNode({ data, selected }: NodeProps) {
   const { t } = useI18n();
   const d = data as { label: string; slug: string; status: AppStatus; icon_url: string | null; ports: Port[]; level: string; vpn: boolean };
   const status = useLiveStatus(d.slug, d.status);
+  // Published ports always show (how the app is reached); internal ones only at "all".
+  const ports = d.level === "all" ? d.ports : d.ports.filter((p) => p.exposure !== "internal");
   return (
     <div className={cn("rounded-md border bg-card px-2 py-1.5 shadow-sm", selected && "ring-2 ring-ring", status === "error" && "border-danger")}>
       {handles}
@@ -55,10 +57,11 @@ export function AppNode({ data, selected }: NodeProps) {
         <span className="min-w-0 flex-1 truncate text-xs font-medium">{d.label}</span>
         <span className={cn("size-2 shrink-0 rounded-full", DOT[status])} aria-label={t(`status.${status}`)} />
       </div>
-      {d.level === "all" && d.ports.length > 0 && (
+      {ports.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-0.5">
-          {d.ports.map((p) => (
-            <span key={`${p.service}${p.port}${p.protocol}`} className={cn("rounded px-1 font-mono text-[9px] leading-4", EXPOSURE[p.exposure])}>
+          {ports.map((p) => (
+            <span key={`${p.service}${p.port}${p.protocol}`} title={t(`topology.exposure.${p.exposure}` as "topology.exposure.lan")} className={cn("rounded px-1 font-mono text-[9px] leading-4", EXPOSURE[p.exposure])}>
+              {p.exposure === "lan" ? "LAN " : p.exposure === "public" ? "WAN " : ""}
               {p.port}/{p.protocol}
             </span>
           ))}
