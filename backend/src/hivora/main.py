@@ -19,6 +19,7 @@ from hivora.games.api import router as modpacks_router
 from hivora.hostfw.api import router as hostfw_router
 from hivora.jobs.api import router as jobs_router
 from hivora.metrics.api import router as metrics_router
+from hivora.pyapps.api import router as python_router
 from hivora.realtime.logs import router as logs_router
 from hivora.realtime.ws import router as ws_router
 from hivora.runtime import Runtime
@@ -65,6 +66,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
         ("/host-firewall", hostfw_router),
     ):  # fmt: skip
         app.include_router(router, prefix=f"{API_PREFIX}{prefix}")
+    app.include_router(python_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(game_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(vpn_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(logs_router, prefix=f"{API_PREFIX}/apps")

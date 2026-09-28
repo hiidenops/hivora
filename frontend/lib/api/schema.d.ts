@@ -139,6 +139,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/python": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deploy */
+        post: operations["deploy_api_v1_apps_python_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/python/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analyze
+         * @description Upload a project's .zip (request body): what Hivora found in it.
+         */
+        post: operations["analyze_api_v1_apps_python_analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{app_id}": {
         parameters: {
             query?: never;
@@ -467,6 +504,26 @@ export interface paths {
         get: operations["download_api_v1_apps__app_id__logs_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/python/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update Code
+         * @description New code (request body: the project's .zip): code folders replaced, data kept.
+         */
+        post: operations["update_code_api_v1_apps__app_id__python_code_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1740,6 +1797,35 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /** AnalysisOut */
+        AnalysisOut: {
+            /** Apt */
+            apt: string[];
+            /** Entry */
+            entry: string[];
+            /** Env */
+            env: components["schemas"]["EnvIO"][];
+            /** Files */
+            files: number;
+            /** Mounts */
+            mounts: components["schemas"]["MountIO"][];
+            /** Name */
+            name: string;
+            /** Notes */
+            notes: string[];
+            /** Ports */
+            ports: number[];
+            /** Python */
+            python: string;
+            /** Requirements */
+            requirements: string | null;
+            /** Size */
+            size: number;
+            /** Token */
+            token: string;
+            /** Workdir */
+            workdir: string;
+        };
         /** AppDetailOut */
         AppDetailOut: {
             /** Access */
@@ -1768,6 +1854,11 @@ export interface components {
             origin: string;
             /** Ports */
             ports: components["schemas"]["PortOut"][];
+            /**
+             * Python
+             * @default false
+             */
+            python: boolean;
             /** Revision */
             revision: number | null;
             /** Slug */
@@ -2126,6 +2217,26 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /** EnvIO */
+        EnvIO: {
+            /** Key */
+            key: string;
+            /**
+             * Secret
+             * @default false
+             */
+            secret: boolean;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /**
+             * Value
+             * @default
+             */
+            value: string;
+        };
         /** ExtraPort */
         ExtraPort: {
             /** Container */
@@ -2420,6 +2531,18 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** MountIO */
+        MountIO: {
+            /**
+             * Data
+             * @default false
+             */
+            data: boolean;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+        };
         /**
          * NetworkMode
          * @enum {string}
@@ -2510,6 +2633,13 @@ export interface components {
             /** Running */
             running: boolean;
         };
+        /** PortIO */
+        PortIO: {
+            /** Container */
+            container: number;
+            /** Host */
+            host: number;
+        };
         /** PortOut */
         PortOut: {
             /** Container Port */
@@ -2537,6 +2667,40 @@ export interface components {
             x: number;
             /** Y */
             y: number;
+        };
+        /** ProjectIn */
+        ProjectIn: {
+            /**
+             * Apt
+             * @default []
+             */
+            apt: string[];
+            /** Entry */
+            entry: string[];
+            /**
+             * Env
+             * @default []
+             */
+            env: components["schemas"]["EnvIO"][];
+            /** Mounts */
+            mounts: components["schemas"]["MountIO"][];
+            /** Name */
+            name: string;
+            /**
+             * Ports
+             * @default []
+             */
+            ports: components["schemas"]["PortIO"][];
+            /** Python */
+            python: string;
+            /** Requirements */
+            requirements?: string | null;
+            /** Token */
+            token: string;
+            /** Workdir */
+            workdir: string;
+            /** Zone */
+            zone?: string | null;
         };
         /** RecoveryCodesOut */
         RecoveryCodesOut: {
@@ -3470,6 +3634,70 @@ export interface operations {
             };
         };
     };
+    deploy_api_v1_apps_python_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_api_v1_apps_python_analyze_post: {
+        parameters: {
+            query?: {
+                filename?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_app_api_v1_apps__app_id__get: {
         parameters: {
             query?: never;
@@ -4180,6 +4408,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_code_api_v1_apps__app_id__python_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
                 };
             };
             /** @description Validation Error */

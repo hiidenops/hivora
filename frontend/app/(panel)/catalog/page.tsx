@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWindow, ArrowLeft, Container, Gamepad2 } from "lucide-react";
+import { AppWindow, ArrowLeft, Container, FileCode, Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
@@ -175,6 +175,11 @@ function Catalog() {
           title={t("catalog.home.apps")}
           actions={
             <>
+              <Button variant="outline" asChild>
+                <Link href="/python/">
+                  <FileCode /> {t("py.open")}
+                </Link>
+              </Button>
               <Button variant="outline" asChild>
                 <Link href="/custom/">
                   <Container /> {t("custom.open")}

@@ -84,6 +84,104 @@
         "title": "AgentIn",
         "type": "object"
       },
+      "AnalysisOut": {
+        "properties": {
+          "apt": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Apt",
+            "type": "array"
+          },
+          "entry": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Entry",
+            "type": "array"
+          },
+          "env": {
+            "items": {
+              "$ref": "#/components/schemas/EnvIO"
+            },
+            "title": "Env",
+            "type": "array"
+          },
+          "files": {
+            "title": "Files",
+            "type": "integer"
+          },
+          "mounts": {
+            "items": {
+              "$ref": "#/components/schemas/MountIO"
+            },
+            "title": "Mounts",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "ports": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ports",
+            "type": "array"
+          },
+          "python": {
+            "title": "Python",
+            "type": "string"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "workdir": {
+            "title": "Workdir",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "name",
+          "python",
+          "requirements",
+          "workdir",
+          "entry",
+          "mounts",
+          "env",
+          "ports",
+          "apt",
+          "notes",
+          "files",
+          "size"
+        ],
+        "title": "AnalysisOut",
+        "type": "object"
+      },
       "AppDetailOut": {
         "properties": {
           "access": {
@@ -154,6 +252,11 @@
             },
             "title": "Ports",
             "type": "array"
+          },
+          "python": {
+            "default": false,
+            "title": "Python",
+            "type": "boolean"
           },
           "revision": {
             "anyOf": [
@@ -1222,6 +1325,36 @@
         "title": "EnabledIn",
         "type": "object"
       },
+      "EnvIO": {
+        "properties": {
+          "key": {
+            "maxLength": 128,
+            "title": "Key",
+            "type": "string"
+          },
+          "secret": {
+            "default": false,
+            "title": "Secret",
+            "type": "boolean"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "value": {
+            "default": "",
+            "maxLength": 4096,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "EnvIO",
+        "type": "object"
+      },
       "ExtraPort": {
         "additionalProperties": false,
         "properties": {
@@ -2081,6 +2214,31 @@
         "title": "ModpackOut",
         "type": "object"
       },
+      "MountIO": {
+        "properties": {
+          "data": {
+            "default": false,
+            "title": "Data",
+            "type": "boolean"
+          },
+          "source": {
+            "maxLength": 200,
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "maxLength": 200,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "MountIO",
+        "type": "object"
+      },
       "NetworkMode": {
         "enum": [
           "none",
@@ -2356,6 +2514,28 @@
         "title": "PlayersOut",
         "type": "object"
       },
+      "PortIO": {
+        "properties": {
+          "container": {
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Container",
+            "type": "integer"
+          },
+          "host": {
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Host",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "container",
+          "host"
+        ],
+        "title": "PortIO",
+        "type": "object"
+      },
       "PortOut": {
         "properties": {
           "container_port": {
@@ -2459,6 +2639,106 @@
           "y"
         ],
         "title": "Position",
+        "type": "object"
+      },
+      "ProjectIn": {
+        "properties": {
+          "apt": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Apt",
+            "type": "array"
+          },
+          "entry": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Entry",
+            "type": "array"
+          },
+          "env": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EnvIO"
+            },
+            "maxItems": 100,
+            "title": "Env",
+            "type": "array"
+          },
+          "mounts": {
+            "items": {
+              "$ref": "#/components/schemas/MountIO"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Mounts",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "ports": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PortIO"
+            },
+            "maxItems": 10,
+            "title": "Ports",
+            "type": "array"
+          },
+          "python": {
+            "title": "Python",
+            "type": "string"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
+          },
+          "token": {
+            "maxLength": 64,
+            "title": "Token",
+            "type": "string"
+          },
+          "workdir": {
+            "title": "Workdir",
+            "type": "string"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          }
+        },
+        "required": [
+          "token",
+          "name",
+          "python",
+          "workdir",
+          "entry",
+          "mounts"
+        ],
+        "title": "ProjectIn",
         "type": "object"
       },
       "RecoveryCodesOut": {
@@ -4584,6 +4864,92 @@
         ]
       }
     },
+    "/api/v1/apps/python": {
+      "post": {
+        "operationId": "deploy_api_v1_apps_python_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deploy",
+        "tags": [
+          "python"
+        ]
+      }
+    },
+    "/api/v1/apps/python/analyze": {
+      "post": {
+        "description": "Upload a project's .zip (request body): what Hivora found in it.",
+        "operationId": "analyze_api_v1_apps_python_analyze_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "filename",
+            "required": false,
+            "schema": {
+              "default": "project.zip",
+              "maxLength": 200,
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyze",
+        "tags": [
+          "python"
+        ]
+      }
+    },
     "/api/v1/apps/{app_id}": {
       "delete": {
         "description": "Data is kept unless ``remove_data=true`` is passed explicitly.",
@@ -5697,6 +6063,49 @@
         "summary": "Download",
         "tags": [
           "logs"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/python/code": {
+      "post": {
+        "description": "New code (request body: the project's .zip): code folders replaced, data kept.",
+        "operationId": "update_code_api_v1_apps__app_id__python_code_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Code",
+        "tags": [
+          "python"
         ]
       }
     },

@@ -23,6 +23,7 @@ import { ZoneSelect } from "@/features/zones/zone-select";
 // Only VPN apps need it: loaded on demand (page budget).
 const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.VpnCard));
 const LogsCard = dynamic(() => import("@/features/logs/logs-card").then((m) => m.LogsCard));
+const PythonCodeCard = dynamic(() => import("@/features/apps/python-code-card").then((m) => m.PythonCodeCard));
 const TasksCard = dynamic(() => import("@/features/tasks/tasks-card").then((m) => m.TasksCard));
 const BackupsCard = dynamic(() => import("@/features/backups/backups-card").then((m) => m.BackupsCard));
 const UpgradeBanner = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.UpgradeBanner));
@@ -116,6 +117,7 @@ function AppDetail() {
           />
         )}
         {app.vpn && can("operator") && <VpnCard appId={app.id} onJob={setActiveJob} />}
+        {can("operator") && app.python && <PythonCodeCard appId={app.id} onJob={setActiveJob} />}
         {can("operator") && <BackupsCard appId={app.id} onJob={setActiveJob} />}
         {can("operator") && <TasksCard appId={app.id} />}
         {can("operator") && <LogsCard appId={app.id} />}
