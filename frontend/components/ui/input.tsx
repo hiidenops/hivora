@@ -21,7 +21,7 @@ export function Label({ className, ...props }: ComponentProps<"label">) {
 export function Switch({ className, ...props }: Omit<ComponentProps<"input">, "type" | "role">) {
   return (
     <span className={cn("relative inline-flex h-[26px] w-[44px] shrink-0", className)}>
-      <input type="checkbox" role="switch" className="peer absolute inset-0 z-10 m-0 cursor-pointer opacity-0" {...props} />
+      <input type="checkbox" role="switch" className="peer absolute inset-0 z-10 m-0 size-full cursor-pointer appearance-none opacity-0" {...props} />
       <span
         aria-hidden
         className="pointer-events-none absolute inset-0 rounded-full bg-input shadow-[inset_0_1px_3px_var(--shadow-strong)] transition-colors duration-300 ease-(--ease-out) peer-checked:bg-primary peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring peer-disabled:opacity-50"
