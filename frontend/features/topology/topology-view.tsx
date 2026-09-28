@@ -40,6 +40,7 @@ import { nodeTypes } from "./nodes";
 
 const KEY = ["apps", "topology"]; // under "apps": refreshed whenever an app changes
 const MAX_DETAILED = 150;
+const PENDING = "hivora.topology.pending"; // prepared changes survive refreshes
 const select = "h-9 rounded-md border bg-card px-2 text-sm";
 
 function download(name: string, href: string) {
@@ -229,7 +230,23 @@ function Canvas() {
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState("firewall");
   const [label, setLabel] = useState("");
-  const [changes, setChanges] = useState<Change[]>([]);
+  const [changes, setChangesState] = useState<Change[]>(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(PENDING) ?? "[]") as Change[];
+    } catch {
+      return [];
+    }
+  });
+  const setChanges = (next: Change[] | ((l: Change[]) => Change[])) =>
+    setChangesState((prev) => {
+      const value = typeof next === "function" ? next(prev) : next;
+      try {
+        sessionStorage.setItem(PENDING, JSON.stringify(value));
+      } catch {
+        /* private mode: kept for this page only */
+      }
+      return value;
+    });
   const [firewallOpen, setFirewallOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<{ jobs: number[]; errors: string[] } | null>(null);
@@ -406,41 +423,6 @@ function Canvas() {
           <p className="w-full text-xs text-muted-foreground">{t("topology.addHelp")}</p>
         </form>
       )}
-      {changes.length > 0 && (
-        <div className="grid gap-2 rounded-lg border border-warn/50 bg-warn/10 p-3 text-sm">
-          <p className="font-medium">{t("topology.pending", { n: changes.length })}</p>
-          <ul className="grid gap-1">
-            {changes.map((c) => (
-              <li key={changeKey(c)} className="flex items-center justify-between gap-2">
-                <span>
-                  {c.kind === "move"
-                    ? t("topology.change.move", { app: c.app, zone: c.zoneLabel })
-                    : c.kind === "expose"
-                      ? t("topology.change.expose", { app: c.app, port: c.port, exposure: c.exposure === "default" ? t("topology.exposure.reopen") : t(`topology.exposure.${c.exposure}` as "topology.exposure.lan") })
-                      : t(c.on ? "topology.change.reach" : "topology.change.unreach", { vpn: c.vpn, target: c.targetLabel })}
-                </span>
-                <button className="text-muted-foreground hover:text-foreground" aria-label={t("overrides.remove")} onClick={() => setChanges((l) => l.filter((x) => changeKey(x) !== changeKey(c)))}>
-                  <X className="size-4" />
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs text-muted-foreground">{t("topology.pendingHelp")}</p>
-          <div className="flex gap-2">
-            <Button size="sm" disabled={applying} onClick={() => window.confirm(t("topology.applyConfirm")) && void apply()}>
-              {t("topology.apply", { n: changes.length })}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setChanges([])}>
-              {t("topology.discard")}
-            </Button>
-          </div>
-        </div>
-      )}
-      {result && (
-        <Alert tone={result.errors.length ? "danger" : "info"}>
-          {result.errors.length ? result.errors.join(" · ") : t("topology.applied", { n: result.jobs.length })}
-        </Alert>
-      )}
       {tooBig && <Alert tone="info">{t("topology.tooBig", { n: MAX_DETAILED })}</Alert>}
       {error && <Alert tone="danger">{String(error)}</Alert>}
       <div className="relative h-[70vh] min-h-[480px] overflow-hidden rounded-xl border bg-card/30">
@@ -457,6 +439,14 @@ function Canvas() {
           onEdgeClick={(_, e) => {
             const data = e.data as { declaredId?: number; kind?: string } | undefined;
             if (!canEdit) return;
+            if (data?.kind === "exposed") {
+              const app = gnode(e.target);
+              const [port, protocol] = String(e.label ?? "").split("/");
+              const p = (app?.ports as Port[] | undefined)?.find((x) => String(x.port) === port && x.protocol === protocol);
+              if (app && p && window.confirm(t("topology.closeConfirm", { port: `${port}/${protocol}`, app: String(app.label) })))
+                onChange({ kind: "expose", appId: Number(app.id), app: String(app.label), service: p.service, port: `${p.container}/${p.protocol}`, exposure: "none" });
+              return;
+            }
             if (data?.kind === "vpn") {
               const [vpn, target] = [gnode(e.source), gnode(e.target)];
               if (vpn && target && window.confirm(t("topology.detachConfirm")))
@@ -480,6 +470,41 @@ function Canvas() {
         {node && graph && <Inspector key={node.key} node={node} graph={graph} canEdit={canEdit} changes={changes} onChange={onChange} openFirewall={() => setFirewallOpen(true)} onClose={() => setSelected(null)} onChanged={() => void refresh()} />}
         {firewallOpen && <FirewallDialog open={firewallOpen} onOpenChange={setFirewallOpen} onChanged={() => void refresh()} />}
       </div>
+      {changes.length > 0 && (
+        <section aria-label={t("topology.pending", { n: changes.length })} className="grid gap-2 rounded-lg border border-warn/50 bg-warn/10 p-3 text-sm">
+          <p className="font-medium">{t("topology.pending", { n: changes.length })}</p>
+          <ul className="grid gap-1">
+            {changes.map((c) => (
+              <li key={changeKey(c)} className="flex items-center justify-between gap-2">
+                <span>
+                  {c.kind === "move"
+                    ? t("topology.change.move", { app: c.app, zone: c.zoneLabel })
+                    : c.kind === "expose"
+                      ? t("topology.change.expose", { app: c.app, port: c.port, exposure: c.exposure === "default" ? t("topology.exposure.reopen") : t(`topology.exposure.${c.exposure}` as "topology.exposure.lan") })
+                      : t(c.on ? "topology.change.reach" : "topology.change.unreach", { vpn: c.vpn, target: c.targetLabel })}
+                </span>
+                <button className="text-muted-foreground hover:text-foreground" aria-label={t("overrides.remove")} onClick={() => setChanges((l) => l.filter((x) => changeKey(x) !== changeKey(c)))}>
+                  <X className="size-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">{t("topology.pendingHelp")}</p>
+          <div className="flex gap-2">
+            <Button size="sm" disabled={applying} onClick={() => void apply()}>
+              {applying ? t("common.loading") : t("topology.apply", { n: changes.length })}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setChanges([])}>
+              {t("topology.discard")}
+            </Button>
+          </div>
+        </section>
+      )}
+      {result && (
+        <Alert tone={result.errors.length ? "danger" : "info"}>
+          {result.errors.length ? result.errors.join(" · ") : t("topology.applied", { n: result.jobs.length })}
+        </Alert>
+      )}
       <div className="grid gap-2 text-sm">
         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1"><span className="inline-block w-6 border-t-2 border-dashed" style={{ borderColor: "var(--danger)" }} /> {t("topology.legend.exposed")}</span>
