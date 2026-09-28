@@ -352,7 +352,8 @@ function Canvas() {
     const h = Math.ceil(bounds.height + 160);
     const vp = getViewportForBounds(bounds, w, h, 0.5, 2, 0.05);
     const bg = getComputedStyle(document.body).backgroundColor;
-    const url = await toPng(viewport, { backgroundColor: bg, width: w, height: h, pixelRatio: 2, style: { width: `${w}px`, height: `${h}px`, transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` } });
+    const handle = (n: HTMLElement) => n.classList?.contains("react-flow__handle");
+    const url = await toPng(viewport, { backgroundColor: bg, width: w, height: h, pixelRatio: 2, filter: (n) => !handle(n), style: { width: `${w}px`, height: `${h}px`, transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` } });
     download("hivora-topology.png", url);
   };
   const exportJson = () => {
@@ -449,11 +450,11 @@ function Canvas() {
           onPaneClick={() => setSelected(null)}
           onConnect={connect}
           onEdgeClick={(_, e) => {
-            const data = e.data as { declaredId?: number; kind?: string } | undefined;
+            const data = e.data as { declaredId?: number; kind?: string; port?: string } | undefined;
             if (!canEdit) return;
             if (data?.kind === "exposed") {
               const app = gnode(e.target);
-              const [port, protocol] = String(e.label ?? "").split("/");
+              const [port, protocol] = String(data.port ?? "").split("/");
               const p = (app?.ports as Port[] | undefined)?.find((x) => String(x.port) === port && x.protocol === protocol);
               if (app && p && window.confirm(t("topology.closeConfirm", { port: `${port}/${protocol}`, app: String(app.label) })))
                 onChange({ kind: "expose", appId: Number(app.id), app: String(app.label), service: p.service, port: `${p.container}/${p.protocol}`, exposure: "none" });

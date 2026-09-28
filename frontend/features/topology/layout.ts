@@ -24,7 +24,8 @@ export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): {
   const zones = nodes.filter((n) => n.type === "zone");
   const apps = nodes.filter((n) => n.type === "app");
   const declared = nodes.filter((n) => n.type === "declared");
-  const appH = level === "all" ? APP_H.all : APP_H.apps;
+  // Cards grow when they list ports: always at "all", published ones at "apps".
+  const published = (a: GNode) => (a.ports as { exposure: string }[] | undefined)?.some((p) => p.exposure !== "internal");
   const out: Node[] = [];
   type Saved = { x: number; y: number; w?: number | null; h?: number | null };
   const at = (key: string) => saved[key] as Saved | undefined;
@@ -39,6 +40,7 @@ export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): {
   zones.forEach((z, i) => {
     const children = apps.filter((a) => a.parent === z.key);
     const rows = level === "zones" ? 0 : Math.ceil(children.length / COLS);
+    const appH = level === "all" || children.some(published) ? APP_H.all : APP_H.apps;
     const auto = {
       w: level === "zones" ? 180 : PAD * 2 + Math.max(1, Math.min(COLS, children.length)) * (APP_W + GAP) - GAP,
       h: level === "zones" ? 52 : HEADER + PAD + Math.max(1, rows) * (appH + GAP) - GAP,
@@ -87,9 +89,11 @@ export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): {
       id,
       source,
       target,
-      label: e.label || undefined,
+      // Exposed ports show on the app cards ("WAN …") and in the alerts, not on the line
+      // (its middle falls under the firewall card).
+      label: e.kind === "exposed" ? undefined : e.label || undefined,
       animated: e.kind === "exposed",
-      data: { kind: e.kind, declaredId: e.id },
+      data: { kind: e.kind, declaredId: e.id, port: e.label },
       style:
         e.kind === "exposed"
           ? { stroke: "var(--danger)", strokeDasharray: "6 4" }
@@ -98,7 +102,10 @@ export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): {
             : e.kind === "host"
               ? { stroke: "var(--border)", strokeWidth: 1 }
             : { stroke: "var(--muted-foreground)", strokeDasharray: "4 4" },
-      labelStyle: { fontSize: 11 },
+      labelStyle: { fontSize: 11, fill: e.kind === "exposed" ? "var(--danger)" : "var(--foreground)" },
+      labelBgStyle: { fill: "var(--card)" },
+      labelBgPadding: [4, 2],
+      labelBgBorderRadius: 4,
     });
   }
   return { nodes: out, edges };
