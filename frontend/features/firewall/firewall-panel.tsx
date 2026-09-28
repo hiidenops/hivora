@@ -92,7 +92,7 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
           {(act.error ?? confirm.error) && <Alert tone="danger">{errorMessage(act.error ?? confirm.error)}</Alert>}
           {totp && (
             <form
-              className="flex flex-wrap items-end gap-2 rounded-md border p-3"
+              className="surface flex flex-wrap items-end gap-2 rounded-md border p-3"
               onSubmit={(e) => {
                 e.preventDefault();
                 confirm.mutate();
@@ -106,18 +106,20 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
             </form>
           )}
 
-          <label className="flex items-center gap-2 font-medium">
+          <div className="surface grid gap-1 rounded-lg border p-3">
+            <label className="flex items-center gap-2 font-medium">
             <Switch checked={!!data?.agent} disabled={!data || act.isPending} onChange={(e) => {
               const enabled = e.target.checked;
               if (!enabled || window.confirm(t("fw.agentConfirm"))) act.mutate(() => api("/host-firewall/agent", { method: "PUT", body: { enabled } }));
             }} />
             {t("fw.agent")}
           </label>
-          <p className="-mt-2 text-xs text-muted-foreground">{t("fw.agentHelp")}</p>
+            <p className="text-xs text-muted-foreground">{t("fw.agentHelp")}</p>
+          </div>
 
           {data?.agent && (
             <>
-              <section className="grid gap-2 rounded-lg border p-3">
+              <section className="surface grid gap-2 rounded-lg border p-3">
                 <h3 className="font-semibold">UFW</h3>
                 {!data.ufw_installed ? (
                   <p className="text-muted-foreground">{t("fw.ufwMissing")}</p>
@@ -176,7 +178,7 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
                 )}
               </section>
 
-              <section className="grid gap-2 rounded-lg border p-3">
+              <section className="surface grid gap-2 rounded-lg border p-3">
                 <h3 className="font-semibold">fail2ban</h3>
                 {!data.fail2ban_installed ? (
                   <p className="text-muted-foreground">{t("fw.f2bMissing")}</p>
@@ -226,7 +228,7 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
 
 type Listening = { protocol: string; address: string; port: number; process: string; app: string | null; ufw: "bypassed" | "off" | "local" | "allowed" | "blocked" };
 const UFW_TONE: Record<Listening["ufw"], string> = { bypassed: "text-danger", off: "text-warn", allowed: "text-warn", local: "text-muted-foreground", blocked: "text-ok" };
-const box = "grid gap-2 rounded-lg border p-3";
+const box = "surface grid gap-2 rounded-lg border p-3";
 const th = "px-2 py-1 text-left font-medium text-muted-foreground";
 
 /** What listens on the host right now, and whether it is reachable from outside. */
