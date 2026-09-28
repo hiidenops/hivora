@@ -17,7 +17,11 @@ if command == "logs":
     sys.exit(0)
 
 if command == "config":
-    print(json.dumps({"name": args[args.index("--project-name") + 1], "argv": args}))
+    import yaml  # the file as the resolved model (enough for the checks built on it)
+
+    with open(args[args.index("--file") + 1]) as f:
+        model = yaml.safe_load(f) or {}
+    print(json.dumps({**model, "name": args[args.index("--project-name") + 1], "argv": args}))
     sys.exit(0)
 
 progress: list[dict[str, object]] = [

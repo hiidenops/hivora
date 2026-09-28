@@ -13,6 +13,7 @@ import yaml
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hivora.apps.compose_check import problems as compose_problems
 from hivora.apps.files import tree_size
 from hivora.apps.models import (
     Application,
@@ -29,7 +30,7 @@ from hivora.apps.models import (
     VolumeMount,
 )
 from hivora.apps.ports import PortConflict, find_conflicts, used_ports
-from hivora.compose_runner import ComposeRunner
+from hivora.compose_runner import ComposeError, ComposeRunner
 from hivora.core.clock import Clock, SystemClock
 from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
@@ -53,9 +54,12 @@ from hivora.templates import (
     validate_inputs,
 )
 from hivora.templates.catalog import CUSTOM_SOURCE, TemplateInvalidError, parse_template
+from hivora.templates.compiler import PortPlan
 from hivora.templates.custom import CustomApp, CustomEnv, CustomPort
 from hivora.templates.custom import manifest as custom_manifest
+from hivora.templates.expressions import secret_env_name
 from hivora.templates.models import TemplateVersion
+from hivora.templates.overrides import Overrides
 from hivora.zones import Zone, get_zone, zone_network
 
 LABEL_COMPOSE_SERVICE = "com.docker.compose.service"
@@ -93,6 +97,7 @@ class DeployPlan:
     compiled: CompiledApp
     form: FormValues
     conflicts: list[PortConflict]
+    overrides: Overrides = field(default_factory=Overrides)
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,10 +110,25 @@ class UpdatePlan:
     reset_fields: list[str] = field(default_factory=list)
     reset_volumes: dict[str, list[str]] = field(default_factory=dict)
     reset_size: int = 0  # bytes currently stored in those volumes
+    replaces_custom: bool = False  # the current compose was written by hand: it goes away
 
 
 class DataResetRequiredError(ConflictError):
     code = "data_reset_required"
+
+
+class ComposeRejectedError(ValidationError):
+    code = "compose_rejected"
+
+
+@dataclass(frozen=True, slots=True)
+class ComposePlan:
+    app: Application
+    compose_yaml: str
+    diff: str
+    problems: list[str]  # what forbids applying it (empty: fine)
+    conflicts: list[PortConflict]
+    services: list[Service]  # declared services, read from the resolved model
 
 
 class RevisionNotRestorableError(ConflictError):
@@ -242,6 +262,7 @@ class AppService:
         inputs: dict[str, Any],
         *,
         revision: int,
+        overrides: Overrides | None = None,
     ) -> DeployPlan:
         inputs = await self._with_setting_fallbacks(entry, inputs)
         app_ctx = AppContext(
@@ -252,10 +273,12 @@ class AppService:
         host = self.host
         defaults_ctx = build_context(app_ctx, host, FormValues(), list(entry.template.services))
         form = validate_inputs(entry.template, inputs, defaults_ctx)
-        compiled = compile_template(entry.template, app_ctx, host, form, self.settings.volumes_root)
+        overrides = overrides or Overrides()
+        compiled = compile_template(entry.template, app_ctx, host, form, self.settings.volumes_root,
+                                    overrides)  # fmt: skip
         used = await used_ports(session, self.state, exclude_app=slug)
         conflicts = find_conflicts((p for s in compiled.services for p in s.ports), used)
-        return DeployPlan(slug, name, entry, zone, compiled, form, conflicts)
+        return DeployPlan(slug, name, entry, zone, compiled, form, conflicts, overrides)
 
     async def _with_setting_fallbacks(
         self, entry: CatalogEntry, inputs: dict[str, Any]
@@ -325,7 +348,7 @@ class AppService:
 
     async def plan_update(
         self, session: AsyncSession, app_id: int, inputs: dict[str, Any],
-        entry: CatalogEntry | None = None,
+        entry: CatalogEntry | None = None, overrides: Overrides | None = None,
     ) -> UpdatePlan:  # fmt: skip
         """Preview a settings change: new compose, its diff, port conflicts.
 
@@ -340,8 +363,10 @@ class AppService:
         latest = await self._latest_revision(session, app.id)
         number = (latest.number if latest else 0) + 1
         zone = await session.get(Zone, app.zone_id) if app.zone_id else None
+        if overrides is None:  # unchanged: the latest revision's advanced settings
+            overrides = Overrides.model_validate(latest.overrides or {}) if latest else None
         plan = await self._plan(session, entry, app.slug, app.name, zone, {**inputs, **kept},
-                                revision=number)  # fmt: skip
+                                revision=number, overrides=overrides)  # fmt: skip
         previous = latest.compose_yaml if latest else ""
         new = plan.compiled.compose_yaml
         diff = "".join(difflib.unified_diff(
@@ -360,22 +385,28 @@ class AppService:
             if f.reset_data_on_change and f.id in before
             and before[f.id] != plan.form.values.get(f.id)
         ]  # fmt: skip
+        custom = bool(latest and latest.custom_compose)
         if not reset_fields:
-            return UpdatePlan(plan, number, diff)
-        specs = entry.template.services
+            return UpdatePlan(plan, number, diff, replaces_custom=custom)
+        # The template's volumes only: extra folders (advanced settings) are the user's own.
+        keep = {(n, v.name): v.reset_keep for n, sp in entry.template.services.items()
+                for v in sp.volumes}  # fmt: skip
         reset_volumes = {
-            str(v.source): next(x.reset_keep for x in specs[v.service].volumes if x.name == v.name)
-            for svc in plan.compiled.services for v in svc.volumes if not v.read_only
+            str(v.source): keep[(v.service, v.name)]
+            for svc in plan.compiled.services for v in svc.volumes
+            if not v.read_only and (v.service, v.name) in keep
         }  # fmt: skip
         size = sum(tree_size(Path(p)) for p in reset_volumes)
-        return UpdatePlan(plan, number, diff, reset_fields, reset_volumes, size)
+        return UpdatePlan(plan, number, diff, reset_fields, reset_volumes, size,
+                          replaces_custom=custom)  # fmt: skip
 
     async def update(
         self, app_id: int, inputs: dict[str, Any], *, reset_data: bool = False,
         entry: CatalogEntry | None = None, event: str = "app.updated",
+        overrides: Overrides | None = None,
     ) -> Job:  # fmt: skip
         async with self.sessions() as session, session.begin():
-            upd = await self.plan_update(session, app_id, inputs, entry)
+            upd = await self.plan_update(session, app_id, inputs, entry, overrides)
             plan = upd.plan
             if upd.reset_fields and not reset_data:
                 raise DataResetRequiredError(
@@ -407,6 +438,7 @@ class AppService:
                 app_id=app.id, number=upd.number, inputs=plan.form.values,
                 compose_yaml=plan.compiled.compose_yaml, diff_from_previous=upd.diff,
                 template_version_id=version.id,
+                overrides=plan.overrides.model_dump(exclude_defaults=True) or None,
                 created_at=self.clock.now(), status=RevisionStatus.PENDING,
             )  # fmt: skip
             session.add(revision)
@@ -506,17 +538,82 @@ class AppService:
 
     async def plan_restore(self, session: AsyncSession, app_id: int, number: int) -> UpdatePlan:
         rev, entry = await self._revision_entry(session, app_id, number)
-        return await self.plan_update(session, app_id, dict(rev.inputs), entry)
+        return await self.plan_update(session, app_id, dict(rev.inputs), entry,
+                                      Overrides.model_validate(rev.overrides or {}))  # fmt: skip
 
     async def restore(self, app_id: int, number: int, *, reset_data: bool = False) -> Job:
         """A new revision with the settings and template version of revision ``number``."""
         async with self.sessions() as session:
             rev, entry = await self._revision_entry(session, app_id, number)
-            inputs = dict(rev.inputs)
+            inputs, overrides = dict(rev.inputs), Overrides.model_validate(rev.overrides or {})
+            custom = rev.compose_yaml if rev.custom_compose else None
+        if custom is not None:  # a hand-written compose comes back as it was
+            return await self.apply_compose(app_id, custom, event="app.restored")
         job = await self.update(app_id, inputs, reset_data=reset_data, entry=entry,
-                                event="app.restored")  # fmt: skip
+                                event="app.restored", overrides=overrides)  # fmt: skip
         if entry.source == CUSTOM_SOURCE:
             self.catalog.add_custom(entry.manifest)  # that pin is the app's template again
+        return job
+
+    # --- hand-written compose (admin) ------------------------------------------
+    async def plan_compose(self, session: AsyncSession, app_id: int,
+                           compose_yaml: str) -> ComposePlan:  # fmt: skip
+        """Validate a hand-written compose file: resolved by Compose, then checked."""
+        app = await self.get(session, app_id)
+        secrets = await self.decrypt_secrets(session, app.id)
+        env = {secret_env_name(k): v for k, v in secrets.items()}
+        try:
+            model = await self.runner.check(app.slug, compose_yaml, env)
+        except ComposeError as exc:
+            return ComposePlan(app, compose_yaml, "", [f"compose: {exc}"[:500]], [], [])
+        roots = [self.volumes_dir(app.slug), self.runner.project_dir(app.slug),
+                 self.runner.apps_dir / f".check-{app.slug}"]  # fmt: skip
+        found = compose_problems(model, app.slug, roots)
+        services = [] if found else _services_from_model(model)
+        used = await used_ports(session, self.state, exclude_app=app.slug)
+        conflicts = find_conflicts((
+            PortPlan(sv.name, p.container_port, p.host_port, p.protocol, "other",
+                     p.exposure.value, p.host_ip)
+            for sv in services for p in sv.ports
+        ), used)  # fmt: skip
+        latest = await self._latest_revision(session, app.id)
+        diff = "".join(difflib.unified_diff(
+            (latest.compose_yaml if latest else "").splitlines(keepends=True),
+            compose_yaml.splitlines(keepends=True),
+            fromfile="current", tofile="edited",
+        ))  # fmt: skip
+        return ComposePlan(app, compose_yaml, diff, found, conflicts, services)
+
+    async def apply_compose(self, app_id: int, compose_yaml: str, *,
+                            event: str = "app.compose_edited") -> Job:  # fmt: skip
+        async with self.sessions() as session, session.begin():
+            plan = await self.plan_compose(session, app_id, compose_yaml)
+            if plan.problems:
+                raise ComposeRejectedError("this compose file cannot be applied",
+                                           problems=plan.problems)  # fmt: skip
+            if plan.conflicts:
+                conflicts = [_conflict_dict(c) for c in plan.conflicts]
+                raise PortConflictError("host ports already in use", conflicts=conflicts)
+            app = plan.app
+            latest = await self._latest_revision(session, app.id)
+            app.services.clear()
+            await session.flush()
+            app.services = plan.services
+            revision = AppRevision(
+                app_id=app.id, number=(latest.number if latest else 0) + 1,
+                inputs=dict(latest.inputs) if latest else {}, compose_yaml=compose_yaml,
+                diff_from_previous=plan.diff, created_at=self.clock.now(),
+                status=RevisionStatus.PENDING, custom_compose=True,
+                template_version_id=latest.template_version_id if latest else None,
+                overrides=latest.overrides if latest else None,
+            )  # fmt: skip
+            session.add(revision)
+            await session.flush()
+            app.desired_state = DesiredState.RUNNING
+            job = self.jobs.add(session, JobKind.UPDATE, app_id=app.id, app_slug=app.slug,
+                                params={"revision_id": revision.id})  # fmt: skip
+        self.jobs.wake()
+        self.bus.publish(event, app=app.slug, revision=revision.number, job=job.id)
         return job
 
     # --- free images (any registry image, through a generated template) -------
@@ -772,3 +869,30 @@ def _services_from(compiled: CompiledApp) -> list[Service]:
             ],
         ))  # fmt: skip
     return services
+
+
+def _services_from_model(model: dict[str, Any]) -> list[Service]:
+    """Services, ports and bind mounts of a resolved compose model (hand-written file)."""
+    out: list[Service] = []
+    for name, svc in (model.get("services") or {}).items():
+        ports = []
+        for p in svc.get("ports") or []:
+            if not isinstance(p, dict) or not p.get("published"):
+                continue
+            ports.append(PortBinding(
+                host_ip=p.get("host_ip") or None, host_port=int(str(p["published"]).split("-")[0]),
+                container_port=int(p.get("target", 0)), protocol=p.get("protocol", "tcp"),
+                purpose="other", exposure=Exposure.PUBLIC if not p.get("host_ip") else Exposure.LAN,
+            ))  # fmt: skip
+        volumes = [
+            VolumeMount(kind=VolumeKind.BIND, source=str(v["source"]), target=str(v["target"]),
+                        read_only=bool(v.get("read_only")), backup=True)
+            for v in svc.get("volumes") or []
+            if isinstance(v, dict) and v.get("type") == "bind" and v.get("source")
+        ]  # fmt: skip
+        out.append(Service(
+            name=name, image=str(svc.get("image") or ""), role=ServiceRole.MAIN if not out
+            else ServiceRole.SIDECAR, restart_policy=str(svc.get("restart") or "no"),
+            ports=ports, volumes=volumes,
+        ))  # fmt: skip
+    return out

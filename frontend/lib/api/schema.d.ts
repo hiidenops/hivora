@@ -218,8 +218,32 @@ export interface paths {
         };
         /** Get Compose */
         get: operations["get_compose_api_v1_apps__app_id__compose_get"];
-        put?: never;
+        /**
+         * Apply Compose
+         * @description Apply a hand-written compose file as a new revision (admin: it runs as written).
+         */
+        put: operations["apply_compose_api_v1_apps__app_id__compose_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/compose/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Plan Compose
+         * @description Check a hand-written compose file (resolved by Compose, then security checks).
+         */
+        post: operations["plan_compose_api_v1_apps__app_id__compose_plan_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1579,6 +1603,20 @@ export interface components {
             /** Output */
             output: string;
         };
+        /** ComposeIn */
+        ComposeIn: {
+            /** Compose Yaml */
+            compose_yaml: string;
+        };
+        /** ComposePlanOut */
+        ComposePlanOut: {
+            /** Conflicts */
+            conflicts: components["schemas"]["ConflictOut"][];
+            /** Diff */
+            diff: string;
+            /** Problems */
+            problems: string[];
+        };
         /** ConflictOut */
         ConflictOut: {
             /** Port */
@@ -1717,6 +1755,37 @@ export interface components {
         EnabledIn: {
             /** Enabled */
             enabled: boolean;
+        };
+        /** ExtraPort */
+        ExtraPort: {
+            /** Container */
+            container: number;
+            /**
+             * Exposure
+             * @default lan
+             * @enum {string}
+             */
+            exposure: "lan" | "public";
+            /** Host */
+            host: number;
+            /**
+             * Protocol
+             * @default tcp
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+        };
+        /** ExtraVolume */
+        ExtraVolume: {
+            /** Name */
+            name: string;
+            /**
+             * Read Only
+             * @default false
+             */
+            read_only: boolean;
+            /** Target */
+            target: string;
         };
         /** GameCapsOut */
         GameCapsOut: {
@@ -1951,6 +2020,16 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** Overrides */
+        Overrides: {
+            /**
+             * Services
+             * @default {}
+             */
+            services: {
+                [key: string]: components["schemas"]["ServiceOverrides"];
+            };
+        };
         /** PasswordConfirmIn */
         PasswordConfirmIn: {
             /** Password */
@@ -2140,6 +2219,32 @@ export interface components {
              */
             weekday: number;
         };
+        /** ServiceOverrides */
+        ServiceOverrides: {
+            /** Cpus */
+            cpus?: number | null;
+            /**
+             * Env
+             * @default {}
+             */
+            env: {
+                [key: string]: string;
+            };
+            /** Memory */
+            memory?: string | null;
+            /**
+             * Ports
+             * @default []
+             */
+            ports: components["schemas"]["ExtraPort"][];
+            /** Restart */
+            restart?: ("no" | "always" | "unless-stopped" | "on-failure") | null;
+            /**
+             * Volumes
+             * @default []
+             */
+            volumes: components["schemas"]["ExtraVolume"][];
+        };
         /** SessionOut */
         SessionOut: {
             /**
@@ -2173,6 +2278,7 @@ export interface components {
             inputs: {
                 [key: string]: unknown;
             };
+            overrides?: components["schemas"]["Overrides"] | null;
             /**
              * Reset Data
              * @default false
@@ -2181,12 +2287,17 @@ export interface components {
         };
         /** SettingsOut */
         SettingsOut: {
+            /** Custom Compose */
+            custom_compose: boolean;
             /** Form */
             form: {
                 [key: string]: unknown;
             };
+            overrides: components["schemas"]["Overrides"];
             /** Secrets Set */
             secrets_set: string[];
+            /** Services */
+            services: string[];
             /** Template */
             template: string;
             /** Values */
@@ -2312,6 +2423,11 @@ export interface components {
             ports: components["schemas"]["PortOut"][];
             /** Public Ports */
             public_ports: number[];
+            /**
+             * Replaces Custom
+             * @default false
+             */
+            replaces_custom: boolean;
             reset: components["schemas"]["ResetOut"] | null;
             /** Revision */
             revision: number;
@@ -2967,6 +3083,76 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_compose_api_v1_apps__app_id__compose_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComposeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_compose_api_v1_apps__app_id__compose_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ComposeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComposePlanOut"];
                 };
             };
             /** @description Validation Error */

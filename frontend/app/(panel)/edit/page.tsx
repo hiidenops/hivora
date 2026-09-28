@@ -7,6 +7,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { AppIcon } from "@/components/app-icon";
 import { PageHeader, useSession } from "@/components/app-shell";
 import { DiffView } from "@/components/diff-view";
+import { OverridesEditor, type Overrides } from "@/features/apps/overrides-editor";
 import { JobProgress } from "@/components/job-progress";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -42,13 +43,32 @@ function Edit() {
   const [jobId, setJobId] = useState<number | null>(null);
   const [finished, setFinished] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [overrides, setOverrides] = useState<Overrides>({ services: {} });
 
   const form = settings?.form as { basic?: FieldDef[]; advanced?: FieldDef[] } | undefined;
   const basic = useMemo(() => form?.basic ?? [], [form]);
   const advancedFields = useMemo(() => form?.advanced ?? [], [form]);
   useEffect(() => {
-    if (settings) setValues(settings.values);
+    if (settings) {
+      setValues(settings.values);
+      setOverrides(settings.overrides);
+    }
   }, [settings]);
+  // Empty rows are left out (an added line never filled in).
+  const cleaned = (): Overrides => ({
+    services: Object.fromEntries(
+      Object.entries(overrides.services ?? {}).map(([name, s]) => [
+        name,
+        {
+          ...s,
+          env: Object.fromEntries(Object.entries(s.env ?? {}).filter(([k]) => k.trim())),
+          ports: (s.ports ?? []).filter((p) => p.container && p.host),
+          volumes: (s.volumes ?? []).filter((v) => v.name && v.target),
+        },
+      ]),
+    ),
+  });
+  const hasOverrides = Object.values(settings?.overrides.services ?? {}).some((s) => Object.keys(s).length > 0);
 
   const error = plan.error ?? apply.error;
   const fieldErrors =
@@ -102,6 +122,17 @@ function Edit() {
               </div>
             </details>
           )}
+          {(advanced || hasOverrides) && (
+            <details open={hasOverrides}>
+              <summary className="surface rounded-lg border px-4 py-3 text-sm font-medium transition-shadow duration-200 hover:shadow-md">
+                {t("overrides.title")}
+              </summary>
+              <div className="mt-4">
+                <OverridesEditor services={settings.services} value={overrides} onChange={setOverrides} />
+              </div>
+            </details>
+          )}
+          {settings.custom_compose && <Alert tone="warn">{t("overrides.customCompose")}</Alert>}
           {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
           <div className="flex gap-2">
             <Button variant="outline" asChild>
@@ -110,7 +141,7 @@ function Edit() {
             <Button
               disabled={plan.isPending}
               onClick={() =>
-                plan.mutate(values, {
+                plan.mutate({ inputs: values, overrides: cleaned() }, {
                   onSuccess: (p) => {
                     setReview(p);
                     setConfirmReset(false);
@@ -137,6 +168,7 @@ function Edit() {
               </Alert>
             ))}
             {review.public_ports.length > 0 && <Alert tone="warn">{t("deploy.public")}</Alert>}
+            {review.replaces_custom && <Alert tone="warn">{t("overrides.replacesCustom")}</Alert>}
             {review.reset && (
               <Alert tone="danger" className="grid gap-3">
                 <p className="font-medium">
@@ -179,7 +211,7 @@ function Edit() {
                 variant={review.reset ? "destructive" : undefined}
                 disabled={review.conflicts.length > 0 || apply.isPending || (!!review.reset && !confirmReset)}
                 onClick={() =>
-                  apply.mutate({ inputs: values, resetData: !!review.reset && confirmReset }, {
+                  apply.mutate({ inputs: values, resetData: !!review.reset && confirmReset, overrides: cleaned() }, {
                     onSuccess: (job) => {
                       setJobId(job.id);
                       setStep("progress");

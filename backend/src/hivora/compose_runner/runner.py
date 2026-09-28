@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import shutil
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -125,6 +126,23 @@ class ComposeRunner:
         parsed: dict[str, Any] = json.loads(result.stdout)
         return parsed
 
+    async def check(self, slug: str, compose_yaml: str, env: dict[str, str]) -> dict[str, Any]:
+        """``docker compose config`` of a candidate file, without touching the app's own."""
+        tmp = self.apps_dir / f".check-{validate_slug(slug)}"
+        try:
+            tmp.mkdir(parents=True, exist_ok=True)
+            lines = "".join(f"{k}='{v}'\n" for k, v in sorted(env.items()))
+            _atomic_write(tmp / ENV_FILE, lines, mode=0o600)
+            _atomic_write(tmp / COMPOSE_FILE, compose_yaml, mode=0o600)
+            result = await self._run(slug, ["config", "--format", "json"], Redactor(env.values()),
+                                     project_dir=tmp)  # fmt: skip
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        if result.returncode != 0:
+            raise ComposeError(result.error or "invalid compose file", slug=slug)
+        parsed: dict[str, Any] = json.loads(result.stdout)
+        return parsed
+
     async def up(
         self,
         slug: str,
@@ -196,8 +214,9 @@ class ComposeRunner:
         args: list[str],
         redactor: Redactor,
         on_progress: ProgressCallback | None = None,
+        project_dir: Path | None = None,
     ) -> ComposeResult:
-        project_dir = self.project_dir(slug)
+        project_dir = project_dir or self.project_dir(slug)
         argv = [
             *self._cmd,
             "--progress",

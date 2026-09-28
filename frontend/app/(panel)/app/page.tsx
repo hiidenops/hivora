@@ -26,6 +26,7 @@ const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.Vp
 const LogsCard = dynamic(() => import("@/features/logs/logs-card").then((m) => m.LogsCard));
 const BackupsCard = dynamic(() => import("@/features/backups/backups-card").then((m) => m.BackupsCard));
 const UpgradeBanner = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.UpgradeBanner));
+const ComposeEditor = dynamic(() => import("@/features/apps/compose-editor").then((m) => m.ComposeEditor));
 const RestoreButton = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.RestoreButton));
 import { ApiError } from "@/lib/api/client";
 import { useApp, useAppCompose, useJob, useRevisions } from "@/lib/api/hooks";
@@ -41,6 +42,7 @@ function AppDetail() {
   const { data: compose } = useAppCompose(id, advanced && !!app);
   const { data: revisions } = useRevisions(id, advanced && !!app);
   const [activeJob, setActiveJob] = useState<number | null>(null);
+  const [editingCompose, setEditingCompose] = useState(false);
   const [removing, setRemoving] = useState(false);
   const { data: active } = useJob(activeJob);
   const status = useLiveStatus(app?.slug ?? "", app?.status ?? "missing");
@@ -183,11 +185,20 @@ function AppDetail() {
             </Card>
             {compose && (
               <Card className="lg:col-span-2">
-                <CardHeader>
+                <CardHeader className="flex-row items-center justify-between gap-3">
                   <CardTitle>{t("app.compose")}</CardTitle>
+                  {can("admin") && !editingCompose && (
+                    <Button size="sm" variant="outline" onClick={() => setEditingCompose(true)}>
+                      {t("compose.edit")}
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
-                  <CodeView code={compose.compose_yaml} />
+                  {editingCompose ? (
+                    <ComposeEditor appId={app.id} initial={compose.compose_yaml} onJob={setActiveJob} onClose={() => setEditingCompose(false)} />
+                  ) : (
+                    <CodeView code={compose.compose_yaml} />
+                  )}
                 </CardContent>
               </Card>
             )}

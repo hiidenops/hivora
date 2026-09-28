@@ -219,15 +219,15 @@ export const useAppSettings = (id: number) =>
 
 export const usePlanUpdate = (id: number) =>
   useMutation({
-    mutationFn: (inputs: Record<string, unknown>) =>
-      api<UpdatePlan>(`/apps/${id}/settings/plan`, { method: "POST", body: { inputs } }),
+    mutationFn: ({ inputs, overrides }: { inputs: Record<string, unknown>; overrides?: unknown }) =>
+      api<UpdatePlan>(`/apps/${id}/settings/plan`, { method: "POST", body: { inputs, overrides } }),
   });
 
 export function useUpdateSettings(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ inputs, resetData }: { inputs: Record<string, unknown>; resetData: boolean }) =>
-      api<JobRef>(`/apps/${id}/settings`, { method: "PUT", body: { inputs, reset_data: resetData } }),
+    mutationFn: ({ inputs, resetData, overrides }: { inputs: Record<string, unknown>; resetData: boolean; overrides?: unknown }) =>
+      api<JobRef>(`/apps/${id}/settings`, { method: "PUT", body: { inputs, reset_data: resetData, overrides } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.app(id) }),
   });
 }

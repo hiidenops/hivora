@@ -16,8 +16,9 @@ from hivora.state import AppStatus
 from hivora.templates.catalog import host_arch
 from hivora.templates.custom import CustomEnv, CustomPort
 from hivora.templates.models import TemplateVersion
+from hivora.templates.overrides import Overrides
 from hivora.templates.schema import Localized
-from hivora.web.deps import Operator, RuntimeDep, Viewer
+from hivora.web.deps import Admin, Operator, RuntimeDep, Viewer
 
 router = APIRouter(tags=["apps"])
 
@@ -157,11 +158,25 @@ class SettingsOut(BaseModel):
     form: dict[str, Any]
     values: dict[str, Any]
     secrets_set: list[str]
+    services: list[str]  # what advanced settings can target
+    overrides: Overrides  # the advanced settings in force
+    custom_compose: bool  # the compose was written by hand: saving the form replaces it
 
 
 class SettingsIn(BaseModel):
     inputs: dict[str, Any] = {}
     reset_data: bool = False  # confirms a change that erases the app data
+    overrides: Overrides | None = None  # None: keep the current advanced settings
+
+
+class ComposeIn(BaseModel):
+    compose_yaml: str = Field(min_length=1, max_length=200_000)
+
+
+class ComposePlanOut(BaseModel):
+    diff: str
+    problems: list[str]  # why it cannot be applied (empty: it can)
+    conflicts: list[ConflictOut]
 
 
 class ResetOut(BaseModel):
@@ -175,6 +190,7 @@ class UpdatePlanOut(PlanOut):
     revision: int
     diff: str
     reset: ResetOut | None  # set when applying erases the app data
+    replaces_custom: bool = False  # the hand-written compose goes away
 
 
 class RemovalPlanOut(BaseModel):
@@ -500,10 +516,16 @@ async def remove(app_id: int, _: Operator, rt: RuntimeDep, remove_data: bool = F
 async def get_settings(app_id: int, _: Operator, rt: RuntimeDep) -> SettingsOut:
     async with rt.sessions() as session:
         st = await rt.apps.current_settings(session, app_id)
+        latest = await session.scalar(
+            select(AppRevision).where(AppRevision.app_id == app_id)
+            .order_by(AppRevision.number.desc()).limit(1)
+        )  # fmt: skip
     t = st.entry.template
     return SettingsOut(template=st.entry.slug, version=t.metadata.version,
                        form=t.form.model_dump(by_alias=True, exclude_none=True),
-                       values=st.values, secrets_set=st.secrets_set)  # fmt: skip
+                       values=st.values, secrets_set=st.secrets_set, services=list(t.services),
+                       overrides=Overrides.model_validate(latest.overrides or {} if latest else {}),
+                       custom_compose=bool(latest and latest.custom_compose))  # fmt: skip
 
 
 def update_plan_out(upd: UpdatePlan) -> UpdatePlanOut:
@@ -514,7 +536,7 @@ def update_plan_out(upd: UpdatePlan) -> UpdatePlanOut:
         if upd.reset_fields else None
     )  # fmt: skip
     return UpdatePlanOut(**plan_out(upd.plan).model_dump(), revision=upd.number, diff=upd.diff,
-                         reset=reset)  # fmt: skip
+                         reset=reset, replaces_custom=upd.replaces_custom)  # fmt: skip
 
 
 @router.post("/{app_id}/settings/plan")
@@ -523,13 +545,16 @@ async def plan_settings(
 ) -> UpdatePlanOut:
     """Preview: new compose and its diff against the current revision. Nothing is written."""
     async with rt.sessions() as session:
-        return update_plan_out(await rt.apps.plan_update(session, app_id, body.inputs))
+        return update_plan_out(
+            await rt.apps.plan_update(session, app_id, body.inputs, overrides=body.overrides)
+        )
 
 
 @router.put("/{app_id}/settings", status_code=202)
 async def update_settings(app_id: int, body: SettingsIn, _: Operator, rt: RuntimeDep) -> JobRef:
     """New revision from these inputs, applied by a job (secrets left empty are kept)."""
-    return job_ref(await rt.apps.update(app_id, body.inputs, reset_data=body.reset_data))
+    return job_ref(await rt.apps.update(app_id, body.inputs, reset_data=body.reset_data,
+                                        overrides=body.overrides))  # fmt: skip
 
 
 @router.get("/{app_id}/upgrade")
@@ -563,3 +588,19 @@ async def restore(app_id: int, number: int, body: ApplyIn, _: Operator,
                   rt: RuntimeDep) -> JobRef:  # fmt: skip
     """A new revision with that revision's settings and template version."""
     return job_ref(await rt.apps.restore(app_id, number, reset_data=body.reset_data))
+
+
+@router.post("/{app_id}/compose/plan")
+async def plan_compose(app_id: int, body: ComposeIn, _: Admin, rt: RuntimeDep) -> ComposePlanOut:
+    """Check a hand-written compose file (resolved by Compose, then security checks)."""
+    async with rt.sessions() as session:
+        p = await rt.apps.plan_compose(session, app_id, body.compose_yaml)
+    conflicts = [ConflictOut(port=c.port, protocol=c.protocol, used_by=c.used_by,
+                             suggestion=c.suggestion) for c in p.conflicts]  # fmt: skip
+    return ComposePlanOut(diff=p.diff, problems=p.problems, conflicts=conflicts)
+
+
+@router.put("/{app_id}/compose", status_code=202)
+async def apply_compose(app_id: int, body: ComposeIn, _: Admin, rt: RuntimeDep) -> JobRef:
+    """Apply a hand-written compose file as a new revision (admin: it runs as written)."""
+    return job_ref(await rt.apps.apply_compose(app_id, body.compose_yaml))

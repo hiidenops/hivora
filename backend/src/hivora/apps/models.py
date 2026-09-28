@@ -88,6 +88,9 @@ class AppRevision(Base):
     compose_yaml: Mapped[str] = mapped_column(Text)  # exact artefact applied
     # Template version it was compiled from (restoring recompiles with it); None: older rows.
     template_version_id: Mapped[int | None] = mapped_column(ForeignKey("template_version.id"))
+    overrides: Mapped[dict[str, Any] | None] = mapped_column(JSON)  # advanced settings
+    # Compose written by hand (admin): applied as is, the form no longer drives it.
+    custom_compose: Mapped[bool] = mapped_column(default=False, server_default="0")
     diff_from_previous: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[int | None]
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)

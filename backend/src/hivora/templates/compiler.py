@@ -13,6 +13,7 @@ import yaml
 from hivora.core.errors import ValidationError
 from hivora.templates.expressions import render, secret_env_name
 from hivora.templates.forms import FormValues
+from hivora.templates.overrides import Overrides, ServiceOverrides
 from hivora.templates.schema import Exposure, PortSpec, Template
 
 LABEL_APP = "io.hivora.app"
@@ -146,14 +147,70 @@ def _plan_port(svc: str, spec: PortSpec, ctx: dict[str, Any], host: HostInfo) ->
     )
 
 
+def _apply_overrides(
+    svc: dict[str, Any], o: ServiceOverrides, name: str, ports: tuple[PortPlan, ...],
+    volumes: tuple[VolumePlan, ...], restart: str, slug: str, volumes_root: Path, host: HostInfo,
+) -> tuple[tuple[PortPlan, ...], tuple[VolumePlan, ...], str]:  # fmt: skip
+    """The advanced settings of one service, written into its compose entry."""
+    if o.env:
+        env = svc.setdefault("environment", {})
+        env.update({k: escape_compose(v) for k, v in o.env.items()})
+    if o.ports:
+        taken = {(p.container_port, p.protocol) for p in ports}
+        extra = []
+        for e in o.ports:
+            if (e.container, e.protocol) in taken:
+                raise ValidationError("port already declared by the template",
+                                      service=name, port=f"{e.container}/{e.protocol}")  # fmt: skip
+            where = f"{name}:{e.container}/{e.protocol}"
+            extra.append(PortPlan(name, e.container, e.host, e.protocol, "other", e.exposure,
+                                  _host_ip(e.exposure, host, where)))  # fmt: skip
+        ports = (*ports, *extra)
+        svc["ports"] = [
+            {"target": p.container_port, "published": str(p.host_port), "protocol": p.protocol,
+             **({"host_ip": p.host_ip} if p.host_ip else {})}
+            for p in ports if p.host_port is not None
+        ]  # fmt: skip
+    if o.volumes:
+        names = {v.name for v in volumes}
+        targets = {v.target for v in volumes}
+        extra_v = []
+        for v in o.volumes:
+            if v.name in names or v.target in targets:
+                raise ValidationError("folder or path already used", service=name, volume=v.name)
+            names.add(v.name)
+            targets.add(v.target)
+            extra_v.append(VolumePlan(name, v.name, volumes_root / slug / v.name, v.target,
+                                      v.read_only, True))  # fmt: skip
+        volumes = (*volumes, *extra_v)
+        svc["volumes"] = [
+            {"type": "bind", "source": str(v.source), "target": v.target,
+             **({"read_only": True} if v.read_only else {})}
+            for v in volumes
+        ]  # fmt: skip
+    if o.cpus is not None:
+        svc["cpus"] = o.cpus
+    if o.memory is not None:
+        svc["mem_limit"] = o.memory
+    if o.restart is not None:
+        restart = o.restart
+        svc["restart"] = restart
+    return ports, volumes, restart
+
+
 def compile_template(
     template: Template,
     app: AppContext,
     host: HostInfo,
     form: FormValues,
     volumes_root: Path,
+    overrides: Overrides | None = None,
 ) -> CompiledApp:
+    """``overrides``: the app's advanced settings, applied on top of the template."""
     ctx = build_context(app, host, form, list(template.services))
+    overrides = overrides or Overrides()
+    if unknown := set(overrides.services) - set(template.services):
+        raise ValidationError("advanced settings name unknown services", services=sorted(unknown))
     labels = {LABEL_APP: app.slug, LABEL_REVISION: str(app.revision)}
     if app.zone:
         labels[LABEL_ZONE] = app.zone
@@ -223,11 +280,13 @@ def compile_template(
             svc["stdin_open"] = True
         if spec.tty:
             svc["tty"] = True
+        restart: str = template.defaults.restart
+        if (o := overrides.of(name)) is not None:
+            ports, volumes, restart = _apply_overrides(svc, o, name, ports, volumes, restart,
+                                                       app.slug, volumes_root, host)  # fmt: skip
         svc["labels"] = labels
         compose_services[name] = svc
-        plans.append(
-            ServicePlan(name, spec.image_ref, spec.role, template.defaults.restart, ports, volumes)
-        )
+        plans.append(ServicePlan(name, spec.image_ref, spec.role, restart, ports, volumes))
 
     compose: dict[str, Any] = {"name": app.slug, "services": compose_services}
     if configs:
