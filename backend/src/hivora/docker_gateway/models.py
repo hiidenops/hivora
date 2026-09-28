@@ -75,3 +75,4 @@ class NetworkInfo:
     internal: bool
     labels: dict[str, str] = field(default_factory=dict)
     options: dict[str, Any] = field(default_factory=dict)
+    subnets: tuple[str, ...] = ()  # IPAM subnets, e.g. ("172.20.0.0/16",)

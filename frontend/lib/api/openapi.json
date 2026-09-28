@@ -1,6 +1,32 @@
 {
   "components": {
     "schemas": {
+      "AccessIO": {
+        "description": "What the client may reach, enforced by the server whatever its configuration.",
+        "properties": {
+          "internet": {
+            "default": true,
+            "title": "Internet",
+            "type": "boolean"
+          },
+          "lan": {
+            "default": true,
+            "title": "Lan",
+            "type": "boolean"
+          },
+          "zones": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Zones",
+            "type": "array"
+          }
+        },
+        "title": "AccessIO",
+        "type": "object"
+      },
       "AddressIn": {
         "properties": {
           "address": {
@@ -374,6 +400,16 @@
       },
       "ClientIn": {
         "properties": {
+          "access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessIO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "address": {
             "anyOf": [
               {
@@ -401,11 +437,34 @@
             ],
             "title": "Allowed Ips"
           },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
           "name": {
             "maxLength": 32,
             "minLength": 1,
             "pattern": "^[A-Za-z0-9 _.-]+$",
             "title": "Name",
+            "type": "string"
+          },
+          "routing": {
+            "default": "default",
+            "enum": [
+              "default",
+              "all",
+              "access",
+              "custom"
+            ],
+            "title": "Routing",
             "type": "string"
           }
         },
@@ -416,7 +475,18 @@
         "type": "object"
       },
       "ClientUpdateIn": {
+        "description": "Only the fields sent change.",
         "properties": {
+          "access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessIO"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "address": {
             "anyOf": [
               {
@@ -459,6 +529,49 @@
               }
             ],
             "title": "Enabled"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9 _.-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "routing": {
+            "anyOf": [
+              {
+                "enum": [
+                  "default",
+                  "all",
+                  "access",
+                  "custom"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing"
           }
         },
         "title": "ClientUpdateIn",
@@ -2670,6 +2783,13 @@
       },
       "VpnClientOut": {
         "properties": {
+          "access": {
+            "$ref": "#/components/schemas/AccessIO"
+          },
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
           "address": {
             "anyOf": [
               {
@@ -2699,6 +2819,29 @@
             "title": "Enabled",
             "type": "boolean"
           },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -2718,6 +2861,10 @@
             "title": "Name",
             "type": "string"
           },
+          "online": {
+            "title": "Online",
+            "type": "boolean"
+          },
           "public_key": {
             "anyOf": [
               {
@@ -2728,6 +2875,16 @@
               }
             ],
             "title": "Public Key"
+          },
+          "routing": {
+            "enum": [
+              "default",
+              "all",
+              "access",
+              "custom"
+            ],
+            "title": "Routing",
+            "type": "string"
           },
           "rx": {
             "title": "Rx",
@@ -2743,9 +2900,15 @@
           "name",
           "address",
           "enabled",
+          "active",
+          "expires_at",
+          "access",
+          "routing",
           "allowed_ips",
           "public_key",
           "latest_handshake",
+          "online",
+          "endpoint",
           "rx",
           "tx"
         ],

@@ -1,11 +1,12 @@
 """WireGuard peers of a managed VPN: the server itself and its clients."""
 
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import JSON, ForeignKey, LargeBinary, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from hivora.db.base import Base
+from hivora.db.base import Base, UTCDateTime
 
 
 class VpnPeer(Base):
@@ -20,7 +21,14 @@ class VpnPeer(Base):
     name: Mapped[str] = mapped_column(String(32))
     address: Mapped[str] = mapped_column(String(45))
     enabled: Mapped[bool] = mapped_column(default=True)
-    allowed_ips: Mapped[list[Any] | None] = mapped_column(JSON)  # None: the VPN's default
+    allowed_ips: Mapped[list[Any] | None] = mapped_column(JSON)  # routing "custom" only
+    # What the client reaches, enforced by the server: {"internet", "lan", "zones": [slugs]}.
+    # None: everything the VPN reaches.
+    access: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # Traffic the client sends through the tunnel: "default" (VPN setting), "all",
+    # "access" (only what it may reach, the rest goes direct), "custom" (allowed_ips).
+    routing: Mapped[str] = mapped_column(String(10), default="default", server_default="default")
+    expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime)  # disabled after
     public_key: Mapped[str] = mapped_column(String(44))
     private_nonce: Mapped[bytes] = mapped_column(LargeBinary)
     private_key: Mapped[bytes] = mapped_column(LargeBinary)

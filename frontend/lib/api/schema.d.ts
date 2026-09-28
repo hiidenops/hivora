@@ -1165,6 +1165,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccessIO
+         * @description What the client may reach, enforced by the server whatever its configuration.
+         */
+        AccessIO: {
+            /**
+             * Internet
+             * @default true
+             */
+            internet: boolean;
+            /**
+             * Lan
+             * @default true
+             */
+            lan: boolean;
+            /**
+             * Zones
+             * @default []
+             */
+            zones: string[];
+        };
         /** AddressIn */
         AddressIn: {
             /**
@@ -1283,15 +1304,28 @@ export interface components {
         };
         /** ClientIn */
         ClientIn: {
+            access?: components["schemas"]["AccessIO"] | null;
             /** Address */
             address?: string | null;
             /** Allowed Ips */
             allowed_ips?: string[] | null;
+            /** Expires At */
+            expires_at?: string | null;
             /** Name */
             name: string;
+            /**
+             * Routing
+             * @default default
+             * @enum {string}
+             */
+            routing: "default" | "all" | "access" | "custom";
         };
-        /** ClientUpdateIn */
+        /**
+         * ClientUpdateIn
+         * @description Only the fields sent change.
+         */
         ClientUpdateIn: {
+            access?: components["schemas"]["AccessIO"] | null;
             /** Address */
             address?: string | null;
             /** Allowed Ips */
@@ -1303,6 +1337,12 @@ export interface components {
             clear_allowed_ips: boolean;
             /** Enabled */
             enabled?: boolean | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Routing */
+            routing?: ("default" | "all" | "access" | "custom") | null;
         };
         /** CodeIn */
         CodeIn: {
@@ -2060,20 +2100,34 @@ export interface components {
         };
         /** VpnClientOut */
         VpnClientOut: {
+            access: components["schemas"]["AccessIO"];
+            /** Active */
+            active: boolean;
             /** Address */
             address: string | null;
             /** Allowed Ips */
             allowed_ips: string[] | null;
             /** Enabled */
             enabled: boolean;
+            /** Endpoint */
+            endpoint: string | null;
+            /** Expires At */
+            expires_at: string | null;
             /** Id */
             id: number;
             /** Latest Handshake */
             latest_handshake: string | null;
             /** Name */
             name: string;
+            /** Online */
+            online: boolean;
             /** Public Key */
             public_key: string | null;
+            /**
+             * Routing
+             * @enum {string}
+             */
+            routing: "default" | "all" | "access" | "custom";
             /** Rx */
             rx: number;
             /** Tx */

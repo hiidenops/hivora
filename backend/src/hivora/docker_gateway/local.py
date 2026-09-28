@@ -57,6 +57,11 @@ def _health(value: str | None) -> Health:
         return Health.NONE
 
 
+def _subnets(network: dict[str, Any]) -> tuple[str, ...]:
+    configs = (network.get("IPAM") or {}).get("Config") or []
+    return tuple(c["Subnet"] for c in configs if c.get("Subnet"))
+
+
 def _ips(networks: dict[str, Any]) -> tuple[str, ...]:
     return tuple(ip for n in networks.values() if (ip := (n or {}).get("IPAddress")))
 
@@ -313,6 +318,7 @@ class LocalDockerGateway(DockerGateway):
                 internal=bool(n.get("Internal")),
                 labels=n.get("Labels") or {},
                 options=n.get("Options") or {},
+                subnets=_subnets(n),
             )
             for n in await self._docker.networks.list()
         ]

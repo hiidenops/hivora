@@ -1,5 +1,8 @@
 """VPN routes, mounted under /api/v1/apps: /{app_id}/vpn/..."""
 
+from datetime import datetime
+from typing import Literal
+
 from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
@@ -11,14 +14,32 @@ router = APIRouter(tags=["vpn"])
 IP_LIST = r"^[0-9a-fA-F.:/]{3,49}$"
 
 
+class AccessIO(BaseModel):
+    """What the client may reach, enforced by the server whatever its configuration."""
+
+    internet: bool = True
+    lan: bool = True  # private networks: the LAN, the host, the VPN itself
+    zones: list[str] = Field(default=[], max_length=50)  # among the zones the VPN reaches
+
+
+Routing = Literal["default", "all", "access", "custom"]
+NAME = r"^[A-Za-z0-9 _.-]+$"
+
+
 class VpnClientOut(BaseModel):
     id: int
     name: str
     address: str | None
-    enabled: bool
-    allowed_ips: list[str] | None  # None: the VPN's default
+    enabled: bool  # wanted
+    active: bool  # enabled and not expired
+    expires_at: datetime | None
+    access: AccessIO
+    routing: Routing
+    allowed_ips: list[str] | None  # routing "custom"
     public_key: str | None
     latest_handshake: str | None
+    online: bool  # handshake in the last 3 minutes
+    endpoint: str | None  # where the client connects from
     rx: int
     tx: int
 
@@ -27,22 +48,31 @@ class VpnOut(BaseModel):
     running: bool
     subnet: str  # VPN network, e.g. 10.8.0.0/24
     server_address: str  # the WireGuard gateway
-    default_allowed_ips: str  # traffic sent through the VPN when a client sets none
+    default_allowed_ips: str  # traffic sent through the VPN with routing "default"
     clients: list[VpnClientOut]
     zones: list[str]  # zones whose networks the VPN reaches
 
 
 class ClientIn(BaseModel):
-    name: str = Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9 _.-]+$")
+    name: str = Field(min_length=1, max_length=32, pattern=NAME)
     allowed_ips: list[str] | None = Field(default=None, max_length=32)
     address: str | None = Field(default=None, max_length=45)  # None: next free address
+    access: AccessIO | None = None  # None: everything
+    routing: Routing = "default"
+    expires_at: datetime | None = None
 
 
 class ClientUpdateIn(BaseModel):
+    """Only the fields sent change."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=32, pattern=NAME)
     enabled: bool | None = None
     allowed_ips: list[str] | None = Field(default=None, max_length=32)
     clear_allowed_ips: bool = False  # back to the VPN's default
     address: str | None = Field(default=None, max_length=45)
+    access: AccessIO | None = None  # null: everything
+    routing: Routing | None = None
+    expires_at: datetime | None = None  # null: never
 
 
 class ZonesIn(BaseModel):
@@ -72,16 +102,20 @@ async def overview(app_id: int, _: Operator, rt: RuntimeDep) -> VpnOut:
 @router.post("/{app_id}/vpn/clients", status_code=201)
 async def create(app_id: int, body: ClientIn, _: Operator, rt: RuntimeDep) -> dict[str, int]:
     _check_ips(body.allowed_ips)
-    return {"id": await VpnTools(rt).create(app_id, body.name, body.allowed_ips, body.address)}
+    extra = body.model_dump(include={"access", "routing", "expires_at"}, exclude_unset=True)
+    return {"id": await VpnTools(rt).create(app_id, body.name, body.allowed_ips, body.address,
+                                            **extra)}  # fmt: skip
 
 
 @router.put("/{app_id}/vpn/clients/{cid}", status_code=204)
 async def update(app_id: int, cid: int, body: ClientUpdateIn, _: Operator, rt: RuntimeDep) -> None:
     _check_ips(body.allowed_ips)
-    await VpnTools(rt).update(
-        app_id, cid, enabled=body.enabled, allowed_ips=body.allowed_ips,
-        clear_allowed=body.clear_allowed_ips, address=body.address,
-    )  # fmt: skip
+    changes = body.model_dump(exclude_unset=True)
+    if changes.get("name") is None:
+        changes.pop("name", None)
+    if changes.get("routing") is None:
+        changes.pop("routing", None)
+    await VpnTools(rt).update(app_id, cid, **changes)
 
 
 @router.delete("/{app_id}/vpn/clients/{cid}", status_code=204)

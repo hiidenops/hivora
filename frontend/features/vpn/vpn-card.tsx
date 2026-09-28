@@ -20,33 +20,102 @@ type Client = components["schemas"]["VpnClientOut"];
 
 const ips = (text: string) => text.split(/[\s,]+/).filter(Boolean);
 
-function ClientNetwork({ appId, client, defaultIps, onSaved }: { appId: number; client: Client; defaultIps: string; onSaved: () => void }) {
+type Zone = { slug: string; name: string; color: string };
+type Routing = Client["routing"];
+
+/** "2026-09-28T14:00:00+00:00" <-> the value of <input type="datetime-local"> (local time). */
+const toLocal = (iso: string | null | undefined) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+};
+
+function ClientSettings({ appId, client, vpn, zones, onSaved }: { appId: number; client: Client; vpn: Vpn; zones: Zone[]; onSaved: () => void }) {
   const { t, errorMessage } = useI18n();
+  const [name, setName] = useState(client.name);
   const [address, setAddress] = useState(client.address ?? "");
-  const [text, setText] = useState((client.allowed_ips ?? []).join(", "));
+  const [access, setAccess] = useState(client.access);
+  const [routing, setRouting] = useState<Routing>(client.routing);
+  const [custom, setCustom] = useState((client.allowed_ips ?? []).join(", "));
+  const [expires, setExpires] = useState(toLocal(client.expires_at));
   const save = useMutation({
     mutationFn: () =>
       api(`/apps/${appId}/vpn/clients/${client.id}`, {
         method: "PUT",
-        body: { ...(text.trim() ? { allowed_ips: ips(text) } : { clear_allowed_ips: true }), address: address.trim() || null },
+        body: {
+          name,
+          address: address.trim() || null,
+          access,
+          routing,
+          ...(routing === "custom" ? { allowed_ips: ips(custom) } : {}),
+          expires_at: expires ? new Date(expires).toISOString() : null,
+        },
       }),
     onSuccess: onSaved,
   });
+  const reached = zones.filter((z) => vpn.zones.includes(z.slug));
+  const toggleZone = (slug: string, on: boolean) =>
+    setAccess({ ...access, zones: on ? [...access.zones, slug] : access.zones.filter((z) => z !== slug) });
   return (
-    <form
-      className="flex flex-wrap gap-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        save.mutate();
-      }}
-    >
-      <Input aria-label={t("vpn.address")} title={t("vpn.address")} className="h-8 w-32 font-mono text-xs" value={address} maxLength={15} onChange={(e) => setAddress(e.target.value)} />
-      <Input aria-label={t("vpn.allowedIps")} title={t("vpn.allowedIps")} className="h-8 min-w-48 flex-1 font-mono text-xs" placeholder={t("vpn.defaultIps", { ips: defaultIps })} value={text} onChange={(e) => setText(e.target.value)} />
-      <Button type="submit" size="sm" variant="outline" disabled={save.isPending}>
-        {t("common.save")}
-      </Button>
-      {save.error && <Alert tone="danger">{errorMessage(save.error)}</Alert>}
-    </form>
+    <details className="group rounded-md border bg-muted/30 px-3 py-2">
+      <summary className="cursor-pointer text-sm font-medium">{t("vpn.settings")}</summary>
+      <form
+        className="mt-3 grid gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+      >
+        <div className="flex flex-wrap gap-3">
+          <label className="grid gap-1 text-sm">
+            {t("vpn.name")}
+            <Input className="h-8 w-48" value={name} maxLength={32} pattern="[A-Za-z0-9 _.\-]+" required onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="grid gap-1 text-sm">
+            {t("vpn.address")}
+            <Input className="h-8 w-36 font-mono text-xs" value={address} maxLength={15} onChange={(e) => setAddress(e.target.value)} />
+          </label>
+          <label className="grid gap-1 text-sm">
+            {t("vpn.expires")}
+            <Input type="datetime-local" className="h-8 w-56" value={expires} onChange={(e) => setExpires(e.target.value)} />
+          </label>
+        </div>
+        <fieldset className="grid gap-2">
+          <legend className="mb-1 text-sm font-medium">{t("vpn.access")}</legend>
+          <p className="text-xs text-muted-foreground">{t("vpn.accessHelp")}</p>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <Switch checked={access.internet} onChange={(e) => setAccess({ ...access, internet: e.target.checked })} /> {t("vpn.accessInternet")}
+            </label>
+            <label className="flex items-center gap-2">
+              <Switch checked={access.lan} onChange={(e) => setAccess({ ...access, lan: e.target.checked })} /> {t("vpn.accessLan")}
+            </label>
+            {reached.map((z) => (
+              <label key={z.slug} className="flex items-center gap-2">
+                <Switch checked={access.zones.includes(z.slug)} onChange={(e) => toggleZone(z.slug, e.target.checked)} />
+                <span className="size-2.5 rounded-full" style={{ background: z.color }} /> {z.name}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <label className="grid gap-1 text-sm">
+          {t("vpn.routing")}
+          <select className="h-9 rounded-md border bg-card px-2 text-sm" value={routing} onChange={(e) => setRouting(e.target.value as Routing)}>
+            <option value="default">{t("vpn.routing.default", { ips: vpn.default_allowed_ips })}</option>
+            <option value="all">{t("vpn.routing.all")}</option>
+            <option value="access">{t("vpn.routing.access")}</option>
+            <option value="custom">{t("vpn.routing.custom")}</option>
+          </select>
+        </label>
+        {routing === "custom" && (
+          <Input aria-label={t("vpn.allowedIps")} className="h-8 font-mono text-xs" placeholder="192.168.1.0/24, 10.8.0.0/24" value={custom} required onChange={(e) => setCustom(e.target.value)} />
+        )}
+        <Button type="submit" size="sm" className="justify-self-start" disabled={save.isPending}>
+          {t("common.save")}
+        </Button>
+        {save.error && <Alert tone="danger">{errorMessage(save.error)}</Alert>}
+      </form>
+    </details>
   );
 }
 
@@ -113,18 +182,30 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
                     <div className="flex flex-wrap items-center gap-3">
                       <Switch
                         aria-label={t("vpn.enabled", { name: c.name })}
-                        checked={c.enabled}
+                        checked={c.active}
                         onChange={(e) => {
                           const enabled = e.target.checked; // read now: React restores the controlled input before the mutation runs
                           act.mutate(() => api(`/apps/${appId}/vpn/clients/${c.id}`, { method: "PUT", body: { enabled } }));
                         }}
                       />
+                      <span
+                        className={`size-2.5 rounded-full ${c.online ? "bg-ok" : "bg-idle"}`}
+                        role="img"
+                        aria-label={c.online ? t("vpn.online") : t("vpn.offline")}
+                        title={c.online ? t("vpn.online") : t("vpn.offline")}
+                      />
                       <span className="font-medium">{c.name}</span>
                       <span className="font-mono text-xs text-muted-foreground">{c.address}</span>
                       <span className="text-xs text-muted-foreground">
-                        {c.latest_handshake ? t("vpn.seen", { when: new Date(c.latest_handshake).toLocaleString(lang) }) : t("vpn.never")}
+                        {c.online ? t("vpn.online") : c.latest_handshake ? t("vpn.seen", { when: new Date(c.latest_handshake).toLocaleString(lang) }) : t("vpn.never")}
+                        {c.endpoint && ` · ${t("vpn.from", { ip: c.endpoint.replace(/:\d+$/, "") })}`}
                         {" · "}↓ {u.size(c.rx)} ↑ {u.size(c.tx)}
                       </span>
+                      {c.expires_at && (
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${c.active ? "bg-muted" : "bg-danger/15 text-danger"}`}>
+                          {c.active ? t("vpn.until", { when: new Date(c.expires_at).toLocaleString(lang) }) : t("vpn.expired")}
+                        </span>
+                      )}
                       <span className="ml-auto flex gap-1">
                         <Dialog>
                           <DialogTrigger asChild>
@@ -162,7 +243,7 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
                         </Button>
                       </span>
                     </div>
-                    <ClientNetwork key={`${c.address}|${(c.allowed_ips ?? []).join()}`} appId={appId} client={c} defaultIps={data.default_allowed_ips} onSaved={refresh} />
+                    <ClientSettings key={JSON.stringify([c.name, c.address, c.access, c.routing, c.allowed_ips, c.expires_at])} appId={appId} client={c} vpn={data} zones={zones ?? []} onSaved={refresh} />
                     {c.public_key && <p className="truncate font-mono text-xs text-muted-foreground">{t("vpn.publicKey")} {c.public_key}</p>}
                   </li>
                 ))}

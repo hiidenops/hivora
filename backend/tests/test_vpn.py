@@ -11,7 +11,8 @@ def test_keys_configs_and_dump() -> None:
     assert len(private) == len(public) == 44 and wg.public_of(private) == public
 
     peers = [wg.Peer("phone", "10.8.0.2", "PUB2")]
-    conf = wg.server_conf("PRIV", "10.8.0.0/24", "10.8.0.1", 51820, "wg0", peers)
+    conf = wg.server_conf("PRIV", "10.8.0.0/24", "10.8.0.1", 51820, "wg0", peers, "/config/acl.sh")
+    assert "; sh /config/acl.sh" in conf
     assert "Address = 10.8.0.1/24" in conf and "ListenPort = 51820" in conf
     assert "-s 10.8.0.0/24 -j MASQUERADE" in conf  # every interface: LAN and zone networks
     assert "# phone\n[Peer]\nPublicKey = PUB2\nAllowedIPs = 10.8.0.2/32" in conf
@@ -28,14 +29,36 @@ def test_keys_configs_and_dump() -> None:
     assert wg.free_address("10.8.0.0/30", {"10.8.0.1", "10.8.0.2"}) is None
 
     dump = "PRIV\tPUB\t51820\toff\nPUB2\t(none)\t1.2.3.4:5\t10.8.0.2/32\t1700000000\t10\t20\t25\n"
-    stats = wg.parse_dump(dump)["PUB2"]
+    stats = wg.parse_dump(dump, 1_700_000_060)["PUB2"]
     assert (stats.rx, stats.tx) == (10, 20) and stats.latest_handshake.startswith("2023-11-14")
+    assert stats.online and stats.endpoint == "1.2.3.4:5"
+    assert not wg.parse_dump(dump, 1_700_000_500)["PUB2"].online
     assert (
-        wg.parse_dump("PRIV\tPUB\t51820\toff\nP3\t(none)\t(none)\t10.8.0.3/32\t0\t0\t0\toff\n")[
+        wg.parse_dump("PRIV\tPUB\t51820\toff\nP3\t(none)\t(none)\t10.8.0.3/32\t0\t0\t0\toff\n", 0)[
             "P3"
         ].latest_handshake
         is None
     )
+
+
+def test_access_rights_script_and_routes() -> None:
+    zone = "172.20.0.0/16"
+    only_zone = wg.Access("10.8.0.2", internet=False, lan=False, zones=(zone,))
+    everything = wg.Access("10.8.0.3", internet=True, lan=True, zones=())
+    script = wg.acl_script("wg0", [only_zone, everything], [zone, "172.21.0.0/16"])
+    lines = script.splitlines()
+    first = lines.index("iptables -A HIVORA-VPN-NEW -s 10.8.0.2/32 -d 172.20.0.0/16 -j ACCEPT")
+    assert lines[first + 1] == "iptables -A HIVORA-VPN-NEW -s 10.8.0.2/32 -d 172.21.0.0/16 -j DROP"
+    assert "iptables -A HIVORA-VPN-NEW -s 10.8.0.2/32 -d 192.168.0.0/16 -j DROP" in lines
+    assert "iptables -A HIVORA-VPN-NEW -s 10.8.0.2/32 -j DROP" in lines  # no Internet
+    # Denied zones come before the local network, which would otherwise open them.
+    rule = "iptables -A HIVORA-VPN-NEW -s 10.8.0.3/32 -d "
+    drop, lan = f"{rule}172.20.0.0/16 -j DROP", f"{rule}172.16.0.0/12 -j ACCEPT"
+    assert lines.index(drop) < lines.index(lan)
+    assert "iptables -A HIVORA-VPN-NEW -s 10.8.0.3/32 -j ACCEPT" in lines
+    assert lines[-1] == "iptables -E HIVORA-VPN-NEW HIVORA-VPN" and "set -e" in lines
+    assert wg.routes("10.8.0.0/24", only_zone) == ["10.8.0.0/24", zone]
+    assert wg.routes("10.8.0.0/24", everything) == ["0.0.0.0/0"]
 
 
 def test_vpn_clients_and_linked_zones(client: Any, tmp_path: Path) -> None:
@@ -124,3 +147,31 @@ def test_vpn_clients_and_linked_zones(client: Any, tmp_path: Path) -> None:
     assert "Address = 10.9.0.254/24" in text and "-s 10.9.0.0/24 -j MASQUERADE" in text
     cfg = client.get(f"{API}/apps/{app_id}/vpn/clients/{laptop}/config").text
     assert "Endpoint = vpn.example.org:51999" in cfg
+
+    # Access rights, routing preset, rename, expiry.
+    from dataclasses import replace
+    from datetime import timedelta
+
+    gw.networks = [replace(n, subnets=("172.30.0.0/16",)) if n.name == "hivora-zone-jeux" else n
+                   for n in gw.networks]  # fmt: skip
+    acl = conf.parent.parent / "hivora-acl.sh"
+    change = {"name": "portable", "routing": "access",
+              "access": {"internet": False, "lan": False, "zones": ["jeux"]}}  # fmt: skip
+    assert client.put(f"{API}/apps/{app_id}/vpn/clients/{laptop}", json=change).status_code == 204
+    row = client.get(f"{API}/apps/{app_id}/vpn").json()["clients"][0]
+    assert row["name"] == "portable" and row["access"]["zones"] == ["jeux"]
+    assert "-s 10.9.0.1/32 -d 172.30.0.0/16 -j ACCEPT" in acl.read_text()
+    assert "-s 10.9.0.1/32 -j DROP" in acl.read_text() and "sh /config/hivora-acl.sh" in text
+    cfg = client.get(f"{API}/apps/{app_id}/vpn/clients/{laptop}/config").text
+    assert "AllowedIPs = 10.9.0.0/24, 172.30.0.0/16" in cfg
+
+    soon = (runtime.clock.now() + timedelta(hours=1)).isoformat()
+    client.put(f"{API}/apps/{app_id}/vpn/clients/{laptop}", json={"expires_at": soon})
+    assert client.get(f"{API}/apps/{app_id}/vpn").json()["clients"][0]["active"] is True
+    past = (runtime.clock.now() - timedelta(minutes=1)).isoformat()
+    client.put(f"{API}/apps/{app_id}/vpn/clients/{laptop}", json={"expires_at": past})
+    row = client.get(f"{API}/apps/{app_id}/vpn").json()["clients"][0]
+    assert row["active"] is False and "# portable" not in conf.read_text()
+    client.put(f"{API}/apps/{app_id}/vpn/clients/{laptop}", json={"enabled": True})
+    row = client.get(f"{API}/apps/{app_id}/vpn").json()["clients"][0]
+    assert row["active"] is True and row["expires_at"] is None  # re-enabled by hand
