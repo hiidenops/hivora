@@ -364,12 +364,17 @@ class GameSaves(_Strict):
 
 
 class Vpn(_Strict):
-    """A VPN Hivora manages through its API (clients, allowed IPs, zones reached)."""
+    """A WireGuard server Hivora manages itself: it writes the config and applies it by exec."""
 
-    provider: Literal["wg-easy"]
-    api_port: int  # container port of the API / web UI
-    username: str
-    password_secret: str  # secret form field holding that account's password
+    provider: Literal["wireguard"]
+    volume: str  # main-service volume holding the config
+    config: str = "wg_confs/wg0.conf"  # path of the server config inside that volume
+    interface: str = "wg0"
+    port: int = 51820  # published UDP port, used in client configs
+    subnet: str = "10.8.0.0/24"
+    endpoint_field: str  # form field: public address clients connect to
+    dns_field: str | None = None  # form field: DNS given to clients
+    allowed_ips_field: str | None = None  # form field: default traffic sent through the VPN
     zones_field: str | None = None  # form field: zone slugs whose networks the VPN joins
 
 
@@ -422,13 +427,13 @@ class Template(_Strict):
         if unknown := set(self.summary) - set(fields):
             raise ValueError(f"summary lists unknown fields {sorted(unknown)}")
         if self.vpn:
-            if (
-                fields.get(self.vpn.password_secret, None) is None
-                or fields[self.vpn.password_secret].type != "secret"
-            ):
-                raise ValueError("vpn.password_secret must name a secret field")
-            if self.vpn.zones_field and self.vpn.zones_field not in fields:
-                raise ValueError("vpn.zones_field: unknown form field")
+            refs = (self.vpn.endpoint_field, self.vpn.dns_field, self.vpn.allowed_ips_field,
+                    self.vpn.zones_field)  # fmt: skip
+            if missing := [r for r in refs if r and r not in fields]:
+                raise ValueError(f"vpn: unknown form fields {missing}")
+            vols = {v.name for v in self.services[self.main_service].volumes}
+            if self.vpn.volume not in vols:
+                raise ValueError("vpn.volume: not a volume of the main service")
         if self.game:
             for ref in (
                 *(gl.enabled_field for gl in self.game.lists),

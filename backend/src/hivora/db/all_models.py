@@ -10,4 +10,5 @@ import hivora.auth.models
 import hivora.db.models
 import hivora.jobs.models
 import hivora.templates.models
+import hivora.vpn.models
 import hivora.zones.models  # noqa: F401

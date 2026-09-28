@@ -48,7 +48,7 @@ function AllowedIps({ appId, client, onSaved }: { appId: number; client: Client;
   );
 }
 
-/** Clients of the VPN (wg-easy) and the zones it reaches, managed from Hivora. */
+/** Clients of the WireGuard server and the zones it reaches: Hivora writes its config. */
 export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) => void }) {
   const { t, lang, errorMessage } = useI18n();
   const qc = useQueryClient();
@@ -89,7 +89,7 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
       <CardContent className="grid gap-5">
         {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
         {data && !data.running && <p className="text-sm text-muted-foreground">{t("vpn.stopped")}</p>}
-        {data?.running && (
+        {data && (
           <>
             <form onSubmit={add} className="flex flex-wrap gap-2">
               <Input aria-label={t("vpn.clientName")} className="w-56" placeholder={t("vpn.clientName")} value={name} maxLength={32} pattern="[A-Za-z0-9 _.\-]+" required onChange={(e) => setName(e.target.value)} />

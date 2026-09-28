@@ -33,6 +33,7 @@ class Purpose(StrEnum):
     REGISTRY = "registry"
     TOTP = "totp"
     SETTING = "setting"  # secret global settings (e.g. third-party API keys)
+    VPN = "vpn"  # WireGuard private keys
 
 
 @dataclass(frozen=True, slots=True)
