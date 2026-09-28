@@ -2,7 +2,7 @@
 
 from hivora.state.service import StateService
 from hivora.state.status import AppStatus, aggregate_status
-from hivora.state.store import AppState, StateStore, app_key, app_key_from_labels
+from hivora.state.store import AppState, StateStore, app_key, app_key_from_labels, set_adopted
 
 __all__ = [
     "AppState",
@@ -12,4 +12,5 @@ __all__ = [
     "aggregate_status",
     "app_key",
     "app_key_from_labels",
+    "set_adopted",
 ]

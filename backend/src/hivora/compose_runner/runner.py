@@ -126,6 +126,32 @@ class ComposeRunner:
         parsed: dict[str, Any] = json.loads(result.stdout)
         return parsed
 
+    async def project(self, project: str, verb: str, *,
+                      on_progress: ProgressCallback | None = None) -> ComposeResult:  # fmt: skip
+        """start / stop / restart a stack by its project name, without its file.
+
+        Adopted stacks: their compose file stays where the user keeps it (often
+        out of Hivora's reach); Compose finds the containers by project label.
+        """
+        if verb not in ("start", "stop", "restart"):
+            raise ValidationError("unsupported project command", verb=verb)
+        argv = [*self._cmd, "--progress", "json", "--project-name", validate_slug(project), verb]
+        self.apps_dir.mkdir(parents=True, exist_ok=True)
+        proc = await asyncio.create_subprocess_exec(
+            *argv, cwd=self.apps_dir, env=self._env, stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )  # fmt: skip
+        stdout, stderr = await proc.communicate()
+        events = tuple(e for line in stderr.decode(errors="replace").splitlines()
+                       if (e := parse_progress_line(line)) is not None)  # fmt: skip
+        if on_progress:
+            for e in events:
+                await on_progress(e)
+        result = ComposeResult(await proc.wait(), events, stdout.decode(errors="replace"))
+        if result.returncode != 0:
+            raise ComposeError(result.error or f"compose {verb} failed", slug=project)
+        return result
+
     async def check(self, slug: str, compose_yaml: str, env: dict[str, str]) -> dict[str, Any]:
         """``docker compose config`` of a candidate file, without touching the app's own."""
         tmp = self.apps_dir / f".check-{validate_slug(slug)}"

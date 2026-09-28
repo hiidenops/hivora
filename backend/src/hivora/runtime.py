@@ -138,6 +138,7 @@ class Runtime:
         await self.backups.start()
         await self.auth.ensure_initial_admin()
         await self.apps.load_custom_templates()
+        await self.apps.load_adopted()
         try:
             set_host_arch(await self.gateway.architecture())
         except Exception:

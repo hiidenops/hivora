@@ -12,13 +12,22 @@ LABEL_REVISION = "io.hivora.revision"
 LABEL_COMPOSE_PROJECT = "com.docker.compose.project"
 
 
+# Compose projects adopted as Hivora apps: keyed by the project name (their slug).
+_adopted: set[str] = set()
+
+
+def set_adopted(projects: set[str]) -> None:
+    _adopted.clear()
+    _adopted.update(projects)
+
+
 def app_key_from_labels(labels: Mapping[str, str]) -> str | None:
-    """Hivora apps are keyed by ``io.hivora.app``; other compose stacks (adoption
-    candidates or adopted apps not yet converted) by their compose project."""
+    """Hivora apps are keyed by ``io.hivora.app``, adopted stacks by their compose
+    project, other compose stacks (adoption candidates) by ``compose:<project>``."""
     if slug := labels.get(LABEL_APP):
         return slug
     if project := labels.get(LABEL_COMPOSE_PROJECT):
-        return f"compose:{project}"
+        return project if project in _adopted else f"compose:{project}"
     return None
 
 

@@ -6,7 +6,7 @@ import yaml
 from sqlalchemy import update
 
 from hivora.apps.files import empty_dir, ensure_dir, remove_tree
-from hivora.apps.models import Application, AppRevision, RevisionStatus
+from hivora.apps.models import Application, AppRevision, Origin, RevisionStatus
 from hivora.apps.service import AppService, UnsupportedArchitectureError
 from hivora.compose_runner import ComposeError, ProgressEvent, ProgressStatus
 from hivora.jobs import JobContext, JobKind
@@ -93,24 +93,54 @@ class AppJobHandlers:
             (await session.get_one(Application, app.id)).current_revision_id = rev.id
         s.bus.publish("app.deployed", app=app.slug, revision=revision.number)
 
+    async def _adopted(self, ctx: JobContext, verb: str) -> bool:
+        """Adopted stacks are driven by project name (their file stays with the user)."""
+        async with self.s.sessions() as session:
+            app = await self.s.get(session, _app_id(ctx))
+        if app.origin is not Origin.ADOPTED:
+            return False
+        async with self.s.runner.lock(app.slug):
+            await self.s.runner.project(
+                app.slug, verb, on_progress=lambda e: self._log_event(ctx, e)
+            )
+        return True
+
     async def start(self, ctx: JobContext) -> None:
+        if await self._adopted(ctx, "start"):
+            return
         # `up` rather than `start`: recreates containers removed behind our back.
         slug, secrets = await self._slug_and_secrets(ctx)
         async with self.s.runner.lock(slug):
             await self._up(ctx, slug, secrets)
 
     async def stop(self, ctx: JobContext) -> None:
+        if await self._adopted(ctx, "stop"):
+            return
         slug, _ = await self._slug_and_secrets(ctx)
         async with self.s.runner.lock(slug):
             await self.s.runner.stop(slug, on_progress=lambda e: self._log_event(ctx, e))
 
     async def restart(self, ctx: JobContext) -> None:
+        if await self._adopted(ctx, "restart"):
+            return
         slug, _ = await self._slug_and_secrets(ctx)
         async with self.s.runner.lock(slug):
             await self.s.runner.restart(slug, on_progress=lambda e: self._log_event(ctx, e))
 
     async def remove(self, ctx: JobContext) -> None:
         s, remove_data = self.s, bool(ctx.params.get("remove_data"))
+        async with s.sessions() as session, session.begin():
+            app = await s.get(session, _app_id(ctx))
+            if app.origin is Origin.ADOPTED:  # forget it: the stack itself is left alone
+                slug = app.slug
+                await session.delete(app)
+            else:
+                slug = ""
+        if slug:
+            await s.load_adopted()
+            await ctx.log(f"{slug} is no longer managed by Hivora; its containers keep running")
+            s.bus.publish("app.removed", app=slug, data_removed=False)
+            return
         slug, _ = await self._slug_and_secrets(ctx)
         async with s.runner.lock(slug):
             if s.runner.compose_path(slug).exists():

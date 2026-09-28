@@ -31,6 +31,7 @@ from hivora.apps.models import (
 )
 from hivora.apps.ports import PortConflict, find_conflicts, used_ports
 from hivora.compose_runner import ComposeError, ComposeRunner
+from hivora.compose_runner.runner import validate_slug
 from hivora.core.clock import Clock, SystemClock
 from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
@@ -39,7 +40,7 @@ from hivora.crypto.cipher import Purpose, Sealed, SecretBox
 from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
 from hivora.images.registry import ImageInfo, Registry
 from hivora.jobs import Job, JobKind, JobQueue
-from hivora.state import StateStore, app_key
+from hivora.state import StateStore, app_key, set_adopted
 from hivora.system.secrets import SecretSetting, SecretSettings
 from hivora.templates import (
     AppContext,
@@ -63,6 +64,8 @@ from hivora.templates.overrides import Overrides
 from hivora.zones import Zone, get_zone, zone_network
 
 LABEL_COMPOSE_SERVICE = "com.docker.compose.service"
+LABEL_COMPOSE_PROJECT = "com.docker.compose.project"
+LABEL_WORKING_DIR = "com.docker.compose.project.working_dir"
 
 
 class AppNotFoundError(NotFoundError):
@@ -115,6 +118,17 @@ class UpdatePlan:
 
 class DataResetRequiredError(ConflictError):
     code = "data_reset_required"
+
+
+@dataclass(frozen=True, slots=True)
+class Candidate:
+    """A compose stack Hivora could adopt."""
+
+    project: str
+    services: list[str]
+    running: int
+    containers: int
+    working_dir: str | None  # where its compose file lives on the host (label)
 
 
 class ComposeRejectedError(ValidationError):
@@ -555,6 +569,60 @@ class AppService:
             self.catalog.add_custom(entry.manifest)  # that pin is the app's template again
         return job
 
+    # --- adoption of existing compose stacks ------------------------------------
+    def candidates(self) -> list[Candidate]:
+        """Compose stacks running on this Docker that Hivora does not manage yet."""
+        groups: dict[str, list[ContainerInfo]] = {}
+        for c in self.state.containers():
+            project = c.labels.get(LABEL_COMPOSE_PROJECT)
+            if not project or c.labels.get("io.hivora.app") or c.labels.get("io.hivora.self"):
+                continue
+            if app_key(c) != f"compose:{project}":
+                continue  # already adopted
+            groups.setdefault(project, []).append(c)
+        out = []
+        for project, cs in sorted(groups.items()):
+            services = sorted({c.labels.get(LABEL_COMPOSE_SERVICE, c.name) for c in cs})
+            running = sum(c.state is ContainerState.RUNNING for c in cs)
+            where = next((w for c in cs if (w := c.labels.get(LABEL_WORKING_DIR))), None)
+            out.append(Candidate(project, services, running, len(cs), where))
+        return out
+
+    async def adopt(self, project: str, name: str, zone_slug: str | None) -> Application:
+        """Link a running stack to Hivora (metadata only: nothing is redeployed)."""
+        found = next((c for c in self.candidates() if c.project == project), None)
+        if found is None:
+            raise NotFoundError("no such compose stack to adopt", project=project)
+        try:
+            validate_slug(project)
+        except ValidationError:
+            raise ValidationError("this project name cannot be an app id",
+                                  project=project) from None  # fmt: skip
+        containers = [c for c in self.state.containers()
+                      if c.labels.get(LABEL_COMPOSE_PROJECT) == project]  # fmt: skip
+        async with self.sessions() as session, session.begin():
+            if await session.scalar(select(Application.id).where(Application.slug == project)):
+                raise ConflictError("an app already uses this name", slug=project)
+            zone = await get_zone(session, zone_slug) if zone_slug else None
+            app = Application(
+                slug=project, name=name or project, zone_id=zone.id if zone else None,
+                origin=Origin.ADOPTED, template_version_id=None,
+                desired_state=DesiredState.RUNNING, icon=None, notes="",
+                created_at=self.clock.now(), services=_services_from_containers(containers),
+            )  # fmt: skip
+            session.add(app)
+        await self.load_adopted()
+        self.bus.publish("app.adopted", app=project, containers=len(containers))
+        return app
+
+    async def load_adopted(self) -> None:
+        """The state keys adopted stacks by project name: tell it which ones."""
+        async with self.sessions() as session:
+            slugs = await session.scalars(
+                select(Application.slug).where(Application.origin == Origin.ADOPTED)
+            )
+            set_adopted(set(slugs))
+
     # --- hand-written compose (admin) ------------------------------------------
     async def plan_compose(self, session: AsyncSession, app_id: int,
                            compose_yaml: str) -> ComposePlan:  # fmt: skip
@@ -773,6 +841,8 @@ class AppService:
     async def removal_plan(self, app_id: int) -> RemovalPlan:
         async with self.sessions() as session:
             app = await self.get(session, app_id)
+        if app.origin is Origin.ADOPTED:  # forgotten only: its containers keep running
+            return RemovalPlan(slug=app.slug, containers=[], files=[], data=[])
         project = self.runner.project_dir(app.slug)
         data = self.volumes_dir(app.slug)
         return RemovalPlan(
@@ -798,7 +868,7 @@ class AppService:
     async def _lifecycle(self, app_id: int, kind: JobKind, desired: DesiredState) -> Job:
         async with self.sessions() as session, session.begin():
             app = await self.get(session, app_id)
-            if app.current_revision_id is None:
+            if app.current_revision_id is None and app.origin is not Origin.ADOPTED:
                 raise ConflictError("app has never been deployed", slug=app.slug)
             app.desired_state = desired
             job = self.jobs.add(session, kind, app_id=app.id, app_slug=app.slug)
@@ -895,4 +965,26 @@ def _services_from_model(model: dict[str, Any]) -> list[Service]:
             else ServiceRole.SIDECAR, restart_policy=str(svc.get("restart") or "no"),
             ports=ports, volumes=volumes,
         ))  # fmt: skip
+    return out
+
+
+def _services_from_containers(containers: list[ContainerInfo]) -> list[Service]:
+    """Services of an adopted stack, as its containers show them (image, published ports)."""
+    by_service: dict[str, ContainerInfo] = {}
+    for c in containers:
+        by_service.setdefault(c.labels.get(LABEL_COMPOSE_SERVICE, c.name), c)
+    out: list[Service] = []
+    everywhere = {None, "0.0.0.0", "::"}  # noqa: S104 (reading Docker's bindings)
+    for name, c in sorted(by_service.items()):
+        unique = {(p.container_port, p.protocol, p.host_port): p for p in c.ports}.values()
+        ports = [
+            PortBinding(host_ip=None if p.host_ip in everywhere else p.host_ip,
+                        host_port=p.host_port, container_port=p.container_port,
+                        protocol=p.protocol, purpose="other",
+                        exposure=Exposure.PUBLIC if p.host_ip in everywhere else Exposure.LAN)
+            for p in unique if p.host_port
+        ]  # fmt: skip
+        out.append(Service(name=name, image=c.image, role=ServiceRole.MAIN if not out
+                           else ServiceRole.SIDECAR, restart_policy="unknown", ports=ports,
+                           volumes=[]))  # fmt: skip
     return out

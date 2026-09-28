@@ -61,8 +61,8 @@ def test_advanced_settings_and_hand_written_compose(client: Any) -> None:
         "ports": [{"container": 3012, "host": 3012}],
         "volumes": [{"name": "extra", "target": "/extra"}],
     }}}  # fmt: skip
-    job = client.put(f"{API}/apps/{app_id}/settings",
-                     json={"inputs": settings["values"], "overrides": overrides}).json()  # fmt: skip
+    change = {"inputs": settings["values"], "overrides": overrides}
+    job = client.put(f"{API}/apps/{app_id}/settings", json=change).json()
     assert wait_job(client, job["id"])["status"] == "succeeded"
     compose = yaml.safe_load(client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"])
     svc = compose["services"]["server"]

@@ -1,9 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { PageHeader } from "@/components/app-shell";
+import { PageHeader, useSession } from "@/components/app-shell";
 import { AppIcon } from "@/components/app-icon";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -35,8 +36,11 @@ function AppTile({ app }: { app: App }) {
   );
 }
 
+const AdoptBanner = dynamic(() => import("@/features/apps/adopt-banner").then((m) => m.AdoptBanner));
+
 export default function DashboardPage() {
   const { t } = useI18n();
+  const { can } = useSession();
   const { data: apps, isPending } = useApps();
   const { data: zones } = useZones();
   const [query, setQuery] = useState("");
@@ -66,6 +70,7 @@ export default function DashboardPage() {
           />
         }
       />
+      {can("operator") && <AdoptBanner />}
       {isPending && <TileSkeletons label={t("common.loading")} />}
       {apps?.length === 0 && (
         <Card className="grid place-items-center gap-4 p-12 text-center">

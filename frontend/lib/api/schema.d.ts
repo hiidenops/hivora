@@ -22,6 +22,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adopt
+         * @description Manage a running stack from Hivora: metadata only, nothing is redeployed.
+         */
+        post: operations["adopt_api_v1_apps_adopt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/custom": {
         parameters: {
             query?: never;
@@ -53,6 +73,26 @@ export interface paths {
          * @description Preview the compose generated for a free image. Nothing is written.
          */
         post: operations["plan_custom_api_v1_apps_custom_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/discover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discover
+         * @description Compose stacks running on this Docker that Hivora does not manage yet.
+         */
+        get: operations["discover_api_v1_apps_discover_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1405,6 +1445,18 @@ export interface components {
              */
             address: string;
         };
+        /** AdoptIn */
+        AdoptIn: {
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Project */
+            project: string;
+            /** Zone */
+            zone?: string | null;
+        };
         /** AppDetailOut */
         AppDetailOut: {
             /** Access */
@@ -1545,6 +1597,19 @@ export interface components {
             timezone: string;
             /** Volumes */
             volumes: string[];
+        };
+        /** CandidateOut */
+        CandidateOut: {
+            /** Containers */
+            containers: number;
+            /** Project */
+            project: string;
+            /** Running */
+            running: number;
+            /** Services */
+            services: string[];
+            /** Working Dir */
+            working_dir: string | null;
         };
         /** ClearedOut */
         ClearedOut: {
@@ -2678,6 +2743,41 @@ export interface operations {
             };
         };
     };
+    adopt_api_v1_apps_adopt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdoptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     deploy_custom_api_v1_apps_custom_post: {
         parameters: {
             query?: never;
@@ -2740,6 +2840,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discover_api_v1_apps_discover_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateOut"][];
                 };
             };
         };

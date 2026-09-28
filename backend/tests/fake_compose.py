@@ -10,6 +10,9 @@ import sys
 
 args = sys.argv[1:]
 mode = os.environ.get("FAKE_COMPOSE_MODE", "ok")
+if "--file" not in args:  # a stack driven by project name only (adopted apps)
+    print(json.dumps({"id": "Container x", "status": "Done", "text": "ok"}), file=sys.stderr)
+    sys.exit(0)
 command = args[args.index("--file") + 2]
 
 if command == "logs":

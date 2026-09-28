@@ -39,6 +39,38 @@
         "title": "AddressIn",
         "type": "object"
       },
+      "AdoptIn": {
+        "properties": {
+          "name": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Name",
+            "type": "string"
+          },
+          "project": {
+            "maxLength": 63,
+            "minLength": 1,
+            "title": "Project",
+            "type": "string"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "title": "AdoptIn",
+        "type": "object"
+      },
       "AppDetailOut": {
         "properties": {
           "access": {
@@ -479,6 +511,49 @@
           "backups"
         ],
         "title": "BackupsOut",
+        "type": "object"
+      },
+      "CandidateOut": {
+        "properties": {
+          "containers": {
+            "title": "Containers",
+            "type": "integer"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "services": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "working_dir": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Working Dir"
+          }
+        },
+        "required": [
+          "project",
+          "services",
+          "running",
+          "containers",
+          "working_dir"
+        ],
+        "title": "CandidateOut",
         "type": "object"
       },
       "ClearedOut": {
@@ -3663,6 +3738,52 @@
         ]
       }
     },
+    "/api/v1/apps/adopt": {
+      "post": {
+        "description": "Manage a running stack from Hivora: metadata only, nothing is redeployed.",
+        "operationId": "adopt_api_v1_apps_adopt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdoptIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Adopt Api V1 Apps Adopt Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Adopt",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
     "/api/v1/apps/custom": {
       "post": {
         "operationId": "deploy_custom_api_v1_apps_custom_post",
@@ -3741,6 +3862,32 @@
           }
         },
         "summary": "Plan Custom",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/discover": {
+      "get": {
+        "description": "Compose stacks running on this Docker that Hivora does not manage yet.",
+        "operationId": "discover_api_v1_apps_discover_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CandidateOut"
+                  },
+                  "title": "Response Discover Api V1 Apps Discover Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Discover",
         "tags": [
           "apps"
         ]
