@@ -34,6 +34,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 import { applyChanges, changeKey, upsert, type Change } from "./changes";
+import { FirewallDialog } from "./firewall-dialog";
 import { toFlow, type GNode, type Graph, type Level } from "./layout";
 import { nodeTypes } from "./nodes";
 
@@ -50,10 +51,11 @@ function download(name: string, href: string) {
 
 type Port = { port: number; container: number; protocol: string; exposure: string; service: string };
 
-function Inspector({ node, graph, onClose, canEdit, onChanged, changes, onChange }: {
-  node: GNode; graph: Graph; onClose: () => void; canEdit: boolean; onChanged: () => void; changes: Change[]; onChange: (c: Change) => void;
+function Inspector({ node, graph, onClose, canEdit, onChanged, changes, onChange, openFirewall }: {
+  node: GNode; graph: Graph; onClose: () => void; canEdit: boolean; onChanged: () => void; changes: Change[]; onChange: (c: Change) => void; openFirewall: () => void;
 }) {
   const { t } = useI18n();
+  const { can } = useSession();
   const [label, setLabel] = useState(String(node.label ?? ""));
   const [kind, setKind] = useState(String(node.kind ?? "note"));
   const save = useMutation({ mutationFn: () => api(`/topology/nodes/${node.id}`, { method: "PUT", body: { kind, label } }), onSuccess: onChanged });
@@ -163,6 +165,16 @@ function Inspector({ node, graph, onClose, canEdit, onChanged, changes, onChange
           </Button>
         </>
       )}
+      {node.type === "firewall" && (
+        <>
+          <p className="text-muted-foreground">{t("fw.inspector")}</p>
+          {can("admin") && (
+            <Button size="sm" onClick={openFirewall}>
+              {t("fw.configure")}
+            </Button>
+          )}
+        </>
+      )}
       {node.type === "internet" && (
         <>
           <p className="text-muted-foreground">{t("topology.internetHelp")}</p>
@@ -217,6 +229,7 @@ function Canvas() {
   const [kind, setKind] = useState("firewall");
   const [label, setLabel] = useState("");
   const [changes, setChanges] = useState<Change[]>([]);
+  const [firewallOpen, setFirewallOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<{ jobs: number[]; errors: string[] } | null>(null);
   const { getIntersectingNodes } = useReactFlow();
@@ -451,7 +464,8 @@ function Canvas() {
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable className="!hidden md:!block" />
         </ReactFlow>
-        {node && graph && <Inspector key={node.key} node={node} graph={graph} canEdit={canEdit} changes={changes} onChange={onChange} onClose={() => setSelected(null)} onChanged={() => void refresh()} />}
+        {node && graph && <Inspector key={node.key} node={node} graph={graph} canEdit={canEdit} changes={changes} onChange={onChange} openFirewall={() => setFirewallOpen(true)} onClose={() => setSelected(null)} onChanged={() => void refresh()} />}
+        {firewallOpen && <FirewallDialog open={firewallOpen} onOpenChange={setFirewallOpen} onChanged={() => void refresh()} />}
       </div>
       <div className="grid gap-2 text-sm">
         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">

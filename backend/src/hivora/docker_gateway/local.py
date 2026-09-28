@@ -228,6 +228,44 @@ class LocalDockerGateway(DockerGateway):
             return False
         return True
 
+    async def ensure_agent(self, name: str, image: str, labels: dict[str, str]) -> str:
+        try:
+            existing = await self._docker.containers.get(name)
+            if not existing._container.get("State", {}).get("Running"):
+                await existing.start()
+            return str(existing.id)
+        except aiodocker.exceptions.DockerError as exc:
+            if exc.status != 404:
+                raise
+        try:
+            await self._docker.images.inspect(image)
+        except aiodocker.exceptions.DockerError:
+            await self._docker.images.pull(image)
+        container = await self._docker.containers.create(
+            {
+                "Image": image,
+                "Cmd": ["sleep", "infinity"],
+                "Labels": labels,
+                "HostConfig": {
+                    "Privileged": True,
+                    "PidMode": "host",
+                    "NetworkMode": "host",
+                    "RestartPolicy": {"Name": "unless-stopped"},
+                },
+            },
+            name=name,
+        )
+        await container.start()
+        return str(container.id)
+
+    async def remove_agent(self, name: str) -> bool:
+        try:
+            container = await self._docker.containers.get(name)
+        except aiodocker.exceptions.DockerError:
+            return False
+        await container.delete(force=True)
+        return True
+
     async def architecture(self) -> str:
         return str((await self._get_json("info")).get("Architecture", ""))
 

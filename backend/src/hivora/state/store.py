@@ -73,8 +73,10 @@ class StateStore:
         return list(self._containers.values())
 
     def unmanaged(self) -> list[ContainerInfo]:
-        """Standalone containers, outside any Hivora app or compose project."""
-        return [c for c in self._containers.values() if app_key(c) is None]
+        """Standalone containers, outside any Hivora app or compose project (Hivora's
+        own containers, the panel and its host agent, are not counted)."""
+        return [c for c in self._containers.values()
+                if app_key(c) is None and not c.labels.get("io.hivora.self")]  # fmt: skip
 
     def app(self, key: str) -> AppState:
         members = tuple(c for c in self._containers.values() if app_key(c) == key)

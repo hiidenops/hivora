@@ -71,6 +71,19 @@
         "title": "AdoptIn",
         "type": "object"
       },
+      "AgentIn": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "AgentIn",
+        "type": "object"
+      },
       "AppDetailOut": {
         "properties": {
           "access": {
@@ -748,20 +761,6 @@
         "title": "ClientUpdateIn",
         "type": "object"
       },
-      "CodeIn": {
-        "properties": {
-          "code": {
-            "maxLength": 32,
-            "title": "Code",
-            "type": "string"
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "title": "CodeIn",
-        "type": "object"
-      },
       "CommandOut": {
         "properties": {
           "output": {
@@ -1171,6 +1170,19 @@
         "title": "DesiredState",
         "type": "string"
       },
+      "DoneOut": {
+        "properties": {
+          "output": {
+            "title": "Output",
+            "type": "string"
+          }
+        },
+        "required": [
+          "output"
+        ],
+        "title": "DoneOut",
+        "type": "object"
+      },
       "EdgeIn": {
         "properties": {
           "label": {
@@ -1180,12 +1192,12 @@
             "type": "string"
           },
           "source": {
-            "pattern": "^(internet|zone:(\\d+|none)|app:\\d+|decl:\\d+)$",
+            "pattern": "^(internet|firewall|zone:(\\d+|none)|app:\\d+|decl:\\d+)$",
             "title": "Source",
             "type": "string"
           },
           "target": {
-            "pattern": "^(internet|zone:(\\d+|none)|app:\\d+|decl:\\d+)$",
+            "pattern": "^(internet|firewall|zone:(\\d+|none)|app:\\d+|decl:\\d+)$",
             "title": "Target",
             "type": "string"
           }
@@ -1538,6 +1550,25 @@
           "detected_public_ip"
         ],
         "title": "IntegrationsOut",
+        "type": "object"
+      },
+      "JailIpIn": {
+        "properties": {
+          "ban": {
+            "default": false,
+            "title": "Ban",
+            "type": "boolean"
+          },
+          "ip": {
+            "maxLength": 45,
+            "title": "Ip",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ip"
+        ],
+        "title": "JailIpIn",
         "type": "object"
       },
       "JobDetailOut": {
@@ -2607,6 +2638,47 @@
         "title": "Role",
         "type": "string"
       },
+      "RuleIn": {
+        "properties": {
+          "action": {
+            "enum": [
+              "allow",
+              "deny",
+              "limit"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "port": {
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "type": "integer"
+          },
+          "protocol": {
+            "default": "tcp",
+            "enum": [
+              "tcp",
+              "udp",
+              "any"
+            ],
+            "title": "Protocol",
+            "type": "string"
+          },
+          "source": {
+            "default": "any",
+            "maxLength": 64,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "port"
+        ],
+        "title": "RuleIn",
+        "type": "object"
+      },
       "RunOut": {
         "properties": {
           "output": {
@@ -3517,6 +3589,24 @@
         "title": "TotpEnrollOut",
         "type": "object"
       },
+      "UfwIn": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "keep_ssh": {
+            "default": true,
+            "title": "Keep Ssh",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "UfwIn",
+        "type": "object"
+      },
       "UpdatePlanOut": {
         "properties": {
           "access": {
@@ -4126,6 +4216,35 @@
           "zone"
         ],
         "title": "ZoneIn",
+        "type": "object"
+      },
+      "hivora__auth__api__CodeIn": {
+        "properties": {
+          "code": {
+            "maxLength": 32,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "CodeIn",
+        "type": "object"
+      },
+      "hivora__hostfw__api__CodeIn": {
+        "properties": {
+          "code": {
+            "maxLength": 20,
+            "minLength": 6,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "CodeIn",
         "type": "object"
       },
       "hivora__zones__api__ZoneIn": {
@@ -7150,7 +7269,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CodeIn"
+                "$ref": "#/components/schemas/hivora__auth__api__CodeIn"
               }
             }
           },
@@ -7236,6 +7355,295 @@
         "summary": "Totp Enroll",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/host-firewall": {
+      "get": {
+        "operationId": "state_api_v1_host_firewall_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "fresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Fresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response State Api V1 Host Firewall Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "State",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/agent": {
+      "put": {
+        "operationId": "agent_api_v1_host_firewall_agent_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Agent",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/confirm": {
+      "post": {
+        "operationId": "confirm_api_v1_host_firewall_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/hivora__hostfw__api__CodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/fail2ban/{jail}": {
+      "post": {
+        "operationId": "jail_ip_api_v1_host_firewall_fail2ban__jail__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jail",
+            "required": true,
+            "schema": {
+              "title": "Jail",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JailIpIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Jail Ip",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/ufw": {
+      "put": {
+        "operationId": "ufw_api_v1_host_firewall_ufw_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UfwIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ufw",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/ufw/rules": {
+      "post": {
+        "operationId": "add_rule_api_v1_host_firewall_ufw_rules_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Rule",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/ufw/rules/{number}": {
+      "delete": {
+        "operationId": "delete_rule_api_v1_host_firewall_ufw_rules__number__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Rule",
+        "tags": [
+          "host-firewall"
         ]
       }
     },

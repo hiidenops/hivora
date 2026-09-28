@@ -8,6 +8,7 @@ from datetime import datetime
 from hivora.docker_gateway.base import ContainerNotFoundError, DockerGateway, ExecSession
 from hivora.docker_gateway.models import (
     ContainerInfo,
+    ContainerState,
     DockerEvent,
     NetworkInfo,
     StatsSample,
@@ -140,6 +141,15 @@ class FakeDockerGateway(DockerGateway):
         await self.get_container(container_id)
         self.exec_calls.append(cmd)
         return self.exec_results.get(" ".join(cmd), (0, ""))
+
+    async def ensure_agent(self, name: str, image: str, labels: dict[str, str]) -> str:
+        if name not in self.containers:
+            self.put(ContainerInfo(id=name, name=name, image=image,
+                                   state=ContainerState.RUNNING, labels=labels))  # fmt: skip
+        return name
+
+    async def remove_agent(self, name: str) -> bool:
+        return self.containers.pop(name, None) is not None
 
     async def list_networks(self) -> list[NetworkInfo]:
         return list(self.networks)

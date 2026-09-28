@@ -234,6 +234,13 @@ class AuthService:
         self.bus.publish("auth.logout")
 
     # --- console re-confirmation ---------------------------------------------
+    def recently_confirmed(self, session_id: int, totp_enabled: bool) -> bool:
+        """A TOTP code confirmed on this session in the last minutes (console, host)."""
+        if not totp_enabled:
+            return True
+        until = self._console_ok.get(session_id)
+        return until is not None and until > self.clock.now()
+
     def console_confirmed(self, user: User, session_id: int) -> bool:
         if not user.totp_enabled:
             return True

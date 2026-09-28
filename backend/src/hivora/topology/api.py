@@ -12,7 +12,7 @@ from hivora.topology.service import build
 from hivora.web.deps import Operator, RuntimeDep, Viewer
 
 router = APIRouter(tags=["topology"])
-KEY = r"^(internet|zone:(\d+|none)|app:\d+|decl:\d+)$"
+KEY = r"^(internet|firewall|zone:(\d+|none)|app:\d+|decl:\d+)$"
 
 
 class GraphOut(BaseModel):

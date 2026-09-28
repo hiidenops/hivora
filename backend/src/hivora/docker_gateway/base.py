@@ -97,6 +97,16 @@ class DockerGateway(ABC):
         """Remove a network if it exists and nothing uses it. True if removed."""
 
     @abstractmethod
+    async def ensure_agent(self, name: str, image: str, labels: dict[str, str]) -> str:
+        """Start (or reuse) the host agent: a sleeping container sharing the host's PID
+        and network namespaces, privileged so that ``nsenter`` reaches the host. Only
+        fixed commands run in it (host firewall). Returns its id."""
+
+    @abstractmethod
+    async def remove_agent(self, name: str) -> bool:
+        """Stop and delete the host agent; False when there was none."""
+
+    @abstractmethod
     async def architecture(self) -> str:
         """The Engine's CPU architecture as reported by Docker (e.g. ``x86_64``)."""
 

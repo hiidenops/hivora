@@ -1053,6 +1053,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/host-firewall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** State */
+        get: operations["state_api_v1_host_firewall_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-firewall/agent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Agent */
+        put: operations["agent_api_v1_host_firewall_agent_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-firewall/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm */
+        post: operations["confirm_api_v1_host_firewall_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-firewall/fail2ban/{jail}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Jail Ip */
+        post: operations["jail_ip_api_v1_host_firewall_fail2ban__jail__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-firewall/ufw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Ufw */
+        put: operations["ufw_api_v1_host_firewall_ufw_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-firewall/ufw/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Rule */
+        post: operations["add_rule_api_v1_host_firewall_ufw_rules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-firewall/ufw/rules/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Rule */
+        delete: operations["delete_rule_api_v1_host_firewall_ufw_rules__number__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs": {
         parameters: {
             query?: never;
@@ -1616,6 +1735,11 @@ export interface components {
             /** Zone */
             zone?: string | null;
         };
+        /** AgentIn */
+        AgentIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** AppDetailOut */
         AppDetailOut: {
             /** Access */
@@ -1817,11 +1941,6 @@ export interface components {
             /** Routing */
             routing?: ("default" | "all" | "access" | "custom") | null;
         };
-        /** CodeIn */
-        CodeIn: {
-            /** Code */
-            code: string;
-        };
         /** CommandOut */
         CommandOut: {
             /** Output */
@@ -1985,6 +2104,11 @@ export interface components {
          * @enum {string}
          */
         DesiredState: "running" | "stopped";
+        /** DoneOut */
+        DoneOut: {
+            /** Output */
+            output: string;
+        };
         /** EdgeIn */
         EdgeIn: {
             /**
@@ -2127,6 +2251,16 @@ export interface components {
             detected_public_ip: string | null;
             /** Public Address */
             public_address: string | null;
+        };
+        /** JailIpIn */
+        JailIpIn: {
+            /**
+             * Ban
+             * @default false
+             */
+            ban: boolean;
+            /** Ip */
+            ip: string;
         };
         /** JobDetailOut */
         JobDetailOut: {
@@ -2464,6 +2598,27 @@ export interface components {
          * @enum {string}
          */
         Role: "viewer" | "operator" | "admin";
+        /** RuleIn */
+        RuleIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "allow" | "deny" | "limit";
+            /** Port */
+            port: number;
+            /**
+             * Protocol
+             * @default tcp
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp" | "any";
+            /**
+             * Source
+             * @default any
+             */
+            source: string;
+        };
         /** RunOut */
         RunOut: {
             /** Output */
@@ -2837,6 +2992,16 @@ export interface components {
             /** Uri */
             uri: string;
         };
+        /** UfwIn */
+        UfwIn: {
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Keep Ssh
+             * @default true
+             */
+            keep_ssh: boolean;
+        };
         /** UpdatePlanOut */
         UpdatePlanOut: {
             /** Access */
@@ -3038,6 +3203,16 @@ export interface components {
         hivora__apps__api__ZoneIn: {
             /** Zone */
             zone: string | null;
+        };
+        /** CodeIn */
+        hivora__auth__api__CodeIn: {
+            /** Code */
+            code: string;
+        };
+        /** CodeIn */
+        hivora__hostfw__api__CodeIn: {
+            /** Code */
+            code: string;
         };
         /** ZoneIn */
         hivora__zones__api__ZoneIn: {
@@ -5115,7 +5290,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CodeIn"];
+                "application/json": components["schemas"]["hivora__auth__api__CodeIn"];
             };
         };
         responses: {
@@ -5186,6 +5361,233 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TotpEnrollOut"];
+                };
+            };
+        };
+    };
+    state_api_v1_host_firewall_get: {
+        parameters: {
+            query?: {
+                fresh?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    agent_api_v1_host_firewall_agent_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_api_v1_host_firewall_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["hivora__hostfw__api__CodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    jail_ip_api_v1_host_firewall_fail2ban__jail__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jail: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JailIpIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ufw_api_v1_host_firewall_ufw_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UfwIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_rule_api_v1_host_firewall_ufw_rules_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RuleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_rule_api_v1_host_firewall_ufw_rules__number__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

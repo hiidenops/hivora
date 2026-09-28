@@ -68,7 +68,9 @@ export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): {
     rowH = Math.max(rowH, h);
   });
   const width = Math.max(x - 40, 300);
-  out.push({ id: "internet", type: "internet", position: pos("internet", width / 2 - 70, 0), data: { label: "Internet" } });
+  out.push({ id: "internet", type: "internet", position: pos("internet", width / 2 - 50, -60), data: { label: "Internet" } });
+  const fw = nodes.find((n) => n.type === "firewall");
+  if (fw) out.push({ id: "firewall", type: "firewall", position: pos("firewall", width / 2 - 88, 20), data: fw });
   declared.forEach((d, i) => out.push({ id: d.key, type: "declared", position: pos(d.key, -300, 160 + i * 110), data: d }));
 
   const shown = new Set(out.map((n) => n.id));
@@ -93,6 +95,8 @@ export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): {
           ? { stroke: "var(--danger)", strokeDasharray: "6 4" }
           : e.kind === "vpn"
             ? { stroke: "var(--ok)", strokeWidth: 2 }
+            : e.kind === "host"
+              ? { stroke: "var(--border)", strokeWidth: 1 }
             : { stroke: "var(--muted-foreground)", strokeDasharray: "4 4" },
       labelStyle: { fontSize: 11 },
     });

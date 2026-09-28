@@ -19,6 +19,7 @@ AUDITED_PREFIXES = (
     "app.",
     "backup.",
     "task.",
+    "hostfw.",
     "zone.",
     "vpn.",
     "job.finished",

@@ -78,6 +78,23 @@ export function InternetNode({ selected }: NodeProps) {
   );
 }
 
+export function FirewallNode({ data, selected }: NodeProps) {
+  const { t } = useI18n();
+  const d = data as { agent: boolean; ufw_installed?: boolean; ufw_active?: boolean; ufw_rules?: number; fail2ban_running?: boolean; banned?: number; error?: string };
+  const ufw = !d.agent ? t("fw.node.unknown") : d.error ? t("fw.node.error") : !d.ufw_installed ? t("fw.node.noUfw") : d.ufw_active ? t("fw.node.ufwOn", { n: d.ufw_rules ?? 0 }) : t("fw.node.ufwOff");
+  return (
+    <div className={cn("w-44 rounded-md border-2 bg-card px-2 py-1 text-xs", d.ufw_active ? "border-ok" : "border-warn border-dashed", selected && "ring-2 ring-ring")}>
+      <Handle type="target" position={Position.Top} className="!size-2 !bg-muted-foreground" />
+      <Handle type="source" position={Position.Bottom} className="!size-2 !bg-muted-foreground" />
+      <div className="flex items-center gap-1.5 font-semibold">
+        <Shield className="size-3.5" /> {t("fw.node.title")}
+      </div>
+      <p className="text-muted-foreground">{ufw}</p>
+      {d.agent && d.fail2ban_running && <p className="text-muted-foreground">{t("fw.node.f2b", { n: d.banned ?? 0 })}</p>}
+    </div>
+  );
+}
+
 const ICONS = { firewall: Shield, router: Router, vpn: ShieldCheck, device: Monitor, note: StickyNote } as const;
 
 export function DeclaredNode({ data, selected }: NodeProps) {
@@ -96,4 +113,4 @@ export function DeclaredNode({ data, selected }: NodeProps) {
   );
 }
 
-export const nodeTypes = { zone: ZoneNode, app: AppNode, internet: InternetNode, declared: DeclaredNode };
+export const nodeTypes = { zone: ZoneNode, app: AppNode, internet: InternetNode, declared: DeclaredNode, firewall: FirewallNode };

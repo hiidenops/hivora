@@ -33,6 +33,7 @@ from hivora.templates.catalog import set_host_arch
 from hivora.templates.icons import IconCache
 
 if TYPE_CHECKING:
+    from hivora.hostfw.service import HostFirewall
     from hivora.realtime.console import ConsoleManager
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,7 @@ class Runtime:
     public_address: PublicAddress
     app_metrics: AppMetrics
     backups: BackupService
+    hostfw: "HostFirewall" = field(init=False)
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
     consoles: "ConsoleManager" = field(init=False)
@@ -69,6 +71,9 @@ class Runtime:
         from hivora.realtime.console import ConsoleManager  # needs Runtime itself
 
         self.consoles = ConsoleManager(self)
+        from hivora.hostfw.service import HostFirewall
+
+        self.hostfw = HostFirewall(self)
 
     @classmethod
     def build(

@@ -16,6 +16,7 @@ from hivora.core.config import Settings
 from hivora.core.logging import configure_logging
 from hivora.games.api import game_router, options_router
 from hivora.games.api import router as modpacks_router
+from hivora.hostfw.api import router as hostfw_router
 from hivora.jobs.api import router as jobs_router
 from hivora.metrics.api import router as metrics_router
 from hivora.realtime.logs import router as logs_router
@@ -61,6 +62,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
         ("/templates", templates_router), ("/apps", apps_router), ("/zones", zones_router),
         ("/jobs", jobs_router), ("/audit", audit_router), ("/metrics", metrics_router),
         ("/modpacks", modpacks_router), ("/topology", topology_router),
+        ("/host-firewall", hostfw_router),
     ):  # fmt: skip
         app.include_router(router, prefix=f"{API_PREFIX}{prefix}")
     app.include_router(game_router, prefix=f"{API_PREFIX}/apps")

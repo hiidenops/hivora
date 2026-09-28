@@ -21,6 +21,7 @@ from hivora.topology.models import TopologyEdge, TopologyLayout, TopologyNode
 from hivora.zones import NetworkMode, Zone
 
 INTERNET = "internet"
+FIREWALL = "firewall"
 NO_ZONE = "zone:none"
 
 
@@ -63,9 +64,25 @@ async def build(rt: Runtime) -> Graph:
                                      if z]  # fmt: skip
 
     graph.nodes.append({"key": INTERNET, "type": "internet", "label": "Internet"})
+    # The host firewall sits between the Internet and the host (published Docker
+    # ports go around it: their own edges from the Internet say so).
+    try:
+        fw = await rt.hostfw.state()
+        firewall: dict[str, Any] = {
+            "agent": fw.agent, "ufw_installed": fw.ufw_installed, "ufw_active": fw.ufw_active,
+            "ufw_rules": len(fw.ufw_rules), "fail2ban_installed": fw.fail2ban_installed,
+            "fail2ban_running": fw.fail2ban_running, "jails": len(fw.jails),
+            "banned": sum(len(j.banned) for j in fw.jails),
+        }  # fmt: skip
+    except Exception as exc:  # agent unreachable: shown as such
+        firewall = {"agent": True, "error": str(exc)[:200]}
+    graph.nodes.append({"key": FIREWALL, "type": "firewall", "label": "UFW / fail2ban", **firewall})
+    graph.edges.append({"source": INTERNET, "target": FIREWALL, "kind": "host", "label": ""})
     zone_key = {z.id: f"zone:{z.id}" for z in zones}
     by_slug = {z.slug: z for z in zones}
     for z in zones:
+        graph.edges.append({"source": FIREWALL, "target": zone_key[z.id], "kind": "host",
+                            "label": ""})  # fmt: skip
         graph.nodes.append({"key": zone_key[z.id], "type": "zone", "label": z.name,
                             "slug": z.slug, "color": z.color,
                             "network_mode": z.network_mode.value})  # fmt: skip
