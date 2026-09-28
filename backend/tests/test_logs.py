@@ -17,6 +17,25 @@ def test_split_timestamp() -> None:
     assert unix("2026-09-28T10:00:01.123456789Z") == 1790589601
 
 
+async def test_hidden_lines_stay_out_of_the_live_view() -> None:
+    from types import SimpleNamespace
+
+    from hivora.realtime.logs import LogStream
+
+    lines = ["2026-09-28T10:00:01Z [Server thread/INFO]: Thread RCON Client /127.0.0.1 started",
+             "2026-09-28T10:00:02Z [Server thread/INFO]: Steve joined the game"]  # fmt: skip
+
+    async def logs(*_: Any, **__: Any) -> Any:
+        for line in lines:
+            yield line
+
+    rt = SimpleNamespace(gateway=SimpleNamespace(logs=logs))
+    stream = LogStream(rt, "s", "cube", [], None, hide=["Thread RCON Client"])  # type: ignore[arg-type]
+    c = ContainerInfo(id="c", name="cube-server-1", image="x", state=ContainerState.EXITED)
+    await stream.follow(c)
+    assert [p["l"] for p in stream.pending] == ["[Server thread/INFO]: Steve joined the game"]
+
+
 def test_live_logs_and_download(client: Any) -> None:
     admin(client)
     body = {"template": "vaultwarden", "name": "Coffre", "inputs": {"admin_token": SECRET}}

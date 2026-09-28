@@ -137,12 +137,13 @@ class Connection:
             return
         try:
             async with self.rt.sessions() as session:
-                app = await self.rt.apps.get(session, int(msg["app"]))
+                app, entry, _ = await self.rt.apps.main_container(session, int(msg["app"]))
                 secrets = await self.rt.apps.decrypt_secrets(session, app.id)
         except HivoraError as exc:
             await self.send(error(exc.code))
             return
-        stream = LogStream(self.rt, sid, app.slug, list(secrets.values()), self.send)
+        hide = entry.template.logs.hide if entry else []
+        stream = LogStream(self.rt, sid, app.slug, list(secrets.values()), self.send, hide)
         self.log_streams[sid] = stream
         services = sorted({service_of(c) for c in stream.containers()})
         await self.send({"channel": "logs", "id": sid, "type": "opened", "services": services})

@@ -8,7 +8,7 @@ import re
 from collections.abc import Iterator
 from typing import Annotated, Any, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hivora.templates.expressions import find_expressions
 
@@ -299,6 +299,19 @@ class Update(_Strict):
     strategy: Literal["manual", "auto-patch", "auto-minor"] = "manual"
 
 
+class Logs(_Strict):
+    # Regular expressions: matching lines are hidden from the live logs (noise the
+    # panel itself causes, e.g. RCON polling). The download keeps everything.
+    hide: list[str] = []
+
+    @field_validator("hide")
+    @classmethod
+    def _compiles(cls, v: list[str]) -> list[str]:
+        for pattern in v:
+            re.compile(pattern)
+        return v
+
+
 class GameCommand(_Strict):
     command: str
     description: Localized
@@ -412,6 +425,7 @@ class Template(_Strict):
     update: Update | None = None
     game: Game | None = None
     vpn: Vpn | None = None
+    logs: Logs = Logs()
     defaults: Defaults = Defaults()
     # Form fields highlighted on the app page (e.g. server type, version, memory).
     summary: list[str] = []

@@ -8,7 +8,8 @@ container cannot flood the socket; the drop is reported.
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+import re
+from collections.abc import Awaitable, Callable, Sequence
 from contextlib import suppress
 from datetime import datetime
 from typing import Any
@@ -55,8 +56,10 @@ def app_containers(rt: Runtime, slug: str) -> list[ContainerInfo]:
 
 
 class LogStream:
-    def __init__(self, rt: Runtime, sid: str, slug: str, secrets: list[str], send: Send) -> None:
+    def __init__(self, rt: Runtime, sid: str, slug: str, secrets: list[str], send: Send,
+                 hide: Sequence[str] = ()) -> None:  # fmt: skip
         self.rt = rt
+        self.hide = re.compile("|".join(f"(?:{h})" for h in hide)) if hide else None
         self.sid = sid
         self.slug = slug
         self.redact = Redactor(secrets)
@@ -83,6 +86,8 @@ class LogStream:
                 continue  # `since` has a one-second resolution: skip what was sent
             if ts:
                 self.last[c.id] = ts
+            if self.hide and self.hide.search(text):
+                continue
             if len(self.pending) >= MAX_BATCH:
                 self.dropped += 1
                 continue
