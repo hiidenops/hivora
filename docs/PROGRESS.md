@@ -39,6 +39,7 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Sauvegardes | À la demande ou planifiées, rétention, restauration, téléchargement | ✅ | voir `git log` |
 | M6 Livraison | Image Docker, HTTPS, script d'installation, budgets en CI | ✅ | voir `git log` |
 | Page Pare-feu | Ports ouverts en direct, UFW, jails fail2ban (bans et réglages), routes | ✅ | voir `git log` |
+| Retours tests #6 | Règles UFW visibles pare-feu coupé, autoriser/refuser depuis les ports ouverts, crash « database is locked » (VPN) corrigé, ports publiés sur les cartes, modifications dans la barre d'outils, liseré de zone, export PNG propre | ✅ | `e085102` |
 | Topologie | Schéma observé + déclaré, alertes d'exposition, export PNG/JSON | ✅ | voir `git log` |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
@@ -48,7 +49,7 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | Fiche d'app et réglages | Carte d'état, cartes repliables, versions en liste, propriétés disponibles | ✅ | voir `git log` |
 | Minecraft, partie C | Gestion des mondes | ⏳ proposé | — |
 
-Tests : 110 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Playwright, contrôle du budget bundle. Tout passe.
+Tests : 209 backend (dont 3 d'intégration sur Docker réel), 1 parcours e2e Playwright, contrôle du budget bundle. Tout passe (28/09).
 
 ## En attente de ton retour
 
