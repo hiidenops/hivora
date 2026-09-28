@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/collapsible-card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AppDetail } from "@/lib/api/client";
@@ -30,7 +30,7 @@ type Kind = "server" | "shell";
 type Phase = "connecting" | "totp" | "open" | "closed";
 type Controller = ReturnType<ReturnType<typeof useRealtime>["openConsole"]>;
 
-/** Always-on console of a running app: connects by itself, reconnects on demand. */
+/** Console of a running app, in a foldable card: connects while unfolded, reconnects on demand. */
 export function ConsolePanel({ app, running }: { app: AppDetail; running: boolean }) {
   const { t, l } = useI18n();
   const rt = useRealtime();
@@ -86,13 +86,16 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
 
   // A fresh terminal (and console) whenever the app runs, the kind changes or on reconnect.
   const restart = () => setSession((n) => n + 1);
+  // Connected only while the card is unfolded.
+  const [open, setOpen] = useState(false);
+  const onToggle = useCallback((o: boolean) => setOpen(o), []);
   useEffect(() => {
-    if (running) restart();
+    if (running && open) restart();
     else {
       disconnect();
       setPhase("closed");
     }
-  }, [running, kind]);
+  }, [running, kind, open]);
   useEffect(() => disconnect, []);
 
   const submitTotp = (e: FormEvent<HTMLFormElement>) => {
@@ -104,12 +107,19 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
   const showGuide = guideOpen && kind === "server" && commands.length > 0;
 
   return (
-    <Card className="lg:col-span-2">
-      <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-        <CardTitle className="flex items-center gap-2">
+    <CollapsibleCard
+      storageKey="app.console"
+      className="lg:col-span-2"
+      defaultOpen
+      onToggle={onToggle}
+      title={
+        <>
           <SquareTerminal className="size-5" /> {t("console.title")}
           {phase === "open" && <span className="size-2 rounded-full bg-ok" aria-hidden />}
-        </CardTitle>
+        </>
+      }
+    >
+      <div className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <div role="tablist" className="inline-flex rounded-md border p-0.5">
             {(hasServer ? (["server", "shell"] as Kind[]) : (["shell"] as Kind[])).map((k) => (
@@ -138,8 +148,6 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
             </Button>
           )}
         </div>
-      </CardHeader>
-      <CardContent className="grid gap-3">
         {!running && <Alert>{t("console.notRunning")}</Alert>}
         {kind === "shell" && <p className="text-xs text-muted-foreground">{t("console.shellHint")}</p>}
         {phase === "totp" && (
@@ -198,7 +206,7 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
             </aside>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }

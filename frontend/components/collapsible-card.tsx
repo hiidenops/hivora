@@ -7,13 +7,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { readPref, writePref } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
 
-/** Card whose body folds away (folded by default); the choice is remembered per `storageKey`. */
+/** Card whose body folds away (folded unless `defaultOpen`); the choice is remembered per `storageKey`. */
 export function CollapsibleCard({
   title,
   aside,
   storageKey,
   className,
   onToggle,
+  defaultOpen = false,
   children,
 }: {
   title: ReactNode;
@@ -21,11 +22,15 @@ export function CollapsibleCard({
   storageKey: string;
   className?: string;
   onToggle?: (open: boolean) => void; // e.g. stream only while open
+  defaultOpen?: boolean; // until the user folds or unfolds it once
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
-  useEffect(() => setOpen(readPref(`fold.${storageKey}`) === "1"), [storageKey]);
+  useEffect(() => {
+    const saved = readPref(`fold.${storageKey}`);
+    setOpen(saved === null ? defaultOpen : saved === "1");
+  }, [storageKey, defaultOpen]);
   useEffect(() => onToggle?.(open), [open, onToggle]);
   const toggle = () => {
     writePref(`fold.${storageKey}`, open ? "0" : "1");

@@ -58,10 +58,11 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await page.getByRole("link", { name: "Voir l'application" }).click();
   await expect(page.getByRole("heading", { name: /Vaultwarden/ })).toBeVisible();
   expect(await page.evaluate(() => isSecureContext)).toBe(false); // the realistic case
-  await expect(page.getByRole("heading", { name: "Console" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Console", expanded: true })).toBeVisible();
   // Live usage: sampled every 5 s only while the page is open.
   await expect(page.getByRole("region", { name: "Consommation" })).toContainText("25,0 %", { timeout: 12_000 });
   await expect(page.locator(".xterm")).toBeVisible(); // auto-connected on a running app
+  await page.locator(".xterm").scrollIntoViewIfNeeded(); // xterm only paints on screen
   await expectPointerCursors(page);
   await expect(page.locator(".xterm-rows")).toContainText("$ sh -c"); // fake exec echoes its command
   await page.getByRole("button", { name: "Supprimer" }).click();
