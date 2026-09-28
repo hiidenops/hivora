@@ -130,6 +130,8 @@ def test_deploy_flow_websocket_and_audit(client: TestClient) -> None:
     assert templates["vaultwarden"]["compatible"] is True
     detail = client.get(f"{API}/templates/minecraft").json()
     assert detail["form"]["basic"][0]["id"] == "eula"
+    wg = client.get(f"{API}/templates/wireguard").json()["form"]["basic"][0]
+    assert wg["default"] == "203.0.113.7"  # host facts pre-filled in the form
 
     body = {"template": "vaultwarden", "name": "Coffre", "inputs": {"web_port": 8090}}
     plan = client.post(f"{API}/apps/plan", json=body).json()

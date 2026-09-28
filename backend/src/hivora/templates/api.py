@@ -1,5 +1,6 @@
 """Catalog routes (/api/v1/templates)."""
 
+import re
 from typing import Any
 
 from fastapi import APIRouter
@@ -9,6 +10,9 @@ from pydantic import BaseModel
 from hivora.core.errors import NotFoundError
 from hivora.runtime import Runtime
 from hivora.templates.catalog import CatalogEntry, host_arch
+from hivora.templates.compiler import AppContext, build_context
+from hivora.templates.expressions import render
+from hivora.templates.forms import FormValues
 from hivora.templates.icons import MEDIA_TYPES
 from hivora.templates.schema import Localized
 from hivora.web.deps import RuntimeDep, Viewer
@@ -65,10 +69,17 @@ async def list_templates(_: Viewer, rt: RuntimeDep) -> list[TemplateSummary]:
 async def get_template(slug: str, _: Viewer, rt: RuntimeDep) -> TemplateDetail:
     entry = rt.catalog.get(slug)
     t = entry.template
+    form = t.form.model_dump(by_alias=True, exclude_none=True)
+    host = {"host": build_context(AppContext("", "", 0), rt.apps.host, FormValues(), [])["host"]}
+    for f in (f for part in form.values() if isinstance(part, list) for f in part):
+        d = f.get("default")
+        # Host facts are known now: show them in the form (app.* stays for the backend).
+        if isinstance(d, str) and set(re.findall(r"\{\{\s*(\w+)", d)) == {"host"}:
+            f["default"] = render(d, host) or d
     return TemplateDetail(
         **summary(rt, entry).model_dump(), links=t.metadata.links,
         requirements=t.requirements.model_dump(exclude_none=True),
-        form=t.form.model_dump(by_alias=True, exclude_none=True),
+        form=form,
         services=list(t.services), manifest=entry.manifest, default_zone=t.defaults.zone,
     )  # fmt: skip
 

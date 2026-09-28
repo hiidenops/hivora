@@ -57,6 +57,10 @@ def _health(value: str | None) -> Health:
         return Health.NONE
 
 
+def _ips(networks: dict[str, Any]) -> tuple[str, ...]:
+    return tuple(ip for n in networks.values() if (ip := (n or {}).get("IPAddress")))
+
+
 def container_from_summary(raw: dict[str, Any]) -> ContainerInfo:
     """Parse an item of ``GET /containers/json``."""
     status: str = raw.get("Status") or ""
@@ -73,7 +77,7 @@ def container_from_summary(raw: dict[str, Any]) -> ContainerInfo:
         )
         for p in raw.get("Ports") or []
     )
-    networks = tuple(((raw.get("NetworkSettings") or {}).get("Networks") or {}).keys())
+    nets = (raw.get("NetworkSettings") or {}).get("Networks") or {}
     return ContainerInfo(
         id=raw["Id"],
         name=(raw.get("Names") or ["/"])[0].lstrip("/"),
@@ -83,7 +87,8 @@ def container_from_summary(raw: dict[str, Any]) -> ContainerInfo:
         exit_code=int(exit_match.group(1)) if exit_match else None,
         labels=raw.get("Labels") or {},
         ports=ports,
-        networks=networks,
+        networks=tuple(nets),
+        ips=_ips(nets),
     )
 
 
@@ -103,6 +108,7 @@ def container_from_inspect(raw: dict[str, Any]) -> ContainerInfo:
                     host_port=int(b["HostPort"]) if b and b.get("HostPort") else None,
                 )
             )
+    nets = (raw.get("NetworkSettings") or {}).get("Networks") or {}
     return ContainerInfo(
         id=raw["Id"],
         name=raw.get("Name", "").lstrip("/"),
@@ -115,7 +121,8 @@ def container_from_inspect(raw: dict[str, Any]) -> ContainerInfo:
         started_at=_parse_time(st.get("StartedAt")) if state is ContainerState.RUNNING else None,
         labels=(raw.get("Config") or {}).get("Labels") or {},
         ports=tuple(ports),
-        networks=tuple(((raw.get("NetworkSettings") or {}).get("Networks") or {}).keys()),
+        networks=tuple(nets),
+        ips=_ips(nets),
     )
 
 

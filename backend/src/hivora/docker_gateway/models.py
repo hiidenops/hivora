@@ -42,6 +42,7 @@ class ContainerInfo:
     labels: dict[str, str] = field(default_factory=dict)
     ports: tuple[PublishedPort, ...] = ()
     networks: tuple[str, ...] = ()
+    ips: tuple[str, ...] = ()  # one per network, same order
     started_at: datetime | None = None  # from inspect; container listings omit it
 
 

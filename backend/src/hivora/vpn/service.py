@@ -46,19 +46,13 @@ class VpnTools:
             spec = entry.template.vpn if entry else None
             if entry is None or spec is None:
                 raise NotAVpnError("this app is not a managed VPN", slug=app.slug)
-            main = next(s for s in app.services if s.name == entry.template.main_service)
-            port = next(
-                (p.host_port for p in main.ports if p.container_port == spec.api_port), None
-            )
             secrets = await self.rt.apps.decrypt_secrets(session, app.id)
             values = (await self.rt.apps.current_settings(session, app_id)).values
         zones = [z for z in str(values.get(spec.zones_field or "") or "").split(",") if z]
         api = None
-        if container is not None and port:
-            host = self.rt.settings.host_lan_ip or "127.0.0.1"
-            api = WgEasy(
-                f"http://{host}:{port}", spec.username, secrets.get(spec.password_secret, "")
-            )
+        if container is not None and container.ips:  # app network: the API is never published
+            api = WgEasy(f"http://{container.ips[0]}:{spec.api_port}", spec.username,
+                         secrets.get(spec.password_secret, ""))  # fmt: skip
         return _Vpn(app.slug, spec, container is not None, api, zones)
 
     async def _api(self, app_id: int) -> tuple[_Vpn, WgEasy]:

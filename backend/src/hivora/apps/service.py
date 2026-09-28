@@ -304,7 +304,9 @@ class AppService:
         entry = await self._entry_of(session, app)
         revision = await self._latest_revision(session, app.id)
         secrets = await self.decrypt_secrets(session, app.id)
-        return AppSettings(app, entry, dict(revision.inputs) if revision else {}, sorted(secrets))
+        known = {f.id for f in entry.template.form.fields}  # a newer template may drop fields
+        values = {k: v for k, v in (revision.inputs if revision else {}).items() if k in known}
+        return AppSettings(app, entry, values, sorted(secrets))
 
     async def plan_update(
         self, session: AsyncSession, app_id: int, inputs: dict[str, Any]

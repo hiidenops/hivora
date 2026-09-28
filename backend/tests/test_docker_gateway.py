@@ -18,13 +18,13 @@ def test_summary_with_health_field() -> None:
             "Health": {"Status": "healthy"},
             "Labels": {"io.hivora.app": "demo"},
             "Ports": [{"IP": "0.0.0.0", "PrivatePort": 80, "PublicPort": 8080, "Type": "tcp"}],
-            "NetworkSettings": {"Networks": {"demo_default": {}}},
+            "NetworkSettings": {"Networks": {"demo_default": {"IPAddress": "172.18.0.2"}}},
         }
     )
     assert c.name == "demo-web-1"
     assert c.state is ContainerState.RUNNING and c.health is Health.HEALTHY
     assert c.ports == (PublishedPort(80, "tcp", "0.0.0.0", 8080),)
-    assert c.networks == ("demo_default",)
+    assert c.networks == ("demo_default",) and c.ips == ("172.18.0.2",)
 
 
 def test_summary_old_engine_status_fallback_and_exit_code() -> None:
