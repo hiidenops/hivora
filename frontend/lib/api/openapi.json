@@ -396,6 +396,91 @@
         "title": "AuditOut",
         "type": "object"
       },
+      "BackupOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scheduled": {
+            "title": "Scheduled",
+            "type": "boolean"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "scheduled",
+          "status",
+          "name",
+          "size"
+        ],
+        "title": "BackupOut",
+        "type": "object"
+      },
+      "BackupsOut": {
+        "properties": {
+          "backups": {
+            "items": {
+              "$ref": "#/components/schemas/BackupOut"
+            },
+            "title": "Backups",
+            "type": "array"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/ScheduleIO"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          },
+          "volumes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Volumes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schedule",
+          "next_run_at",
+          "timezone",
+          "volumes",
+          "backups"
+        ],
+        "title": "BackupsOut",
+        "type": "object"
+      },
       "ClearedOut": {
         "properties": {
           "deleted": {
@@ -1282,7 +1367,9 @@
           "convert",
           "move_zone",
           "world_import",
-          "world_delete"
+          "world_delete",
+          "backup",
+          "backup_restore"
         ],
         "title": "JobKind",
         "type": "string"
@@ -2141,6 +2228,67 @@
         ],
         "title": "Role",
         "type": "string"
+      },
+      "ScheduleIO": {
+        "properties": {
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "every_hours": {
+            "default": 6,
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Every Hours",
+            "type": "integer"
+          },
+          "frequency": {
+            "default": "daily",
+            "enum": [
+              "daily",
+              "weekly",
+              "hours"
+            ],
+            "title": "Frequency",
+            "type": "string"
+          },
+          "hour": {
+            "default": 4,
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Hour",
+            "type": "integer"
+          },
+          "keep": {
+            "default": 7,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Keep",
+            "type": "integer"
+          },
+          "minute": {
+            "default": 0,
+            "maximum": 59.0,
+            "minimum": 0.0,
+            "title": "Minute",
+            "type": "integer"
+          },
+          "stop": {
+            "default": true,
+            "title": "Stop",
+            "type": "boolean"
+          },
+          "weekday": {
+            "default": 0,
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "title": "ScheduleIO",
+        "type": "object"
       },
       "SessionOut": {
         "properties": {
@@ -3538,6 +3686,285 @@
         "summary": "Get App",
         "tags": [
           "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/backups": {
+      "get": {
+        "operationId": "overview_api_v1_apps__app_id__backups_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Overview",
+        "tags": [
+          "backups"
+        ]
+      },
+      "post": {
+        "operationId": "backup_now_api_v1_apps__app_id__backups_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Backup Now",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/backups/schedule": {
+      "put": {
+        "operationId": "set_schedule_api_v1_apps__app_id__backups_schedule_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleIO"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleIO"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Schedule",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/backups/{backup_id}": {
+      "delete": {
+        "operationId": "delete_api_v1_apps__app_id__backups__backup_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "backup_id",
+            "required": true,
+            "schema": {
+              "title": "Backup Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/backups/{backup_id}/download": {
+      "get": {
+        "operationId": "download_api_v1_apps__app_id__backups__backup_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "backup_id",
+            "required": true,
+            "schema": {
+              "title": "Backup Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download",
+        "tags": [
+          "backups"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/backups/{backup_id}/restore": {
+      "post": {
+        "description": "Replace the app's volumes with this backup (the app is stopped meanwhile).",
+        "operationId": "restore_api_v1_apps__app_id__backups__backup_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "backup_id",
+            "required": true,
+            "schema": {
+              "title": "Backup Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore",
+        "tags": [
+          "backups"
         ]
       }
     },

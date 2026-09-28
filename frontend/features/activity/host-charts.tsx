@@ -47,7 +47,11 @@ export function units(lang: string) {
       hour: "2-digit", minute: "2-digit", ...(seconds ? { second: "2-digit" } : {}),
     });  // prettier-ignore
   const size = (bytes: number) =>
-    bytes >= 1024 ** 3 ? gb(bytes) : `${num(bytes / 1024 ** 2, 0)} ${lang === "fr" ? "Mo" : "MB"}`;
+    bytes >= 1024 ** 3
+      ? gb(bytes)
+      : bytes >= 1024 ** 2
+        ? `${num(bytes / 1024 ** 2, 0)} ${lang === "fr" ? "Mo" : "MB"}`
+        : `${num(bytes / 1024, 0)} ${lang === "fr" ? "Ko" : "KB"}`;
   return { num, gb, size, rate, time, clock };
 }
 

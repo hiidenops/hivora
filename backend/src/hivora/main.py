@@ -11,6 +11,7 @@ from hivora.apps.api import router as apps_router
 from hivora.audit.api import router as audit_router
 from hivora.auth.api import router as auth_router
 from hivora.auth.users_api import router as users_router
+from hivora.backups.api import router as backups_router
 from hivora.core.config import Settings
 from hivora.core.logging import configure_logging
 from hivora.games.api import game_router, options_router
@@ -63,6 +64,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
     app.include_router(game_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(vpn_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(logs_router, prefix=f"{API_PREFIX}/apps")
+    app.include_router(backups_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(options_router, prefix=f"{API_PREFIX}/options")
     app.include_router(ws_router)
     return app

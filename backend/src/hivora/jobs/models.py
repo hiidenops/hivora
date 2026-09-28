@@ -24,6 +24,8 @@ class JobKind(StrEnum):
     MOVE_ZONE = "move_zone"
     WORLD_IMPORT = "world_import"
     WORLD_DELETE = "world_delete"
+    BACKUP = "backup"
+    BACKUP_RESTORE = "backup_restore"
 
 
 class JobStatus(StrEnum):

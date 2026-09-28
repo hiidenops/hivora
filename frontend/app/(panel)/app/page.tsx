@@ -24,6 +24,7 @@ import { ZoneSelect } from "@/features/zones/zone-select";
 // Only VPN apps need it: loaded on demand (page budget).
 const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.VpnCard));
 const LogsCard = dynamic(() => import("@/features/logs/logs-card").then((m) => m.LogsCard));
+const BackupsCard = dynamic(() => import("@/features/backups/backups-card").then((m) => m.BackupsCard));
 const UpgradeBanner = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.UpgradeBanner));
 const RestoreButton = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.RestoreButton));
 import { ApiError } from "@/lib/api/client";
@@ -117,6 +118,7 @@ function AppDetail() {
           />
         )}
         {app.vpn && can("operator") && <VpnCard appId={app.id} onJob={setActiveJob} />}
+        {can("operator") && <BackupsCard appId={app.id} onJob={setActiveJob} />}
         {can("operator") && <LogsCard appId={app.id} />}
         {can("operator") && (
           <ConsolePanel app={app} running={["healthy", "starting", "degraded"].includes(status)} />

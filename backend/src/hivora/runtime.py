@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from hivora.apps import AppJobHandlers, AppService
 from hivora.audit import AuditRecorder
 from hivora.auth.service import AuthService
+from hivora.backups.service import BackupService
 from hivora.compose_runner import ComposeRunner
 from hivora.core.clock import Clock, SystemClock
 from hivora.core.config import Settings
@@ -59,6 +60,7 @@ class Runtime:
     modpacks: ModpackCatalog
     public_address: PublicAddress
     app_metrics: AppMetrics
+    backups: BackupService
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
     consoles: "ConsoleManager" = field(init=False)
@@ -115,13 +117,15 @@ class Runtime:
         )
         AppJobHandlers(apps).register()
         WorldJobs(apps).register()
+        backups = BackupService(apps)
+        backups.register()
         auth = AuthService(settings=settings, sessions=sessions, box=box, bus=bus, clock=clock)
         audit = AuditRecorder(sessions, bus)
         icons = IconCache(settings.data_dir / "icons")
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
-                   public_address, AppMetrics(gateway, state.store, bus))  # fmt: skip
+                   public_address, AppMetrics(gateway, state.store, bus), backups)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
@@ -130,6 +134,7 @@ class Runtime:
         await self.metrics.start()
         await self.public_address.start()
         await self.app_metrics.start()
+        await self.backups.start()
         await self.auth.ensure_initial_admin()
         await self.apps.load_custom_templates()
         try:
@@ -159,6 +164,7 @@ class Runtime:
         await self.metrics.stop()
         await self.public_address.stop()
         await self.app_metrics.stop()
+        await self.backups.stop()
         await self.state.stop()
         await self.audit.stop()
         await self.gateway.close()
