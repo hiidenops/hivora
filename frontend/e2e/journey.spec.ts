@@ -106,6 +106,11 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toBeHidden();
 
+  // Host firewall page: the agent is off by default, nothing runs on the host.
+  await page.getByRole("link", { name: "Pare-feu" }).click();
+  await expect(page.getByRole("heading", { name: "Pare-feu" })).toBeVisible();
+  await expect(page.getByText("UFW ne filtre pas les ports publiés par Docker", { exact: false }).first()).toBeVisible();
+
   // Language switch.
   await page.getByRole("link", { name: "Paramètres" }).click();
   await page.getByLabel("Langue", { exact: true }).selectOption("en");

@@ -41,7 +41,7 @@ Conséquences : pas de streams `stats` permanents (échantillonnage one-shot tou
 ## Sécurité (non négociable)
 
 - Accès au socket = root sur l'hôte. Le conteneur Hivora n'est jamais `privileged` et ne monte que le socket, `/opt/hivora/data` et `/srv/hivora`, **au même chemin que sur l'hôte**, pour que le compose généré contienne des chemins hôte absolus valides.
-- Pas de shell sur l'hôte, seulement `exec` dans les conteneurs. **Exception validée le 29/09/2026** : l'agent hôte optionnel (`hostfw`, conteneur `hivora-host-agent` privilégié, PID/réseau de l'hôte) n'exécute que des lignes de commande fixes `ufw` / `fail2ban-client` aux arguments validés (jamais via un shell) ; désactivé par défaut, admin + TOTP récent, tout est audité.
+- Pas de shell sur l'hôte, seulement `exec` dans les conteneurs. **Exception validée le 29/09/2026** : l'agent hôte optionnel (`hostfw`, conteneur `hivora-host-agent` privilégié, PID/réseau de l'hôte) n'exécute que des lignes de commande fixes (`ufw`, `fail2ban-client`, `ss`, `ip route`) aux arguments validés, jamais du code shell construit ; seule écriture : `jail.d/hivora.local`, contenu généré par Hivora passé en argument d'un script fixe ; désactivé par défaut, admin + TOTP récent, tout est audité.
 - **Les secrets n'apparaissent jamais** dans `inputs`, les logs de job, l'audit ou les logs applicatifs : ils sont référencés par clé et chiffrés en AES-GCM (clé maître `/opt/hivora/data/secret.key`, 0600).
 - Auth : Argon2id, cookies `Secure`/`HttpOnly`/`SameSite=Strict`, CSRF, TOTP RFC 6238, rate limiting (5 échecs → délai exponentiel).
 - Compte initial `admin` / `admin` créé au premier démarrage : tant que son mot de passe n'est pas changé, la session n'autorise que `me`, `password` et `logout` (403 partout ailleurs).

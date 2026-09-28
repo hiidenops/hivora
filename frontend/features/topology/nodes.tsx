@@ -80,7 +80,7 @@ export function InternetNode({ selected }: NodeProps) {
 
 export function FirewallNode({ data, selected }: NodeProps) {
   const { t } = useI18n();
-  const d = data as { agent: boolean; ufw_installed?: boolean; ufw_active?: boolean; ufw_rules?: number; fail2ban_running?: boolean; banned?: number; error?: string };
+  const d = data as { agent: boolean; ufw_installed?: boolean; ufw_active?: boolean; ufw_rules?: number; fail2ban_running?: boolean; banned?: number; open?: number[]; error?: string };
   const ufw = !d.agent ? t("fw.node.unknown") : d.error ? t("fw.node.error") : !d.ufw_installed ? t("fw.node.noUfw") : d.ufw_active ? t("fw.node.ufwOn", { n: d.ufw_rules ?? 0 }) : t("fw.node.ufwOff");
   return (
     <div className={cn("w-44 rounded-md border-2 bg-card px-2 py-1 text-xs", d.ufw_active ? "border-ok" : "border-warn border-dashed", selected && "ring-2 ring-ring")}>
@@ -90,6 +90,7 @@ export function FirewallNode({ data, selected }: NodeProps) {
         <Shield className="size-3.5" /> {t("fw.node.title")}
       </div>
       <p className="text-muted-foreground">{ufw}</p>
+      {d.open && <p className={d.open.length ? "text-warn" : "text-muted-foreground"}>{t("fw.node.open", { n: d.open.length, ports: d.open.slice(0, 6).join(", ") + (d.open.length > 6 ? "…" : "") })}</p>}
       {d.agent && d.fail2ban_running && <p className="text-muted-foreground">{t("fw.node.f2b", { n: d.banned ?? 0 })}</p>}
     </div>
   );

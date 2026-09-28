@@ -34,7 +34,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 import { applyChanges, changeKey, upsert, type Change } from "./changes";
-import { FirewallDialog } from "./firewall-dialog";
+import { FirewallDialog } from "@/features/firewall/firewall-panel";
 import { toFlow, type GNode, type Graph, type Level } from "./layout";
 import { nodeTypes } from "./nodes";
 

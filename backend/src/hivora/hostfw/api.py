@@ -7,7 +7,13 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from hivora.core.errors import PermissionDeniedError
-from hivora.hostfw.service import HostFirewall
+from hivora.hostfw.service import (
+    HostFirewall,
+    jail_settings,
+    listening,
+    routes,
+    save_jails,
+)
 from hivora.web.deps import Admin, Principal, RuntimeDep
 
 router = APIRouter(tags=["host-firewall"])
@@ -94,3 +100,46 @@ async def ufw(body: UfwIn, principal: Admin, rt: RuntimeDep) -> DoneOut:
 async def jail_ip(jail: str, body: JailIpIn, principal: Admin, rt: RuntimeDep) -> DoneOut:
     confirmed(principal, rt)
     return DoneOut(output=await fw(rt).jail_ip(jail, body.ip, ban=body.ban))
+
+
+class JailIn(BaseModel):
+    enabled: bool = True
+    maxretry: int | None = Field(default=None, ge=1, le=1000)
+    bantime: str | None = Field(default=None, max_length=12)  # 600, 10m, 1h, 1d, -1
+    findtime: str | None = Field(default=None, max_length=12)
+
+
+class JailsIn(BaseModel):
+    jails: dict[str, JailIn] = Field(max_length=50)
+
+
+@router.get("/listening")
+async def open_ports(_: Admin, rt: RuntimeDep) -> list[dict[str, Any]]:
+    """What listens on the host, what opens it, and what UFW does about it."""
+    return await listening(fw(rt))
+
+
+@router.get("/routes")
+async def host_routes(_: Admin, rt: RuntimeDep) -> dict[str, Any]:
+    """The host's routing table (read-only) and the ports Docker forwards to apps."""
+    forwards = [
+        {"port": p.host_port, "protocol": p.protocol, "address": p.host_ip or "0.0.0.0",  # noqa: S104
+         "app": c.labels.get("io.hivora.app") or c.name, "container_port": p.container_port}
+        for c in rt.state.store.containers() for p in c.ports if p.host_port
+    ]  # fmt: skip
+    unique = {(f["port"], f["protocol"], f["address"]): f for f in forwards}
+    ordered = sorted(unique.values(), key=lambda f: int(str(f["port"])))
+    return {"routes": await routes(fw(rt)), "forwards": ordered}
+
+
+@router.get("/fail2ban/settings")
+async def get_jails(_: Admin, rt: RuntimeDep) -> dict[str, dict[str, str]]:
+    return await jail_settings(fw(rt))
+
+
+@router.put("/fail2ban/settings")
+async def put_jails(body: JailsIn, principal: Admin, rt: RuntimeDep) -> DoneOut:
+    """Writes /etc/fail2ban/jail.d/hivora.local, then reloads fail2ban."""
+    confirmed(principal, rt)
+    jails = {name: j.model_dump(exclude_none=True) for name, j in body.jails.items()}
+    return DoneOut(output=await save_jails(fw(rt), jails))

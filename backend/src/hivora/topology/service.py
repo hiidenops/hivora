@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import select
 
 from hivora.apps.models import Application, AppRevision, Exposure, Origin
+from hivora.hostfw.service import listening
 from hivora.runtime import Runtime
 from hivora.state import app_key
 from hivora.templates.catalog import host_arch
@@ -91,6 +92,11 @@ async def build(rt: Runtime) -> Graph:
             "fail2ban_running": fw.fail2ban_running, "jails": len(fw.jails),
             "banned": sum(len(j.banned) for j in fw.jails),
         }  # fmt: skip
+        if fw.agent:  # ports reachable from outside the host right now
+            rows = await listening(rt.hostfw)
+            firewall["open"] = sorted(
+                {r["port"] for r in rows if r["ufw"] != "local" and r["ufw"] != "blocked"}
+            )
     except Exception as exc:  # agent unreachable: shown as such
         firewall = {"agent": True, "error": str(exc)[:200]}
     graph.nodes.append({"key": FIREWALL, "type": "firewall", "label": "UFW / fail2ban", **firewall})

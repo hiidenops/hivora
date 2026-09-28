@@ -9,6 +9,7 @@ says so rather than presenting UFW as a protection for the apps.
 
 import asyncio
 import ipaddress
+import json
 import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -206,3 +207,117 @@ class HostFirewall:
         return await self._change("hostfw.banned" if ban else "hostfw.unbanned",
                                   ["fail2ban-client", "set", jail, verb, address],
                                   target=address, jail=jail)  # fmt: skip
+
+
+# --- listening ports, routes, fail2ban jail settings (lot I) ----------------------------
+
+SS_LINE = re.compile(
+    r"^(tcp|udp)\s+\S+\s+\d+\s+\d+\s+(\S+):(\d+)\s+\S+(?:\s+users:\(\(\"([^\"]+)\")?"
+)
+JAIL_FILE = "/etc/fail2ban/jail.d/hivora.local"
+DURATION = re.compile(r"^-?\d{1,9}[smhdw]?$")  # fail2ban: 600, 10m, 1h, 1d, -1 (forever)
+
+
+@dataclass
+class Listening:
+    protocol: str
+    address: str
+    port: int
+    process: str
+
+
+def parse_ss(text: str) -> list[Listening]:
+    """``ss -H -tulpn``: what listens on the host (one entry per protocol/port/address)."""
+    seen: dict[tuple[str, str, int], Listening] = {}
+    for line in text.splitlines():
+        m = SS_LINE.match(line.strip())
+        if m:
+            proto, addr, port, proc = (
+                m.group(1),
+                m.group(2).strip("[]"),
+                int(m.group(3)),
+                m.group(4),
+            )
+            seen.setdefault((proto, addr, port), Listening(proto, addr, port, proc or ""))
+    return sorted(seen.values(), key=lambda x: (x.port, x.protocol, x.address))
+
+
+def jail_config(jails: dict[str, dict[str, Any]]) -> str:
+    """The whole jail.d/hivora.local, generated from validated values only."""
+    lines = ["# Written by Hivora: fail2ban settings changed from the panel.", ""]
+    for name, s in sorted(jails.items()):
+        if not JAIL.match(name):
+            raise ValidationError("invalid jail name", field="jail")
+        lines.append(f"[{name}]")
+        lines.append(f"enabled = {'true' if s.get('enabled', True) else 'false'}")
+        if s.get("maxretry") is not None:
+            if not 1 <= int(s["maxretry"]) <= 1000:
+                raise ValidationError("maxretry out of range", field="maxretry")
+            lines.append(f"maxretry = {int(s['maxretry'])}")
+        for key in ("bantime", "findtime"):
+            if s.get(key) is not None:
+                if not DURATION.match(str(s[key])):
+                    raise ValidationError(f"invalid {key}", field=key)
+                lines.append(f"{key} = {s[key]}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+async def listening(fw: "HostFirewall") -> list[dict[str, Any]]:
+    """Open ports on the host, with what opens them (a Docker app, a host process) and
+    whether UFW would filter them (it does not for ports Docker publishes)."""
+    _, out = await fw._run(["ss", "-H", "-tulpn"], check=False)
+    state = await fw.state()
+    published: dict[tuple[int, str], str] = {}
+    for c in fw.rt.state.store.containers():
+        for p in c.ports:
+            if p.host_port:
+                published[(p.host_port, p.protocol)] = c.labels.get("io.hivora.app") or c.name
+    rules = [r for r in state.ufw_rules if "ALLOW" in r.action or "LIMIT" in r.action]
+    out_rows = []
+    for item in parse_ss(out):
+        docker = published.get((item.port, item.protocol))
+        allowed = any(r.to.split("/")[0] == str(item.port) or r.to.startswith(f"{item.port}/")
+                      for r in rules)  # fmt: skip
+        if item.address == "::1" or item.address.startswith("127."):
+            ufw = "local"
+        elif docker:
+            ufw = "bypassed"  # Docker's own rules come first
+        elif not state.ufw_active:
+            ufw = "off"
+        else:
+            ufw = "allowed" if allowed else "blocked"
+        out_rows.append({**item.__dict__, "app": docker, "ufw": ufw})
+    return out_rows
+
+
+async def routes(fw: "HostFirewall") -> list[dict[str, Any]]:
+    _, out = await fw._run(["ip", "-j", "route"], check=False)
+    try:
+        rows = json.loads(out or "[]")
+    except ValueError:
+        return []
+    keys = ("dst", "gateway", "dev", "protocol", "scope", "prefsrc", "metric")
+    return [{k: r.get(k) for k in keys} for r in rows if isinstance(r, dict)]
+
+
+async def jail_settings(fw: "HostFirewall") -> dict[str, dict[str, str]]:
+    state = await fw.state()
+    out: dict[str, dict[str, str]] = {}
+    for jail in state.jails:
+        values = {}
+        for key in ("maxretry", "bantime", "findtime"):
+            code, text = await fw._run(["fail2ban-client", "get", jail.name, key], check=False)
+            values[key] = text.strip() if code == 0 else ""
+        out[jail.name] = values
+    return out
+
+
+async def save_jails(fw: "HostFirewall", jails: dict[str, dict[str, Any]]) -> str:
+    """Write jail.d/hivora.local (content passed as an argument, never as shell code),
+    then reload fail2ban."""
+    content = jail_config(jails)
+    await fw._run(["sh", "-c", 'printf "%s" "$1" > ' + JAIL_FILE, "hivora", content])
+    out = await fw._change("hostfw.jails_saved", ["fail2ban-client", "reload"],
+                           target=", ".join(sorted(jails)))  # fmt: skip
+    return out
