@@ -206,11 +206,20 @@ class VpnTools:
     def _active(self, peer: VpnPeer) -> bool:
         return peer.enabled and (peer.expires_at is None or peer.expires_at > self.rt.clock.now())
 
-    async def _sync(self, session: AsyncSession, vpn: _Vpn, *, if_changed: bool = False) -> None:
+    async def _sync(self, vpn: _Vpn, *, if_changed: bool = False) -> None:
         """Rewrite the server config and access rights, then apply them if the VPN runs.
 
+        Caller holds ``_LOCK``, outside any transaction: the exec into the container
+        (``wg-quick up`` can take seconds) never runs with the database locked.
         ``if_changed``: only when a file differs (settings changed, file edited or lost).
         """
+        async with self.rt.sessions() as session, session.begin():
+            address = await self._write(session, vpn, if_changed=if_changed)
+        if address is not None:
+            await self._up(vpn, address)
+
+    async def _write(self, session: AsyncSession, vpn: _Vpn, *, if_changed: bool) -> str | None:
+        """Write wg0.conf and the access script; the server address to apply, if running."""
         server, clients = await self._peers(session, vpn)
         s = vpn.spec
         subnet, _ = vpn.network()
@@ -225,7 +234,7 @@ class VpnTools:
         with suppress(OSError):
             if if_changed and vpn.host_config.read_text() == text \
                     and vpn.host_acl.read_text() == acl:  # fmt: skip
-                return
+                return None
         vpn.host_config.parent.mkdir(parents=True, exist_ok=True)
         for path, content in ((vpn.host_acl, acl), (vpn.host_config, text)):
             tmp = path.with_suffix(".tmp")
@@ -233,12 +242,17 @@ class VpnTools:
             with os.fdopen(fd, "w") as f:
                 f.write(content)
             tmp.replace(path)
-        if vpn.container is None:
-            return  # the image brings it up on start (PostUp runs the access rights)
+        # Not running: the image brings it up on start (PostUp runs the access rights).
+        return server.address if vpn.container is not None else None
+
+    async def _up(self, vpn: _Vpn, address: str) -> None:
+        assert vpn.container is not None
+        s = vpn.spec
+        subnet, _ = vpn.network()
         # Same address: peers and rights applied live. New addressing: interface rebuilt.
         # ponytail: the old network's NAT rule stays until the container restarts (harmless)
         i, c = s.interface, vpn.config
-        inet = f"inet {server.address}/{ipaddress.ip_network(subnet).prefixlen} "
+        inet = f"inet {address}/{ipaddress.ip_network(subnet).prefixlen} "
         code, out = await self.rt.gateway.exec_run(vpn.container.id, ["sh", "-c", (
             f"if wg show {i} >/dev/null 2>&1; then"
             f" if ip -4 -o addr show {i} | grep -qF '{inet}'; then"
@@ -252,8 +266,8 @@ class VpnTools:
 
     async def sync(self, app_id: int) -> None:
         vpn = await self._vpn(app_id)
-        async with _LOCK, self.rt.sessions() as session, session.begin():
-            await self._sync(session, vpn)
+        async with _LOCK:
+            await self._sync(vpn)
 
     async def _client(self, session: AsyncSession, vpn: _Vpn, cid: int) -> VpnPeer:
         peer = await session.get(VpnPeer, cid)
@@ -264,15 +278,16 @@ class VpnTools:
     async def overview(self, app_id: int) -> dict[str, Any]:
         vpn = await self._vpn(app_id)
         stats: dict[str, wg.PeerStats] = {}
-        async with _LOCK, self.rt.sessions() as session, session.begin():
-            _, clients = await self._peers(session, vpn)
+        async with _LOCK:
             with suppress(VpnApplyError):  # listing still works; the next change reports it
-                await self._sync(session, vpn, if_changed=True)
+                await self._sync(vpn, if_changed=True)
+            async with self.rt.sessions() as session, session.begin():
+                _, clients = await self._peers(session, vpn)
             if vpn.container is not None:
                 cmd = ["wg", "show", vpn.spec.interface, "dump"]
                 code, out = await self.rt.gateway.exec_run(vpn.container.id, cmd)
                 if code != 0:  # interface down (first start, config lost): bring it back
-                    await self._sync(session, vpn)
+                    await self._sync(vpn)
                     code, out = await self.rt.gateway.exec_run(vpn.container.id, cmd)
                 now = self.rt.clock.now().timestamp()
                 stats = wg.parse_dump(out, now) if code == 0 else {}
@@ -299,25 +314,34 @@ class VpnTools:
     async def create(self, app_id: int, name: str, allowed_ips: list[str] | None,
                      address: str | None = None, **changes: Any) -> int:  # fmt: skip
         vpn = await self._vpn(app_id)
-        async with _LOCK, self.rt.sessions() as session, session.begin():
-            server, clients = await self._peers(session, vpn)
-            used = {server.address, *(c.address for c in clients)}
-            if address:
-                self._check_address(vpn, address, used)
-            address = address or wg.free_address(vpn.network()[0], used)
-            if address is None:
-                raise VpnFullError("no address left in the VPN network")
-            private, public = wg.keypair()
-            sealed = self._seal(vpn.app_id, private, public)
-            peer = VpnPeer(app_id=vpn.app_id, name=name, address=address, enabled=True,
-                           allowed_ips=allowed_ips or None, public_key=public,
-                           routing="custom" if allowed_ips else "default",
-                           private_nonce=sealed.nonce, private_key=sealed.ciphertext)  # fmt: skip
-            self._set_psk(peer)
-            self._apply(peer, changes)
-            session.add(peer)
-            await session.flush()
-            await self._sync(session, vpn)
+        async with _LOCK:
+            async with self.rt.sessions() as session, session.begin():
+                server, clients = await self._peers(session, vpn)
+                used = {server.address, *(c.address for c in clients)}
+                if address:
+                    self._check_address(vpn, address, used)
+                address = address or wg.free_address(vpn.network()[0], used)
+                if address is None:
+                    raise VpnFullError("no address left in the VPN network")
+                private, public = wg.keypair()
+                sealed = self._seal(vpn.app_id, private, public)
+                peer = VpnPeer(app_id=vpn.app_id, name=name, address=address, enabled=True,
+                               allowed_ips=allowed_ips or None, public_key=public,
+                               routing="custom" if allowed_ips else "default",
+                               private_nonce=sealed.nonce,
+                               private_key=sealed.ciphertext)  # fmt: skip
+                self._set_psk(peer)
+                self._apply(peer, changes)
+                session.add(peer)
+                await session.flush()
+            try:
+                await self._sync(vpn)
+            except VpnApplyError:  # refused by WireGuard: the client is not kept
+                async with self.rt.sessions() as session, session.begin():
+                    await session.delete(await session.get(VpnPeer, peer.id))
+                    await session.flush()
+                    await self._write(session, vpn, if_changed=False)
+                raise
         self.rt.bus.publish("vpn.client_created", app=vpn.slug, target=name)
         return peer.id
 
@@ -343,40 +367,43 @@ class VpnTools:
 
     async def update(self, app_id: int, cid: int, **changes: Any) -> None:
         vpn = await self._vpn(app_id)
-        async with _LOCK, self.rt.sessions() as session, session.begin():
-            server, clients = await self._peers(session, vpn)
-            peer = await self._client(session, vpn, cid)
-            address = changes.pop("address", None)
-            if address and address != peer.address:
-                taken = {server.address, *(c.address for c in clients if c is not peer)}
-                self._check_address(vpn, address, taken)
-                peer.address = address
-            self._apply(peer, changes)
-            await session.flush()
-            await self._sync(session, vpn)
+        async with _LOCK:
+            async with self.rt.sessions() as session, session.begin():
+                server, clients = await self._peers(session, vpn)
+                peer = await self._client(session, vpn, cid)
+                address = changes.pop("address", None)
+                if address and address != peer.address:
+                    taken = {server.address, *(c.address for c in clients if c is not peer)}
+                    self._check_address(vpn, address, taken)
+                    peer.address = address
+                self._apply(peer, changes)
+                await session.flush()
+            await self._sync(vpn)
         self.rt.bus.publish("vpn.client_updated", app=vpn.slug, target=peer.name)
 
     async def delete(self, app_id: int, cid: int) -> None:
         vpn = await self._vpn(app_id)
-        async with _LOCK, self.rt.sessions() as session, session.begin():
-            peer = await self._client(session, vpn, cid)
-            await session.delete(peer)
-            await session.flush()
-            await self._sync(session, vpn)
+        async with _LOCK:
+            async with self.rt.sessions() as session, session.begin():
+                peer = await self._client(session, vpn, cid)
+                await session.delete(peer)
+                await session.flush()
+            await self._sync(vpn)
         self.rt.bus.publish("vpn.client_deleted", app=vpn.slug, target=peer.name)
 
     async def renew(self, app_id: int, cid: int) -> int:
         """New key pair, same client (name, address, allowed IPs)."""
         vpn = await self._vpn(app_id)
-        async with _LOCK, self.rt.sessions() as session, session.begin():
-            peer = await self._client(session, vpn, cid)
-            private, public = wg.keypair()
-            sealed = self._seal(vpn.app_id, private, public)
-            peer.public_key = public
-            peer.private_nonce, peer.private_key = sealed.nonce, sealed.ciphertext
-            self._set_psk(peer)
-            await session.flush()
-            await self._sync(session, vpn)
+        async with _LOCK:
+            async with self.rt.sessions() as session, session.begin():
+                peer = await self._client(session, vpn, cid)
+                private, public = wg.keypair()
+                sealed = self._seal(vpn.app_id, private, public)
+                peer.public_key = public
+                peer.private_nonce, peer.private_key = sealed.nonce, sealed.ciphertext
+                self._set_psk(peer)
+                await session.flush()
+            await self._sync(vpn)
         self.rt.bus.publish("vpn.client_renewed", app=vpn.slug, target=peer.name)
         return peer.id
 

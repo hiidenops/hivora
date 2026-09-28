@@ -92,11 +92,25 @@ def test_vpn_clients_and_linked_zones(client: Any, tmp_path: Path) -> None:
         assert time.monotonic() < deadline
         time.sleep(0.02)
 
+    # The exec into WireGuard runs with the database free: other requests can write.
+    from sqlalchemy import text as sql
+
+    real_exec, writes = gw.exec_run, []
+
+    async def exec_while_writing(cid: str, cmd: list[str], user: str | None = None) -> Any:
+        async with runtime.sessions() as s, s.begin():
+            await s.execute(sql("UPDATE vpn_peer SET name = name"))
+        writes.append(cmd[0])
+        return await real_exec(cid, cmd, user)
+
+    gw.exec_run = exec_while_writing
     laptop = client.post(
         f"{API}/apps/{app_id}/vpn/clients",
         json={"name": "laptop", "allowed_ips": ["192.168.1.0/24"]},
     ).json()["id"]
     assert gw.exec_calls[-1][:2] == ["sh", "-c"] and "wg syncconf wg0" in gw.exec_calls[-1][2]
+    gw.exec_run = real_exec
+    assert writes == ["sh"]
     cfg = client.get(f"{API}/apps/{app_id}/vpn/clients/{laptop}/config").text
     assert "Endpoint = vpn.example.org:51820" in cfg and "AllowedIPs = 192.168.1.0/24" in cfg
     assert "Address = 10.8.0.3/32" in cfg and "DNS = 1.1.1.1,9.9.9.9" in cfg
