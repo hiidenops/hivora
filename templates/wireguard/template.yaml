@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: wireguard
   name: WireGuard
-  version: 2.1.0
+  version: 2.2.0
   category: network
   tags: [vpn, wireguard, network, remote-access]
   icon: { url: "https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/wireguard.png" }
@@ -77,10 +77,10 @@ form:
       group: { fr: Zones accessibles, en: Zones reached }
       label: { fr: Zones accessibles par le VPN, en: Zones reached through the VPN }
       type: string
-      pattern: "[a-z0-9,-]{0,500}"
+      pattern: "[a-z0-9,@_-]{0,1000}"
       help:
-        fr: "Se règle depuis la carte VPN de la fiche. Seules les zones « Reliées entre elles » ont un réseau à rejoindre."
-        en: "Set from the VPN card on the app page. Only “Linked together” zones have a network to join."
+        fr: "Se règle depuis la carte VPN ou la topologie. Zones « Reliées entre elles » et apps placées derrière le VPN (@nom-de-l-app)."
+        en: "Set from the VPN card or the topology. “Linked together” zones and apps put behind the VPN (@app-name)."
 services:
   server:
     role: main

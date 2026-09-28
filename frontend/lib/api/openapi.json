@@ -1344,7 +1344,14 @@
           "positions": {
             "additionalProperties": {
               "additionalProperties": {
-                "type": "number"
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "type": "object"
             },
@@ -2377,6 +2384,32 @@
       },
       "Position": {
         "properties": {
+          "h": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 40.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H"
+          },
+          "w": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 40.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "W"
+          },
           "x": {
             "maximum": 1000000.0,
             "minimum": -1000000.0,
@@ -2700,6 +2733,21 @@
             "maxItems": 20,
             "title": "Ports",
             "type": "array"
+          },
+          "publish": {
+            "default": {},
+            "patternProperties": {
+              "^\\d{1,5}/(tcp|udp)$": {
+                "enum": [
+                  "public",
+                  "lan",
+                  "none"
+                ],
+                "type": "string"
+              }
+            },
+            "title": "Publish",
+            "type": "object"
           },
           "restart": {
             "anyOf": [

@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from hivora.apps.models import Application, Exposure, Origin
 from hivora.runtime import Runtime
+from hivora.state import app_key
 from hivora.templates.catalog import host_arch
 from hivora.templates.models import TemplateVersion
 from hivora.topology.models import TopologyEdge, TopologyLayout, TopologyNode
@@ -29,7 +30,7 @@ class Graph:
     nodes: list[dict[str, Any]] = field(default_factory=list)
     edges: list[dict[str, Any]] = field(default_factory=list)
     alerts: list[dict[str, Any]] = field(default_factory=list)
-    positions: dict[str, dict[str, float]] = field(default_factory=dict)
+    positions: dict[str, dict[str, float | None]] = field(default_factory=dict)
 
 
 async def build(rt: Runtime) -> Graph:
@@ -46,7 +47,7 @@ async def build(rt: Runtime) -> Graph:
         declared = list(await session.scalars(select(TopologyNode).order_by(TopologyNode.id)))
         links = list(await session.scalars(select(TopologyEdge).order_by(TopologyEdge.id)))
         graph.positions = {
-            row.key: {"x": row.x, "y": row.y}
+            row.key: {"x": row.x, "y": row.y, "w": row.w, "h": row.h}
             for row in await session.scalars(select(TopologyLayout))
         }
         vpn_reach: dict[int, list[str]] = {}
@@ -66,19 +67,23 @@ async def build(rt: Runtime) -> Graph:
     by_slug = {z.slug: z for z in zones}
     for z in zones:
         graph.nodes.append({"key": zone_key[z.id], "type": "zone", "label": z.name,
-                            "color": z.color, "network_mode": z.network_mode.value})  # fmt: skip
+                            "slug": z.slug, "color": z.color,
+                            "network_mode": z.network_mode.value})  # fmt: skip
     if any(a.zone_id not in zone_key for a in apps):
-        graph.nodes.append({"key": NO_ZONE, "type": "zone", "label": None, "color": None,
-                            "network_mode": "none"})  # fmt: skip
+        graph.nodes.append({"key": NO_ZONE, "type": "zone", "label": None, "slug": None,
+                            "color": None, "network_mode": "none"})  # fmt: skip
 
+    app_by_slug = {a.slug: a.id for a in apps}
+    behind = {slug[1:] for reach in vpn_reach.values() for slug in reach if slug.startswith("@")}
     for app in apps:
         key = f"app:{app.id}"
         template = templates.get(app.template_version_id or -1)
         status = rt.state.store.app(app.slug).status.value
-        ports = [
-            {"port": p.host_port, "container": p.container_port, "protocol": p.protocol,
-             "exposure": p.exposure.value, "service": svc.name}
-            for svc in app.services for p in svc.ports if p.host_port
+        ports = [  # unpublished ones too (port: the container's): they can be opened again
+            {"port": p.host_port or p.container_port, "container": p.container_port,
+             "protocol": p.protocol, "service": svc.name,
+             "exposure": p.exposure.value if p.host_port else "internal"}
+            for svc in app.services for p in svc.ports
         ]  # fmt: skip
         parent = zone_key.get(app.zone_id or -1, NO_ZONE)
         icon = (
@@ -88,7 +93,9 @@ async def build(rt: Runtime) -> Graph:
             "key": key, "type": "app", "parent": parent, "id": app.id, "label": app.name,
             "slug": app.slug, "status": status, "icon_url": icon, "template": template,
             "origin": app.origin.value, "services": [s.name for s in app.services],
-            "ports": ports, "vpn": app.id in vpn_reach,
+            "ports": ports, "vpn": app.id in vpn_reach, "behind_vpn": app.slug in behind,
+            "vpn_address": _address_on(rt, app.slug, f"{app.slug}_default")
+            if app.slug in behind else None,
         })  # fmt: skip
         public = [p for p in ports if p["exposure"] == Exposure.PUBLIC.value]
         for p in public:
@@ -110,6 +117,9 @@ async def build(rt: Runtime) -> Graph:
             if slug in by_slug:
                 graph.edges.append({"source": key, "target": zone_key[by_slug[slug].id],
                                     "kind": "vpn", "label": "VPN"})  # fmt: skip
+            elif slug.startswith("@") and slug[1:] in app_by_slug:
+                graph.edges.append({"source": key, "target": f"app:{app_by_slug[slug[1:]]}",
+                                    "kind": "vpn", "label": "VPN"})  # fmt: skip
 
     unmanaged = len(rt.state.store.unmanaged()) + len(rt.apps.candidates())
     if unmanaged:
@@ -125,3 +135,13 @@ async def build(rt: Runtime) -> Graph:
             graph.edges.append({"id": e.id, "source": e.source, "target": e.target,
                                 "kind": "declared", "label": e.label})  # fmt: skip
     return graph
+
+
+def _address_on(rt: Runtime, slug: str, network: str) -> str | None:
+    """The app's main container address on one Docker network (what VPN clients use)."""
+    for c in rt.state.store.containers():
+        if app_key(c) == slug and network in c.networks:
+            ips = dict(zip(c.networks, c.ips, strict=False))
+            if ip := ips.get(network):
+                return ip
+    return None

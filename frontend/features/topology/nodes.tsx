@@ -1,10 +1,9 @@
 "use client";
 
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
 import { Globe, Router, Shield, ShieldCheck, StickyNote, Monitor } from "lucide-react";
 
 import { AppIcon } from "@/components/app-icon";
-import { StatusBadge } from "@/components/status-badge";
 import type { AppStatus } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import { useLiveStatus } from "@/lib/realtime";
@@ -22,40 +21,44 @@ const handles = (
 
 export function ZoneNode({ data, selected }: NodeProps) {
   const { t } = useI18n();
-  const d = data as { label: string | null; color: string | null; count: number; level: string };
+  const d = data as { label: string | null; color: string | null; count: number; level: string; minW: number; minH: number; editable?: boolean; onResized?: (w: number, h: number) => void };
   const color = d.color ?? "var(--muted-foreground)";
   return (
     <div
-      className={cn("size-full rounded-xl border-2 bg-card/40", selected && "ring-2 ring-ring")}
+      className={cn("size-full rounded-lg border-2 bg-card/40", selected && "ring-2 ring-ring")}
       style={{ borderColor: color, background: `color-mix(in oklab, ${color} 7%, transparent)` }}
     >
+      {d.editable && d.level !== "zones" && (
+        <NodeResizer isVisible={selected} minWidth={d.minW} minHeight={d.minH} color={color} onResizeEnd={(_, p) => d.onResized?.(p.width, p.height)} />
+      )}
       {handles}
-      <div className="flex items-center gap-2 px-3 py-2 text-sm font-semibold">
-        <span className="size-2.5 rounded-full" style={{ background: color }} />
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold">
+        <span className="size-2 rounded-full" style={{ background: color }} />
         {d.label ?? t("topology.noZone")}
-        {d.level === "zones" && <span className="ml-auto text-xs font-normal text-muted-foreground">{t("topology.apps", { n: d.count })}</span>}
+        {d.level === "zones" && <span className="ml-auto font-normal text-muted-foreground">{t("topology.apps", { n: d.count })}</span>}
       </div>
     </div>
   );
 }
 
+const DOT: Record<AppStatus, string> = { healthy: "bg-ok", starting: "bg-info animate-pulse", degraded: "bg-warn", stopped: "bg-idle", error: "bg-danger", missing: "border border-idle" };
+
 export function AppNode({ data, selected }: NodeProps) {
+  const { t } = useI18n();
   const d = data as { label: string; slug: string; status: AppStatus; icon_url: string | null; ports: Port[]; level: string; vpn: boolean };
   const status = useLiveStatus(d.slug, d.status);
   return (
-    <div className={cn("surface rounded-lg border bg-card p-2 shadow-sm", selected && "ring-2 ring-ring", status === "error" && "border-danger")}>
+    <div className={cn("rounded-md border bg-card px-2 py-1.5 shadow-sm", selected && "ring-2 ring-ring", status === "error" && "border-danger")}>
       {handles}
-      <div className="flex items-center gap-2">
-        <AppIcon src={d.icon_url} name={d.label} className="size-8" />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{d.label}</p>
-          <StatusBadge status={status} />
-        </div>
+      <div className="flex items-center gap-1.5" title={t(`status.${status}`)}>
+        <AppIcon src={d.icon_url} name={d.label} className="size-5 rounded" />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium">{d.label}</span>
+        <span className={cn("size-2 shrink-0 rounded-full", DOT[status])} aria-label={t(`status.${status}`)} />
       </div>
       {d.level === "all" && d.ports.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
+        <div className="mt-1 flex flex-wrap gap-0.5">
           {d.ports.map((p) => (
-            <span key={`${p.service}${p.port}${p.protocol}`} className={cn("rounded px-1.5 py-0.5 font-mono text-[10px]", EXPOSURE[p.exposure])}>
+            <span key={`${p.service}${p.port}${p.protocol}`} className={cn("rounded px-1 font-mono text-[9px] leading-4", EXPOSURE[p.exposure])}>
               {p.port}/{p.protocol}
             </span>
           ))}
@@ -67,8 +70,8 @@ export function AppNode({ data, selected }: NodeProps) {
 
 export function InternetNode({ selected }: NodeProps) {
   return (
-    <div className={cn("flex items-center gap-2 rounded-full border-2 border-danger/60 bg-card px-4 py-2 text-sm font-semibold", selected && "ring-2 ring-ring")}>
-      <Globe className="size-4" /> Internet
+    <div className={cn("flex items-center gap-1.5 rounded-full border-2 border-danger/60 bg-card px-3 py-1 text-xs font-semibold", selected && "ring-2 ring-ring")}>
+      <Globe className="size-3.5" /> Internet
       <Handle type="source" position={Position.Bottom} className="!size-2 !bg-danger" />
       <Handle type="target" position={Position.Top} className="!size-2 !bg-danger" />
     </div>
@@ -82,13 +85,13 @@ export function DeclaredNode({ data, selected }: NodeProps) {
   const d = data as { kind: keyof typeof ICONS; label: string };
   const Icon = ICONS[d.kind] ?? StickyNote;
   return (
-    <div className={cn("w-48 rounded-lg border-2 border-dashed bg-card/80 p-2 text-sm", selected && "ring-2 ring-ring")} title={t("topology.declaredHint")}>
+    <div className={cn("w-36 rounded-md border-2 border-dashed bg-card/80 px-2 py-1 text-xs", selected && "ring-2 ring-ring")} title={t("topology.declaredHint")}>
       {handles}
-      <div className="flex items-center gap-2">
-        <Icon className="size-4 shrink-0 text-muted-foreground" />
+      <div className="flex items-center gap-1.5">
+        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 break-words">{d.label}</span>
       </div>
-      <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">{t(`topology.kind.${d.kind}` as "topology.kind.note")}</p>
+      <p className="text-[9px] uppercase tracking-wide text-muted-foreground">{t(`topology.kind.${d.kind}` as "topology.kind.note")}</p>
     </div>
   );
 }

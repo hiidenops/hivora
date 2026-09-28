@@ -2067,7 +2067,7 @@ export interface components {
             /** Positions */
             positions: {
                 [key: string]: {
-                    [key: string]: number;
+                    [key: string]: number | null;
                 };
             };
         };
@@ -2395,6 +2395,10 @@ export interface components {
         };
         /** Position */
         Position: {
+            /** H */
+            h?: number | null;
+            /** W */
+            w?: number | null;
             /** X */
             x: number;
             /** Y */
@@ -2529,6 +2533,13 @@ export interface components {
              * @default []
              */
             ports: components["schemas"]["ExtraPort"][];
+            /**
+             * Publish
+             * @default {}
+             */
+            publish: {
+                [key: string]: "public" | "lan" | "none";
+            };
             /** Restart */
             restart?: ("no" | "always" | "unless-stopped" | "on-failure") | null;
             /**

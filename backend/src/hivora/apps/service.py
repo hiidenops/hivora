@@ -756,12 +756,23 @@ class AppService:
     async def _vpn_networks(
         self, session: AsyncSession, entry: CatalogEntry, inputs: dict[str, Any]
     ) -> tuple[str, ...]:
-        """A VPN reaching zones joins their networks (only "linked together" zones have one)."""
+        """A VPN joins the networks of the zones it reaches (only "linked together" zones
+        have one) and of the apps put behind it ("@<app>": that app's default network)."""
         vpn = entry.template.vpn
         if not vpn or not vpn.zones_field:
             return ()
         names = []
         for slug in (s for s in str(inputs.get(vpn.zones_field) or "").split(",") if s):
+            if slug.startswith("@"):
+                app_slug = slug[1:]
+                if not await session.scalar(
+                    select(Application.id).where(Application.slug == app_slug)
+                ):
+                    raise ValidationError(
+                        "no such app to reach", field=vpn.zones_field, app=app_slug
+                    )
+                names.append(f"{app_slug}_default")
+                continue
             name = zone_network(await get_zone(session, slug))
             if name is None:
                 raise ValidationError("this zone does not link its apps: no network to reach",
@@ -852,9 +863,27 @@ class AppService:
             data=[str(data)] if data.exists() else [],
         )
 
+    async def vpns_reaching(self, session: AsyncSession, slug: str) -> list[str]:
+        """Names of the VPN apps that joined this app's network (it is behind them)."""
+        out = []
+        for other in await session.scalars(select(Application)):
+            try:
+                entry = await self._entry_of(session, other)
+            except (ConflictError, NotFoundError):
+                continue
+            vpn = entry.template.vpn
+            if vpn and vpn.zones_field:
+                values = (await self.current_settings(session, other.id)).values
+                if f"@{slug}" in str(values.get(vpn.zones_field) or "").split(","):
+                    out.append(other.name)
+        return out
+
     async def remove(self, app_id: int, *, remove_data: bool = False) -> Job:
         async with self.sessions() as session, session.begin():
             app = await self.get(session, app_id)
+            if vpns := await self.vpns_reaching(session, app.slug):
+                raise ConflictError("this app is behind a VPN: detach it from the VPN first",
+                                    vpn=", ".join(vpns))  # fmt: skip
             job = self.jobs.add(
                 session,
                 JobKind.REMOVE,

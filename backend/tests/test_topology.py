@@ -52,7 +52,8 @@ def test_topology_graph_declared_layer_and_layout(client: Any) -> None:
     layout = {"positions": {key: {"x": 10, "y": 20}, cube["key"]: {"x": 30.5, "y": 40}}}
     assert client.put(f"{API}/topology/layout", json=layout).status_code == 204
     graph = client.get(f"{API}/topology").json()
-    assert by_key(graph)[key]["label"] == "UFW" and graph["positions"][key] == {"x": 10, "y": 20}
+    assert by_key(graph)[key]["label"] == "UFW"
+    assert graph["positions"][key] == {"x": 10, "y": 20, "w": None, "h": None}
     assert any(e.get("id") == edge["id"] for e in graph["edges"])
 
     client.put(f"{API}/topology/nodes/{fw['id']}", json={"kind": "router", "label": "Box"})
@@ -61,3 +62,50 @@ def test_topology_graph_declared_layer_and_layout(client: Any) -> None:
     graph = client.get(f"{API}/topology").json()
     assert key not in by_key(graph) and key not in graph["positions"]
     assert not any(e.get("id") == edge["id"] for e in graph["edges"])  # its links went too
+
+
+def test_put_an_app_behind_the_vpn(client: Any) -> None:
+    import yaml
+    from helpers import code
+
+    admin(client)
+    mc_body = {"template": "minecraft", "name": "cube", "inputs": {"eula": True}}
+    vpn_body = {"template": "wireguard", "name": "vpn", "inputs": {"host": "vpn.example.org"}}
+    mc = client.post(f"{API}/apps", json=mc_body).json()
+    vpn = client.post(f"{API}/apps", json=vpn_body).json()
+    for d in (mc, vpn):
+        assert wait_job(client, d["job"]["id"])["status"] == "succeeded"
+    mc_id, vpn_id = mc["app"]["id"], vpn["app"]["id"]
+
+    # 1. The game port is no longer published (reachable on Docker networks only).
+    settings = client.get(f"{API}/apps/{mc_id}/settings").json()
+    closed = {"services": {"server": {"publish": {"25565/tcp": "none"}}}}
+    change = {"inputs": settings["values"], "overrides": closed}
+    assert wait_job(client, client.put(f"{API}/apps/{mc_id}/settings", json=change).json()["id"])[
+        "status"] == "succeeded"  # fmt: skip
+    compose = yaml.safe_load(client.get(f"{API}/apps/{mc_id}/compose").json()["compose_yaml"])
+    server = compose["services"]["server"]
+    assert "25565/tcp" in server["expose"] and not any(
+        p["target"] == 25565 for p in server.get("ports", [])
+    )
+
+    # 2. The VPN joins its network.
+    job = client.put(f"{API}/apps/{vpn_id}/vpn/zones", json={"zones": ["@cube"]}).json()
+    assert wait_job(client, job["id"])["status"] == "succeeded"
+    compose = yaml.safe_load(client.get(f"{API}/apps/{vpn_id}/compose").json()["compose_yaml"])
+    assert compose["networks"]["reach0"] == {"name": "cube_default", "external": True}
+    graph = client.get(f"{API}/topology").json()
+    assert {"source": f"app:{vpn_id}", "target": f"app:{mc_id}", "kind": "vpn",
+            "label": "VPN"} in graph["edges"]  # fmt: skip
+    cube = next(n for n in graph["nodes"] if n["key"] == f"app:{mc_id}")
+    assert cube["behind_vpn"] is True
+    assert not any(e["kind"] == "exposed" and e["target"] == cube["key"] for e in graph["edges"])
+
+    # 3. It cannot be removed while the VPN uses its network; detached, it can.
+    refused = client.delete(f"{API}/apps/{mc_id}")
+    assert refused.status_code == 409 and "VPN" in refused.json()["error"]["message"]
+    assert code(client.put(f"{API}/apps/{vpn_id}/vpn/zones",
+                           json={"zones": ["@nope"]})) == "validation_error"  # fmt: skip
+    job = client.put(f"{API}/apps/{vpn_id}/vpn/zones", json={"zones": []}).json()
+    assert wait_job(client, job["id"])["status"] == "succeeded"
+    assert client.delete(f"{API}/apps/{mc_id}").status_code == 202

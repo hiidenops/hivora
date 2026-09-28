@@ -4,7 +4,7 @@ The output is plain Compose: it runs with ``docker compose up`` without
 Hivora. Secrets are ``${HV_SECRET_*}`` references resolved from ``.env``.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -147,11 +147,40 @@ def _plan_port(svc: str, spec: PortSpec, ctx: dict[str, Any], host: HostInfo) ->
     )
 
 
+def _write_ports(svc: dict[str, Any], ports: tuple[PortPlan, ...]) -> None:
+    published = [p for p in ports if p.host_port is not None]
+    svc.pop("ports", None)
+    svc.pop("expose", None)
+    if published:
+        svc["ports"] = [
+            {"target": p.container_port, "published": str(p.host_port), "protocol": p.protocol,
+             **({"host_ip": p.host_ip} if p.host_ip else {})}
+            for p in published
+        ]  # fmt: skip
+    if internal := [p for p in ports if p.host_port is None]:
+        svc["expose"] = [f"{p.container_port}/{p.protocol}" for p in internal]
+
+
 def _apply_overrides(
     svc: dict[str, Any], o: ServiceOverrides, name: str, ports: tuple[PortPlan, ...],
     volumes: tuple[VolumePlan, ...], restart: str, slug: str, volumes_root: Path, host: HostInfo,
 ) -> tuple[tuple[PortPlan, ...], tuple[VolumePlan, ...], str]:  # fmt: skip
     """The advanced settings of one service, written into its compose entry."""
+    if o.publish:
+        changed = []
+        for p in ports:
+            exposure = o.publish.get(f"{p.container_port}/{p.protocol}")
+            if exposure is None or (p.host_port is None and exposure != "none"):
+                changed.append(p)  # untouched (an internal port stays internal)
+            elif exposure == "none":
+                changed.append(replace(p, host_port=None, exposure="internal", host_ip=None))
+            else:
+                where = f"{name}:{p.container_port}/{p.protocol}"
+                changed.append(
+                    replace(p, exposure=exposure, host_ip=_host_ip(exposure, host, where))
+                )
+        ports = tuple(changed)
+        _write_ports(svc, ports)
     if o.env:
         env = svc.setdefault("environment", {})
         env.update({k: escape_compose(v) for k, v in o.env.items()})
@@ -166,11 +195,7 @@ def _apply_overrides(
             extra.append(PortPlan(name, e.container, e.host, e.protocol, "other", e.exposure,
                                   _host_ip(e.exposure, host, where)))  # fmt: skip
         ports = (*ports, *extra)
-        svc["ports"] = [
-            {"target": p.container_port, "published": str(p.host_port), "protocol": p.protocol,
-             **({"host_ip": p.host_ip} if p.host_ip else {})}
-            for p in ports if p.host_port is not None
-        ]  # fmt: skip
+        _write_ports(svc, ports)
     if o.volumes:
         names = {v.name for v in volumes}
         targets = {v.target for v in volumes}

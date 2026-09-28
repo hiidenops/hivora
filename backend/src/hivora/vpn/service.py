@@ -189,10 +189,11 @@ class VpnTools:
                                   field="address", address=address[:45])  # fmt: skip
 
     async def _zone_subnets(self, vpn: _Vpn) -> dict[str, tuple[str, ...]]:
-        """Subnets of the zone networks this VPN reaches, by zone slug."""
+        """Subnets of the networks this VPN reaches, by zone slug or "@<app>"."""
         if not vpn.zones:
             return {}
-        names = {f"hivora-zone-{z}": z for z in vpn.zones}
+        names = {(f"{z[1:]}_default" if z.startswith("@") else f"hivora-zone-{z}"): z
+                 for z in vpn.zones}  # fmt: skip
         return {names[n.name]: n.subnets for n in await self.rt.gateway.list_networks()
                 if n.name in names}  # fmt: skip
 

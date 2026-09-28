@@ -35,3 +35,5 @@ class TopologyLayout(Base):
     key: Mapped[str] = mapped_column(String(40), primary_key=True)
     x: Mapped[float] = mapped_column(Float)
     y: Mapped[float] = mapped_column(Float)
+    w: Mapped[float | None] = mapped_column(Float)  # zones the user resized
+    h: Mapped[float | None] = mapped_column(Float)

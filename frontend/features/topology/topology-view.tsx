@@ -13,6 +13,7 @@ import {
   getViewportForBounds,
   useEdgesState,
   useNodesState,
+  useReactFlow,
   type Connection,
   type Edge,
   type Node,
@@ -32,6 +33,7 @@ import { api } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
+import { applyChanges, changeKey, upsert, type Change } from "./changes";
 import { toFlow, type GNode, type Graph, type Level } from "./layout";
 import { nodeTypes } from "./nodes";
 
@@ -46,7 +48,11 @@ function download(name: string, href: string) {
   a.click();
 }
 
-function Inspector({ node, graph, onClose, canEdit, onChanged }: { node: GNode; graph: Graph; onClose: () => void; canEdit: boolean; onChanged: () => void }) {
+type Port = { port: number; container: number; protocol: string; exposure: string; service: string };
+
+function Inspector({ node, graph, onClose, canEdit, onChanged, changes, onChange }: {
+  node: GNode; graph: Graph; onClose: () => void; canEdit: boolean; onChanged: () => void; changes: Change[]; onChange: (c: Change) => void;
+}) {
   const { t } = useI18n();
   const [label, setLabel] = useState(String(node.label ?? ""));
   const [kind, setKind] = useState(String(node.kind ?? "note"));
@@ -59,6 +65,13 @@ function Inspector({ node, graph, onClose, canEdit, onChanged }: { node: GNode; 
     },
   });
   const nodes = graph.nodes as GNode[];
+  const vpns = nodes.filter((n) => n.type === "app" && n.vpn && n.key !== node.key);
+  const reached = (graph.edges as { source: string; target: string; kind: string }[])
+    .filter((e) => e.kind === "vpn" && e.source === node.key)
+    .map((e) => {
+      const target = nodes.find((n) => n.key === e.target);
+      return { target: target?.type === "app" ? `@${target.slug}` : String(target?.slug ?? ""), label: String(target?.label ?? "") };
+    });
   const exposed = (graph.edges as { source: string; target: string; kind: string; label?: string }[]).filter((e) => e.kind === "exposed");
   return (
     <aside className="surface absolute right-3 top-3 z-10 grid w-72 gap-3 rounded-lg border bg-card p-4 text-sm shadow-lg">
@@ -72,13 +85,70 @@ function Inspector({ node, graph, onClose, canEdit, onChanged }: { node: GNode; 
         <>
           <StatusBadge status={node.status as AppStatus} />
           {(node.services as string[]).length > 1 && <p className="text-xs text-muted-foreground">{t("topology.services", { services: (node.services as string[]).join(", ") })}</p>}
-          <ul className="grid gap-1 font-mono text-xs">
-            {(node.ports as { port: number; protocol: string; exposure: string; service: string }[]).map((p) => (
-              <li key={`${p.service}${p.port}${p.protocol}`}>
-                {p.port}/{p.protocol} → {p.service} ({t(`topology.exposure.${p.exposure}` as "topology.exposure.lan")})
-              </li>
-            ))}
+          {node.behind_vpn && (
+            <p className="rounded bg-ok/10 px-2 py-1 text-xs text-ok">
+              {t("topology.behindVpn")}
+              {node.vpn_address ? ` ${t("topology.vpnAddress", { address: String(node.vpn_address) })}` : ""}
+            </p>
+          )}
+          <ul className="grid gap-1.5 text-xs">
+            {(node.ports as Port[]).map((p) => {
+              const key = `${p.container}/${p.protocol}`;
+              const pending = changes.find((c) => c.kind === "expose" && c.appId === node.id && c.service === p.service && c.port === key) as Extract<Change, { kind: "expose" }> | undefined;
+              const current = p.exposure === "public" ? "public" : p.exposure === "lan" ? "lan" : "none";
+              return (
+                <li key={`${p.service}${p.port}${p.protocol}`} className="flex items-center gap-2">
+                  <span className="font-mono">{p.port}/{p.protocol}</span>
+                  {canEdit ? (
+                    <select
+                      aria-label={t("topology.exposureOf", { port: key })}
+                      className="h-7 rounded border bg-card px-1 text-xs"
+                      value={pending?.exposure ?? current}
+                      onChange={(e) => onChange({ kind: "expose", appId: Number(node.id), app: String(node.label), service: p.service, port: key, exposure: e.target.value as "public" | "lan" | "none" })}
+                    >
+                      <option value="public">{t("topology.exposure.public")}</option>
+                      <option value="lan">{t("topology.exposure.lan")}</option>
+                      <option value="none">{t("topology.exposure.none")}</option>
+                    </select>
+                  ) : (
+                    <span>({t(`topology.exposure.${p.exposure}` as "topology.exposure.lan")})</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
+          {canEdit && !node.behind_vpn && vpns.length > 0 && (
+            <div className="grid gap-1">
+              <p className="text-xs text-muted-foreground">{t("topology.behindHelp")}</p>
+              {vpns.map((v) => (
+                <Button
+                  key={v.key}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    onChange({ kind: "reach", vpnId: Number(v.id), vpn: String(v.label), target: `@${node.slug}`, targetLabel: String(node.label), on: true });
+                    for (const p of (node.ports as Port[]).filter((x) => x.exposure === "public"))
+                      onChange({ kind: "expose", appId: Number(node.id), app: String(node.label), service: p.service, port: `${p.container}/${p.protocol}`, exposure: "none" });
+                  }}
+                >
+                  {t("topology.putBehind", { vpn: String(v.label) })}
+                </Button>
+              ))}
+            </div>
+          )}
+          {canEdit && Boolean(node.vpn) && reached.length > 0 && (
+            <div className="grid gap-1">
+              <p className="text-xs font-medium">{t("topology.reached")}</p>
+              {reached.map((r) => (
+                <div key={r.target} className="flex items-center justify-between gap-2 text-xs">
+                  <span>{r.label}</span>
+                  <Button size="sm" variant="ghost" onClick={() => onChange({ kind: "reach", vpnId: Number(node.id), vpn: String(node.label), target: r.target, targetLabel: r.label, on: false })}>
+                    {t("topology.detach")}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
           <Button size="sm" asChild>
             <Link href={`/app/?id=${node.id}`}>{t("topology.openApp")}</Link>
           </Button>
@@ -146,27 +216,82 @@ function Canvas() {
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState("firewall");
   const [label, setLabel] = useState("");
+  const [changes, setChanges] = useState<Change[]>([]);
+  const [applying, setApplying] = useState(false);
+  const [result, setResult] = useState<{ jobs: number[]; errors: string[] } | null>(null);
+  const { getIntersectingNodes } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const refresh = () => qc.invalidateQueries({ queryKey: KEY });
 
   const tooBig = (graph?.nodes.length ?? 0) > MAX_DETAILED;
   const effective: Level = tooBig ? "zones" : level;
-  const flow = useMemo(() => (graph ? toFlow(graph, effective, graph.positions) : null), [graph, effective]);
+  const flow = useMemo(() => {
+    if (!graph) return null;
+    const f = toFlow(graph, effective, graph.positions);
+    // Zone boxes: resizable by operators, their size saved with their position.
+    for (const n of f.nodes) {
+      if (n.type !== "zone") continue;
+      n.data = {
+        ...n.data,
+        editable: canEdit,
+        onResized: (width: number, height: number) =>
+          void api("/topology/layout", { method: "PUT", body: { positions: { [n.id]: { ...n.position, w: Math.round(width), h: Math.round(height) } } } }).then(refresh),
+      };
+    }
+    return f;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh is stable enough (query key)
+  }, [graph, effective, canEdit]);
   useEffect(() => {
     if (!flow) return;
     setNodes(flow.nodes);
     setEdges(flow.edges);
   }, [flow, setNodes, setEdges]);
 
+  const gnode = (id: string) => (graph?.nodes as GNode[] | undefined)?.find((n) => n.key === id);
+  const onChange = (c: Change) => setChanges((list) => upsert(list, c));
+  const dragStop = (node: Node, moved: Node[]) => {
+    if (node.type === "app" && canEdit) {
+      const zone = getIntersectingNodes(node).find((n) => n.type === "zone" && n.id !== node.parentId);
+      const app = gnode(node.id);
+      if (zone && app) {
+        const z = gnode(zone.id);
+        onChange({ kind: "move", appId: Number(app.id), app: String(app.label), zone: (z?.slug as string | null) ?? null, zoneLabel: String(z?.label ?? t("topology.noZone")) });
+        if (flow) setNodes(flow.nodes); // it moves for real once applied
+        return;
+      }
+    }
+    savePositions(moved.length ? moved : [node]);
+  };
   const savePositions = (moved: Node[]) => {
     if (!canEdit || !moved.length) return;
-    const positions = Object.fromEntries(moved.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y) }]));
+    const size = (n: Node) => (n.type === "zone" && n.measured ? { w: Math.round(n.measured.width ?? 0) || null, h: Math.round(n.measured.height ?? 0) || null } : {});
+    const positions = Object.fromEntries(moved.map((n) => [n.id, { x: Math.round(n.position.x), y: Math.round(n.position.y), ...size(n) }]));
     void api("/topology/layout", { method: "PUT", body: { positions } }).then(refresh);
   };
   const connect = (c: Connection) => {
     if (!canEdit || !c.source || !c.target) return;
+    const [a, b] = [gnode(c.source), gnode(c.target)];
+    const vpn = a?.vpn ? a : b?.vpn ? b : null;
+    const other = vpn === a ? b : a;
+    // From a VPN to an app or a zone: a real change (the VPN joins its network).
+    if (vpn && other && (other.type === "app" || (other.type === "zone" && other.slug))) {
+      const target = other.type === "app" ? `@${other.slug}` : String(other.slug);
+      onChange({ kind: "reach", vpnId: Number(vpn.id), vpn: String(vpn.label), target, targetLabel: String(other.label), on: true });
+      if (other.type === "app")
+        for (const p of (other.ports as Port[]).filter((x) => x.exposure === "public"))
+          onChange({ kind: "expose", appId: Number(other.id), app: String(other.label), service: p.service, port: `${p.container}/${p.protocol}`, exposure: "none" });
+      return;
+    }
     void api("/topology/edges", { method: "POST", body: { source: c.source, target: c.target, label: "" } }).then(refresh);
+  };
+  const apply = async () => {
+    setApplying(true);
+    const r = await applyChanges(changes);
+    setApplying(false);
+    setResult(r);
+    if (!r.errors.length) setChanges([]);
+    void refresh();
   };
   const add = useMutation({
     mutationFn: () => api("/topology/nodes", { method: "POST", body: { kind, label } }),
@@ -255,6 +380,41 @@ function Canvas() {
           <p className="w-full text-xs text-muted-foreground">{t("topology.addHelp")}</p>
         </form>
       )}
+      {changes.length > 0 && (
+        <div className="grid gap-2 rounded-lg border border-warn/50 bg-warn/10 p-3 text-sm">
+          <p className="font-medium">{t("topology.pending", { n: changes.length })}</p>
+          <ul className="grid gap-1">
+            {changes.map((c) => (
+              <li key={changeKey(c)} className="flex items-center justify-between gap-2">
+                <span>
+                  {c.kind === "move"
+                    ? t("topology.change.move", { app: c.app, zone: c.zoneLabel })
+                    : c.kind === "expose"
+                      ? t("topology.change.expose", { app: c.app, port: c.port, exposure: t(`topology.exposure.${c.exposure}` as "topology.exposure.lan") })
+                      : t(c.on ? "topology.change.reach" : "topology.change.unreach", { vpn: c.vpn, target: c.targetLabel })}
+                </span>
+                <button className="text-muted-foreground hover:text-foreground" aria-label={t("overrides.remove")} onClick={() => setChanges((l) => l.filter((x) => changeKey(x) !== changeKey(c)))}>
+                  <X className="size-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">{t("topology.pendingHelp")}</p>
+          <div className="flex gap-2">
+            <Button size="sm" disabled={applying} onClick={() => window.confirm(t("topology.applyConfirm")) && void apply()}>
+              {t("topology.apply", { n: changes.length })}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setChanges([])}>
+              {t("topology.discard")}
+            </Button>
+          </div>
+        </div>
+      )}
+      {result && (
+        <Alert tone={result.errors.length ? "danger" : "info"}>
+          {result.errors.length ? result.errors.join(" · ") : t("topology.applied", { n: result.jobs.length })}
+        </Alert>
+      )}
       {tooBig && <Alert tone="info">{t("topology.tooBig", { n: MAX_DETAILED })}</Alert>}
       {error && <Alert tone="danger">{String(error)}</Alert>}
       <div className="relative h-[70vh] min-h-[480px] overflow-hidden rounded-xl border bg-card/30">
@@ -264,17 +424,25 @@ function Canvas() {
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onNodeDragStop={(_, n, moved) => savePositions(moved.length ? moved : [n])}
+          onNodeDragStop={(_, n, moved) => dragStop(n, moved)}
           onNodeClick={(_, n) => setSelected(n.id)}
           onPaneClick={() => setSelected(null)}
           onConnect={connect}
           onEdgeClick={(_, e) => {
-            const id = (e.data as { declaredId?: number } | undefined)?.declaredId;
-            if (canEdit && id && window.confirm(t("topology.deleteLink"))) void api(`/topology/edges/${id}`, { method: "DELETE" }).then(refresh);
+            const data = e.data as { declaredId?: number; kind?: string } | undefined;
+            if (!canEdit) return;
+            if (data?.kind === "vpn") {
+              const [vpn, target] = [gnode(e.source), gnode(e.target)];
+              if (vpn && target && window.confirm(t("topology.detachConfirm")))
+                onChange({ kind: "reach", vpnId: Number(vpn.id), vpn: String(vpn.label), target: target.type === "app" ? `@${target.slug}` : String(target.slug), targetLabel: String(target.label), on: false });
+              return;
+            }
+            if (data?.declaredId && window.confirm(t("topology.deleteLink"))) void api(`/topology/edges/${data.declaredId}`, { method: "DELETE" }).then(refresh);
           }}
           nodesDraggable={canEdit}
           nodesConnectable={canEdit}
           fitView
+          fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
           minZoom={0.2}
           colorMode="system"
           proOptions={{ hideAttribution: true }}
@@ -283,7 +451,7 @@ function Canvas() {
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable className="!hidden md:!block" />
         </ReactFlow>
-        {node && graph && <Inspector key={node.key} node={node} graph={graph} canEdit={canEdit} onClose={() => setSelected(null)} onChanged={() => void refresh()} />}
+        {node && graph && <Inspector key={node.key} node={node} graph={graph} canEdit={canEdit} changes={changes} onChange={onChange} onClose={() => setSelected(null)} onChanged={() => void refresh()} />}
       </div>
       <div className="grid gap-2 text-sm">
         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">

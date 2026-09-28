@@ -37,7 +37,13 @@ class ExtraVolume(_Strict):
         return self
 
 
+PORT_KEY = r"^\d{1,5}/(tcp|udp)$"
+
+
 class ServiceOverrides(_Strict):
+    # Exposure of the template's own ports, by "80/tcp": "none" stops publishing it
+    # (reachable only on Docker networks, e.g. through the VPN).
+    publish: dict[Annotated[str, Field(pattern=PORT_KEY)], Literal["public", "lan", "none"]] = {}
     env: dict[Annotated[str, Field(pattern=ENV_KEY)], Annotated[str, Field(max_length=4096)]] = {}
     ports: list[ExtraPort] = Field(default=[], max_length=20)
     volumes: list[ExtraVolume] = Field(default=[], max_length=20)

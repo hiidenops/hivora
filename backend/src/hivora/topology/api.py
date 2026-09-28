@@ -20,7 +20,7 @@ class GraphOut(BaseModel):
     nodes: list[dict[str, Any]]
     edges: list[dict[str, Any]]
     alerts: list[dict[str, Any]]
-    positions: dict[str, dict[str, float]]
+    positions: dict[str, dict[str, float | None]]
 
 
 class DeclaredIn(BaseModel):
@@ -37,6 +37,8 @@ class EdgeIn(BaseModel):
 class Position(BaseModel):
     x: float = Field(ge=-1e6, le=1e6)
     y: float = Field(ge=-1e6, le=1e6)
+    w: float | None = Field(default=None, ge=40, le=1e5)  # zone boxes only
+    h: float | None = Field(default=None, ge=40, le=1e5)
 
 
 class LayoutIn(BaseModel):
@@ -112,4 +114,4 @@ async def save_layout(body: LayoutIn, _: Operator, rt: RuntimeDep) -> None:
         if not body.positions:
             await session.execute(delete(TopologyLayout))
         for key, pos in body.positions.items():
-            await session.merge(TopologyLayout(key=key[:40], x=pos.x, y=pos.y))
+            await session.merge(TopologyLayout(key=key[:40], x=pos.x, y=pos.y, w=pos.w, h=pos.h))

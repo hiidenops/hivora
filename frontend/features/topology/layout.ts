@@ -6,11 +6,11 @@ export type Graph = components["schemas"]["GraphOut"];
 export type GNode = Record<string, unknown> & { key: string; type: string; label?: string | null; parent?: string };
 export type Level = "zones" | "apps" | "all";
 
-export const APP_W = 230;
-const APP_H = { apps: 64, all: 104 };
-const GAP = 24;
-const PAD = 20;
-const HEADER = 40;
+export const APP_W = 170;
+const APP_H = { apps: 40, all: 62 };
+const GAP = 14;
+const PAD = 14;
+const HEADER = 32;
 const COLS = 2; // apps per row inside a zone
 const ZONES_PER_ROW = 3;
 
@@ -26,39 +26,48 @@ export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): {
   const declared = nodes.filter((n) => n.type === "declared");
   const appH = level === "all" ? APP_H.all : APP_H.apps;
   const out: Node[] = [];
-  const pos = (key: string, x: number, y: number) => (saved[key] as { x: number; y: number } | undefined) ?? { x, y };
+  type Saved = { x: number; y: number; w?: number | null; h?: number | null };
+  const at = (key: string) => saved[key] as Saved | undefined;
+  const pos = (key: string, x: number, y: number) => {
+    const p = at(key);
+    return p ? { x: p.x, y: p.y } : { x, y };
+  };
 
   let x = 0;
-  let y = 160;
+  let y = 120;
   let rowH = 0;
   zones.forEach((z, i) => {
     const children = apps.filter((a) => a.parent === z.key);
     const rows = level === "zones" ? 0 : Math.ceil(children.length / COLS);
-    const w = level === "zones" ? 220 : PAD * 2 + Math.max(1, Math.min(COLS, children.length)) * (APP_W + GAP) - GAP;
-    const h = level === "zones" ? 70 : HEADER + PAD + Math.max(1, rows) * (appH + GAP);
+    const auto = {
+      w: level === "zones" ? 180 : PAD * 2 + Math.max(1, Math.min(COLS, children.length)) * (APP_W + GAP) - GAP,
+      h: level === "zones" ? 52 : HEADER + PAD + Math.max(1, rows) * (appH + GAP) - GAP,
+    };
+    // A size the user set wins, but never smaller than the apps it holds.
+    const w = level === "zones" ? auto.w : Math.max(auto.w, at(z.key)?.w ?? 0);
+    const h = level === "zones" ? auto.h : Math.max(auto.h, at(z.key)?.h ?? 0);
     if (i > 0 && i % ZONES_PER_ROW === 0) {
       x = 0;
       y += rowH + 60;
       rowH = 0;
     }
-    out.push({ id: z.key, type: "zone", position: pos(z.key, x, y), data: { ...z, count: children.length, level }, style: { width: w, height: h }, zIndex: -1 });
+    out.push({ id: z.key, type: "zone", position: pos(z.key, x, y), data: { ...z, count: children.length, level, minW: auto.w, minH: auto.h }, style: { width: w, height: h }, zIndex: -1 });
     if (level !== "zones") {
       children.forEach((a, j) => {
         out.push({
           id: a.key,
           type: "app",
           parentId: z.key,
-          extent: "parent",
           position: pos(a.key, PAD + (j % COLS) * (APP_W + GAP), HEADER + Math.floor(j / COLS) * (appH + GAP)),
           data: { ...a, level },
           style: { width: APP_W },
         });
       });
     }
-    x += w + 60;
+    x += w + 40;
     rowH = Math.max(rowH, h);
   });
-  const width = Math.max(x - 60, 300);
+  const width = Math.max(x - 40, 300);
   out.push({ id: "internet", type: "internet", position: pos("internet", width / 2 - 70, 0), data: { label: "Internet" } });
   declared.forEach((d, i) => out.push({ id: d.key, type: "declared", position: pos(d.key, -300, 160 + i * 110), data: d }));
 
