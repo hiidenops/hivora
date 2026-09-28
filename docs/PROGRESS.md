@@ -34,6 +34,7 @@ L'alpha V0.x est fonctionnelle de bout en bout : un utilisateur installe, se con
 | 13 applications | WireGuard, Stirling PDF, Uptime Kuma, AdGuard, Jellyfin, Immich, Paperless, Nextcloud, Home Assistant, Gitea, Syncthing, File Browser, n8n | ✅ | `7389764` |
 | Image Docker libre | N'importe quelle image de registre, gérée comme les autres apps | ✅ | `921d41c` |
 | WireGuard géré | Clients, IP autorisées, clés, QR code, zones accessibles | ✅ | voir `git log` |
+| Logs en direct | Tous les conteneurs d'une app, filtre par service, recherche, téléchargement | ✅ | voir `git log` |
 | M6 Livraison | Image Docker, HTTPS, script d'installation | ⏳ | |
 | Retours tests #3 | Fond plus discret en pinceau, graphiques continus (2 s), console toujours ouverte | ✅ | voir `git log` |
 | Retours tests #4 | Fiche d'app qui ne chargeait pas (HTTP par IP), fond en trait continu | ✅ | voir `git log` |
@@ -146,6 +147,7 @@ Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en b
 - **WireGuard géré** (module `vpn`, section de template `vpn`, image `linuxserver/wireguard`) : Hivora est la source de vérité (table `vpn_peer`, clés privées chiffrées AES-GCM), réécrit `wg0.conf` dans le volume et l'applique à chaud par exec (`wg syncconf`) ; ni API, ni interface web, seul 51820/udp est publié. Carte « Clients VPN » (ajout, activation, IP autorisées, QR code, configuration, nouvelles clés, suppression, stats `wg show dump`) et « Zones accessibles » (réseaux de zone rejoints, NAT sur toutes les interfaces dans PostUp). Testé en réel sur ARM avec un vrai client (handshake, ping, coupure à la désactivation). Remplace wg-easy (les apps wg-easy existantes ne sont pas migrées). Adressage en mode avancé (réseau, IP de la passerelle, port UDP public) ; IP de chaque client modifiable sur la carte ; un changement de réseau renumérote les clients hors réseau et reconstruit l'interface, appliqué automatiquement après chaque déploiement (`app.deployed`). **Droits par client appliqués par le serveur** (chaîne `HIVORA-VPN` dans le conteneur, script `hivora-acl.sh` reconstruit à côté puis permuté, relancé par PostUp) : Internet, réseau local (plages privées) et chaque zone atteinte ; préréglages du trafic envoyé dans le tunnel (réglage du VPN, tout, seulement l'autorisé, personnalisé) ; renommage ; expiration (désactivation automatique chaque minute, réactivation manuelle = sans limite) ; pastille en ligne (handshake < 3 min) et IP d'origine. Migration `0007`. Testé en réel : client limité à une zone (zone OK, LAN et Internet bloqués), puis inversé à chaud, expiration coupant le client. À faire après M6 : panel accessible uniquement par le VPN.
 - Budget pages : menu Radix remplacé par un menu maison (−17 Ko sur /users), dictionnaire anglais chargé à la demande, carte VPN chargée à la demande.
 - Plus tard (V3) : WireGuard en passerelle d'une zone.
+- **Logs en direct** (F-13) : carte « Logs » de la fiche (opérateur, chargée à la demande, flux seulement carte ouverte) : canal WS `logs.open`/`logs.close` (4 flux max par onglet), tous les conteneurs de l'app suivis, liste relue toutes les 2 s (redémarrage, recréation : reprise depuis la dernière ligne, sans doublon), lignes groupées toutes les 250 ms (500 max, le surplus est compté), secrets de l'app masqués. Filtre par service, recherche, suivi automatique, vider. Téléchargement `GET /apps/{id}/logs` (10 000 lignes par conteneur, fusionnées par heure, audit `app.logs_downloaded`). Testé en réel (Vaultwarden, redémarrage suivi).
 
 ▶ **Prochaine étape** : tester les jeux x86 sur une machine x86, puis M6 (livraison). Catalogue LinuxGSM générique (140+ jeux) : non fait (ports inconnus avant installation, contraire à la règle des digests figés).
 
@@ -213,7 +215,7 @@ Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en b
 - Dérive : seulement état voulu (démarrée / arrêtée) contre état réel ; pas encore l'image modifiée à la main.
 - IP publique non détectée : l'adresse d'accès utilise l'IP LAN à défaut.
 - Budget frontend serré : base commune 183 Ko, page la plus lourde (`/users`) 238 Ko sur 250. Topologie et console devront être chargées à la demande.
-- Non implémenté : adoption de conteneurs existants, gestion des zones dans l'UI, révisions/rollback dans l'UI, logs en direct, topologie.
+- Non implémenté : adoption de conteneurs existants, retour à une révision dans l'UI, topologie.
 
 ## Prochaine étape proposée : M6 (livraison)
 

@@ -63,9 +63,14 @@ class DockerGateway(ABC):
 
     @abstractmethod
     def logs(
-        self, container_id: str, *, follow: bool = False, tail: int = 200
-    ) -> AsyncIterator[str]:
-        """Container output lines (stdout and stderr)."""
+        self, container_id: str, *, follow: bool = False, tail: int | str = 200,
+        since: int | None = None, timestamps: bool = False,
+    ) -> AsyncIterator[str]:  # fmt: skip
+        """Container output lines (stdout and stderr).
+
+        ``tail``: last lines ("all": everything); ``since``: Unix time of the first line;
+        ``timestamps``: each line starts with its RFC 3339 time and a space.
+        """
 
     @abstractmethod
     async def open_exec(self, container_id: str, cmd: list[str]) -> ExecSession:

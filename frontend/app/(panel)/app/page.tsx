@@ -23,6 +23,7 @@ import { ZoneSelect } from "@/features/zones/zone-select";
 
 // Only VPN apps need it: loaded on demand (page budget).
 const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.VpnCard));
+const LogsCard = dynamic(() => import("@/features/logs/logs-card").then((m) => m.LogsCard));
 import { ApiError } from "@/lib/api/client";
 import { useApp, useAppCompose, useJob, useRevisions } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
@@ -113,6 +114,7 @@ function AppDetail() {
           />
         )}
         {app.vpn && can("operator") && <VpnCard appId={app.id} onJob={setActiveJob} />}
+        {can("operator") && <LogsCard appId={app.id} />}
         {can("operator") && (
           <ConsolePanel app={app} running={["healthy", "starting", "degraded"].includes(status)} />
         )}

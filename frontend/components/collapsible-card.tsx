@@ -13,17 +13,20 @@ export function CollapsibleCard({
   aside,
   storageKey,
   className,
+  onToggle,
   children,
 }: {
   title: ReactNode;
   aside?: ReactNode; // stays visible when folded (e.g. a counter)
   storageKey: string;
   className?: string;
+  onToggle?: (open: boolean) => void; // e.g. stream only while open
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
   useEffect(() => setOpen(readPref(`fold.${storageKey}`) === "1"), [storageKey]);
+  useEffect(() => onToggle?.(open), [open, onToggle]);
   const toggle = () => {
     writePref(`fold.${storageKey}`, open ? "0" : "1");
     setOpen(!open);

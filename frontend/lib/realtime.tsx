@@ -34,6 +34,7 @@ class RealtimeStore {
   private watchedJobs = new Set<number>();
   private watchedApps = new Map<string, number>(); // slug -> watching components
   private consoles = new Map<string, (msg: Message) => void>();
+  private logs = new Map<string, { app: number; onMessage: (msg: Message) => void }>();
   private retry = 0;
   private closed = false;
   onJobFinished: ((msg: Message) => void) | null = null;
@@ -57,6 +58,7 @@ class RealtimeStore {
       this.send({ op: "subscribe", channel: "metrics" });
       this.watchedJobs.forEach((id) => this.send({ op: "subscribe", channel: "job", id }));
       this.watchedApps.forEach((_, app) => this.send({ op: "subscribe", channel: "app_metrics", app }));
+      this.logs.forEach(({ app }, id) => this.send({ op: "logs.open", id, app })); // server lost them
       this.emit();
     };
     ws.onmessage = (e) => this.handle(JSON.parse(e.data) as Message);
@@ -112,6 +114,17 @@ class RealtimeStore {
     };
   }
 
+  /** Follows an app's logs on the shared socket; `onMessage` gets opened/lines/error. */
+  openLogs(app: number, onMessage: (msg: Message) => void) {
+    const id = `logs-${app}-${Math.random().toString(36).slice(2)}`;
+    this.logs.set(id, { app, onMessage });
+    this.send({ op: "logs.open", id, app });
+    return () => {
+      this.send({ op: "logs.close", id });
+      this.logs.delete(id);
+    };
+  }
+
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -133,6 +146,10 @@ class RealtimeStore {
   private handle(msg: Message) {
     if (msg.channel === "console") {
       this.consoles.get(String(msg.id))?.(msg);
+      return;
+    }
+    if (msg.channel === "logs") {
+      this.logs.get(String(msg.id))?.onMessage(msg);
       return;
     }
     if (msg.channel === "app_metrics") {

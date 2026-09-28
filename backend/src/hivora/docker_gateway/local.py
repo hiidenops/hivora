@@ -263,14 +263,19 @@ class LocalDockerGateway(DockerGateway):
         return stats_from_raw(raw)
 
     async def logs(
-        self, container_id: str, *, follow: bool = False, tail: int = 200
-    ) -> AsyncIterator[str]:
+        self, container_id: str, *, follow: bool = False, tail: int | str = 200,
+        since: int | None = None, timestamps: bool = False,
+    ) -> AsyncIterator[str]:  # fmt: skip
         container = self._docker.containers.container(container_id)
+        opts: dict[str, Any] = {"stdout": True, "stderr": True, "tail": tail,
+                                "timestamps": timestamps}  # fmt: skip
+        if since is not None:
+            opts["since"] = since
         if follow:
-            async for line in container.log(stdout=True, stderr=True, follow=True, tail=tail):
+            async for line in container.log(follow=True, **opts):
                 yield line.rstrip("\n")
         else:
-            for line in await container.log(stdout=True, stderr=True, tail=tail):
+            for line in await container.log(**opts):
                 yield line.rstrip("\n")
 
     async def open_exec(self, container_id: str, cmd: list[str]) -> ExecSession:

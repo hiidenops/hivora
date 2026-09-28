@@ -8,6 +8,8 @@ Client -> server:  {"op": "subscribe" | "unsubscribe", "channel": "state" | "job
                    {"op": "console.input", "id": cid, "data": "..."}
                    {"op": "console.resize", "id": cid, "rows": n, "cols": n}
                    {"op": "console.close", "id": cid}
+                   {"op": "logs.open", "id": sid, "app": app_id}   (operator)
+                   {"op": "logs.close", "id": sid}
 Server -> client:  {"channel": "state", "type": "snapshot", "apps": {slug: status}}
                    {"channel": "state", "type": "app", "app": slug, "status": ...}
                    {"channel": "jobs", "type": "started" | "progress" | "finished", ...}
@@ -16,6 +18,9 @@ Server -> client:  {"channel": "state", "type": "snapshot", "apps": {slug: statu
                    {"channel": "app_metrics", "app": slug, "type": "snapshot" | "sample", ...}
                    {"channel": "console", "id": cid,
                     "type": "opened" | "data" | "closed" | "error", ...}
+                   {"channel": "logs", "id": sid, "type": "opened", "services": [...]}
+                   {"channel": "logs", "id": sid, "type": "lines", "dropped": n,
+                    "lines": [{"s": service, "t": rfc3339 | null, "l": text}]}
 
 Authenticated by the session cookie; the Origin must match the Host
 (cross-site WebSocket hijacking).
@@ -35,6 +40,7 @@ from hivora.core.context import Actor, current_actor
 from hivora.core.errors import HivoraError
 from hivora.core.events import Event
 from hivora.realtime.console import Console
+from hivora.realtime.logs import LogStream, service_of
 from hivora.runtime import Runtime
 from hivora.web.deps import SESSION_COOKIE
 
@@ -45,6 +51,7 @@ REVALIDATE_EVERY_S = 60.0
 CLOSE_UNAUTHORIZED = 4401
 CLOSE_FORBIDDEN = 4403
 MAX_INPUT = 4096
+MAX_LOG_STREAMS = 4  # per connection
 
 
 def same_origin(ws: WebSocket) -> bool:
@@ -62,6 +69,7 @@ class Connection:
         self.jobs: set[int] = set()
         self.app_metrics: set[str] = set()  # slugs this tab watches
         self.consoles: dict[str, Console] = {}
+        self.log_streams: dict[str, LogStream] = {}
         self._send_lock = asyncio.Lock()  # several tasks write to one socket
 
     async def send(self, message: dict[str, Any]) -> None:
@@ -75,6 +83,9 @@ class Connection:
                 op = msg["op"]
                 if op.startswith("console."):
                     await self.handle_console(op, msg)
+                    continue
+                if op.startswith("logs."):
+                    await self.handle_logs(op, msg)
                     continue
                 channel = msg["channel"]
             except (ValueError, KeyError, TypeError, AttributeError):
@@ -104,6 +115,38 @@ class Connection:
             await console.session.resize(int(msg["rows"]), int(msg["cols"]))
         elif op == "console.close" and console:
             await self.close_console(cid)
+
+    async def handle_logs(self, op: str, msg: dict[str, Any]) -> None:
+        sid = str(msg["id"])[:64]
+        if op == "logs.close":
+            stream = self.log_streams.pop(sid, None)
+            if stream:
+                await stream.stop()
+            return
+        if op != "logs.open" or sid in self.log_streams:
+            return
+
+        def error(code: str) -> dict[str, Any]:
+            return {"channel": "logs", "id": sid, "type": "error", "code": code}
+
+        if not self.user.role.allows(Role.OPERATOR):
+            await self.send(error("insufficient_role"))
+            return
+        if len(self.log_streams) >= MAX_LOG_STREAMS:
+            await self.send(error("too_many_streams"))
+            return
+        try:
+            async with self.rt.sessions() as session:
+                app = await self.rt.apps.get(session, int(msg["app"]))
+                secrets = await self.rt.apps.decrypt_secrets(session, app.id)
+        except HivoraError as exc:
+            await self.send(error(exc.code))
+            return
+        stream = LogStream(self.rt, sid, app.slug, list(secrets.values()), self.send)
+        self.log_streams[sid] = stream
+        services = sorted({service_of(c) for c in stream.containers()})
+        await self.send({"channel": "logs", "id": sid, "type": "opened", "services": services})
+        stream.start()
 
     async def open_console(self, cid: str, msg: dict[str, Any]) -> None:
         def error(code: str) -> dict[str, Any]:
@@ -160,6 +203,9 @@ class Connection:
     async def close_all(self) -> None:
         for cid in list(self.consoles):
             await self.close_console(cid)
+        for stream in self.log_streams.values():
+            await stream.stop()
+        self.log_streams.clear()
         for slug in list(self.app_metrics):
             await self.watch_app(slug, False)
 

@@ -120,9 +120,12 @@ class FakeDockerGateway(DockerGateway):
         return self.stats.get(container_id) or StatsSample(0.0, 0, 0, 0, 0)
 
     async def logs(
-        self, container_id: str, *, follow: bool = False, tail: int = 200
-    ) -> AsyncIterator[str]:
-        for line in self.logs_by_container.get(container_id, [])[-tail:]:
+        self, container_id: str, *, follow: bool = False, tail: int | str = 200,
+        since: int | None = None, timestamps: bool = False,
+    ) -> AsyncIterator[str]:  # fmt: skip
+        """Stored lines as given (tests write them with their timestamps)."""
+        lines = self.logs_by_container.get(container_id, [])
+        for line in lines if tail == "all" else lines[-int(tail) :] if tail else []:
             yield line
 
     async def open_exec(self, container_id: str, cmd: list[str]) -> ExecSession:
