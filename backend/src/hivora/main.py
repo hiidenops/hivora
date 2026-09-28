@@ -24,6 +24,7 @@ from hivora.runtime import Runtime
 from hivora.system.api import router as system_router
 from hivora.tasks.api import router as tasks_router
 from hivora.templates.api import router as templates_router
+from hivora.topology.api import router as topology_router
 from hivora.vpn.api import router as vpn_router
 from hivora.web import errors
 from hivora.zones.api import router as zones_router
@@ -59,7 +60,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
         ("/system", system_router), ("/auth", auth_router), ("/users", users_router),
         ("/templates", templates_router), ("/apps", apps_router), ("/zones", zones_router),
         ("/jobs", jobs_router), ("/audit", audit_router), ("/metrics", metrics_router),
-        ("/modpacks", modpacks_router),
+        ("/modpacks", modpacks_router), ("/topology", topology_router),
     ):  # fmt: skip
         app.include_router(router, prefix=f"{API_PREFIX}{prefix}")
     app.include_router(game_router, prefix=f"{API_PREFIX}/apps")

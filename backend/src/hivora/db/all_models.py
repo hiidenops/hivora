@@ -12,5 +12,6 @@ import hivora.db.models
 import hivora.jobs.models
 import hivora.tasks.models
 import hivora.templates.models
+import hivora.topology.models
 import hivora.vpn.models
 import hivora.zones.models  # noqa: F401
