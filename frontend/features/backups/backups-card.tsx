@@ -5,6 +5,7 @@ import { Archive, Download, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { CollapsibleCard } from "@/components/collapsible-card";
+import { ScheduleFields } from "@/components/schedule-fields";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input, Switch } from "@/components/ui/input";
@@ -17,8 +18,6 @@ import { useI18n } from "@/lib/i18n";
 type Overview = components["schemas"]["BackupsOut"];
 type Schedule = components["schemas"]["ScheduleIO"];
 
-const pad = (n: number) => String(n).padStart(2, "0");
-
 function ScheduleForm({ appId, initial, timezone, onSaved }: { appId: number; initial: Schedule; timezone: string; onSaved: () => void }) {
   const { t, errorMessage } = useI18n();
   const [s, setS] = useState(initial);
@@ -27,10 +26,6 @@ function ScheduleForm({ appId, initial, timezone, onSaved }: { appId: number; in
     mutationFn: () => api(`/apps/${appId}/backups/schedule`, { method: "PUT", body: s }),
     onSuccess: onSaved,
   });
-  const days = [
-    t("backups.day.0"), t("backups.day.1"), t("backups.day.2"), t("backups.day.3"),
-    t("backups.day.4"), t("backups.day.5"), t("backups.day.6"),
-  ];
   return (
     <form
       className="grid gap-3 rounded-md border bg-muted/30 p-3"
@@ -43,45 +38,7 @@ function ScheduleForm({ appId, initial, timezone, onSaved }: { appId: number; in
         <Switch checked={s.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> {t("backups.auto")}
       </label>
       <div className="flex flex-wrap items-end gap-3 text-sm">
-        <label className="grid gap-1">
-          {t("backups.frequency")}
-          <select className="h-9 rounded-md border bg-card px-2" value={s.frequency} onChange={(e) => set({ frequency: e.target.value as Schedule["frequency"] })}>
-            <option value="daily">{t("backups.daily")}</option>
-            <option value="weekly">{t("backups.weekly")}</option>
-            <option value="hours">{t("backups.hours")}</option>
-          </select>
-        </label>
-        {s.frequency === "weekly" && (
-          <label className="grid gap-1">
-            {t("backups.weekday")}
-            <select className="h-9 rounded-md border bg-card px-2" value={s.weekday} onChange={(e) => set({ weekday: Number(e.target.value) })}>
-              {days.map((d, i) => (
-                <option key={i} value={i}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {s.frequency === "hours" ? (
-          <label className="grid gap-1">
-            {t("backups.everyHours")}
-            <Input type="number" min={1} max={168} className="h-9 w-24" value={s.every_hours} onChange={(e) => set({ every_hours: Number(e.target.value) })} />
-          </label>
-        ) : (
-          <label className="grid gap-1">
-            {t("backups.time", { tz: timezone })}
-            <Input
-              type="time"
-              className="h-9 w-32"
-              value={`${pad(s.hour)}:${pad(s.minute)}`}
-              onChange={(e) => {
-                const [h, m] = e.target.value.split(":").map(Number);
-                set({ hour: h || 0, minute: m || 0 });
-              }}
-            />
-          </label>
-        )}
+        <ScheduleFields value={s} onChange={set} timezone={timezone} />
         <label className="grid gap-1">
           {t("backups.keep")}
           <Input type="number" min={1} max={365} className="h-9 w-24" value={s.keep} onChange={(e) => set({ keep: Number(e.target.value) })} />

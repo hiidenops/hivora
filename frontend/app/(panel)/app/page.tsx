@@ -7,7 +7,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import { PageHeader, useSession } from "@/components/app-shell";
-import { CodeView } from "@/components/code-view";
 import { JobProgress } from "@/components/job-progress";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -24,25 +23,22 @@ import { ZoneSelect } from "@/features/zones/zone-select";
 // Only VPN apps need it: loaded on demand (page budget).
 const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.VpnCard));
 const LogsCard = dynamic(() => import("@/features/logs/logs-card").then((m) => m.LogsCard));
+const TasksCard = dynamic(() => import("@/features/tasks/tasks-card").then((m) => m.TasksCard));
 const BackupsCard = dynamic(() => import("@/features/backups/backups-card").then((m) => m.BackupsCard));
 const UpgradeBanner = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.UpgradeBanner));
-const ComposeEditor = dynamic(() => import("@/features/apps/compose-editor").then((m) => m.ComposeEditor));
-const RestoreButton = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.RestoreButton));
+const AdvancedCards = dynamic(() => import("@/features/apps/advanced-cards").then((m) => m.AdvancedCards));
 import { ApiError } from "@/lib/api/client";
-import { useApp, useAppCompose, useJob, useRevisions } from "@/lib/api/hooks";
+import { useApp, useJob } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { useLiveStatus } from "@/lib/realtime";
 
 function AppDetail() {
-  const { t, lang, errorMessage } = useI18n();
+  const { t, errorMessage } = useI18n();
   const router = useRouter();
   const { advanced, can } = useSession();
   const id = Number(useSearchParams().get("id") ?? 0);
   const { data: app, error } = useApp(id);
-  const { data: compose } = useAppCompose(id, advanced && !!app);
-  const { data: revisions } = useRevisions(id, advanced && !!app);
   const [activeJob, setActiveJob] = useState<number | null>(null);
-  const [editingCompose, setEditingCompose] = useState(false);
   const [removing, setRemoving] = useState(false);
   const { data: active } = useJob(activeJob);
   const status = useLiveStatus(app?.slug ?? "", app?.status ?? "missing");
@@ -121,89 +117,12 @@ function AppDetail() {
         )}
         {app.vpn && can("operator") && <VpnCard appId={app.id} onJob={setActiveJob} />}
         {can("operator") && <BackupsCard appId={app.id} onJob={setActiveJob} />}
+        {can("operator") && <TasksCard appId={app.id} />}
         {can("operator") && <LogsCard appId={app.id} />}
         {can("operator") && (
           <ConsolePanel app={app} running={["healthy", "starting", "degraded"].includes(status)} />
         )}
-        {advanced && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("app.ports")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="grid gap-1 font-mono text-xs">
-                  {app.ports.map((p) => (
-                    <li key={`${p.service}-${p.container_port}-${p.protocol}`}>
-                      {p.host_port ? `${p.host_ip ?? "0.0.0.0"}:${p.host_port} → ` : ""}
-                      {p.service}:{p.container_port}/{p.protocol} ({p.exposure})
-                    </li>
-                  ))}
-                </ul>
-                <h4 className="mb-2 mt-4 text-sm font-medium">{t("app.containers")}</h4>
-                <ul className="grid gap-1 text-xs">
-                  {app.containers.map((c) => (
-                    <li key={c.id} className="flex justify-between gap-2">
-                      <span className="font-mono">{c.name}</span>
-                      <span className="text-muted-foreground">
-                        {c.state}
-                        {c.health !== "none" && ` · ${c.health}`}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <h4 className="mb-2 mt-4 text-sm font-medium">{t("app.volumes")}</h4>
-                <ul className="grid gap-1 font-mono text-xs">
-                  {app.volumes.map((v) => (
-                    <li key={v}>{v}</li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("app.revisions")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="divide-y text-sm">
-                  {revisions?.map((r) => (
-                    <li key={r.id} className="flex items-center justify-between gap-2 py-2">
-                      <span className="font-mono">
-                        #{r.number}
-                        {r.number === app.revision && <span className="ml-2 font-sans text-xs text-muted-foreground">{t("restore.current")}</span>}
-                      </span>
-                      <span className="ml-auto text-xs text-muted-foreground">
-                        {r.status} · {new Date(r.created_at).toLocaleString(lang)}
-                      </span>
-                      {can("operator") && r.restorable && r.number !== app.revision && (
-                        <RestoreButton appId={app.id} number={r.number} onJob={setActiveJob} />
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-            {compose && (
-              <Card className="lg:col-span-2">
-                <CardHeader className="flex-row items-center justify-between gap-3">
-                  <CardTitle>{t("app.compose")}</CardTitle>
-                  {can("admin") && !editingCompose && (
-                    <Button size="sm" variant="outline" onClick={() => setEditingCompose(true)}>
-                      {t("compose.edit")}
-                    </Button>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  {editingCompose ? (
-                    <ComposeEditor appId={app.id} initial={compose.compose_yaml} onJob={setActiveJob} onClose={() => setEditingCompose(false)} />
-                  ) : (
-                    <CodeView code={compose.compose_yaml} />
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </>
-        )}
+        {advanced && <AdvancedCards app={app} onJob={setActiveJob} />}
       </div>
     </>
   );

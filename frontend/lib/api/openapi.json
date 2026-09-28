@@ -2430,6 +2430,24 @@
         "title": "Role",
         "type": "string"
       },
+      "RunOut": {
+        "properties": {
+          "output": {
+            "title": "Output",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "output"
+        ],
+        "title": "RunOut",
+        "type": "object"
+      },
       "ScheduleIO": {
         "properties": {
           "enabled": {
@@ -2788,6 +2806,282 @@
           "python"
         ],
         "title": "SystemInfo",
+        "type": "object"
+      },
+      "TaskIn": {
+        "properties": {
+          "action": {
+            "enum": [
+              "restart",
+              "stop",
+              "start",
+              "backup",
+              "command"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "command": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Command",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "every_hours": {
+            "default": 6,
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Every Hours",
+            "type": "integer"
+          },
+          "frequency": {
+            "default": "daily",
+            "enum": [
+              "daily",
+              "weekly",
+              "hours"
+            ],
+            "title": "Frequency",
+            "type": "string"
+          },
+          "hour": {
+            "default": 4,
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Hour",
+            "type": "integer"
+          },
+          "minute": {
+            "default": 0,
+            "maximum": 59.0,
+            "minimum": 0.0,
+            "title": "Minute",
+            "type": "integer"
+          },
+          "mode": {
+            "default": "shell",
+            "enum": [
+              "shell",
+              "console"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "weekday": {
+            "default": 0,
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "action"
+        ],
+        "title": "TaskIn",
+        "type": "object"
+      },
+      "TaskOut": {
+        "properties": {
+          "action": {
+            "enum": [
+              "restart",
+              "stop",
+              "start",
+              "backup",
+              "command"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "command": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Command",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "every_hours": {
+            "default": 6,
+            "maximum": 168.0,
+            "minimum": 1.0,
+            "title": "Every Hours",
+            "type": "integer"
+          },
+          "frequency": {
+            "default": "daily",
+            "enum": [
+              "daily",
+              "weekly",
+              "hours"
+            ],
+            "title": "Frequency",
+            "type": "string"
+          },
+          "hour": {
+            "default": 4,
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Hour",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_output": {
+            "title": "Last Output",
+            "type": "string"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "minute": {
+            "default": 0,
+            "maximum": 59.0,
+            "minimum": 0.0,
+            "title": "Minute",
+            "type": "integer"
+          },
+          "mode": {
+            "default": "shell",
+            "enum": [
+              "shell",
+              "console"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "weekday": {
+            "default": 0,
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Weekday",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "action",
+          "id",
+          "next_run_at",
+          "last_run_at",
+          "last_status",
+          "last_output"
+        ],
+        "title": "TaskOut",
+        "type": "object"
+      },
+      "TasksOut": {
+        "properties": {
+          "console": {
+            "title": "Console",
+            "type": "boolean"
+          },
+          "services": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskOut"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "timezone",
+          "services",
+          "console",
+          "tasks"
+        ],
+        "title": "TasksOut",
         "type": "object"
       },
       "TemplateDetail": {
@@ -5565,6 +5859,249 @@
         "summary": "Stop",
         "tags": [
           "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/tasks": {
+      "get": {
+        "operationId": "list_tasks_api_v1_apps__app_id__tasks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TasksOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tasks",
+        "tags": [
+          "tasks"
+        ]
+      },
+      "post": {
+        "operationId": "create_api_v1_apps__app_id__tasks_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Create Api V1 Apps  App Id  Tasks Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/tasks/{task_id}": {
+      "delete": {
+        "operationId": "delete_api_v1_apps__app_id__tasks__task_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete",
+        "tags": [
+          "tasks"
+        ]
+      },
+      "put": {
+        "operationId": "update_api_v1_apps__app_id__tasks__task_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update",
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/tasks/{task_id}/run": {
+      "post": {
+        "operationId": "run_now_api_v1_apps__app_id__tasks__task_id__run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Now",
+        "tags": [
+          "tasks"
         ]
       }
     },

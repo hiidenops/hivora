@@ -11,7 +11,8 @@ import pytest
 from helpers import API, admin, code, wait_job
 
 from hivora.backups.models import BackupSchedule
-from hivora.backups.service import InvalidBackupError, archive, extract, next_run
+from hivora.backups.service import InvalidBackupError, archive, extract
+from hivora.core.schedule import next_run
 
 PARIS = ZoneInfo("Europe/Paris")
 

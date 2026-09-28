@@ -22,6 +22,7 @@ from hivora.realtime.logs import router as logs_router
 from hivora.realtime.ws import router as ws_router
 from hivora.runtime import Runtime
 from hivora.system.api import router as system_router
+from hivora.tasks.api import router as tasks_router
 from hivora.templates.api import router as templates_router
 from hivora.vpn.api import router as vpn_router
 from hivora.web import errors
@@ -65,6 +66,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
     app.include_router(vpn_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(logs_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(backups_router, prefix=f"{API_PREFIX}/apps")
+    app.include_router(tasks_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(options_router, prefix=f"{API_PREFIX}/options")
     app.include_router(ws_router)
     return app

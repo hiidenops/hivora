@@ -11,7 +11,6 @@ import asyncio
 import logging
 import shutil
 import tarfile
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -22,6 +21,7 @@ from hivora.apps.models import Application, DesiredState
 from hivora.apps.service import AppService
 from hivora.backups.models import Backup, BackupSchedule
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
+from hivora.core.schedule import local_zone, next_run
 from hivora.jobs import Job, JobContext, JobKind
 
 logger = logging.getLogger(__name__)
@@ -37,22 +37,6 @@ class NothingToBackUpError(ConflictError):
 
 class InvalidBackupError(ValidationError):
     code = "invalid_backup"
-
-
-def next_run(s: BackupSchedule, after: datetime, tz: ZoneInfo) -> datetime:
-    """The first run strictly after ``after`` (UTC), for a schedule in local time ``tz``."""
-    if s.frequency == "hours":
-        return (after + timedelta(hours=max(1, s.every_hours))).replace(second=0, microsecond=0)
-    local = after.astimezone(tz)
-    at = local.replace(hour=s.hour, minute=s.minute, second=0, microsecond=0)
-    if s.frequency == "weekly":
-        at += timedelta(days=(s.weekday - at.weekday()) % 7)
-        step = timedelta(days=7)
-    else:
-        step = timedelta(days=1)
-    while at <= local:
-        at += step
-    return at.astimezone(UTC)
 
 
 def archive(volumes: dict[str, Path], dest: Path) -> int:
@@ -101,10 +85,7 @@ class BackupService:
 
     @property
     def tz(self) -> ZoneInfo:
-        try:
-            return ZoneInfo(self.apps.settings.timezone)
-        except (KeyError, ValueError):
-            return ZoneInfo("UTC")
+        return local_zone(self.apps.settings.timezone)
 
     def register(self) -> None:
         self.apps.jobs.register(JobKind.BACKUP, self.run_backup)

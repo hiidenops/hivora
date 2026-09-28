@@ -144,13 +144,21 @@ class Runtime:
         except Exception:
             logger.warning("Docker did not report its architecture; using the local one")
         await self.state.start()
-        from hivora.vpn.service import expire_clients, follow_deploys  # needs Runtime itself
+        from hivora.tasks.service import run_scheduler  # needs Runtime itself
+        from hivora.vpn.service import expire_clients, follow_deploys
 
         self._vpn_tasks = [
             asyncio.create_task(follow_deploys(self), name="vpn-follow"),
             asyncio.create_task(expire_clients(self), name="vpn-expiry"),
+            asyncio.create_task(run_scheduler(self), name="task-scheduler"),
         ]
         await self.jobs.start()
+
+    async def tasks_tick(self) -> None:
+        """Run the scheduled tasks that are due (the scheduler calls this every minute)."""
+        from hivora.tasks.service import TaskTools
+
+        await TaskTools(self).tick()
 
     async def _warm_icons(self) -> None:
         try:

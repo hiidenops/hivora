@@ -636,6 +636,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/{app_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tasks */
+        get: operations["list_tasks_api_v1_apps__app_id__tasks_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_api_v1_apps__app_id__tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update */
+        put: operations["update_api_v1_apps__app_id__tasks__task_id__put"];
+        post?: never;
+        /** Delete */
+        delete: operations["delete_api_v1_apps__app_id__tasks__task_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/tasks/{task_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Now */
+        post: operations["run_now_api_v1_apps__app_id__tasks__task_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{app_id}/upgrade": {
         parameters: {
             query?: never;
@@ -2240,6 +2293,13 @@ export interface components {
          * @enum {string}
          */
         Role: "viewer" | "operator" | "admin";
+        /** RunOut */
+        RunOut: {
+            /** Output */
+            output: string;
+            /** Status */
+            status: string;
+        };
         /** ScheduleIO */
         ScheduleIO: {
             /**
@@ -2393,6 +2453,135 @@ export interface components {
             python: string;
             /** Version */
             version: string;
+        };
+        /** TaskIn */
+        TaskIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "restart" | "stop" | "start" | "backup" | "command";
+            /**
+             * Command
+             * @default
+             */
+            command: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Every Hours
+             * @default 6
+             */
+            every_hours: number;
+            /**
+             * Frequency
+             * @default daily
+             * @enum {string}
+             */
+            frequency: "daily" | "weekly" | "hours";
+            /**
+             * Hour
+             * @default 4
+             */
+            hour: number;
+            /**
+             * Minute
+             * @default 0
+             */
+            minute: number;
+            /**
+             * Mode
+             * @default shell
+             * @enum {string}
+             */
+            mode: "shell" | "console";
+            /** Name */
+            name: string;
+            /** Service */
+            service?: string | null;
+            /**
+             * Weekday
+             * @default 0
+             */
+            weekday: number;
+        };
+        /** TaskOut */
+        TaskOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "restart" | "stop" | "start" | "backup" | "command";
+            /**
+             * Command
+             * @default
+             */
+            command: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Every Hours
+             * @default 6
+             */
+            every_hours: number;
+            /**
+             * Frequency
+             * @default daily
+             * @enum {string}
+             */
+            frequency: "daily" | "weekly" | "hours";
+            /**
+             * Hour
+             * @default 4
+             */
+            hour: number;
+            /** Id */
+            id: number;
+            /** Last Output */
+            last_output: string;
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Last Status */
+            last_status: string | null;
+            /**
+             * Minute
+             * @default 0
+             */
+            minute: number;
+            /**
+             * Mode
+             * @default shell
+             * @enum {string}
+             */
+            mode: "shell" | "console";
+            /** Name */
+            name: string;
+            /** Next Run At */
+            next_run_at: string | null;
+            /** Service */
+            service?: string | null;
+            /**
+             * Weekday
+             * @default 0
+             */
+            weekday: number;
+        };
+        /** TasksOut */
+        TasksOut: {
+            /** Console */
+            console: boolean;
+            /** Services */
+            services: string[];
+            /** Tasks */
+            tasks: components["schemas"]["TaskOut"][];
+            /** Timezone */
+            timezone: string;
         };
         /** TemplateDetail */
         TemplateDetail: {
@@ -3962,6 +4151,170 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tasks_api_v1_apps__app_id__tasks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TasksOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_api_v1_apps__app_id__tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_api_v1_apps__app_id__tasks__task_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_api_v1_apps__app_id__tasks__task_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_now_api_v1_apps__app_id__tasks__task_id__run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */
