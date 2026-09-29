@@ -89,6 +89,26 @@ Leçons ajoutées :
 | `openapi.json` versionné était périmé : la comparaison au schéma versionné aurait masqué un écart | Comparer aussi au schéma exporté depuis `HEAD` (copie de travail propre) ; régénérer le fichier versionné dès qu'une route change (§10) |
 | Un échec e2e isolé n'a pas pu être expliqué : seule la dernière ligne de sortie était gardée | Conserver la sortie complète de l'e2e dans un fichier ; un échec non expliqué se signale, ne s'efface pas en relançant (§10) |
 
+### Bilan des deux découpages (29/09/2026, commit `8986592`)
+
+Rapport complet : `.report/architecture-apres-decoupage-2026-09-29.md` (local, non versionné).
+
+| | Rapport initial (28/09, `f91b3df`) | Après les découpages |
+|---|---|---|
+| Graphe Graphify | 3 160 nœuds, 8 621 liens, 216 communautés, aucun cycle | 3 403 nœuds, 9 219 liens, 261 communautés, aucun cycle détecté |
+| `apps/service.py` | 1 038 lignes, classe ~770, 45 méthodes, 12 dépendances | 315 lignes, classe 236 (façade de relais) |
+| Logique métier des apps | une classe | 7 fichiers de 97 à 340 lignes, 10 dépendances au plus par classe |
+| `apps/api.py` | 647 lignes, 27 routes, 30 modèles | 8 fichiers de 35 à 225 lignes (`__init__.py` : 56) |
+| Duplication (secrets, séquence révision → job) | 2 à 3 copies | une seule (`store_secrets`, `queue_revision`) |
+| Contrat API et tests | — | inchangés à chaque étape (OpenAPI octet par octet, ordre des routes, 208 tests, aucun test modifié) |
+
+**God Objects** : `AppService` et `apps/api.py` ne le sont plus. `AppService` garde 62 liens dans Graphify (57 au départ), parce qu'une façade reste reliée à chaque sous-service et à chaque relais ; ce chiffre ne baissera qu'avec l'étape 7. Aucun nouveau God Object.
+
+**Écarts restants aux règles de ce document**, vérifiés dans le code : détaillés au §4 (dépendances), §7 (tailles et priorités) et §8 (`Runtime`, états globaux). S'y ajoutent les **routes non fines** (§1.5) :
+
+- 13 routes lisent la base directement : `GET /apps`, `/apps/{id}`, `/compose`, `/revisions`, `/settings` (`apps/api`), `GET /apps/{id}/backups`, `GET /jobs`, `/jobs/{id}`, `GET /audit` ;
+- 9 routes y écrivent directement, ce qui est plus grave : `DELETE /audit`, `DELETE /jobs`, les 6 routes d'édition de `/topology` (nœuds, liens, disposition), `DELETE /zones/{slug}`.
+
 ---
 
 ## 1. Principes fondamentaux d'architecture
@@ -134,10 +154,10 @@ Leçons ajoutées :
    - `zones` ne dépend pas de `apps`.
    - Seuls `docker_gateway` et `compose_runner` accèdent au socket Docker.
 4. **Passer par le service, pas par les tables.** Un module lit les données d'un autre module par son service (ou une fonction publique du socle), pas en important ses modèles SQLAlchemy.
-   - *Dette connue* : `topology`, `vpn` et `pyapps` lisent `apps.models` directement.
+   - *Dette connue* : `topology`, `vpn`, `pyapps` et `backups` lisent `apps.models` directement.
 5. **Pas d'utilitaire emprunté à un module métier.**
    - Un outil générique vit dans `core` (Hivora) ou dans le socle du module.
-   - *Dettes connues* : `apps.files` utilisé par `games` et `pyapps` ; `games.worlds.receive_upload` utilisé par `pyapps` ; nom privé `analyze._Zip` importé par `pyapps`.
+   - *Dettes connues* : `apps.files` utilisé par `games` (`worlds`, `engine`) et `pyapps` ; `games.worlds.receive_upload` utilisé par `pyapps` ; nom privé `analyze._Zip` importé par `pyapps`.
 6. **Une vue ne déclenche pas d'action.** Un calcul de lecture (topologie, tableau de bord) n'exécute aucune commande hôte ni aucune mutation.
    - *Dette connue* : `topology` appelle `hostfw.listening()`.
 7. **Réexports explicites seulement** (`from x import Y as Y`), placés dans la façade pour préserver les imports existants. À terme, les appelants importent directement depuis le module qui définit le symbole.
@@ -205,20 +225,33 @@ Situation au 29/09/2026 (commit `e283b3f`, après les deux découpages) :
 | `apps/api/` | 8 fichiers, 35 à 225 lignes | **résolu** (647 → 56 pour `__init__.py`) |
 | `hostfw/service.py` | 355 lignes | sous les seuils |
 
-Recommandations, par ordre de rentabilité :
+Priorités techniques (bilan du 29/09) :
 
-1. **Routes fines** : remonter dans le service les requêtes SQL restées dans `apps/api/queries.py` (`list_apps`, `get_app`, `get_compose`, `list_revisions`) et `apps/api/revisions.py` (`get_settings`) (§1.5).
-2. **`AppPlanner` dans `apps/planner.py`** : `core.py` repasse sous 300 lignes.
-3. **Étape 7 de `AppService`** : brancher les appelants (`api`, `vpn`, `games`, `topology`, `pyapps`, `backups`, `tasks`) sur les sous-services, puis supprimer les relais ; c'est aussi ce qui fera baisser ses liens dans Graphify (§13).
-4. **`topology-view.tsx`** (seuil bloquant) : extraire le panneau d'inspection, le gestionnaire de liens et l'export.
-5. **`vpn/service.py`** : même méthode que pour `apps` (socle `addressing` / `acl` purs, application par exec à part), et mutations par `jobs`.
-6. **`ZoneIn`** : renommer le modèle (ex. `AppZoneIn`) pour supprimer le contournement de `__module__` ; commit séparé, le contrat OpenAPI change.
+- **PRIORITÉ 1 : routes fines.**
+  - Remonter dans les services les accès SQL des 13 routes de lecture et des 9 routes d'écriture listées au §0 : `apps/api/queries.py`, `apps/api/revisions.py`, `topology/api.py`, `audit/api.py`, `jobs/api.py`, `zones/api.py`, `backups/api.py`.
+  - Déplacement pur, contrat OpenAPI identique.
+- **PRIORITÉ 2 : assainir `vpn`, puis `hostfw`.**
+  - Mutations par `jobs`, avec le verrou de l'app.
+  - Dépendances explicites à la place de `Runtime`.
+  - Plus de lecture directe de `apps.models`.
+  - Verrou d'instance à la place de `_LOCK`.
+  - Découpage de `vpn/service.py` (491 lignes) : socle `addressing` / `acl` purs, application par exec à part.
+- **PRIORITÉ 3 : sortir `Runtime` des services métier restants** (`topology`, `tasks`, `pyapps`, `games.engine`). Cela supprime les 4 cycles masqués de `runtime.py` (§8.2).
+
+Second rang :
+
+1. `topology-view.tsx` (seuil bloquant) : extraire le panneau d'inspection, le gestionnaire de liens et l'export.
+2. `AppPlanner` dans `apps/planner.py` : `core.py` repasse sous 300 lignes.
+3. Étape 7 de `AppService` : brancher les appelants sur les sous-services, puis supprimer les relais ; c'est ce qui fera baisser ses liens dans Graphify (§13).
+4. `core/fs` pour `confined`, `tree_size`, `remove_tree` et `receive_upload` (§4.5) ; `_Zip` rendu public.
+5. Topologie branchée sur l'état du pare-feu en cache (§4.6).
+6. `ZoneIn` renommé (ex. `AppZoneIn`) pour supprimer le contournement de `__module__` ; commit séparé, le contrat OpenAPI change.
 
 ## 8. Règles concernant `Runtime` et les services transverses
 
 1. **`Runtime` est la racine de composition, pas un annuaire.** Son rôle est de construire les services (`build`), de les démarrer et de les arrêter. Il ne doit pas être passé aux services métier.
 2. **Aucun nouveau service ne reçoit `Runtime`.** Il reçoit ses dépendances explicites, comme `AppService`, `AppPlanner`, `CustomImages`, `Adoption`, `ComposeEdit`, `Revisions`, `Deployer`, `Lifecycle`.
-   - *Dette connue* : `vpn`, `topology`, `tasks`, `pyapps`, `hostfw` et `realtime` reçoivent `Runtime`, avec des imports différés dans `runtime.py`, donc un cycle masqué. À corriger module par module, en commençant par ceux qui n'utilisent que 2 ou 3 attributs.
+   - *Dette connue* (vérifiée le 29/09) : 6 services métier reçoivent `Runtime` : `topology`, `tasks`, `vpn`, `hostfw`, `pyapps`, `games.engine` (plus `realtime`, toléré, voir point 3). `runtime.py` les importe en différé (`realtime.console`, `hostfw.service`, `tasks.service`, `vpn.service`), soit 4 cycles masqués. À corriger module par module, en commençant par ceux qui n'utilisent que 2 ou 3 attributs.
 3. **Exception tolérée : les adaptateurs de sortie** (`realtime/ws`, `realtime/console`, `realtime/logs`, routes FastAPI via `RuntimeDep`). Ils sont en bordure du système et ne sont importés par aucun service.
 4. **Services transverses** (`core.events.EventBus`, `core.clock`, `core.redact`, `crypto`, `audit`) :
    - ils ne dépendent d'aucun module métier ;
@@ -226,7 +259,8 @@ Recommandations, par ordre de rentabilité :
    - `clock` est toujours injecté, jamais `datetime.now()` direct dans un service, pour que les tests puissent figer le temps.
 5. **Pas d'état global de module pour du nouveau code.**
    - Un verrou, un cache, un registre appartiennent à une instance de service.
-   - *Dettes connues* : `vpn._LOCK`, `state.set_adopted`, `templates.set_host_arch`, `auth._totp_used`.
+   - *Dettes connues* : `vpn._LOCK`, `state._adopted` (`set_adopted`), `templates._detected_arch` (`set_host_arch`).
+   - *Correction du 29/09* : `auth._totp_used`, listé ici auparavant, est un attribut d'instance (`self._totp_used`), pas un état global.
 6. **Un service transverse qui grossit se découpe comme un module métier.** Il n'a pas de statut spécial.
 
 ## 9. Anti-patterns interdits
