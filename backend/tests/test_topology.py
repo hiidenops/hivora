@@ -64,6 +64,64 @@ def test_topology_graph_declared_layer_and_layout(client: Any) -> None:
     assert not any(e.get("id") == edge["id"] for e in graph["edges"])  # its links went too
 
 
+def test_declared_layer_edges_layout_errors_and_events(client: Any) -> None:
+    """The declared layer's behaviour, pinned before its code moves to a service."""
+    from helpers import code
+
+    admin(client)
+    bus = client.app.state.runtime.bus
+    published: list[tuple[str, dict[str, Any]]] = []
+    real_publish = bus.publish
+
+    def spy(topic: str, **payload: Any) -> Any:
+        published.append((topic, payload))
+        return real_publish(topic, **payload)
+
+    bus.publish = spy
+    try:
+        node = client.post(f"{API}/topology/nodes", json={"kind": "router", "label": "Box"}).json()
+        assert ("topology.node_added", {"target": "Box", "kind": "router"}) in published
+        key = f"decl:{node['id']}"
+
+        # Links: removing one that exists or not both answer 204.
+        edge = client.post(f"{API}/topology/edges",
+                           json={"source": "internet", "target": key}).json()  # fmt: skip
+        edges = client.get(f"{API}/topology").json()["edges"]
+        assert any(e.get("id") == edge["id"] for e in edges)
+        assert client.delete(f"{API}/topology/edges/{edge['id']}").status_code == 204
+        edges = client.get(f"{API}/topology").json()["edges"]
+        assert not any(e.get("id") == edge["id"] for e in edges)
+        assert client.delete(f"{API}/topology/edges/999999").status_code == 204
+
+        # Layout: zone sizes kept, keys cut to 40 characters, an empty map resets it.
+        long_key = "zone:none" + "x" * 50
+        layout = {"positions": {
+            "zone:none": {"x": 1, "y": 2, "w": 300, "h": 200},
+            long_key: {"x": 5, "y": 6},
+        }}  # fmt: skip
+        assert client.put(f"{API}/topology/layout", json=layout).status_code == 204
+        positions = client.get(f"{API}/topology").json()["positions"]
+        assert positions["zone:none"] == {"x": 1, "y": 2, "w": 300, "h": 200}
+        assert positions[long_key[:40]] == {"x": 5, "y": 6, "w": None, "h": None}
+        assert long_key not in positions
+        reset = client.put(f"{API}/topology/layout", json={"positions": {}})
+        assert reset.status_code == 204
+        assert client.get(f"{API}/topology").json()["positions"] == {}
+
+        # Unknown declared node: 404 topology_node_not_found, to edit or to remove.
+        body = {"kind": "note", "label": "?"}
+        missing = client.put(f"{API}/topology/nodes/999999", json=body)
+        assert missing.status_code == 404 and code(missing) == "topology_node_not_found"
+        missing = client.delete(f"{API}/topology/nodes/999999")
+        assert missing.status_code == 404 and code(missing) == "topology_node_not_found"
+        assert not any(t == "topology.node_removed" for t, _ in published)
+
+        assert client.delete(f"{API}/topology/nodes/{node['id']}").status_code == 204
+        assert ("topology.node_removed", {"target": "Box"}) in published
+    finally:
+        bus.publish = real_publish
+
+
 def test_put_an_app_behind_the_vpn(client: Any) -> None:
     import yaml
     from helpers import code
