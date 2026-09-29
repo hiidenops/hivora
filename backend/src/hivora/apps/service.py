@@ -14,6 +14,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.compose_check import problems as compose_problems
+from hivora.apps.core import queue_revision, secret_context, store_secrets
 from hivora.apps.files import tree_size
 from hivora.apps.models import (
     Application,
@@ -181,10 +182,6 @@ def slugify(text: str) -> str:
 
 def vars_of_host(host: HostInfo) -> dict[str, Any]:
     return {f: getattr(host, f) for f in host.__slots__}  # slots dataclass: no __dict__
-
-
-def secret_context(app_id: int, key: str) -> str:
-    return f"app:{app_id}:{key}"
 
 
 class AppService:
@@ -454,18 +451,7 @@ class AppService:
             version = await self._template_version(session, plan.entry)
             app.template_version_id = version.id
             await session.execute(delete(AppSecret).where(AppSecret.app_id == app.id))
-            for key, value in plan.form.secrets.items():
-                sealed = self.box.seal(Purpose.APP_SECRET, value, secret_context(app.id, key))
-                session.add(
-                    AppSecret(
-                        app_id=app.id, key=key, ciphertext=sealed.ciphertext, nonce=sealed.nonce
-                    )
-                )
-            # The declared services now describe the new revision. Delete the old
-            # ones first (orphan cascade + flush): same names, unique per app.
-            app.services.clear()
-            await session.flush()
-            app.services = _services_from(plan.compiled)
+            store_secrets(session, self.box, app.id, plan.form.secrets)
             revision = AppRevision(
                 app_id=app.id, number=upd.number, inputs=plan.form.values,
                 compose_yaml=plan.compiled.compose_yaml, diff_from_previous=upd.diff,
@@ -473,17 +459,10 @@ class AppService:
                 overrides=plan.overrides.model_dump(exclude_defaults=True) or None,
                 created_at=self.clock.now(), status=RevisionStatus.PENDING,
             )  # fmt: skip
-            session.add(revision)
-            await session.flush()
-            app.desired_state = DesiredState.RUNNING
-            job = self.jobs.add(
-                session,
-                JobKind.UPDATE,
-                app_id=app.id,
-                app_slug=app.slug,
-                params={"revision_id": revision.id}
-                | ({"reset_volumes": upd.reset_volumes} if upd.reset_fields else {}),
-            )
+            job = await queue_revision(
+                session, self.jobs, app, revision, _services_from(plan.compiled),
+                {"reset_volumes": upd.reset_volumes} if upd.reset_fields else None,
+            )  # fmt: skip
         self.jobs.wake()
         self.bus.publish(event, app=app.slug, revision=upd.number, job=job.id)
         return job
@@ -682,9 +661,6 @@ class AppService:
                 raise PortConflictError("host ports already in use", conflicts=conflicts)
             app = plan.app
             latest = await self._latest_revision(session, app.id)
-            app.services.clear()
-            await session.flush()
-            app.services = plan.services
             revision = AppRevision(
                 app_id=app.id, number=(latest.number if latest else 0) + 1,
                 inputs=dict(latest.inputs) if latest else {}, compose_yaml=compose_yaml,
@@ -693,11 +669,7 @@ class AppService:
                 template_version_id=latest.template_version_id if latest else None,
                 overrides=latest.overrides if latest else None,
             )  # fmt: skip
-            session.add(revision)
-            await session.flush()
-            app.desired_state = DesiredState.RUNNING
-            job = self.jobs.add(session, JobKind.UPDATE, app_id=app.id, app_slug=app.slug,
-                                params={"revision_id": revision.id})  # fmt: skip
+            job = await queue_revision(session, self.jobs, app, revision, plan.services)
         self.jobs.wake()
         self.bus.publish(event, app=app.slug, revision=revision.number, job=job.id)
         return job
@@ -831,13 +803,7 @@ class AppService:
             )  # fmt: skip
             session.add(app)
             await session.flush()
-            for key, value in plan.form.secrets.items():
-                sealed = self.box.seal(Purpose.APP_SECRET, value, secret_context(app.id, key))
-                session.add(
-                    AppSecret(
-                        app_id=app.id, key=key, ciphertext=sealed.ciphertext, nonce=sealed.nonce
-                    )
-                )
+            store_secrets(session, self.box, app.id, plan.form.secrets)
             revision = AppRevision(
                 app_id=app.id, number=1, inputs=plan.form.values,
                 compose_yaml=plan.compiled.compose_yaml, created_at=self.clock.now(),
