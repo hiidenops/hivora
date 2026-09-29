@@ -13,6 +13,8 @@ from hivora.core.errors import ValidationError
 from hivora.crypto.cipher import Purpose, SecretBox
 from hivora.jobs import Job, JobKind, JobQueue
 
+LABEL_COMPOSE_SERVICE = "com.docker.compose.service"
+
 
 class UnsupportedArchitectureError(ValidationError):
     code = "unsupported_architecture"
