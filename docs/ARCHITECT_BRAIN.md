@@ -1,6 +1,6 @@
 # ARCHITECT_BRAIN — mémoire architecturale de Hivora
 
-*Créé le 29/09/2026, à la suite du découpage de `AppService`.*
+*Créé le 29/09/2026, à la suite du découpage de `AppService` ; mis à jour le même jour après le découpage de `apps/api.py`.*
 
 Ce document garde **pourquoi** le code est organisé ainsi, et les règles qui empêchent de retomber dans les travers corrigés. Il complète :
 
@@ -36,7 +36,7 @@ En cas de contradiction, `CLAUDE.md` l'emporte, puis le document de référence,
 | 4 | `e1e6263` | `apps/compose_edit.py` : `ComposeEdit` (+ requêtes partagées dans `core`) | 767 | 598 |
 | 5a | `1c4e4fc` | `AppPlanner` dans `core.py` (compilation partagée) | 593 | 471 |
 | 5b | `705031f` | `apps/revisions.py` : `Revisions` | 412 | 320 |
-| 6 | voir `git log` | `apps/lifecycle.py` : `Deployer` + `Lifecycle` (deux classes pour rester sous 10 dépendances) | 315 | 236 |
+| 6 | `76aae69` | `apps/lifecycle.py` : `Deployer` + `Lifecycle` (deux classes pour rester sous 10 dépendances) | 315 | 236 |
 
 À chaque étape : 208 tests backend, `mypy` strict, `ruff`, parcours e2e, tous verts, **sans aucune modification de test ni de route**.
 
@@ -62,6 +62,32 @@ service (façade AppService) → tous
 | Deux fois, une commande de tests « ciblés » a affiché `no tests ran` (fichier inexistant, liste mal formée) | Un résultat de tests sans nombre de tests passés ne vaut rien (§10) |
 | `core.py` a grossi à 340 lignes en recevant `AppPlanner` | Un socle a aussi un seuil ; le dépasser déclenche une extraction dédiée (§7, §12) |
 | Crash « database is locked » (28/09) : transaction SQLite ouverte pendant un `docker exec` WireGuard | Jamais d'I/O externe (Docker, réseau, sous-processus) dans une transaction d'écriture (§9) |
+
+### Suite : le découpage de `apps/api.py` (29/09/2026)
+
+`apps/api.py` (647 lignes, 27 routes, 30 modèles) est devenu le paquet `apps/api/`, **un fichier de routes par sous-service** :
+
+| Étape | Commit | Contenu | `__init__.py` |
+|---|---|---|---|
+| 1 | `324d38b` | paquet `apps/api/` + `common.py` (modèles et conversions partagés, réexportés pour `pyapps` et `backups`) | 563 |
+| 2 | `13ecbec` | `adoption.py`, `lifecycle.py` (2 routeurs), `compose_edit.py` | 486 |
+| 3 | `0af93c8` | `deploy.py` (2 routeurs + `POST ""` enregistré par le parent) | 390 |
+| 4 | `465971b` | `revisions.py` (2 routeurs ; contournement `ZoneIn`) | 262 |
+| 5 | `e283b3f` | `queries.py` (`GET ""` enregistré par le parent) | 56 |
+
+Préalable (`4ca33ed`) : `frontend/lib/api/openapi.json` n'était plus à jour depuis le lot I (3 routes pare-feu absentes), régénéré avant tout.
+
+À chaque étape : **ordre des 27 routes identique** (méthode, chemin, nom comparés ligne à ligne), **schéma OpenAPI identique octet par octet et en contenu**, 208 tests, `mypy`, `ruff`, e2e.
+
+Leçons ajoutées :
+
+| Problème | Leçon devenue règle |
+|---|---|
+| Les routes d'un même sous-domaine sont réparties dans l'ordre public (`zone` entre les actions et la suppression, `/plan` avant l'adoption…) | L'ordre d'enregistrement est l'ordre de recherche de FastAPI : on le garde, avec **plusieurs routeurs par fichier** s'il le faut, jamais en réordonnant (§10) |
+| FastAPI refuse une route au chemin vide (`""`) dans un routeur inclus sans préfixe | La fonction vit dans son fichier, le routeur parent l'enregistre à son rang (`router.post("")(deploy.deploy)`) |
+| Deux modèles `ZoneIn` (apps, zones) : FastAPI nomme alors leur schéma d'après le module ; déplacer la classe renommait le schéma public | Vérifier l'unicité des noms de modèles déplacés ; en cas de doublon, `__module__` fixé **dans le corps de la classe** (après la création, c'est trop tard) ou renommage dans un commit séparé qui change le contrat |
+| `openapi.json` versionné était périmé : la comparaison au schéma versionné aurait masqué un écart | Comparer aussi au schéma exporté depuis `HEAD` (copie de travail propre) ; régénérer le fichier versionné dès qu'une route change (§10) |
+| Un échec e2e isolé n'a pas pu être expliqué : seule la dernière ligne de sortie était gardée | Conserver la sortie complète de l'e2e dans un fichier ; un échec non expliqué se signale, ne s'efface pas en relançant (§10) |
 
 ---
 
@@ -131,6 +157,7 @@ Où placer quoi :
 - **Code partagé par plusieurs sous-modules** : dans le socle (`core`). S'il a un état (dépendances), une classe dédiée (`AppPlanner`) ; sinon, des fonctions.
 - **Lecture partagée** (`current_settings`, `vpns_reaching`) : dans le socle, jamais dans le sous-module d'écriture. Sinon on crée une dépendance entre sous-modules frères.
 - **Un fichier par sous-domaine**, nommé par ce qu'il fait (`revisions.py`, `adoption.py`), pas par un motif technique (`helpers.py`, `utils.py`, `manager.py`).
+- **Côté routes, le même découpage que côté services** : `apps/api/<sous-domaine>.py` n'appelle que le sous-service du même nom ; les modèles de réponse partagés vont dans `apps/api/common.py`, et `__init__.py` ne fait qu'assembler les routeurs dans l'ordre public.
 
 ## 6. Critères pour refuser un refactoring
 
@@ -161,20 +188,36 @@ On refuse, ou on reporte, un refactoring quand :
 
 **Seuil bloquant** : aucune nouvelle fonction ne s'ajoute à ce fichier avant son découpage.
 
-Situation au 29/09/2026 :
+Situation au 29/09/2026 (commit `e283b3f`, après les deux découpages) :
 
 | Fichier | Taille | Niveau |
 |---|---|---|
-| `apps/service.py` | 315 lignes, classe 236 | sous les seuils (étape 6 faite) ; l'étape 7 retirerait les relais |
-| `apps/core.py` | 340 lignes | alerte ; sortir `AppPlanner` dans `apps/planner.py` |
-| `apps/api.py` | 647 lignes | bloquant ; même découpage à faire |
-| `vpn/service.py` | 492 lignes | alerte |
-| `features/topology/topology-view.tsx` | ~540 lignes | bloquant |
+| `features/topology/topology-view.tsx` | 541 lignes | **bloquant** (composant React > 500) |
+| `vpn/service.py` | 491 lignes | alerte |
+| `templates/schema.py` | 496 lignes | alerte ; modèles déclaratifs du format `hivora/v1`, moins risqué qu'un service, à surveiller |
+| `auth/service.py` | 424 lignes | alerte |
+| `features/firewall/firewall-panel.tsx` | 372 lignes | alerte (composant React > 300) |
+| `docker_gateway/local.py` | 370 lignes | sous le seuil ; à surveiller (adaptateur unique du socket) |
+| `apps/core.py` | 340 lignes | alerte (socle > 300) ; sortir `AppPlanner` dans `apps/planner.py` |
+| `features/deploy/generated-form.tsx` | 343 lignes | alerte (composant React > 300) |
+| `features/activity/host-charts.tsx` | 321 lignes | alerte (composant React > 300) |
+| `apps/service.py` | 315 lignes, classe 236 | **résolu** (1 038 → 315) ; reste une façade de relais |
+| `apps/api/` | 8 fichiers, 35 à 225 lignes | **résolu** (647 → 56 pour `__init__.py`) |
+| `hostfw/service.py` | 355 lignes | sous les seuils |
+
+Recommandations, par ordre de rentabilité :
+
+1. **Routes fines** : remonter dans le service les requêtes SQL restées dans `apps/api/queries.py` (`list_apps`, `get_app`, `get_compose`, `list_revisions`) et `apps/api/revisions.py` (`get_settings`) (§1.5).
+2. **`AppPlanner` dans `apps/planner.py`** : `core.py` repasse sous 300 lignes.
+3. **Étape 7 de `AppService`** : brancher les appelants (`api`, `vpn`, `games`, `topology`, `pyapps`, `backups`, `tasks`) sur les sous-services, puis supprimer les relais ; c'est aussi ce qui fera baisser ses liens dans Graphify (§13).
+4. **`topology-view.tsx`** (seuil bloquant) : extraire le panneau d'inspection, le gestionnaire de liens et l'export.
+5. **`vpn/service.py`** : même méthode que pour `apps` (socle `addressing` / `acl` purs, application par exec à part), et mutations par `jobs`.
+6. **`ZoneIn`** : renommer le modèle (ex. `AppZoneIn`) pour supprimer le contournement de `__module__` ; commit séparé, le contrat OpenAPI change.
 
 ## 8. Règles concernant `Runtime` et les services transverses
 
 1. **`Runtime` est la racine de composition, pas un annuaire.** Son rôle est de construire les services (`build`), de les démarrer et de les arrêter. Il ne doit pas être passé aux services métier.
-2. **Aucun nouveau service ne reçoit `Runtime`.** Il reçoit ses dépendances explicites, comme `AppService`, `CustomImages`, `Adoption`, `ComposeEdit`, `Revisions`.
+2. **Aucun nouveau service ne reçoit `Runtime`.** Il reçoit ses dépendances explicites, comme `AppService`, `AppPlanner`, `CustomImages`, `Adoption`, `ComposeEdit`, `Revisions`, `Deployer`, `Lifecycle`.
    - *Dette connue* : `vpn`, `topology`, `tasks`, `pyapps`, `hostfw` et `realtime` reçoivent `Runtime`, avec des imports différés dans `runtime.py`, donc un cycle masqué. À corriger module par module, en commençant par ceux qui n'utilisent que 2 ou 3 attributs.
 3. **Exception tolérée : les adaptateurs de sortie** (`realtime/ws`, `realtime/console`, `realtime/logs`, routes FastAPI via `RuntimeDep`). Ils sont en bordure du système et ne sont importés par aucun service.
 4. **Services transverses** (`core.events.EventBus`, `core.clock`, `core.redact`, `crypto`, `audit`) :
@@ -225,6 +268,7 @@ Situation au 29/09/2026 :
 4. **Types déplacés** : réexport explicite `Y as Y` dans l'ancien fichier.
 5. **Prérequis de dépendance** (un type ou une requête à sortir d'abord) : le faire dans l'étape, en l'expliquant, ou dans un commit préparatoire (5a avant 5b).
 6. **Une étape = un sous-module = un commit.**
+7. **Routes déplacées** : garder l'ordre d'enregistrement exact (plusieurs routeurs par fichier si besoin, route au chemin vide enregistrée par le routeur parent), les noms de fonctions (`operationId`) et les tags ; vérifier l'unicité des noms de modèles déplacés.
 
 **C. Vérifications, toutes obligatoires, en lisant les nombres** :
 
@@ -232,10 +276,10 @@ Situation au 29/09/2026 :
 2. `mypy` en mode strict.
 3. **Tests ciblés** sur les fichiers concernés. Vérifier que le nombre de tests passés est > 0 ; `no tests ran` est un échec de la commande, pas un succès.
 4. `pytest` complet (référence au 29/09 : 208 passés).
-5. Parcours e2e Playwright.
+5. Parcours e2e Playwright, **sortie complète conservée** ; un échec non expliqué est signalé, même si la relance passe.
 6. **Aucun cycle** : le nouveau fichier n'importe ni la façade ni un module qui l'importe.
 7. **Diff relu** : aucun code dupliqué, aucun import mort, aucune logique modifiée.
-8. **API** : aucune route modifiée. En cas de doute, régénérer le schéma (`npm run gen:api`) et vérifier que le diff est vide.
+8. **API** : exporter le schéma OpenAPI et le comparer **octet par octet et en contenu** (opérations, schémas, ordre des chemins) au schéma versionné, lui-même vérifié à jour par rapport à `HEAD`. Routes déplacées : comparer aussi l'ordre des routes (méthode, chemin, nom).
 
 **D. Après** :
 
@@ -284,11 +328,11 @@ Le graphe est dans `graphify-out/` (non versionné, reconstruit par un hook git 
   - `graphify path "<A>" "<B>"` : comment deux éléments sont reliés (détecter une dépendance indésirable) ;
   - `graphify explain "<concept>"` : vue ciblée d'un concept.
 - **Revue d'ensemble** (avant un gros lot, ou toutes les ~10 features) : lire `GRAPH_REPORT.md` et relever :
-  - **God Nodes** : comparer le nombre de liens avec le relevé précédent (`AppService` : 57 au 28/09). Une hausse sur un service métier est un signal (§12).
+  - **God Nodes** : comparer le nombre de liens avec le relevé précédent (`AppService` : 57 au 28/09 ; 62 au 29/09, commit `e283b3f`). Une hausse sur un service métier est un signal (§12). *Cas particulier* : une façade de relais garde beaucoup de liens (un par sous-service et par relais) même quand elle ne contient plus de logique ; sa baisse viendra de la suppression des relais (étape 7), pas de nouveaux découpages.
   - **Import Cycles** : doit rester « None detected ». Attention : Graphify ne voit pas les cycles masqués par imports différés ; les chercher à la main (`grep` des imports dans les fonctions et sous `TYPE_CHECKING`).
   - **Communautés à faible cohésion** avec beaucoup de nœuds : candidates au découpage.
   - **Connexions surprenantes** entre modules censés être indépendants.
-- **Relevé de référence** : noter dans `PROGRESS.md` les chiffres clés (nœuds, liens, top 10 des God Nodes) à chaque revue, pour comparer dans le temps.
+- **Relevé de référence** : noter dans `PROGRESS.md` les chiffres clés (nœuds, liens, top 10 des God Nodes) à chaque revue, pour comparer dans le temps. Dernier relevé (29/09, `e283b3f`) : 3 402 nœuds, 9 206 liens ; God Nodes métier : `AppService` (62), `ValidationError` (57), `EventBus` (42). Les sections de `docs/PROGRESS.md` apparaissent aussi dans le graphe (« Réseau et applications » : 91 liens) : ce sont des références documentaires, pas du couplage de code.
 - **Mesures complémentaires** hors Graphify : taille des fichiers et classes (script `ast`), dépendances sortantes par module (analyse des imports `hivora.*`).
 
 ## 14. Checklist architecture avant chaque gros commit
@@ -315,7 +359,8 @@ Le graphe est dans `graphify-out/` (non versionné, reconstruit par un hook git 
 - [ ] `mypy` strict : « no issues found ».
 - [ ] Tests ciblés : nombre de tests passés > 0.
 - [ ] `pytest` complet : tous verts (208 au 29/09, jamais moins sans raison notée).
-- [ ] e2e Playwright : vert.
+- [ ] e2e Playwright : vert (sortie complète gardée ; tout échec non expliqué est signalé).
+- [ ] Routes touchées : ordre des routes et schéma OpenAPI identiques (octet par octet et en contenu), ou changement de contrat explicitement validé.
 - [ ] Frontend touché : `npm run check:bundle` sous 520 Ko gzip par page.
 
 **Traçabilité**
