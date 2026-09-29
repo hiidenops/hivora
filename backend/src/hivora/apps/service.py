@@ -1,20 +1,31 @@
 """Application commands. Every mutation is recorded as intent, then run as a job."""
 
 import difflib
-import hashlib
 import re
-import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-import yaml
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.compose_check import problems as compose_problems
-from hivora.apps.core import queue_revision, secret_context, store_secrets
+from hivora.apps.core import (  # re-exported: imported from here by other modules
+    DeployRequest as DeployRequest,
+)
+from hivora.apps.core import (
+    UnsupportedArchitectureError as UnsupportedArchitectureError,
+)
+from hivora.apps.core import (
+    queue_revision,
+    secret_context,
+    store_secrets,
+)
+from hivora.apps.core import (
+    slugify as slugify,
+)
+from hivora.apps.custom_images import CustomImages
 from hivora.apps.files import tree_size
 from hivora.apps.models import (
     Application,
@@ -57,8 +68,7 @@ from hivora.templates import (
 )
 from hivora.templates.catalog import CUSTOM_SOURCE, TemplateInvalidError, parse_template
 from hivora.templates.compiler import PortPlan
-from hivora.templates.custom import CustomApp, CustomEnv, CustomPort
-from hivora.templates.custom import manifest as custom_manifest
+from hivora.templates.custom import CustomEnv, CustomPort
 from hivora.templates.expressions import secret_env_name
 from hivora.templates.models import TemplateVersion
 from hivora.templates.overrides import Overrides
@@ -75,19 +85,6 @@ class AppNotFoundError(NotFoundError):
 
 class PortConflictError(ConflictError):
     code = "port_conflict"
-
-
-class UnsupportedArchitectureError(ValidationError):
-    code = "unsupported_architecture"
-
-
-@dataclass(frozen=True, slots=True)
-class DeployRequest:
-    template: str
-    name: str
-    inputs: dict[str, Any] = field(default_factory=dict)
-    slug: str | None = None
-    zone: str | None = None  # zone slug; None: "unclassified"
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,12 +171,6 @@ class RemovalPlan:
     data: list[str]  # bind-mounted data: removed only on explicit request
 
 
-def slugify(text: str) -> str:
-    ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
-    slug = re.sub(r"[^a-z0-9]+", "-", ascii_text.lower()).strip("-")
-    return slug[:50].strip("-") or "app"
-
-
 def vars_of_host(host: HostInfo) -> dict[str, Any]:
     return {f: getattr(host, f) for f in host.__slots__}  # slots dataclass: no __dict__
 
@@ -203,8 +194,6 @@ class AppService:
         registry: Registry | None = None,
     ) -> None:
         self.gateway = gateway
-        self.registry = registry or Registry()
-        self._inspected: dict[str, tuple[float, ImageInfo]] = {}
         self.settings = settings
         self.sessions = sessions
         self.catalog = catalog
@@ -216,6 +205,21 @@ class AppService:
         self.clock = clock or SystemClock()
         self.secret_settings = secret_settings
         self.public_address = public_address
+        self.custom = CustomImages(sessions=sessions, catalog=catalog, clock=self.clock,
+                                   registry=registry)  # fmt: skip
+
+    # Free images live in CustomImages; kept here for the API and the tests.
+    @property
+    def registry(self) -> Registry:
+        return self.custom.registry
+
+    @registry.setter
+    def registry(self, value: Registry) -> None:
+        self.custom.registry = value
+
+    @property
+    def _inspected(self) -> dict[str, tuple[float, ImageInfo]]:
+        return self.custom.inspected
 
     @property
     def host(self) -> HostInfo:
@@ -478,39 +482,12 @@ class AppService:
         if entry.source != CUSTOM_SOURCE:
             latest = entry.template.metadata.version
             return UpgradeStatus("template", current.version, latest, latest != current.version)
-        svc = entry.template.services[entry.template.main_service]
-        tag, _, digest = svc.tag.partition("@")
-        info = await self._inspect_cached(f"{svc.image}:{tag}")
-        return UpgradeStatus("image", f"{tag}@{digest[:19]}", f"{tag}@{info.digest[:19]}",
-                             info.digest != digest)  # fmt: skip
-
-    async def _inspect_cached(self, ref: str) -> ImageInfo:
-        # ponytail: in-memory 10 min cache per image, enough for a page refreshed often
-        now = self.clock.now().timestamp()
-        hit = self._inspected.get(ref)
-        if hit and now - hit[0] < 600:
-            return hit[1]
-        info = await self.registry.inspect(ref, host_arch())
-        self._inspected[ref] = (now, info)
-        return info
+        return UpgradeStatus("image", *await self.custom.image_status(entry))
 
     async def _upgrade_entry(self, session: AsyncSession, app: Application) -> CatalogEntry:
         """The entry an upgrade applies: the catalog's, or the free image re-pinned."""
         entry = await self._entry_of(session, app)
-        if entry.source != CUSTOM_SOURCE:
-            return entry
-        doc = yaml.safe_load(entry.manifest)
-        svc = doc["services"][entry.template.main_service]
-        tag = str(svc["tag"]).partition("@")[0]
-        self._inspected.pop(f"{svc['image']}:{tag}", None)  # applying: ask the registry again
-        info = await self._inspect_cached(f"{svc['image']}:{tag}")
-        svc["tag"] = f"{tag}@{info.digest}"
-        previous = int(str(doc["metadata"]["version"]).rsplit(".", 1)[-1])
-        now = int(self.clock.now().timestamp())
-        doc["metadata"]["version"] = f"1.0.{max(now, previous + 1)}"  # always a new version
-        text = yaml.safe_dump(doc, sort_keys=False, allow_unicode=True)
-        return CatalogEntry(parse_template(text, require_pinned=True), text,
-                            hashlib.sha256(text.encode()).hexdigest(), CUSTOM_SOURCE)  # fmt: skip
+        return entry if entry.source != CUSTOM_SOURCE else await self.custom.repin(entry)
 
     async def plan_upgrade(self, session: AsyncSession, app_id: int) -> UpdatePlan:
         app = await self.get(session, app_id)
@@ -679,37 +656,10 @@ class AppService:
         self, name: str, image: str, zone: str | None, ports: list[CustomPort],
         volumes: list[str], env: list[CustomEnv],
     ) -> DeployRequest:  # fmt: skip
-        """Read the image from its registry, pin it, generate its template."""
-        arch = host_arch()
-        info = await self.registry.inspect(image, arch)
-        if arch not in info.platforms:
-            raise UnsupportedArchitectureError(
-                f"{info.ref.name}:{info.ref.tag} has no {arch} build", arch=arch,
-                platforms=info.platforms,
-            )  # fmt: skip
-        spec = CustomApp(slugify(name), name, info.ref.name, f"{info.ref.tag}@{info.digest}",
-                         info.platforms, ports, volumes, env)  # fmt: skip
-        try:
-            text = custom_manifest(spec, version=f"1.0.{int(self.clock.now().timestamp())}")
-            entry = self.catalog.add_custom(text)
-        except (ValueError, TemplateInvalidError) as exc:
-            raise ValidationError(str(exc)[:300]) from exc
-        inputs: dict[str, Any] = {f"env_{i}": e.value for i, e in enumerate(env)}
-        inputs |= {f"port_{i}": p.host for i, p in enumerate(ports)}
-        return DeployRequest(entry.slug, name, inputs, zone=zone)
+        return await self.custom.request(name, image, zone, ports, volumes, env)
 
     async def load_custom_templates(self) -> None:
-        """Templates generated for free images live in the database: register them."""
-        async with self.sessions() as session:
-            rows = await session.scalars(
-                select(TemplateVersion.manifest).where(TemplateVersion.source == CUSTOM_SOURCE)
-                .order_by(TemplateVersion.created_at)
-            )  # fmt: skip
-            for text in rows:
-                try:
-                    self.catalog.add_custom(text)
-                except TemplateInvalidError:  # pragma: no cover - written by us
-                    continue
+        await self.custom.load_templates()
 
     async def move_zone(self, app_id: int, zone_slug: str | None) -> Job:
         """Put the app in another zone (or none): a new revision joins the zone's network."""
