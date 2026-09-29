@@ -4,10 +4,8 @@ from typing import Any, Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from sqlalchemy import delete
 
-from hivora.core.errors import NotFoundError
-from hivora.topology.models import TopologyEdge, TopologyLayout, TopologyNode
+from hivora.topology.declared import DeclaredLayer
 from hivora.topology.service import build
 from hivora.web.deps import Operator, RuntimeDep, Viewer
 
@@ -45,8 +43,8 @@ class LayoutIn(BaseModel):
     positions: dict[str, Position] = Field(max_length=2000)
 
 
-class NodeNotFoundError(NotFoundError):
-    code = "topology_node_not_found"
+def declared(rt: RuntimeDep) -> DeclaredLayer:
+    return DeclaredLayer(rt.sessions, rt.bus)
 
 
 @router.get("")
@@ -58,60 +56,31 @@ async def graph(_: Viewer, rt: RuntimeDep) -> GraphOut:
 
 @router.post("/nodes", status_code=201)
 async def add_node(body: DeclaredIn, _: Operator, rt: RuntimeDep) -> dict[str, int]:
-    async with rt.sessions() as session, session.begin():
-        node = TopologyNode(kind=body.kind, label=body.label)
-        session.add(node)
-        await session.flush()
-        nid = node.id
-    rt.bus.publish("topology.node_added", target=body.label, kind=body.kind)
-    return {"id": nid}
+    return {"id": await declared(rt).add_node(body.kind, body.label)}
 
 
 @router.put("/nodes/{node_id}", status_code=204)
 async def edit_node(node_id: int, body: DeclaredIn, _: Operator, rt: RuntimeDep) -> None:
-    async with rt.sessions() as session, session.begin():
-        node = await session.get(TopologyNode, node_id)
-        if node is None:
-            raise NodeNotFoundError("unknown node", id=node_id)
-        node.kind, node.label = body.kind, body.label
+    await declared(rt).edit_node(node_id, body.kind, body.label)
 
 
 @router.delete("/nodes/{node_id}", status_code=204)
 async def remove_node(node_id: int, _: Operator, rt: RuntimeDep) -> None:
-    key = f"decl:{node_id}"
-    async with rt.sessions() as session, session.begin():
-        node = await session.get(TopologyNode, node_id)
-        if node is None:
-            raise NodeNotFoundError("unknown node", id=node_id)
-        await session.delete(node)
-        await session.execute(
-            delete(TopologyEdge).where((TopologyEdge.source == key) | (TopologyEdge.target == key))
-        )
-        await session.execute(delete(TopologyLayout).where(TopologyLayout.key == key))
-    rt.bus.publish("topology.node_removed", target=node.label)
+    await declared(rt).remove_node(node_id)
 
 
 @router.post("/edges", status_code=201)
 async def add_edge(body: EdgeIn, _: Operator, rt: RuntimeDep) -> dict[str, int]:
-    async with rt.sessions() as session, session.begin():
-        edge = TopologyEdge(source=body.source, target=body.target, label=body.label)
-        session.add(edge)
-        await session.flush()
-        eid = edge.id
-    return {"id": eid}
+    return {"id": await declared(rt).add_edge(body.source, body.target, body.label)}
 
 
 @router.delete("/edges/{edge_id}", status_code=204)
 async def remove_edge(edge_id: int, _: Operator, rt: RuntimeDep) -> None:
-    async with rt.sessions() as session, session.begin():
-        await session.execute(delete(TopologyEdge).where(TopologyEdge.id == edge_id))
+    await declared(rt).remove_edge(edge_id)
 
 
 @router.put("/layout", status_code=204)
 async def save_layout(body: LayoutIn, _: Operator, rt: RuntimeDep) -> None:
     """Positions after a drag; an empty map resets to the automatic layout."""
-    async with rt.sessions() as session, session.begin():
-        if not body.positions:
-            await session.execute(delete(TopologyLayout))
-        for key, pos in body.positions.items():
-            await session.merge(TopologyLayout(key=key[:40], x=pos.x, y=pos.y, w=pos.w, h=pos.h))
+    positions = {key: (p.x, p.y, p.w, p.h) for key, p in body.positions.items()}
+    await declared(rt).save_layout(positions)
