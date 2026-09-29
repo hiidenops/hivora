@@ -4,9 +4,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy import delete, select
 
-from hivora.core.errors import NotFoundError
 from hivora.jobs.models import Job, JobKind, JobStatus
 from hivora.web.deps import Admin, Operator, RuntimeDep, Viewer
 
@@ -52,20 +50,13 @@ async def list_jobs(
     _: Viewer, rt: RuntimeDep, app_id: int | None = None,
     limit: int = Query(50, ge=1, le=500),
 ) -> list[JobOut]:  # fmt: skip
-    query = select(Job).order_by(Job.id.desc()).limit(limit)
-    if app_id is not None:
-        query = query.where(Job.app_id == app_id)
-    async with rt.sessions() as session:
-        return [job_out(j) for j in await session.scalars(query)]
+    return [job_out(j) for j in await rt.jobs.recent(app_id, limit)]
 
 
 @router.get("/{job_id}")
 async def get_job(job_id: int, _: Viewer, rt: RuntimeDep) -> JobDetailOut:
-    async with rt.sessions() as session:
-        job = await session.get(Job, job_id)
-        if job is None:
-            raise NotFoundError("job not found")
-        return JobDetailOut(**job_out(job).model_dump(), log=job.log)
+    job = await rt.jobs.get(job_id)
+    return JobDetailOut(**job_out(job).model_dump(), log=job.log)
 
 
 @router.post("/{job_id}/cancel", status_code=202)
@@ -80,10 +71,4 @@ class ClearedOut(BaseModel):
 @router.delete("")
 async def clear_jobs(_: Admin, rt: RuntimeDep) -> ClearedOut:
     """Delete finished jobs and their logs; queued and running ones are kept."""
-    async with rt.sessions() as session, session.begin():
-        result = await session.execute(
-            delete(Job).where(Job.status.not_in((JobStatus.QUEUED, JobStatus.RUNNING)))
-        )
-    deleted = int(result.rowcount or 0)  # type: ignore[attr-defined]
-    rt.bus.publish("jobs.cleared", deleted=deleted)
-    return ClearedOut(deleted=deleted)
+    return ClearedOut(deleted=await rt.jobs.clear_finished())

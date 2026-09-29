@@ -13,7 +13,7 @@ from collections.abc import Awaitable, Callable, Iterable
 from contextlib import suppress
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.core.clock import Clock, SystemClock
@@ -157,6 +157,32 @@ class JobQueue:
                 return
         if task := self._running.get(job_id):
             task.cancel()
+
+    # --- history (read by the job routes) ------------------------------------
+    async def recent(self, app_id: int | None, limit: int) -> list[Job]:
+        """The newest jobs first, of one app or of all."""
+        query = select(Job).order_by(Job.id.desc()).limit(limit)
+        if app_id is not None:
+            query = query.where(Job.app_id == app_id)
+        async with self.sessions() as session:
+            return list(await session.scalars(query))
+
+    async def get(self, job_id: int) -> Job:
+        async with self.sessions() as session:
+            job = await session.get(Job, job_id)
+            if job is None:
+                raise NotFoundError("job not found")
+            return job
+
+    async def clear_finished(self) -> int:
+        """Delete finished jobs and their logs; queued and running ones are kept."""
+        async with self.sessions() as session, session.begin():
+            result = await session.execute(
+                delete(Job).where(Job.status.not_in((JobStatus.QUEUED, JobStatus.RUNNING)))
+            )
+        deleted = int(result.rowcount or 0)  # type: ignore[attr-defined]
+        self.bus.publish("jobs.cleared", deleted=deleted)
+        return deleted
 
     # --- lifecycle ----------------------------------------------------------
     async def start(self) -> None:
