@@ -8,9 +8,9 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from hivora.apps.api import adoption, compose_edit, lifecycle
 from hivora.apps.api.common import (
     AppOut,
-    ConflictOut,
     PlanOut,
     PortOut,
     plan_out,
@@ -35,7 +35,7 @@ from hivora.templates.custom import CustomEnv, CustomPort
 from hivora.templates.models import TemplateVersion
 from hivora.templates.overrides import Overrides
 from hivora.templates.schema import Localized
-from hivora.web.deps import Admin, Operator, RuntimeDep, Viewer
+from hivora.web.deps import Operator, RuntimeDep, Viewer
 
 router = APIRouter(tags=["apps"])
 
@@ -131,16 +131,6 @@ class SettingsIn(BaseModel):
     overrides: Overrides | None = None  # None: keep the current advanced settings
 
 
-class ComposeIn(BaseModel):
-    compose_yaml: str = Field(min_length=1, max_length=200_000)
-
-
-class ComposePlanOut(BaseModel):
-    diff: str
-    problems: list[str]  # why it cannot be applied (empty: it can)
-    conflicts: list[ConflictOut]
-
-
 class ResetOut(BaseModel):
     fields: list[str]
     labels: list[Localized]  # of those fields, in the applied template
@@ -153,13 +143,6 @@ class UpdatePlanOut(PlanOut):
     diff: str
     reset: ResetOut | None  # set when applying erases the app data
     replaces_custom: bool = False  # the hand-written compose goes away
-
-
-class RemovalPlanOut(BaseModel):
-    slug: str
-    containers: list[str]
-    files: list[str]
-    data: list[str]
 
 
 def console_info(rt: RuntimeDep, template: str | None) -> ConsoleInfoOut:
@@ -285,33 +268,7 @@ class ImageOut(BaseModel):
     env: list[CustomEnvIn]
 
 
-class CandidateOut(BaseModel):
-    project: str  # its compose project name, the app id once adopted
-    services: list[str]
-    running: int
-    containers: int
-    working_dir: str | None  # where its compose file lives on the host
-
-
-class AdoptIn(BaseModel):
-    project: str = Field(min_length=1, max_length=63)
-    name: str = Field(default="", max_length=100)
-    zone: str | None = None
-
-
-@router.get("/discover")
-async def discover(_: Operator, rt: RuntimeDep) -> list[CandidateOut]:
-    """Compose stacks running on this Docker that Hivora does not manage yet."""
-    return [CandidateOut(project=c.project, services=c.services, running=c.running,
-                         containers=c.containers, working_dir=c.working_dir)
-            for c in rt.apps.candidates()]  # fmt: skip
-
-
-@router.post("/adopt", status_code=201)
-async def adopt(body: AdoptIn, _: Operator, rt: RuntimeDep) -> dict[str, int]:
-    """Manage a running stack from Hivora: metadata only, nothing is redeployed."""
-    app = await rt.apps.adopt(body.project, body.name.strip(), body.zone)
-    return {"id": app.id}
+router.include_router(adoption.router)
 
 
 @router.get("/images/inspect")
@@ -432,19 +389,7 @@ async def list_revisions(app_id: int, _: Viewer, rt: RuntimeDep) -> list[Revisio
         ]
 
 
-@router.post("/{app_id}/start", status_code=202)
-async def start(app_id: int, _: Operator, rt: RuntimeDep) -> JobRef:
-    return job_ref(await rt.apps.start(app_id))
-
-
-@router.post("/{app_id}/stop", status_code=202)
-async def stop(app_id: int, _: Operator, rt: RuntimeDep) -> JobRef:
-    return job_ref(await rt.apps.stop(app_id))
-
-
-@router.post("/{app_id}/restart", status_code=202)
-async def restart(app_id: int, _: Operator, rt: RuntimeDep) -> JobRef:
-    return job_ref(await rt.apps.restart(app_id))
+router.include_router(lifecycle.router)
 
 
 class ZoneIn(BaseModel):
@@ -457,16 +402,7 @@ async def move_zone(app_id: int, body: ZoneIn, _: Operator, rt: RuntimeDep) -> J
     return job_ref(await rt.apps.move_zone(app_id, body.zone))
 
 
-@router.get("/{app_id}/removal-plan")
-async def removal_plan(app_id: int, _: Operator, rt: RuntimeDep) -> RemovalPlanOut:
-    p = await rt.apps.removal_plan(app_id)
-    return RemovalPlanOut(slug=p.slug, containers=p.containers, files=p.files, data=p.data)
-
-
-@router.delete("/{app_id}", status_code=202)
-async def remove(app_id: int, _: Operator, rt: RuntimeDep, remove_data: bool = False) -> JobRef:
-    """Data is kept unless ``remove_data=true`` is passed explicitly."""
-    return job_ref(await rt.apps.remove(app_id, remove_data=remove_data))
+router.include_router(lifecycle.removal_router)
 
 
 @router.get("/{app_id}/settings")
@@ -547,17 +483,4 @@ async def restore(app_id: int, number: int, body: ApplyIn, _: Operator,
     return job_ref(await rt.apps.restore(app_id, number, reset_data=body.reset_data))
 
 
-@router.post("/{app_id}/compose/plan")
-async def plan_compose(app_id: int, body: ComposeIn, _: Admin, rt: RuntimeDep) -> ComposePlanOut:
-    """Check a hand-written compose file (resolved by Compose, then security checks)."""
-    async with rt.sessions() as session:
-        p = await rt.apps.plan_compose(session, app_id, body.compose_yaml)
-    conflicts = [ConflictOut(port=c.port, protocol=c.protocol, used_by=c.used_by,
-                             suggestion=c.suggestion) for c in p.conflicts]  # fmt: skip
-    return ComposePlanOut(diff=p.diff, problems=p.problems, conflicts=conflicts)
-
-
-@router.put("/{app_id}/compose", status_code=202)
-async def apply_compose(app_id: int, body: ComposeIn, _: Admin, rt: RuntimeDep) -> JobRef:
-    """Apply a hand-written compose file as a new revision (admin: it runs as written)."""
-    return job_ref(await rt.apps.apply_compose(app_id, body.compose_yaml))
+router.include_router(compose_edit.router)
