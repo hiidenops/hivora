@@ -119,7 +119,10 @@ def test_ss_and_jail_config() -> None:
     assert any(r.port == 51820 and r.protocol == "udp" and r.process == "" for r in rows)
     text = jail_config({"sshd": {"enabled": True, "maxretry": 3, "bantime": "1h"}})
     assert "[sshd]\nenabled = true\nmaxretry = 3\nbantime = 1h" in text
-    for bad in ({"ssh d": {}}, {"sshd": {"bantime": "1h; rm"}}, {"sshd": {"maxretry": 0}}):
+    bads: tuple[dict[str, dict[str, Any]], ...] = (
+        {"ssh d": {}}, {"sshd": {"bantime": "1h; rm"}}, {"sshd": {"maxretry": 0}},
+    )  # fmt: skip
+    for bad in bads:
         with pytest.raises(ValidationError):
             jail_config(bad)
 
