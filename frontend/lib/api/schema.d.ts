@@ -1161,6 +1161,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/host-firewall/fail2ban/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Jails */
+        get: operations["get_jails_api_v1_host_firewall_fail2ban_settings_get"];
+        /**
+         * Put Jails
+         * @description Writes /etc/fail2ban/jail.d/hivora.local, then reloads fail2ban.
+         */
+        put: operations["put_jails_api_v1_host_firewall_fail2ban_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/host-firewall/fail2ban/{jail}": {
         parameters: {
             query?: never;
@@ -1172,6 +1193,46 @@ export interface paths {
         put?: never;
         /** Jail Ip */
         post: operations["jail_ip_api_v1_host_firewall_fail2ban__jail__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-firewall/listening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open Ports
+         * @description What listens on the host, what opens it, and what UFW does about it.
+         */
+        get: operations["open_ports_api_v1_host_firewall_listening_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-firewall/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Host Routes
+         * @description The host's routing table (read-only) and the ports Docker forwards to apps.
+         */
+        get: operations["host_routes_api_v1_host_firewall_routes_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2363,6 +2424,20 @@ export interface components {
             /** Public Address */
             public_address: string | null;
         };
+        /** JailIn */
+        JailIn: {
+            /** Bantime */
+            bantime?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Findtime */
+            findtime?: string | null;
+            /** Maxretry */
+            maxretry?: number | null;
+        };
         /** JailIpIn */
         JailIpIn: {
             /**
@@ -2372,6 +2447,13 @@ export interface components {
             ban: boolean;
             /** Ip */
             ip: string;
+        };
+        /** JailsIn */
+        JailsIn: {
+            /** Jails */
+            jails: {
+                [key: string]: components["schemas"]["JailIn"];
+            };
         };
         /** JobDetailOut */
         JobDetailOut: {
@@ -5719,6 +5801,63 @@ export interface operations {
             };
         };
     };
+    get_jails_api_v1_host_firewall_fail2ban_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: {
+                            [key: string]: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    put_jails_api_v1_host_firewall_fail2ban_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JailsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DoneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     jail_ip_api_v1_host_firewall_fail2ban__jail__post: {
         parameters: {
             query?: never;
@@ -5750,6 +5889,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_ports_api_v1_host_firewall_listening_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    host_routes_api_v1_host_firewall_routes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

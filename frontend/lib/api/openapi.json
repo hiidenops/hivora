@@ -1685,6 +1685,54 @@
         "title": "IntegrationsOut",
         "type": "object"
       },
+      "JailIn": {
+        "properties": {
+          "bantime": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bantime"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "findtime": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Findtime"
+          },
+          "maxretry": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxretry"
+          }
+        },
+        "title": "JailIn",
+        "type": "object"
+      },
       "JailIpIn": {
         "properties": {
           "ban": {
@@ -1702,6 +1750,23 @@
           "ip"
         ],
         "title": "JailIpIn",
+        "type": "object"
+      },
+      "JailsIn": {
+        "properties": {
+          "jails": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JailIn"
+            },
+            "maxProperties": 50,
+            "title": "Jails",
+            "type": "object"
+          }
+        },
+        "required": [
+          "jails"
+        ],
+        "title": "JailsIn",
         "type": "object"
       },
       "JobDetailOut": {
@@ -7880,6 +7945,74 @@
         ]
       }
     },
+    "/api/v1/host-firewall/fail2ban/settings": {
+      "get": {
+        "operationId": "get_jails_api_v1_host_firewall_fail2ban_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "title": "Response Get Jails Api V1 Host Firewall Fail2Ban Settings Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Jails",
+        "tags": [
+          "host-firewall"
+        ]
+      },
+      "put": {
+        "description": "Writes /etc/fail2ban/jail.d/hivora.local, then reloads fail2ban.",
+        "operationId": "put_jails_api_v1_host_firewall_fail2ban_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JailsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Jails",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
     "/api/v1/host-firewall/fail2ban/{jail}": {
       "post": {
         "operationId": "jail_ip_api_v1_host_firewall_fail2ban__jail__post",
@@ -7927,6 +8060,57 @@
           }
         },
         "summary": "Jail Ip",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/listening": {
+      "get": {
+        "description": "What listens on the host, what opens it, and what UFW does about it.",
+        "operationId": "open_ports_api_v1_host_firewall_listening_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Open Ports Api V1 Host Firewall Listening Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Open Ports",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/routes": {
+      "get": {
+        "description": "The host's routing table (read-only) and the ports Docker forwards to apps.",
+        "operationId": "host_routes_api_v1_host_firewall_routes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Host Routes Api V1 Host Firewall Routes Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Host Routes",
         "tags": [
           "host-firewall"
         ]
