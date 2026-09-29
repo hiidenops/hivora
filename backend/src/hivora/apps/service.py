@@ -2,7 +2,6 @@
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -15,12 +14,9 @@ from hivora.apps.core import (
     LABEL_COMPOSE_SERVICE,
     AppPlanner,
     AppSettings,
-    conflict_dict,
     decrypt_secrets,
     get_app,
     latest_revision,
-    services_from,
-    store_secrets,
 )
 from hivora.apps.core import (  # re-exported: imported from here by other modules
     AppNotFoundError as AppNotFoundError,
@@ -41,12 +37,13 @@ from hivora.apps.core import (
     slugify as slugify,
 )
 from hivora.apps.custom_images import CustomImages
+from hivora.apps.lifecycle import Deployer, Lifecycle
+from hivora.apps.lifecycle import (  # re-exported: imported from here by other modules
+    RemovalPlan as RemovalPlan,
+)
 from hivora.apps.models import (
     Application,
     AppRevision,
-    DesiredState,
-    Origin,
-    RevisionStatus,
 )
 from hivora.apps.revisions import Revisions, UpgradeStatus
 from hivora.apps.revisions import (  # re-exported: imported from here by other modules
@@ -60,7 +57,7 @@ from hivora.core.events import EventBus
 from hivora.crypto.cipher import SecretBox
 from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
 from hivora.images.registry import ImageInfo, Registry
-from hivora.jobs import Job, JobKind, JobQueue
+from hivora.jobs import Job, JobQueue
 from hivora.state import StateStore, app_key
 from hivora.system.secrets import SecretSettings
 from hivora.templates import (
@@ -70,20 +67,10 @@ from hivora.templates import (
     FormValues,
     HostInfo,
     compile_template,
-    host_arch,
 )
 from hivora.templates.custom import CustomEnv, CustomPort
 from hivora.templates.models import TemplateVersion
 from hivora.templates.overrides import Overrides
-from hivora.zones import get_zone
-
-
-@dataclass(frozen=True, slots=True)
-class RemovalPlan:
-    slug: str
-    containers: list[str]
-    files: list[str]  # compose.yaml, .env: always removed
-    data: list[str]  # bind-mounted data: removed only on explicit request
 
 
 def vars_of_host(host: HostInfo) -> dict[str, Any]:
@@ -128,6 +115,10 @@ class AppService:
         self.adoption = Adoption(sessions=sessions, state=state, bus=bus, clock=self.clock)
         self.custom = CustomImages(sessions=sessions, catalog=catalog, clock=self.clock,
                                    registry=registry)  # fmt: skip
+        self.deployer = Deployer(planner=self.planner, sessions=sessions, catalog=catalog,
+                                 jobs=jobs, box=box, bus=bus, clock=self.clock)  # fmt: skip
+        self.lifecycle = Lifecycle(planner=self.planner, sessions=sessions, settings=settings,
+                                   runner=runner, state=state, jobs=jobs)  # fmt: skip
         self.revisions = Revisions(planner=self.planner, sessions=sessions, catalog=catalog,
                                    jobs=jobs, box=box, bus=bus, clock=self.clock,
                                    custom=self.custom, compose=self.compose)  # fmt: skip
@@ -158,20 +149,6 @@ class AppService:
 
     async def decrypt_secrets(self, session: AsyncSession, app_id: int) -> dict[str, str]:
         return await decrypt_secrets(session, self.box, app_id)
-
-    # --- deploy -------------------------------------------------------------
-    async def plan_deploy(self, session: AsyncSession, req: DeployRequest) -> DeployPlan:
-        entry = self.catalog.get(req.template)
-        if not entry.supports(host_arch()):
-            raise UnsupportedArchitectureError(entry.slug, arch=host_arch())
-        name = req.name.strip() or entry.template.metadata.name
-        slug = req.slug or await self._free_slug(session, slugify(name))
-        if req.slug and await session.scalar(
-            select(Application.id).where(Application.slug == slug)
-        ):
-            raise ConflictError("slug already used", slug=slug)
-        zone = await get_zone(session, req.zone) if req.zone else None
-        return await self.planner.plan(session, entry, slug, name, zone, req.inputs, revision=1)
 
     async def main_container(self, session: AsyncSession, app_id: int) -> tuple[
         Application, CatalogEntry | None, ContainerInfo | None
@@ -312,101 +289,27 @@ class AppService:
     async def _latest_revision(session: AsyncSession, app_id: int) -> AppRevision | None:
         return await latest_revision(session, app_id)
 
-    async def deploy(self, req: DeployRequest) -> tuple[Application, Job]:
-        async with self.sessions() as session, session.begin():
-            plan = await self.plan_deploy(session, req)
-            if plan.conflicts:
-                raise PortConflictError(
-                    "host ports already in use",
-                    conflicts=[conflict_dict(c) for c in plan.conflicts],
-                )
-            version = await self.planner.template_version(session, plan.entry)
-            app = Application(
-                slug=plan.slug, name=plan.name, zone_id=plan.zone.id if plan.zone else None,
-                origin=Origin.TEMPLATE, template_version_id=version.id,
-                desired_state=DesiredState.RUNNING, icon=None,
-                notes="", created_at=self.clock.now(), services=services_from(plan.compiled),
-            )  # fmt: skip
-            session.add(app)
-            await session.flush()
-            store_secrets(session, self.box, app.id, plan.form.secrets)
-            revision = AppRevision(
-                app_id=app.id, number=1, inputs=plan.form.values,
-                compose_yaml=plan.compiled.compose_yaml, created_at=self.clock.now(),
-                template_version_id=version.id,
-                status=RevisionStatus.PENDING,
-            )  # fmt: skip
-            session.add(revision)
-            await session.flush()
-            job = self.jobs.add(
-                session,
-                JobKind.DEPLOY,
-                app_id=app.id,
-                app_slug=app.slug,
-                params={"revision_id": revision.id},
-            )
-        self.jobs.wake()
-        self.bus.publish("app.created", app=app.slug, template=plan.entry.slug, job=job.id)
-        return app, job
+    # --- deploy, lifecycle, removal -------------------------------------------
+    async def plan_deploy(self, session: AsyncSession, req: DeployRequest) -> DeployPlan:
+        return await self.deployer.plan_deploy(session, req)
 
-    # --- lifecycle ----------------------------------------------------------
+    async def deploy(self, req: DeployRequest) -> tuple[Application, Job]:
+        return await self.deployer.deploy(req)
+
     async def start(self, app_id: int) -> Job:
-        return await self._lifecycle(app_id, JobKind.START, DesiredState.RUNNING)
+        return await self.lifecycle.start(app_id)
 
     async def stop(self, app_id: int) -> Job:
-        return await self._lifecycle(app_id, JobKind.STOP, DesiredState.STOPPED)
+        return await self.lifecycle.stop(app_id)
 
     async def restart(self, app_id: int) -> Job:
-        return await self._lifecycle(app_id, JobKind.RESTART, DesiredState.RUNNING)
+        return await self.lifecycle.restart(app_id)
 
     async def removal_plan(self, app_id: int) -> RemovalPlan:
-        async with self.sessions() as session:
-            app = await self.get(session, app_id)
-        if app.origin is Origin.ADOPTED:  # forgotten only: its containers keep running
-            return RemovalPlan(slug=app.slug, containers=[], files=[], data=[])
-        project = self.runner.project_dir(app.slug)
-        data = self.volumes_dir(app.slug)
-        return RemovalPlan(
-            slug=app.slug,
-            containers=sorted(c.name for c in self.state.app(app.slug).containers),
-            files=[str(p) for p in sorted(project.glob("*"))] if project.exists() else [],
-            data=[str(data)] if data.exists() else [],
-        )
+        return await self.lifecycle.removal_plan(app_id)
+
+    async def remove(self, app_id: int, *, remove_data: bool = False) -> Job:
+        return await self.lifecycle.remove(app_id, remove_data=remove_data)
 
     async def vpns_reaching(self, session: AsyncSession, slug: str) -> list[str]:
         return await self.planner.vpns_reaching(session, slug)
-
-    async def remove(self, app_id: int, *, remove_data: bool = False) -> Job:
-        async with self.sessions() as session, session.begin():
-            app = await self.get(session, app_id)
-            if vpns := await self.vpns_reaching(session, app.slug):
-                raise ConflictError("this app is behind a VPN: detach it from the VPN first",
-                                    vpn=", ".join(vpns))  # fmt: skip
-            job = self.jobs.add(
-                session,
-                JobKind.REMOVE,
-                app_id=app.id,
-                app_slug=app.slug,
-                params={"remove_data": remove_data},
-            )
-        self.jobs.wake()
-        return job
-
-    async def _lifecycle(self, app_id: int, kind: JobKind, desired: DesiredState) -> Job:
-        async with self.sessions() as session, session.begin():
-            app = await self.get(session, app_id)
-            if app.current_revision_id is None and app.origin is not Origin.ADOPTED:
-                raise ConflictError("app has never been deployed", slug=app.slug)
-            app.desired_state = desired
-            job = self.jobs.add(session, kind, app_id=app.id, app_slug=app.slug)
-        self.jobs.wake()
-        return job
-
-    # --- helpers --------------------------------------------------------------
-    async def _free_slug(self, session: AsyncSession, base: str) -> str:
-        taken = set(await session.scalars(
-            select(Application.slug).where(Application.slug.like(f"{base}%"))
-        ))  # fmt: skip
-        if base not in taken:
-            return base
-        return next(f"{base}-{n}" for n in range(2, 10_000) if f"{base}-{n}" not in taken)

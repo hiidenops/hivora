@@ -36,7 +36,7 @@ En cas de contradiction, `CLAUDE.md` l'emporte, puis le document de référence,
 | 4 | `e1e6263` | `apps/compose_edit.py` : `ComposeEdit` (+ requêtes partagées dans `core`) | 767 | 598 |
 | 5a | `1c4e4fc` | `AppPlanner` dans `core.py` (compilation partagée) | 593 | 471 |
 | 5b | `705031f` | `apps/revisions.py` : `Revisions` | 412 | 320 |
-| 6 | *à faire* | `apps/lifecycle.py` : déploiement, cycle de vie, suppression | ~250 visé | ~150 visé |
+| 6 | voir `git log` | `apps/lifecycle.py` : `Deployer` + `Lifecycle` (deux classes pour rester sous 10 dépendances) | 315 | 236 |
 
 À chaque étape : 208 tests backend, `mypy` strict, `ruff`, parcours e2e, tous verts, **sans aucune modification de test ni de route**.
 
@@ -47,7 +47,7 @@ core  ←  custom_images
 core  ←  adoption
 core  ←  compose_edit ←─┐
 core  ←  revisions ─────┤→ custom_images
-core  ←  lifecycle (étape 6)
+core  ←  lifecycle
 service (façade AppService) → tous
 ```
 
@@ -165,7 +165,7 @@ Situation au 29/09/2026 :
 
 | Fichier | Taille | Niveau |
 |---|---|---|
-| `apps/service.py` | 412 lignes, classe 320 | alerte ; l'étape 6 le ramène sous le seuil |
+| `apps/service.py` | 315 lignes, classe 236 | sous les seuils (étape 6 faite) ; l'étape 7 retirerait les relais |
 | `apps/core.py` | 340 lignes | alerte ; sortir `AppPlanner` dans `apps/planner.py` |
 | `apps/api.py` | 647 lignes | bloquant ; même découpage à faire |
 | `vpn/service.py` | 492 lignes | alerte |
