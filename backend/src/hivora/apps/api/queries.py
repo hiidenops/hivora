@@ -11,12 +11,17 @@ from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-from sqlalchemy import select
 
 from hivora.apps.api.common import AppOut, PortOut, app_out
-from hivora.apps.models import Application, AppRevision, RevisionStatus
+from hivora.apps.models import RevisionStatus
+from hivora.apps.queries import (
+    applied_compose,
+    applied_revision_number,
+    apps_with_template,
+    revisions_of,
+    template_slug,
+)
 from hivora.core.errors import HivoraError, NotFoundError
-from hivora.templates.models import TemplateVersion
 from hivora.templates.schema import Localized
 from hivora.web.deps import RuntimeDep, Viewer
 
@@ -143,11 +148,7 @@ def game_caps(rt: RuntimeDep, template: str | None) -> GameCapsOut | None:
 
 async def list_apps(_: Viewer, rt: RuntimeDep) -> list[AppOut]:
     async with rt.sessions() as session:
-        rows = await session.execute(
-            select(Application, TemplateVersion.slug)
-            .outerjoin(TemplateVersion, Application.template_version_id == TemplateVersion.id)
-            .order_by(Application.name)
-        )
+        rows = await apps_with_template(session)
         return [app_out(rt, app, template) for app, template in rows]
 
 
@@ -155,11 +156,8 @@ async def list_apps(_: Viewer, rt: RuntimeDep) -> list[AppOut]:
 async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
     async with rt.sessions() as session:
         app = await rt.apps.get(session, app_id)
-        template = await session.scalar(
-            select(TemplateVersion.slug).where(TemplateVersion.id == app.template_version_id)
-        )
-        revision = (await session.get(AppRevision, app.current_revision_id)
-                    if app.current_revision_id else None)  # fmt: skip
+        template = await template_slug(session, app)
+        revision_number = await applied_revision_number(session, app)
         state = rt.state.store.app(app.slug)
         *_unused, main = await rt.apps.main_container(session, app.id)
         access = await rt.apps.access_of(session, app)
@@ -170,7 +168,7 @@ async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
                 started_at = (await rt.gateway.get_container(main.id)).started_at
         return AppDetailOut(
             **app_out(rt, app, template).model_dump(),
-            revision=revision.number if revision else None,
+            revision=revision_number,
             containers=[ContainerOut(id=c.id[:12], name=c.name, image=c.image,
                                      state=c.state.value, health=c.health.value)
                         for c in state.containers],
@@ -193,24 +191,14 @@ async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
 async def get_compose(app_id: int, _: Viewer, rt: RuntimeDep) -> dict[str, str]:
     async with rt.sessions() as session:
         app = await rt.apps.get(session, app_id)
-        revision_id = app.current_revision_id or await session.scalar(
-            select(AppRevision.id).where(AppRevision.app_id == app.id)
-            .order_by(AppRevision.number.desc())
-        )  # fmt: skip
-        if revision_id is None:
-            raise NotFoundError("no revision")
-        revision = await session.get_one(AppRevision, revision_id)
-        return {"compose_yaml": revision.compose_yaml}
+        return {"compose_yaml": await applied_compose(session, app)}
 
 
 @router.get("/{app_id}/revisions")
 async def list_revisions(app_id: int, _: Viewer, rt: RuntimeDep) -> list[RevisionOut]:
     async with rt.sessions() as session:
         await rt.apps.get(session, app_id)
-        rows = await session.scalars(
-            select(AppRevision).where(AppRevision.app_id == app_id)
-            .order_by(AppRevision.number.desc())
-        )  # fmt: skip
+        rows = await revisions_of(session, app_id)
         return [
             RevisionOut(
                 id=r.id,

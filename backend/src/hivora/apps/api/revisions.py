@@ -8,10 +8,9 @@ from typing import Any, Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-from sqlalchemy import select
 
 from hivora.apps.api.common import JobRef, PlanOut, job_ref, plan_out
-from hivora.apps.models import AppRevision
+from hivora.apps.core import latest_revision
 from hivora.apps.service import UpdatePlan
 from hivora.templates.overrides import Overrides
 from hivora.templates.schema import Localized
@@ -82,10 +81,7 @@ async def move_zone(app_id: int, body: ZoneIn, _: Operator, rt: RuntimeDep) -> J
 async def get_settings(app_id: int, _: Operator, rt: RuntimeDep) -> SettingsOut:
     async with rt.sessions() as session:
         st = await rt.apps.current_settings(session, app_id)
-        latest = await session.scalar(
-            select(AppRevision).where(AppRevision.app_id == app_id)
-            .order_by(AppRevision.number.desc()).limit(1)
-        )  # fmt: skip
+        latest = await latest_revision(session, app_id)
     t = st.entry.template
     return SettingsOut(template=st.entry.slug, version=t.metadata.version,
                        form=t.form.model_dump(by_alias=True, exclude_none=True),
