@@ -14,15 +14,21 @@ from hivora.apps.adoption import Adoption, Candidate
 from hivora.apps.compose_edit import ComposeEdit, ComposePlan
 from hivora.apps.core import (
     LABEL_COMPOSE_SERVICE,
+    AppPlanner,
+    AppSettings,
     conflict_dict,
     decrypt_secrets,
     get_app,
     latest_revision,
     queue_revision,
+    services_from,
     store_secrets,
 )
 from hivora.apps.core import (  # re-exported: imported from here by other modules
     AppNotFoundError as AppNotFoundError,
+)
+from hivora.apps.core import (  # re-exported: imported from here by other modules
+    DeployPlan as DeployPlan,
 )
 from hivora.apps.core import (  # re-exported: imported from here by other modules
     DeployRequest as DeployRequest,
@@ -43,58 +49,34 @@ from hivora.apps.models import (
     AppRevision,
     AppSecret,
     DesiredState,
-    Exposure,
     Origin,
-    PortBinding,
     RevisionStatus,
-    Service,
-    ServiceRole,
-    VolumeKind,
-    VolumeMount,
 )
-from hivora.apps.ports import PortConflict, find_conflicts, used_ports
 from hivora.compose_runner import ComposeRunner
 from hivora.core.clock import Clock, SystemClock
 from hivora.core.config import Settings
-from hivora.core.errors import ConflictError, NotFoundError, ValidationError
+from hivora.core.errors import ConflictError, NotFoundError
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import SecretBox
 from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
 from hivora.images.registry import ImageInfo, Registry
 from hivora.jobs import Job, JobKind, JobQueue
 from hivora.state import StateStore, app_key
-from hivora.system.secrets import SecretSetting, SecretSettings
+from hivora.system.secrets import SecretSettings
 from hivora.templates import (
     AppContext,
     Catalog,
     CatalogEntry,
-    CompiledApp,
     FormValues,
     HostInfo,
-    build_context,
     compile_template,
     host_arch,
-    validate_inputs,
 )
 from hivora.templates.catalog import CUSTOM_SOURCE, TemplateInvalidError, parse_template
 from hivora.templates.custom import CustomEnv, CustomPort
 from hivora.templates.models import TemplateVersion
 from hivora.templates.overrides import Overrides
-from hivora.zones import Zone, get_zone, zone_network
-
-
-@dataclass(frozen=True, slots=True)
-class DeployPlan:
-    """Everything the user reviews before deploying (radical transparency)."""
-
-    slug: str
-    name: str
-    entry: CatalogEntry
-    zone: Zone | None
-    compiled: CompiledApp
-    form: FormValues
-    conflicts: list[PortConflict]
-    overrides: Overrides = field(default_factory=Overrides)
+from hivora.zones import Zone, get_zone
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,14 +106,6 @@ class UpgradeStatus:
     current: str
     latest: str
     available: bool
-
-
-@dataclass(frozen=True, slots=True)
-class AppSettings:
-    app: Application
-    entry: CatalogEntry
-    values: dict[str, Any]  # latest revision inputs (secrets excluded)
-    secrets_set: list[str]  # secret keys that already have a value
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +150,9 @@ class AppService:
         self.clock = clock or SystemClock()
         self.secret_settings = secret_settings
         self.public_address = public_address
+        self.planner = AppPlanner(settings=settings, catalog=catalog, state=state, box=box,
+                                  clock=self.clock, secret_settings=secret_settings,
+                                  public_address=public_address)  # fmt: skip
         self.compose = ComposeEdit(settings=settings, sessions=sessions, runner=runner, state=state,
                                    jobs=jobs, box=box, bus=bus, clock=self.clock)  # fmt: skip
         self.adoption = Adoption(sessions=sessions, state=state, bus=bus, clock=self.clock)
@@ -197,16 +174,7 @@ class AppService:
 
     @property
     def host(self) -> HostInfo:
-        s = self.settings
-        return HostInfo(
-            public_ip=self.public_address() if self.public_address else s.host_public_ip,
-            lan_ip=s.host_lan_ip,
-            vpn_ip=s.host_vpn_ip,
-            timezone=s.timezone,
-            puid=s.puid,
-            pgid=s.pgid,
-            arch=host_arch(),
-        )
+        return self.planner.host
 
     def volumes_dir(self, slug: str) -> Path:
         return self.settings.volumes_root / slug
@@ -230,49 +198,7 @@ class AppService:
         ):
             raise ConflictError("slug already used", slug=slug)
         zone = await get_zone(session, req.zone) if req.zone else None
-        return await self._plan(session, entry, slug, name, zone, req.inputs, revision=1)
-
-    async def _plan(
-        self,
-        session: AsyncSession,
-        entry: CatalogEntry,
-        slug: str,
-        name: str,
-        zone: Zone | None,
-        inputs: dict[str, Any],
-        *,
-        revision: int,
-        overrides: Overrides | None = None,
-    ) -> DeployPlan:
-        inputs = await self._with_setting_fallbacks(entry, inputs)
-        app_ctx = AppContext(
-            slug=slug, name=name, revision=revision, zone=zone.slug if zone else None,
-            zone_network=zone_network(zone),
-            extra_networks=await self._vpn_networks(session, entry, inputs),
-        )  # fmt: skip
-        host = self.host
-        defaults_ctx = build_context(app_ctx, host, FormValues(), list(entry.template.services))
-        form = validate_inputs(entry.template, inputs, defaults_ctx)
-        overrides = overrides or Overrides()
-        compiled = compile_template(entry.template, app_ctx, host, form, self.settings.volumes_root,
-                                    overrides)  # fmt: skip
-        used = await used_ports(session, self.state, exclude_app=slug)
-        conflicts = find_conflicts((p for s in compiled.services for p in s.ports), used)
-        return DeployPlan(slug, name, entry, zone, compiled, form, conflicts, overrides)
-
-    async def _with_setting_fallbacks(
-        self, entry: CatalogEntry, inputs: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Empty secrets declaring `from_setting` take the global setting's value."""
-        if self.secret_settings is None:
-            return inputs
-        filled = dict(inputs)
-        for f in entry.template.form.fields:
-            if f.type == "secret" and f.from_setting and not filled.get(f.id):
-                value = await self.secret_settings.get(SecretSetting(f.from_setting))
-                if value:
-                    filled[f.id] = value
-        return filled
+        return await self.planner.plan(session, entry, slug, name, zone, req.inputs, revision=1)
 
     async def main_container(self, session: AsyncSession, app_id: int) -> tuple[
         Application, CatalogEntry | None, ContainerInfo | None
@@ -294,7 +220,7 @@ class AppService:
     async def access_of(self, session: AsyncSession, app: Application) -> dict[str, str]:
         """Connection addresses (web / game) for the latest revision's inputs."""
         try:
-            entry = await self._entry_of(session, app)
+            entry = await self.planner.entry_of(session, app)
         except (ConflictError, NotFoundError):
             return {}
         latest = await self._latest_revision(session, app.id)
@@ -336,13 +262,7 @@ class AppService:
 
     # --- settings (new revision) --------------------------------------------
     async def current_settings(self, session: AsyncSession, app_id: int) -> AppSettings:
-        app = await self.get(session, app_id)
-        entry = await self._entry_of(session, app)
-        revision = await self._latest_revision(session, app.id)
-        secrets = await self.decrypt_secrets(session, app.id)
-        known = {f.id for f in entry.template.form.fields}  # a newer template may drop fields
-        values = {k: v for k, v in (revision.inputs if revision else {}).items() if k in known}
-        return AppSettings(app, entry, values, sorted(secrets))
+        return await self.planner.current_settings(session, app_id)
 
     async def plan_update(
         self, session: AsyncSession, app_id: int, inputs: dict[str, Any],
@@ -354,7 +274,7 @@ class AppService:
         template version (upgrade, restore); default: the catalog's.
         """
         app = await self.get(session, app_id)
-        entry = entry or await self._entry_of(session, app)
+        entry = entry or await self.planner.entry_of(session, app)
         current = await self.decrypt_secrets(session, app.id)
         fields = {f.id for f in entry.template.form.fields}
         kept = {k: v for k, v in current.items() if not inputs.get(k) and k in fields}
@@ -363,7 +283,7 @@ class AppService:
         zone = await session.get(Zone, app.zone_id) if app.zone_id else None
         if overrides is None:  # unchanged: the latest revision's advanced settings
             overrides = Overrides.model_validate(latest.overrides or {}) if latest else None
-        plan = await self._plan(session, entry, app.slug, app.name, zone, {**inputs, **kept},
+        plan = await self.planner.plan(session, entry, app.slug, app.name, zone, {**inputs, **kept},
                                 revision=number, overrides=overrides)  # fmt: skip
         previous = latest.compose_yaml if latest else ""
         new = plan.compiled.compose_yaml
@@ -417,7 +337,7 @@ class AppService:
                     conflicts=[conflict_dict(c) for c in plan.conflicts],
                 )
             app = await self.get(session, app_id)
-            version = await self._template_version(session, plan.entry)
+            version = await self.planner.template_version(session, plan.entry)
             app.template_version_id = version.id
             await session.execute(delete(AppSecret).where(AppSecret.app_id == app.id))
             store_secrets(session, self.box, app.id, plan.form.secrets)
@@ -429,7 +349,7 @@ class AppService:
                 created_at=self.clock.now(), status=RevisionStatus.PENDING,
             )  # fmt: skip
             job = await queue_revision(
-                session, self.jobs, app, revision, _services_from(plan.compiled),
+                session, self.jobs, app, revision, services_from(plan.compiled),
                 {"reset_volumes": upd.reset_volumes} if upd.reset_fields else None,
             )  # fmt: skip
         self.jobs.wake()
@@ -441,7 +361,7 @@ class AppService:
         """Is a newer template version (or, for a free image, a newer image) available?"""
         app = await self.get(session, app_id)
         current = await session.get(TemplateVersion, app.template_version_id)
-        entry = await self._entry_of(session, app)
+        entry = await self.planner.entry_of(session, app)
         if current is None:  # pragma: no cover - every template app has one
             raise ConflictError("this app has no template version", slug=app.slug)
         if entry.source != CUSTOM_SOURCE:
@@ -451,7 +371,7 @@ class AppService:
 
     async def _upgrade_entry(self, session: AsyncSession, app: Application) -> CatalogEntry:
         """The entry an upgrade applies: the catalog's, or the free image re-pinned."""
-        entry = await self._entry_of(session, app)
+        entry = await self.planner.entry_of(session, app)
         return entry if entry.source != CUSTOM_SOURCE else await self.custom.repin(entry)
 
     async def plan_upgrade(self, session: AsyncSession, app_id: int) -> UpdatePlan:
@@ -569,41 +489,6 @@ class AppService:
             jobs.append(await self.update(app_id, values))
         return jobs
 
-    async def _vpn_networks(
-        self, session: AsyncSession, entry: CatalogEntry, inputs: dict[str, Any]
-    ) -> tuple[str, ...]:
-        """A VPN joins the networks of the zones it reaches (only "linked together" zones
-        have one) and of the apps put behind it ("@<app>": that app's default network)."""
-        vpn = entry.template.vpn
-        if not vpn or not vpn.zones_field:
-            return ()
-        names = []
-        for slug in (s for s in str(inputs.get(vpn.zones_field) or "").split(",") if s):
-            if slug.startswith("@"):
-                app_slug = slug[1:]
-                if not await session.scalar(
-                    select(Application.id).where(Application.slug == app_slug)
-                ):
-                    raise ValidationError(
-                        "no such app to reach", field=vpn.zones_field, app=app_slug
-                    )
-                names.append(f"{app_slug}_default")
-                continue
-            name = zone_network(await get_zone(session, slug))
-            if name is None:
-                raise ValidationError("this zone does not link its apps: no network to reach",
-                                      field=vpn.zones_field, zone=slug)  # fmt: skip
-            names.append(name)
-        return tuple(names)
-
-    async def _entry_of(self, session: AsyncSession, app: Application) -> CatalogEntry:
-        slug = await session.scalar(
-            select(TemplateVersion.slug).where(TemplateVersion.id == app.template_version_id)
-        )
-        if slug is None:
-            raise ConflictError("this app was not deployed from a template", slug=app.slug)
-        return self.catalog.get(slug)
-
     @staticmethod
     async def _latest_revision(session: AsyncSession, app_id: int) -> AppRevision | None:
         return await latest_revision(session, app_id)
@@ -616,12 +501,12 @@ class AppService:
                     "host ports already in use",
                     conflicts=[conflict_dict(c) for c in plan.conflicts],
                 )
-            version = await self._template_version(session, plan.entry)
+            version = await self.planner.template_version(session, plan.entry)
             app = Application(
                 slug=plan.slug, name=plan.name, zone_id=plan.zone.id if plan.zone else None,
                 origin=Origin.TEMPLATE, template_version_id=version.id,
                 desired_state=DesiredState.RUNNING, icon=None,
-                notes="", created_at=self.clock.now(), services=_services_from(plan.compiled),
+                notes="", created_at=self.clock.now(), services=services_from(plan.compiled),
             )  # fmt: skip
             session.add(app)
             await session.flush()
@@ -670,19 +555,7 @@ class AppService:
         )
 
     async def vpns_reaching(self, session: AsyncSession, slug: str) -> list[str]:
-        """Names of the VPN apps that joined this app's network (it is behind them)."""
-        out = []
-        for other in await session.scalars(select(Application)):
-            try:
-                entry = await self._entry_of(session, other)
-            except (ConflictError, NotFoundError):
-                continue
-            vpn = entry.template.vpn
-            if vpn and vpn.zones_field:
-                values = (await self.current_settings(session, other.id)).values
-                if f"@{slug}" in str(values.get(vpn.zones_field) or "").split(","):
-                    out.append(other.name)
-        return out
+        return await self.planner.vpns_reaching(session, slug)
 
     async def remove(self, app_id: int, *, remove_data: bool = False) -> Job:
         async with self.sessions() as session, session.begin():
@@ -718,50 +591,3 @@ class AppService:
         if base not in taken:
             return base
         return next(f"{base}-{n}" for n in range(2, 10_000) if f"{base}-{n}" not in taken)
-
-    async def _template_version(
-        self, session: AsyncSession, entry: CatalogEntry
-    ) -> TemplateVersion:
-        meta = entry.template.metadata
-        existing = await session.scalar(
-            select(TemplateVersion).where(
-                TemplateVersion.source == entry.source,
-                TemplateVersion.slug == meta.slug,
-                TemplateVersion.version == meta.version,
-            )
-        )
-        if existing:
-            if existing.checksum != entry.checksum:
-                raise ConflictError(
-                    "template changed without a version bump", slug=meta.slug, version=meta.version
-                )
-            return existing
-        version = TemplateVersion(
-            source=entry.source, slug=meta.slug, version=meta.version,
-            api_version=entry.template.api_version, name=meta.name, category=meta.category,
-            manifest=entry.manifest, checksum=entry.checksum, created_at=self.clock.now(),
-        )  # fmt: skip
-        session.add(version)
-        await session.flush()
-        return version
-
-
-def _services_from(compiled: CompiledApp) -> list[Service]:
-    services = []
-    for plan in compiled.services:
-        services.append(Service(
-            name=plan.name, image=plan.image, role=ServiceRole(plan.role),
-            restart_policy=plan.restart,
-            ports=[
-                PortBinding(host_ip=p.host_ip, host_port=p.host_port,
-                            container_port=p.container_port, protocol=p.protocol,
-                            purpose=p.purpose, exposure=Exposure(p.exposure))
-                for p in plan.ports
-            ],
-            volumes=[
-                VolumeMount(kind=VolumeKind.BIND, source=str(v.source), target=v.target,
-                            read_only=v.read_only, backup=v.backup, owner=v.owner)
-                for v in plan.volumes
-            ],
-        ))  # fmt: skip
-    return services
