@@ -11,15 +11,24 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.adoption import Adoption, Candidate
-from hivora.apps.compose_check import problems as compose_problems
+from hivora.apps.compose_edit import ComposeEdit, ComposePlan
 from hivora.apps.core import (
     LABEL_COMPOSE_SERVICE,
+    conflict_dict,
+    decrypt_secrets,
+    get_app,
+    latest_revision,
     queue_revision,
-    secret_context,
     store_secrets,
 )
 from hivora.apps.core import (  # re-exported: imported from here by other modules
+    AppNotFoundError as AppNotFoundError,
+)
+from hivora.apps.core import (  # re-exported: imported from here by other modules
     DeployRequest as DeployRequest,
+)
+from hivora.apps.core import (
+    PortConflictError as PortConflictError,
 )
 from hivora.apps.core import (
     UnsupportedArchitectureError as UnsupportedArchitectureError,
@@ -44,12 +53,12 @@ from hivora.apps.models import (
     VolumeMount,
 )
 from hivora.apps.ports import PortConflict, find_conflicts, used_ports
-from hivora.compose_runner import ComposeError, ComposeRunner
+from hivora.compose_runner import ComposeRunner
 from hivora.core.clock import Clock, SystemClock
 from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.core.events import EventBus
-from hivora.crypto.cipher import Purpose, Sealed, SecretBox
+from hivora.crypto.cipher import SecretBox
 from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
 from hivora.images.registry import ImageInfo, Registry
 from hivora.jobs import Job, JobKind, JobQueue
@@ -68,20 +77,10 @@ from hivora.templates import (
     validate_inputs,
 )
 from hivora.templates.catalog import CUSTOM_SOURCE, TemplateInvalidError, parse_template
-from hivora.templates.compiler import PortPlan
 from hivora.templates.custom import CustomEnv, CustomPort
-from hivora.templates.expressions import secret_env_name
 from hivora.templates.models import TemplateVersion
 from hivora.templates.overrides import Overrides
 from hivora.zones import Zone, get_zone, zone_network
-
-
-class AppNotFoundError(NotFoundError):
-    code = "app_not_found"
-
-
-class PortConflictError(ConflictError):
-    code = "port_conflict"
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,20 +112,6 @@ class UpdatePlan:
 
 class DataResetRequiredError(ConflictError):
     code = "data_reset_required"
-
-
-class ComposeRejectedError(ValidationError):
-    code = "compose_rejected"
-
-
-@dataclass(frozen=True, slots=True)
-class ComposePlan:
-    app: Application
-    compose_yaml: str
-    diff: str
-    problems: list[str]  # what forbids applying it (empty: fine)
-    conflicts: list[PortConflict]
-    services: list[Service]  # declared services, read from the resolved model
 
 
 class RevisionNotRestorableError(ConflictError):
@@ -191,6 +176,8 @@ class AppService:
         self.clock = clock or SystemClock()
         self.secret_settings = secret_settings
         self.public_address = public_address
+        self.compose = ComposeEdit(settings=settings, sessions=sessions, runner=runner, state=state,
+                                   jobs=jobs, box=box, bus=bus, clock=self.clock)  # fmt: skip
         self.adoption = Adoption(sessions=sessions, state=state, bus=bus, clock=self.clock)
         self.custom = CustomImages(sessions=sessions, catalog=catalog, clock=self.clock,
                                    registry=registry)  # fmt: skip
@@ -226,19 +213,10 @@ class AppService:
 
     # --- queries ------------------------------------------------------------
     async def get(self, session: AsyncSession, app_id: int) -> Application:
-        app = await session.get(Application, app_id)
-        if app is None:
-            raise AppNotFoundError(str(app_id))
-        return app
+        return await get_app(session, app_id)
 
     async def decrypt_secrets(self, session: AsyncSession, app_id: int) -> dict[str, str]:
-        rows = await session.scalars(select(AppSecret).where(AppSecret.app_id == app_id))
-        return {
-            s.key: self.box.open(
-                Purpose.APP_SECRET, Sealed(s.nonce, s.ciphertext), secret_context(app_id, s.key)
-            )
-            for s in rows
-        }
+        return await decrypt_secrets(session, self.box, app_id)
 
     # --- deploy -------------------------------------------------------------
     async def plan_deploy(self, session: AsyncSession, req: DeployRequest) -> DeployPlan:
@@ -436,7 +414,7 @@ class AppService:
             if plan.conflicts:
                 raise PortConflictError(
                     "host ports already in use",
-                    conflicts=[_conflict_dict(c) for c in plan.conflicts],
+                    conflicts=[conflict_dict(c) for c in plan.conflicts],
                 )
             app = await self.get(session, app_id)
             version = await self._template_version(session, plan.entry)
@@ -543,56 +521,11 @@ class AppService:
     # --- hand-written compose (admin) ------------------------------------------
     async def plan_compose(self, session: AsyncSession, app_id: int,
                            compose_yaml: str) -> ComposePlan:  # fmt: skip
-        """Validate a hand-written compose file: resolved by Compose, then checked."""
-        app = await self.get(session, app_id)
-        secrets = await self.decrypt_secrets(session, app.id)
-        env = {secret_env_name(k): v for k, v in secrets.items()}
-        try:
-            model = await self.runner.check(app.slug, compose_yaml, env)
-        except ComposeError as exc:
-            return ComposePlan(app, compose_yaml, "", [f"compose: {exc}"[:500]], [], [])
-        roots = [self.volumes_dir(app.slug), self.runner.project_dir(app.slug),
-                 self.runner.apps_dir / f".check-{app.slug}"]  # fmt: skip
-        found = compose_problems(model, app.slug, roots)
-        services = [] if found else _services_from_model(model)
-        used = await used_ports(session, self.state, exclude_app=app.slug)
-        conflicts = find_conflicts((
-            PortPlan(sv.name, p.container_port, p.host_port, p.protocol, "other",
-                     p.exposure.value, p.host_ip)
-            for sv in services for p in sv.ports
-        ), used)  # fmt: skip
-        latest = await self._latest_revision(session, app.id)
-        diff = "".join(difflib.unified_diff(
-            (latest.compose_yaml if latest else "").splitlines(keepends=True),
-            compose_yaml.splitlines(keepends=True),
-            fromfile="current", tofile="edited",
-        ))  # fmt: skip
-        return ComposePlan(app, compose_yaml, diff, found, conflicts, services)
+        return await self.compose.plan(session, app_id, compose_yaml)
 
     async def apply_compose(self, app_id: int, compose_yaml: str, *,
                             event: str = "app.compose_edited") -> Job:  # fmt: skip
-        async with self.sessions() as session, session.begin():
-            plan = await self.plan_compose(session, app_id, compose_yaml)
-            if plan.problems:
-                raise ComposeRejectedError("this compose file cannot be applied",
-                                           problems=plan.problems)  # fmt: skip
-            if plan.conflicts:
-                conflicts = [_conflict_dict(c) for c in plan.conflicts]
-                raise PortConflictError("host ports already in use", conflicts=conflicts)
-            app = plan.app
-            latest = await self._latest_revision(session, app.id)
-            revision = AppRevision(
-                app_id=app.id, number=(latest.number if latest else 0) + 1,
-                inputs=dict(latest.inputs) if latest else {}, compose_yaml=compose_yaml,
-                diff_from_previous=plan.diff, created_at=self.clock.now(),
-                status=RevisionStatus.PENDING, custom_compose=True,
-                template_version_id=latest.template_version_id if latest else None,
-                overrides=latest.overrides if latest else None,
-            )  # fmt: skip
-            job = await queue_revision(session, self.jobs, app, revision, plan.services)
-        self.jobs.wake()
-        self.bus.publish(event, app=app.slug, revision=revision.number, job=job.id)
-        return job
+        return await self.compose.apply(app_id, compose_yaml, event=event)
 
     # --- free images (any registry image, through a generated template) -------
     async def custom_request(
@@ -673,11 +606,7 @@ class AppService:
 
     @staticmethod
     async def _latest_revision(session: AsyncSession, app_id: int) -> AppRevision | None:
-        latest: AppRevision | None = await session.scalar(
-            select(AppRevision).where(AppRevision.app_id == app_id)
-            .order_by(AppRevision.number.desc()).limit(1)
-        )  # fmt: skip
-        return latest
+        return await latest_revision(session, app_id)
 
     async def deploy(self, req: DeployRequest) -> tuple[Application, Job]:
         async with self.sessions() as session, session.begin():
@@ -685,7 +614,7 @@ class AppService:
             if plan.conflicts:
                 raise PortConflictError(
                     "host ports already in use",
-                    conflicts=[_conflict_dict(c) for c in plan.conflicts],
+                    conflicts=[conflict_dict(c) for c in plan.conflicts],
                 )
             version = await self._template_version(session, plan.entry)
             app = Application(
@@ -817,15 +746,6 @@ class AppService:
         return version
 
 
-def _conflict_dict(conflict: PortConflict) -> dict[str, Any]:
-    return {
-        "port": conflict.port,
-        "protocol": conflict.protocol,
-        "used_by": conflict.used_by,
-        "suggestion": conflict.suggestion,
-    }
-
-
 def _services_from(compiled: CompiledApp) -> list[Service]:
     services = []
     for plan in compiled.services:
@@ -845,30 +765,3 @@ def _services_from(compiled: CompiledApp) -> list[Service]:
             ],
         ))  # fmt: skip
     return services
-
-
-def _services_from_model(model: dict[str, Any]) -> list[Service]:
-    """Services, ports and bind mounts of a resolved compose model (hand-written file)."""
-    out: list[Service] = []
-    for name, svc in (model.get("services") or {}).items():
-        ports = []
-        for p in svc.get("ports") or []:
-            if not isinstance(p, dict) or not p.get("published"):
-                continue
-            ports.append(PortBinding(
-                host_ip=p.get("host_ip") or None, host_port=int(str(p["published"]).split("-")[0]),
-                container_port=int(p.get("target", 0)), protocol=p.get("protocol", "tcp"),
-                purpose="other", exposure=Exposure.PUBLIC if not p.get("host_ip") else Exposure.LAN,
-            ))  # fmt: skip
-        volumes = [
-            VolumeMount(kind=VolumeKind.BIND, source=str(v["source"]), target=str(v["target"]),
-                        read_only=bool(v.get("read_only")), backup=True)
-            for v in svc.get("volumes") or []
-            if isinstance(v, dict) and v.get("type") == "bind" and v.get("source")
-        ]  # fmt: skip
-        out.append(Service(
-            name=name, image=str(svc.get("image") or ""), role=ServiceRole.MAIN if not out
-            else ServiceRole.SIDECAR, restart_policy=str(svc.get("restart") or "no"),
-            ports=ports, volumes=volumes,
-        ))  # fmt: skip
-    return out

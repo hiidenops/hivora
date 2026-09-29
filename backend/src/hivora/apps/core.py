@@ -6,14 +6,24 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hivora.apps.models import Application, AppRevision, AppSecret, DesiredState, Service
-from hivora.core.errors import ValidationError
-from hivora.crypto.cipher import Purpose, SecretBox
+from hivora.apps.ports import PortConflict
+from hivora.core.errors import ConflictError, NotFoundError, ValidationError
+from hivora.crypto.cipher import Purpose, Sealed, SecretBox
 from hivora.jobs import Job, JobKind, JobQueue
 
 LABEL_COMPOSE_SERVICE = "com.docker.compose.service"
+
+
+class AppNotFoundError(NotFoundError):
+    code = "app_not_found"
+
+
+class PortConflictError(ConflictError):
+    code = "port_conflict"
 
 
 class UnsupportedArchitectureError(ValidationError):
@@ -37,6 +47,40 @@ def slugify(text: str) -> str:
 
 def secret_context(app_id: int, key: str) -> str:
     return f"app:{app_id}:{key}"
+
+
+def conflict_dict(conflict: PortConflict) -> dict[str, Any]:
+    return {
+        "port": conflict.port,
+        "protocol": conflict.protocol,
+        "used_by": conflict.used_by,
+        "suggestion": conflict.suggestion,
+    }
+
+
+async def get_app(session: AsyncSession, app_id: int) -> Application:
+    app = await session.get(Application, app_id)
+    if app is None:
+        raise AppNotFoundError(str(app_id))
+    return app
+
+
+async def decrypt_secrets(session: AsyncSession, box: SecretBox, app_id: int) -> dict[str, str]:
+    rows = await session.scalars(select(AppSecret).where(AppSecret.app_id == app_id))
+    return {
+        s.key: box.open(
+            Purpose.APP_SECRET, Sealed(s.nonce, s.ciphertext), secret_context(app_id, s.key)
+        )
+        for s in rows
+    }
+
+
+async def latest_revision(session: AsyncSession, app_id: int) -> AppRevision | None:
+    latest: AppRevision | None = await session.scalar(
+        select(AppRevision).where(AppRevision.app_id == app_id)
+        .order_by(AppRevision.number.desc()).limit(1)
+    )  # fmt: skip
+    return latest
 
 
 def store_secrets(session: AsyncSession, box: SecretBox, app_id: int,
