@@ -164,3 +164,78 @@ async def test_recover_after_crash(sessions: async_sessionmaker[AsyncSession]) -
     assert (await get(sessions, deploy_id)).status is JobStatus.QUEUED  # resumable
     stop_job = await get(sessions, stop_id)
     assert stop_job.status is JobStatus.INTERRUPTED and stop_job.error
+
+
+def test_job_routes_list_detail_and_clear(client: object) -> None:
+    """The /jobs routes' behaviour, pinned before their SQL moves into JobQueue."""
+    import time
+    from typing import Any
+
+    from helpers import API, admin, code, wait_job
+
+    c: Any = client
+    admin(c)
+    rt = c.app.state.runtime
+    ids = []
+    for name, inputs in (("vw1", {}), ("vw2", {"web_port": 8096})):
+        deployed = c.post(f"{API}/apps", json={"template": "vaultwarden", "name": name,
+                                               "inputs": inputs}).json()  # fmt: skip
+        assert wait_job(c, deployed["job"]["id"])["status"] == "succeeded"
+        ids.append(deployed["app"]["id"])
+    app1, app2 = ids
+
+    # No worker from here on: queued and running jobs keep their status.
+    c.portal.call(rt.jobs.stop)
+
+    async def insert() -> None:
+        async with rt.sessions() as session, session.begin():
+            now = rt.clock.now()
+            rows = ((app1, JobStatus.QUEUED), (app2, JobStatus.RUNNING),
+                    (app1, JobStatus.FAILED), (app2, JobStatus.CANCELLED))  # fmt: skip
+            for app_id, status in rows:
+                session.add(Job(kind=JobKind.RESTART, app_id=app_id, app_slug="x", params={},
+                                status=status, log=f"log of {status.value}",
+                                created_at=now))  # fmt: skip
+
+    c.portal.call(insert)
+
+    # GET /jobs: newest first, filter by app, limit.
+    every = c.get(f"{API}/jobs").json()
+    assert [j["id"] for j in every] == sorted((j["id"] for j in every), reverse=True)
+    assert len(every) == 6  # 2 deploys + 4 inserted
+    of_app1 = c.get(f"{API}/jobs", params={"app_id": app1}).json()
+    assert of_app1 and {j["app_id"] for j in of_app1} == {app1}
+    assert [j["id"] for j in of_app1] == sorted((j["id"] for j in of_app1), reverse=True)
+    assert [j["id"] for j in c.get(f"{API}/jobs", params={"limit": 2}).json()] == [
+        every[0]["id"], every[1]["id"],
+    ]  # fmt: skip
+    assert c.get(f"{API}/jobs", params={"limit": 0}).status_code == 422
+
+    # GET /jobs/{id}: the detail adds the log; an unknown id is a plain 404.
+    newest = c.get(f"{API}/jobs/{every[0]['id']}").json()
+    assert newest["log"] == "log of cancelled" and newest["status"] == "cancelled"
+    missing = c.get(f"{API}/jobs/999999")
+    assert missing.status_code == 404 and code(missing) == "not_found"
+    assert missing.json()["error"]["message"] == "job not found"
+
+    # DELETE /jobs: finished jobs go, queued and running ones stay; jobs.cleared is audited.
+    bus = rt.bus
+    published: list[tuple[str, dict[str, Any]]] = []
+    real_publish = bus.publish
+
+    def spy(topic: str, **payload: Any) -> Any:
+        published.append((topic, payload))
+        return real_publish(topic, **payload)
+
+    bus.publish = spy
+    try:
+        assert c.delete(f"{API}/jobs").json() == {"deleted": 4}  # 2 deploys, failed, cancelled
+    finally:
+        bus.publish = real_publish
+    assert ("jobs.cleared", {"deleted": 4}) in published
+    left = c.get(f"{API}/jobs").json()
+    assert sorted(j["status"] for j in left) == ["queued", "running"]
+    time.sleep(0.8)  # the audit recorder writes in small batches
+    cleared = [a for a in c.get(f"{API}/audit").json() if a["action"] == "jobs.cleared"]
+    assert len(cleared) == 1 and cleared[0]["payload"] == {"deleted": 4}
+    assert cleared[0]["username"] == "admin"
