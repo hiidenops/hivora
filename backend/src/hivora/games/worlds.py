@@ -29,6 +29,9 @@ from hivora.core.fs import (  # re-exported: games and tests use them from here
 from hivora.core.fs import (
     InvalidArchiveError as InvalidArchiveError,
 )
+from hivora.core.fs import (
+    NotEnoughSpaceError as NotEnoughSpaceError,
+)
 from hivora.core.fs import confined, remove_tree, tree_size
 from hivora.jobs import JobContext, JobKind
 from hivora.templates.schema import GameSaves
@@ -56,10 +59,6 @@ class WorldExistsError(ConflictError):
 
 class ActiveWorldError(ConflictError):
     code = "world_active"
-
-
-class NotEnoughSpaceError(ConflictError):
-    code = "not_enough_space"
 
 
 @dataclass(frozen=True, slots=True)

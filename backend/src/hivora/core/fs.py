@@ -1,5 +1,6 @@
 """Filesystem operations shared by the modules: paths confined to their roots, app
-directories, and streamed uploads of archives (sizes capped)."""
+directories, streamed uploads of archives (sizes capped), and a folder's contents
+replaced in place."""
 
 import asyncio
 import fnmatch
@@ -8,7 +9,7 @@ import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from hivora.core.errors import PermissionDeniedError, ValidationError
+from hivora.core.errors import ConflictError, PermissionDeniedError, ValidationError
 
 UPLOAD_LIMIT = 10 * 1024**3  # an uploaded archive, as sent
 
@@ -19,6 +20,10 @@ class InvalidArchiveError(ValidationError):
 
 class ArchiveTooLargeError(ValidationError):
     code = "archive_too_large"
+
+
+class NotEnoughSpaceError(ConflictError):
+    code = "not_enough_space"
 
 
 def confined(path: Path, root: Path) -> Path:
@@ -102,3 +107,37 @@ async def receive_upload(chunks: AsyncIterator[bytes], dest: Path,
         await asyncio.to_thread(dest.unlink, missing_ok=True)
         raise InvalidArchiveError("empty upload")
     return size
+
+
+def replace_contents(target: Path, staging: Path, root: Path) -> list[str]:
+    """Swap the entries of ``target`` for those of ``staging``; returns the new names.
+
+    ``target`` itself is kept (same inode): it can be a bind-mount source, which a
+    running container keeps even if the folder is renamed. Only renames on one
+    filesystem: the old entries go to ``<staging>.old`` first, then the new ones move
+    in. On any error, every move is undone, in reverse order, before raising.
+    ponytail: in between, the folder is mixed or partly empty for 2N renames (N
+    top-level entries, well under a millisecond); swap a symlink if that matters.
+    """
+    target, staging = confined(target, root), confined(staging, root)
+    old = confined(staging.with_name(f"{staging.name}.old"), root)
+    old.mkdir()
+    moved_out: list[str] = []
+    moved_in: list[str] = []
+    try:
+        for entry in sorted(target.iterdir()):
+            os.rename(entry, old / entry.name)
+            moved_out.append(entry.name)
+        for entry in sorted(staging.iterdir()):
+            os.rename(entry, target / entry.name)
+            moved_in.append(entry.name)
+    except BaseException:
+        for name in reversed(moved_in):
+            os.rename(target / name, staging / name)
+        for name in reversed(moved_out):
+            os.rename(old / name, target / name)
+        old.rmdir()
+        raise
+    shutil.rmtree(old)
+    staging.rmdir()
+    return moved_in
