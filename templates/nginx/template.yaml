@@ -1,0 +1,52 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: nginx
+  name: nginx
+  version: 1.0.0
+  category: services
+  tags: [web, server, static]
+  icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/nginx.svg" }
+  description:
+    fr: Serveur web léger pour publier un site statique (HTML, CSS, images) sur votre réseau.
+    en: Lightweight web server to publish a static website (HTML, CSS, images) on your network.
+  links:
+    site: https://nginx.org
+    doc: https://nginx.org/en/docs/
+  maintainer: hivora
+  license: BSD-2-Clause (image)
+  source: https://hub.docker.com/_/nginx
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 16Mi, recommended: 32Mi }
+  disk: { min: 20Mi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8085
+      help:
+        fr: "Déposez vos fichiers (index.html, CSS, images) dans le volume « html » : tant qu'il est vide, le site répond « 403 Forbidden »."
+        en: "Put your files (index.html, CSS, images) in the “html” volume: while it is empty, the site answers “403 Forbidden”."
+services:
+  server:
+    role: main
+    image: nginx
+    tag: "1.30.5-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94"
+    track: minor
+    env:
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: html, target: /usr/share/nginx/html, backup: true }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [html]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

@@ -1,0 +1,52 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: httpd
+  name: Apache HTTP Server
+  version: 1.0.0
+  category: services
+  tags: [web, server, static, apache]
+  icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/apache.svg" }
+  description:
+    fr: Le serveur web Apache, pour publier un site statique (HTML, CSS, images) sur votre réseau.
+    en: The Apache web server, to publish a static website (HTML, CSS, images) on your network.
+  links:
+    site: https://httpd.apache.org
+    doc: https://httpd.apache.org/docs/2.4/
+  maintainer: hivora
+  license: Apache-2.0 (image)
+  source: https://hub.docker.com/_/httpd
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 16Mi, recommended: 64Mi }
+  disk: { min: 20Mi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8086
+      help:
+        fr: "Déposez vos fichiers (index.html, CSS, images) dans le volume « htdocs » : tant qu'il est vide, le site affiche une liste vide."
+        en: "Put your files (index.html, CSS, images) in the “htdocs” volume: while it is empty, the site shows an empty listing."
+services:
+  server:
+    role: main
+    image: httpd
+    tag: "2.4.68-alpine@sha256:4e585da9d0125dec36d4500a9f5c5df7b2c0a01f67cb47865a91a4b05bdbec1b"
+    track: minor
+    env:
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      - { name: htdocs, target: /usr/local/apache2/htdocs, backup: true }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+backup:
+  volumes: [htdocs]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

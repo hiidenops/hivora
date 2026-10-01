@@ -1,0 +1,57 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: adminer
+  name: Adminer
+  version: 1.0.0
+  category: development
+  tags: [database, sql, admin]
+  icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/adminer.svg" }
+  description:
+    fr: Interface web pour gérer vos bases de données (PostgreSQL, MySQL/MariaDB, SQLite…) depuis le navigateur.
+    en: Web interface to manage your databases (PostgreSQL, MySQL/MariaDB, SQLite…) from the browser.
+  links:
+    site: https://www.adminer.org
+    doc: https://www.adminer.org/en/
+  maintainer: hivora
+  license: Apache-2.0 or GPL-2.0 (image)
+  source: https://hub.docker.com/_/adminer
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 32Mi, recommended: 64Mi }
+  disk: { min: 50Mi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8087
+      help:
+        fr: "Adminer ne garde aucune donnée : il se connecte à une base existante avec ses identifiants."
+        en: "Adminer keeps no data: it connects to an existing database with its credentials."
+    - id: default_server
+      group: { fr: Connexion, en: Connection }
+      label: { fr: Serveur proposé par défaut, en: Default server }
+      type: string
+      pattern: "[A-Za-z0-9._:-]{1,253}"
+      help:
+        fr: "Facultatif. Nom du service de base de données (ex. « db ») dans une zone dont les apps sont reliées entre elles, ou adresse IP:port."
+        en: "Optional. Database service name (e.g. “db”) in a zone whose apps are linked together, or IP:port address."
+services:
+  server:
+    role: main
+    image: adminer
+    tag: "5.5.1-standalone@sha256:e3a6b4942dd088a29cc8bbce22553429247c5c2b30b07d856ae49012b5c84a5b"
+    track: minor
+    env:
+      TZ: "{{ host.timezone }}"
+      ADMINER_DEFAULT_SERVER: "{{ form.default_server }}"
+    ports:
+      - { container: 8080, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped
