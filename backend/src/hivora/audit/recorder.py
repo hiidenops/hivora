@@ -5,6 +5,7 @@ import logging
 from contextlib import suppress
 from typing import Any
 
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.audit.models import AuditLog
@@ -66,6 +67,27 @@ class AuditRecorder:
             self._task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._task
+
+    # --- the trail (read and emptied by the audit routes) ----------------------
+    async def entries(self, before_id: int | None, limit: int) -> list[AuditLog]:
+        """Newest first; ``before_id`` pages back through older entries."""
+        query = select(AuditLog).order_by(AuditLog.id.desc()).limit(limit)
+        if before_id is not None:
+            query = query.where(AuditLog.id < before_id)
+        async with self.sessions() as session:
+            return list(await session.scalars(query))
+
+    async def clear(self) -> int:
+        """Empty the trail, leaving one entry that says who emptied it and when.
+
+        That entry is written here, in the same transaction, not published on the bus:
+        it must be the only one left, right away.
+        """
+        async with self.sessions() as session, session.begin():
+            deleted = int(await session.scalar(select(func.count(AuditLog.id))) or 0)
+            await session.execute(delete(AuditLog))
+            session.add(to_row(Event("audit.cleared", {"deleted": deleted})))
+        return deleted
 
     async def _run(self, sub: Any) -> None:
         async with sub:
