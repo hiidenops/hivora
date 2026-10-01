@@ -8873,6 +8873,60 @@
         ]
       }
     },
+    "/api/v1/sites/{app_id}/content": {
+      "put": {
+        "description": "Raw .zip body (streamed to disk, 200 MB max); the site's content is replaced by\na job, all at once. A single top folder in the archive is removed.",
+        "operationId": "replace_content_api_v1_sites__app_id__content_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filename",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Content",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
     "/api/v1/sites/{app_id}/enabled": {
       "put": {
         "operationId": "set_enabled_api_v1_sites__app_id__enabled_put",

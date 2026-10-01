@@ -1454,6 +1454,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sites/{app_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace Content
+         * @description Raw .zip body (streamed to disk, 200 MB max); the site's content is replaced by
+         *     a job, all at once. A single top folder in the archive is removed.
+         */
+        put: operations["replace_content_api_v1_sites__app_id__content_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sites/{app_id}/enabled": {
         parameters: {
             query?: never;
@@ -6409,6 +6430,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SiteCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_content_api_v1_sites__app_id__content_put: {
+        parameters: {
+            query?: {
+                filename?: string;
+            };
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
                 };
             };
             /** @description Validation Error */

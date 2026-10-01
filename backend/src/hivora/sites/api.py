@@ -3,7 +3,7 @@ app routes' (a site is an app)."""
 
 from dataclasses import asdict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from hivora.apps.api import JobRef, job_ref
@@ -55,3 +55,13 @@ async def create_site(body: SiteIn, _: Operator, rt: RuntimeDep) -> SiteCreatedO
 @router.put("/{app_id}/enabled", status_code=202)
 async def set_enabled(app_id: int, body: SiteEnabledIn, _: Operator, rt: RuntimeDep) -> JobRef:
     return job_ref(await rt.sites.set_enabled(app_id, body.enabled))
+
+
+@router.put("/{app_id}/content", status_code=202)
+async def replace_content(
+    app_id: int, request: Request, _: Operator, rt: RuntimeDep,
+    filename: str = Query("", max_length=200),
+) -> JobRef:  # fmt: skip
+    """Raw .zip body (streamed to disk, 200 MB max); the site's content is replaced by
+    a job, all at once. A single top folder in the archive is removed."""
+    return job_ref(await rt.sites.replace_content(app_id, filename, request.stream()))
