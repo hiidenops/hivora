@@ -5,17 +5,28 @@ leaves it, and no symbolic link is followed or accepted on the way. A new conten
 first staged in a work file next to ``html`` (same filesystem, never served), then moved
 into place by a single ``os.replace``: nginx sees the old file or the new one, never a
 mix. No content is ever logged.
+
+``SiteFiles`` serves them: reads directly, writes through the ``site_file`` job, in the
+app's lane.
 """
 
+import asyncio
 import hashlib
 import os
+import secrets
 import stat
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from hivora.core.archive import DEFAULT_LIMITS
+from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
-from hivora.core.fs import confined
+from hivora.core.events import EventBus
+from hivora.core.fs import confined, ensure_dir
+from hivora.jobs import Job, JobContext, JobKind, JobQueue
+from hivora.sites import core
 
 EDITABLE = (".html", ".css", ".js")
 MAX_FILE = 1024**2  # bytes, read or written
@@ -211,3 +222,69 @@ def apply_edit(
     finally:
         edit.unlink(missing_ok=True)
     return base_sha256 is None
+
+
+class SiteFiles:
+    """A site's text files: listed and read at once, saved by the ``site_file`` job."""
+
+    def __init__(
+        self, *, sessions: async_sessionmaker[AsyncSession], jobs: JobQueue,
+        settings: Settings, bus: EventBus,
+    ) -> None:  # fmt: skip
+        self.sessions = sessions
+        self.jobs = jobs
+        self.settings = settings
+        self.bus = bus
+
+    def register(self) -> None:
+        self.jobs.register(JobKind.SITE_FILE, self.save_job)
+
+    async def _html(self, app_id: int) -> Path:
+        async with self.sessions() as session:
+            app = await core.get_site(session, app_id)
+            return await core.html_dir(session, app.id)
+
+    async def list(self, app_id: int) -> tuple[list[SiteFile], bool]:
+        return await asyncio.to_thread(list_files, await self._html(app_id))
+
+    async def read(self, app_id: int, rel: str) -> TextFile:
+        return await asyncio.to_thread(read_file, await self._html(app_id), rel)
+
+    async def save(self, app_id: int, rel: str, content: str, base_sha256: str | None) -> Job:
+        """Check and stage the new content next to the site, then queue its move.
+
+        Refused here (nothing queued) if the path, the content or the base is wrong; the
+        job checks the base again before moving the file into place.
+        """
+        app, html_dir = await core.deployed_html(self.sessions, app_id)
+        root, s = self.settings.volumes_root, self.settings
+        await asyncio.to_thread(ensure_dir, html_dir.parent, root, uid=s.puid, gid=s.pgid)
+        edit = confined(html_dir.parent / f".hivora-edit-{secrets.token_hex(8)}", root)
+        try:
+            size = await asyncio.to_thread(stage_edit, html_dir, rel, content, base_sha256,
+                                           edit, uid=s.puid, gid=s.pgid)  # fmt: skip
+            params = {"path": rel, "edit": str(edit), "base_sha256": base_sha256, "bytes": size}
+            async with self.sessions() as session, session.begin():
+                job = self.jobs.add(session, JobKind.SITE_FILE, app_id=app.id,
+                                    app_slug=app.slug, params=params)  # fmt: skip
+        except BaseException:
+            edit.unlink(missing_ok=True)
+            raise
+        self.jobs.wake()
+        return job
+
+    async def save_job(self, ctx: JobContext) -> None:
+        """The site_file job: move a staged file into place, if the file is unchanged."""
+        s, rel = self.settings, ctx.params["path"]
+        edit = confined(Path(ctx.params["edit"]), s.volumes_root)
+        try:
+            app, html_dir = await core.deployed_html(self.sessions, ctx.app_id or 0)
+            await asyncio.to_thread(core.sweep, html_dir.parent, edit)
+            base = ctx.params["base_sha256"]
+            created = await asyncio.to_thread(apply_edit, html_dir, rel, edit, base,
+                                              uid=s.puid, gid=s.pgid)  # fmt: skip
+        finally:
+            edit.unlink(missing_ok=True)
+        size = ctx.params.get("bytes", 0)
+        await ctx.log(f"{'created' if created else 'saved'} {rel} ({size} bytes)")
+        self.bus.publish("site.file_saved", app=app.slug, path=rel, bytes=size, created=created)

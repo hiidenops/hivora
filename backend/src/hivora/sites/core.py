@@ -19,6 +19,7 @@ from hivora.core.errors import ConflictError, NotFoundError
 SITE_KIND = "static-site"
 HTML_TARGET = "/usr/share/nginx/html"  # the nginx template's "html" volume
 UPLOAD_TTL_S = 24 * 3600  # an upload left by an interrupted job is swept after this
+_STAGED = (".hivora-upload-", ".hivora-edit-")  # files a queued job may still be waiting for
 
 
 class SiteNotFoundError(NotFoundError):
@@ -53,14 +54,15 @@ async def deployed_html(
 
 
 def sweep(app_dir: Path, keep: Path) -> None:
-    """Leftovers of an interrupted replacement: staging folders, and uploads old enough
-    that no queued job can still be waiting for them (the lane runs one job at a time)."""
+    """Leftovers of an interrupted job: staging folders, and uploads or staged edits old
+    enough that no queued job can still be waiting for them (the lane runs one job at a
+    time)."""
     for stale in app_dir.glob(".hivora-*"):
         if stale == keep:
             continue
         if stale.name.startswith(".hivora-staging-") and stale.is_dir() and not stale.is_symlink():
             shutil.rmtree(stale)
-        elif stale.name.startswith(".hivora-upload-") and (
+        elif stale.name.startswith(_STAGED) and (
             time.time() - stale.lstat().st_mtime > UPLOAD_TTL_S
         ):
             stale.unlink()

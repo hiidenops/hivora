@@ -1492,6 +1492,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sites/{app_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Files */
+        get: operations["list_files_api_v1_sites__app_id__files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{app_id}/files/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read File */
+        get: operations["read_file_api_v1_sites__app_id__files_content_get"];
+        /**
+         * Save File
+         * @description Saved by a job, all at once, if the file is still the one read (base_sha256).
+         */
+        put: operations["save_file_api_v1_sites__app_id__files_content_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -3078,6 +3116,34 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /** SiteFileIn */
+        SiteFileIn: {
+            /** Base Sha256 */
+            base_sha256: string | null;
+            /** Content */
+            content: string;
+            /** Path */
+            path: string;
+        };
+        /** SiteFileOut */
+        SiteFileOut: {
+            /**
+             * Modified
+             * Format: date-time
+             */
+            modified: string;
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+        };
+        /** SiteFilesOut */
+        SiteFilesOut: {
+            /** Files */
+            files: components["schemas"]["SiteFileOut"][];
+            /** Truncated */
+            truncated: boolean;
+        };
         /** SiteIn */
         SiteIn: {
             /** Name */
@@ -3104,6 +3170,17 @@ export interface components {
             status: components["schemas"]["AppStatus"];
             /** Zone Id */
             zone_id: number | null;
+        };
+        /** SiteTextFileOut */
+        SiteTextFileOut: {
+            /** Content */
+            content: string;
+            /** Path */
+            path: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size */
+            size: number;
         };
         /** SummaryItemOut */
         SummaryItemOut: {
@@ -6488,6 +6565,105 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SiteEnabledIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_files_api_v1_sites__app_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteFilesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_file_api_v1_sites__app_id__files_content_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteTextFileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_file_api_v1_sites__app_id__files_content_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteFileIn"];
             };
         };
         responses: {
