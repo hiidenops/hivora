@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: adminer
   name: Adminer
-  version: 1.0.0
+  version: 1.0.1
   category: development
   tags: [database, sql, admin]
   icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/adminer.svg" }
@@ -36,8 +36,8 @@ form:
       type: string
       pattern: "[A-Za-z0-9._:-]{1,253}"
       help:
-        fr: "Facultatif. Nom du service de base de données (ex. « db ») dans une zone dont les apps sont reliées entre elles, ou adresse IP:port."
-        en: "Optional. Database service name (e.g. “db”) in a zone whose apps are linked together, or IP:port address."
+        fr: "Facultatif. Nom du conteneur de la base (ex. « postgresql-server-1 », soit « <nom de l'app>-server-1 ») si Adminer est dans la même zone, reliée entre elles ; ou adresse IP:port."
+        en: "Optional. Database container name (e.g. “postgresql-server-1”, that is “<app name>-server-1”) if Adminer is in the same zone, linked together; or IP:port address."
 services:
   server:
     role: main

@@ -1,0 +1,59 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: redis
+  name: Redis
+  version: 1.0.0
+  category: services
+  tags: [database, cache, key-value]
+  icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/redis.svg" }
+  description:
+    fr: Base clé-valeur en mémoire (cache, files d'attente), protégée par mot de passe, joignable par les autres apps de sa zone.
+    en: In-memory key-value store (cache, queues), password protected, reachable by the other apps of its zone.
+  links:
+    site: https://redis.io
+    doc: https://redis.io/docs/latest/
+  maintainer: hivora
+  license: AGPL-3.0 / RSALv2 / SSPLv1 (image)
+  source: https://hub.docker.com/_/redis
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 32Mi, recommended: 128Mi }
+  disk: { min: 100Mi }
+form:
+  basic:
+    - id: password
+      group: { fr: Accès, en: Access }
+      label: { fr: Mot de passe, en: Password }
+      type: secret
+      required: true
+      pattern: ".{12,128}"
+      help:
+        fr: "Au moins 12 caractères, demandé à chaque connexion ; il n'est plus affiché ensuite. Joignable uniquement par les apps de la même zone (zone « reliées entre elles ») à l'adresse « <nom de l'app>-server-1:6379 ». Données conservées sur disque (AOF)."
+        en: "At least 12 characters, required on every connection; it is not shown again. Reachable only by the apps of the same zone (zone “linked together”) at “<app name>-server-1:6379”. Data kept on disk (AOF)."
+services:
+  server:
+    role: main
+    image: redis
+    tag: "8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0"
+    track: minor
+    command: ["redis-server", "--requirepass", "{{ secret.password }}", "--appendonly", "yes"]
+    env:
+      REDISCLI_AUTH: "{{ secret.password }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 6379, purpose: other, exposure: internal }
+    volumes:
+      - { name: data, target: /data, backup: true }
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

@@ -240,7 +240,8 @@ def test_every_repo_template_compiles_on_its_architectures(catalog: Catalog) -> 
     answers = {
         "host": "vpn.example.org",
         "eula": True,
-        "password": "hunter2x",
+        "password": "hunter2x-hunter2x",  # 12 characters at least (Redis)
+        "db_password": "correct-horse-12",  # PostgreSQL, MariaDB
         "gslt": "TOKEN",
         "cluster_token": "pds-g^x",
         "admin_password": "correct-horse-12",

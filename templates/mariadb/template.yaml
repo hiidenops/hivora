@@ -1,0 +1,90 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: mariadb
+  name: MariaDB
+  version: 1.0.0
+  category: services
+  tags: [database, sql, mysql]
+  icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/mariadb.svg" }
+  description:
+    fr: Base de données MariaDB (compatible MySQL), version LTS, joignable par les autres apps de sa zone.
+    en: MariaDB database (MySQL compatible), LTS release, reachable by the other apps of its zone.
+  links:
+    site: https://mariadb.org
+    doc: https://mariadb.com/kb/en/documentation/
+  maintainer: hivora
+  license: GPL-2.0 (image)
+  source: https://hub.docker.com/_/mariadb
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 256Mi, recommended: 512Mi }
+  disk: { min: 1Gi }
+form:
+  basic:
+    - id: db_name
+      group: { fr: Base de données, en: Database }
+      label: { fr: Nom de la base, en: Database name }
+      type: string
+      default: app
+      pattern: "[A-Za-z_][A-Za-z0-9_]{0,62}"
+      help:
+        fr: "Joignable uniquement par les apps de la même zone (zone « reliées entre elles »), à l'adresse « <nom de l'app>-server-1:3306 ». L'ouverture sur le réseau local n'est pas encore disponible."
+        en: "Reachable only by the apps of the same zone (zone “linked together”), at “<app name>-server-1:3306”. Opening it to the local network is not available yet."
+    - id: db_user
+      group: { fr: Base de données, en: Database }
+      label: { fr: Utilisateur, en: User }
+      type: string
+      default: app
+      pattern: "[A-Za-z_][A-Za-z0-9_]{0,62}"
+    - id: db_password
+      group: { fr: Base de données, en: Database }
+      label: { fr: Mot de passe, en: Password }
+      type: secret
+      required: true
+      pattern: ".{12,128}"
+      help:
+        fr: "Au moins 12 caractères. Il n'est plus affiché ensuite : notez-le pour vous connecter. Une montée de version majeure demande une migration manuelle ; une sauvegarde ne se restaure que sur la même version majeure."
+        en: "At least 12 characters. It is not shown again: write it down to connect. A major version upgrade needs a manual migration; a backup only restores on the same major version."
+  advanced:
+    - id: root_password
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mot de passe root, en: Root password }
+      type: secret
+      generate: { length: 32 }
+      pattern: ".{12,128}"
+      help:
+        fr: "Laissé vide, il est généré et n'est pas affiché : utilisez l'utilisateur ci-dessus. Saisissez-le si vous avez besoin du compte root."
+        en: "Left empty, it is generated and not shown: use the user above. Enter one if you need the root account."
+services:
+  server:
+    role: main
+    image: mariadb
+    tag: "11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68"
+    track: minor
+    env:
+      MARIADB_ROOT_PASSWORD: "{{ secret.root_password }}"
+      MARIADB_DATABASE: "{{ form.db_name }}"
+      MARIADB_USER: "{{ form.db_user }}"
+      MARIADB_PASSWORD: "{{ secret.db_password }}"
+      MARIADB_AUTO_UPGRADE: "1"
+      MARIADB_MYSQL_LOCALHOST_USER: "1"
+      MARIADB_MYSQL_LOCALHOST_GRANTS: USAGE
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 3306, purpose: other, exposure: internal }
+    volumes:
+      - { name: data, target: /var/lib/mysql, backup: true }
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 30s
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

@@ -1,0 +1,77 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: postgresql
+  name: PostgreSQL
+  version: 1.0.0
+  category: services
+  tags: [database, sql]
+  icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/postgresql.svg" }
+  description:
+    fr: Base de données relationnelle PostgreSQL, joignable par les autres apps de sa zone.
+    en: PostgreSQL relational database, reachable by the other apps of its zone.
+  links:
+    site: https://www.postgresql.org
+    doc: https://www.postgresql.org/docs/18/
+  maintainer: hivora
+  license: PostgreSQL License (image)
+  source: https://hub.docker.com/_/postgres
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 128Mi, recommended: 512Mi }
+  disk: { min: 1Gi }
+form:
+  basic:
+    - id: db_name
+      group: { fr: Base de données, en: Database }
+      label: { fr: Nom de la base, en: Database name }
+      type: string
+      default: app
+      pattern: "[A-Za-z_][A-Za-z0-9_]{0,62}"
+      help:
+        fr: "Joignable uniquement par les apps de la même zone (zone « reliées entre elles »), à l'adresse « <nom de l'app>-server-1:5432 ». L'ouverture sur le réseau local n'est pas encore disponible."
+        en: "Reachable only by the apps of the same zone (zone “linked together”), at “<app name>-server-1:5432”. Opening it to the local network is not available yet."
+    - id: db_user
+      group: { fr: Base de données, en: Database }
+      label: { fr: Utilisateur, en: User }
+      type: string
+      default: app
+      pattern: "[A-Za-z_][A-Za-z0-9_]{0,62}"
+    - id: db_password
+      group: { fr: Base de données, en: Database }
+      label: { fr: Mot de passe, en: Password }
+      type: secret
+      required: true
+      pattern: ".{12,128}"
+      help:
+        fr: "Au moins 12 caractères. Il n'est plus affiché ensuite : notez-le pour vous connecter. Une montée de version majeure demande une migration manuelle ; une sauvegarde ne se restaure que sur la même version majeure."
+        en: "At least 12 characters. It is not shown again: write it down to connect. A major version upgrade needs a manual migration; a backup only restores on the same major version."
+services:
+  server:
+    role: main
+    image: postgres
+    tag: "18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873"
+    track: minor
+    env:
+      POSTGRES_DB: "{{ form.db_name }}"
+      POSTGRES_USER: "{{ form.db_user }}"
+      POSTGRES_PASSWORD: "{{ secret.db_password }}"
+      TZ: "{{ host.timezone }}"
+    ports:
+      - { container: 5432, purpose: other, exposure: internal }
+    volumes:
+      - { name: data, target: /var/lib/postgresql, backup: true }
+    healthcheck:
+      # The container's own variables ($$: read by its shell, not by Compose).
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 30s
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped
