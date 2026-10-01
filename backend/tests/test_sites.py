@@ -316,3 +316,28 @@ def test_sites_routes_roles_and_unknown(client: Any) -> None:
             viewer.put(f"{API}/sites/{site['id']}/enabled", json={"enabled": False}),
         ):
             assert r.status_code == 403 and code(r) == "insufficient_role"
+
+
+# --- S2-a: what the zip replacement builds on --------------------------------------------
+
+
+def test_site_html_dir_is_the_bind_mount_and_lives_next_to_uploads(client: Any) -> None:
+    """Only <slug>/html is mounted: files next to it (uploads, staging) are never served,
+    and they sit on the same filesystem, so moving them into html is a plain rename."""
+    admin(client)
+    settings = client.app.state.runtime.settings
+    site = _site(client)["site"]
+    app_dir = settings.volumes_root / site["slug"]
+    html = app_dir / "html"
+
+    compose = yaml.safe_load(
+        (settings.data_dir / "apps" / site["slug"] / "compose.yaml").read_text()
+    )
+    mounts = [v for svc in compose["services"].values() for v in svc.get("volumes", [])]
+    assert [(m["type"], m["source"], m["target"]) for m in mounts] == [
+        ("bind", str(html), "/usr/share/nginx/html")
+    ]
+    assert sorted(p.name for p in app_dir.iterdir()) == ["html"]
+    assert html.is_dir() and not html.is_symlink()
+    assert html.stat().st_dev == app_dir.stat().st_dev
+    assert sorted(p.name for p in html.iterdir()) == ["index.html"]

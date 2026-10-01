@@ -104,3 +104,24 @@ async def test_receive_upload_refuses_an_empty_body(tmp_path: Path) -> None:
     assert err.value.code == "invalid_archive"
     assert not (tmp_path / "empty.zip").exists()
     assert w.ArchiveTooLargeError.code == "archive_too_large"
+
+
+async def test_receive_upload_stops_at_its_limit(tmp_path: Path) -> None:
+    consumed: list[int] = []
+
+    async def body(sizes: list[int]) -> AsyncIterator[bytes]:
+        for n in sizes:
+            consumed.append(n)
+            yield b"z" * n
+
+    # Exactly at the limit: accepted, every byte written.
+    assert await fs.receive_upload(body([4, 4, 2]), tmp_path / "ok.zip", limit=10) == 10
+    assert (tmp_path / "ok.zip").read_bytes() == b"z" * 10
+
+    # One byte over: refused at that chunk, the partial file removed, the rest not read.
+    consumed.clear()
+    with pytest.raises(fs.ArchiveTooLargeError) as err:
+        await fs.receive_upload(body([4, 4, 3, 100]), tmp_path / "big.zip", limit=10)
+    assert err.value.code == "archive_too_large" and err.value.details == {"limit": 10}
+    assert consumed == [4, 4, 3]
+    assert not (tmp_path / "big.zip").exists()
