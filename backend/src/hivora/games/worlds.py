@@ -21,8 +21,15 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
-from hivora.apps.files import confined, remove_tree, tree_size
+from hivora.core import fs
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
+from hivora.core.fs import (  # re-exported: games and tests use them from here
+    ArchiveTooLargeError as ArchiveTooLargeError,
+)
+from hivora.core.fs import (
+    InvalidArchiveError as InvalidArchiveError,
+)
+from hivora.core.fs import confined, remove_tree, tree_size
 from hivora.jobs import JobContext, JobKind
 from hivora.templates.schema import GameSaves
 
@@ -49,14 +56,6 @@ class WorldExistsError(ConflictError):
 
 class ActiveWorldError(ConflictError):
     code = "world_active"
-
-
-class InvalidArchiveError(ValidationError):
-    code = "invalid_archive"
-
-
-class ArchiveTooLargeError(ValidationError):
-    code = "archive_too_large"
 
 
 class NotEnoughSpaceError(ConflictError):
@@ -223,23 +222,8 @@ def extract_world(
 
 
 async def receive_upload(chunks: AsyncIterator[bytes], dest: Path) -> int:
-    """Write a streamed request body to `dest`, capped at MAX_UPLOAD."""
-    size = 0
-    try:
-        with dest.open("wb") as out:
-            async for chunk in chunks:
-                size += len(chunk)
-                if size > MAX_UPLOAD:
-                    raise ArchiveTooLargeError("archive too large", limit=MAX_UPLOAD)
-                # ponytail: blocking writes of small chunks; move to a thread if it shows.
-                out.write(chunk)
-    except BaseException:
-        await asyncio.to_thread(dest.unlink, missing_ok=True)
-        raise
-    if size == 0:
-        await asyncio.to_thread(dest.unlink, missing_ok=True)
-        raise InvalidArchiveError("empty upload")
-    return size
+    """Write a streamed request body to `dest`, capped at MAX_UPLOAD (read at call time)."""
+    return await fs.receive_upload(chunks, dest, limit=MAX_UPLOAD)
 
 
 async def zip_stream(paths: list[Path], base: Path) -> AsyncIterator[bytes]:

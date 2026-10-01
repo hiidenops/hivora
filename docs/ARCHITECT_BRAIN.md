@@ -157,7 +157,8 @@ Rapport complet : `.report/architecture-apres-decoupage-2026-09-29.md` (local, n
    - *Dette connue* : `topology`, `vpn`, `pyapps` et `backups` lisent `apps.models` directement.
 5. **Pas d'utilitaire emprunté à un module métier.**
    - Un outil générique vit dans `core` (Hivora) ou dans le socle du module.
-   - *Dettes connues* : `apps.files` utilisé par `games` (`worlds`, `engine`) et `pyapps` ; `games.worlds.receive_upload` utilisé par `pyapps` ; nom privé `analyze._Zip` importé par `pyapps`.
+   - *Réglé le 01/10 (lot S0)* : les outils fichiers partagés (`confined`, `ensure_dir`, `remove_tree`, `tree_size`, `empty_dir`, `receive_upload`, erreurs d'archive) vivent dans `core/fs`, qui n'importe aucun module métier ; `apps`, `games` et `pyapps` l'importent directement (`apps/files.py` supprimé).
+   - *Dette connue* : nom privé `analyze._Zip` importé par `pyapps/service.py` (§9.11), correction prévue dans un lot séparé.
 6. **Une vue ne déclenche pas d'action.** Un calcul de lecture (topologie, tableau de bord) n'exécute aucune commande hôte ni aucune mutation.
    - *Dette connue* : `topology` appelle `hostfw.listening()`.
 7. **Réexports explicites seulement** (`from x import Y as Y`), placés dans la façade pour préserver les imports existants. À terme, les appelants importent directement depuis le module qui définit le symbole.
@@ -243,7 +244,7 @@ Second rang :
 1. `topology-view.tsx` (seuil bloquant) : extraire le panneau d'inspection, le gestionnaire de liens et l'export.
 2. `AppPlanner` dans `apps/planner.py` : `core.py` repasse sous 300 lignes.
 3. Étape 7 de `AppService` : brancher les appelants sur les sous-services, puis supprimer les relais ; c'est ce qui fera baisser ses liens dans Graphify (§13).
-4. `core/fs` pour `confined`, `tree_size`, `remove_tree` et `receive_upload` (§4.5) ; `_Zip` rendu public.
+4. ~~`core/fs` pour `confined`, `tree_size`, `remove_tree` et `receive_upload` (§4.5)~~ fait le 01/10 (lot S0) ; reste `_Zip` à rendre public (§9.11).
 5. Topologie branchée sur l'état du pare-feu en cache (§4.6).
 6. `ZoneIn` renommé (ex. `AppZoneIn`) pour supprimer le contournement de `__module__` ; commit séparé, le contrat OpenAPI change.
 

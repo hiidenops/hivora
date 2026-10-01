@@ -23,11 +23,11 @@ from hivora.apps.core import (
     store_secrets,
 )
 from hivora.apps.custom_images import CustomImages
-from hivora.apps.files import tree_size
 from hivora.apps.models import Application, AppRevision, AppSecret, RevisionStatus
 from hivora.core.clock import Clock
 from hivora.core.errors import ConflictError, NotFoundError
 from hivora.core.events import EventBus
+from hivora.core.fs import tree_size
 from hivora.crypto.cipher import SecretBox
 from hivora.jobs import Job, JobQueue
 from hivora.templates import Catalog, CatalogEntry

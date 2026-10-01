@@ -5,10 +5,10 @@ from pathlib import Path
 import yaml
 from sqlalchemy import update
 
-from hivora.apps.files import empty_dir, ensure_dir, remove_tree
 from hivora.apps.models import Application, AppRevision, Origin, RevisionStatus
 from hivora.apps.service import AppService, UnsupportedArchitectureError
 from hivora.compose_runner import ComposeError, ProgressEvent, ProgressStatus
+from hivora.core.fs import empty_dir, ensure_dir, remove_tree
 from hivora.jobs import JobContext, JobKind
 from hivora.templates.catalog import host_arch
 from hivora.templates.expressions import secret_env_name

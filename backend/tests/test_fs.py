@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from hivora.apps import files as fs
+from hivora.core import fs
 from hivora.core.errors import PermissionDeniedError
 from hivora.games import worlds as w
 

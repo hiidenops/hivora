@@ -24,11 +24,10 @@ from typing import Any
 import yaml
 from sqlalchemy import select
 
-from hivora.apps.files import confined
 from hivora.apps.models import Application
 from hivora.apps.service import DeployRequest, slugify
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
-from hivora.games.worlds import receive_upload
+from hivora.core.fs import confined, receive_upload
 from hivora.jobs import Job
 from hivora.pyapps.analyze import Analysis, Mount, ProjectError, _Zip, analyze, volume_name
 from hivora.runtime import Runtime

@@ -16,8 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from hivora.apps.files import confined
 from hivora.core.errors import ConflictError, HivoraError, NotFoundError, ValidationError
+from hivora.core.fs import confined
 from hivora.docker_gateway import ContainerInfo
 from hivora.games import worlds as w
 from hivora.games.a2s import A2SError, query_async

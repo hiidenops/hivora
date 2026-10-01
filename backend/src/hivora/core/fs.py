@@ -1,11 +1,24 @@
-"""Filesystem operations on app directories, confined to their roots."""
+"""Filesystem operations shared by the modules: paths confined to their roots, app
+directories, and streamed uploads of archives (sizes capped)."""
 
+import asyncio
 import fnmatch
 import os
 import shutil
+from collections.abc import AsyncIterator
 from pathlib import Path
 
-from hivora.core.errors import PermissionDeniedError
+from hivora.core.errors import PermissionDeniedError, ValidationError
+
+UPLOAD_LIMIT = 10 * 1024**3  # an uploaded archive, as sent
+
+
+class InvalidArchiveError(ValidationError):
+    code = "invalid_archive"
+
+
+class ArchiveTooLargeError(ValidationError):
+    code = "archive_too_large"
 
 
 def confined(path: Path, root: Path) -> Path:
@@ -68,3 +81,24 @@ def empty_dir(path: Path, root: Path, keep: list[str]) -> list[str]:
             entry.unlink()
         removed.append(entry.name)
     return removed
+
+
+async def receive_upload(chunks: AsyncIterator[bytes], dest: Path,
+                         limit: int = UPLOAD_LIMIT) -> int:  # fmt: skip
+    """Write a streamed request body to `dest`, capped at `limit`."""
+    size = 0
+    try:
+        with dest.open("wb") as out:
+            async for chunk in chunks:
+                size += len(chunk)
+                if size > limit:
+                    raise ArchiveTooLargeError("archive too large", limit=limit)
+                # ponytail: blocking writes of small chunks; move to a thread if it shows.
+                out.write(chunk)
+    except BaseException:
+        await asyncio.to_thread(dest.unlink, missing_ok=True)
+        raise
+    if size == 0:
+        await asyncio.to_thread(dest.unlink, missing_ok=True)
+        raise InvalidArchiveError("empty upload")
+    return size
