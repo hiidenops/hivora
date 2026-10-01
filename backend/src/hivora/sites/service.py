@@ -3,41 +3,33 @@
 A site is only ever an app this service created (``application.kind``): an nginx deployed
 by hand from the catalog is not a site. Deploy, start and stop are the apps' own; the
 site's files are written by its jobs, in the app's lane.
-
-Work files (uploads, staging folders) live next to the ``html`` folder: same filesystem
-(moved in by ``rename``) and outside the bind mount (never served).
 """
 
 import asyncio
 import html
 import os
 import secrets
-import shutil
-import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.orm import selectinload
 
 from hivora.apps.core import DeployRequest, latest_revision
 from hivora.apps.lifecycle import Deployer, Lifecycle
-from hivora.apps.models import Application, DesiredState, Service
+from hivora.apps.models import Application, DesiredState
 from hivora.core import archive, fs
 from hivora.core.config import Settings
-from hivora.core.errors import ConflictError, NotFoundError
 from hivora.core.events import EventBus
 from hivora.core.fs import confined, ensure_dir
 from hivora.jobs import Job, JobContext, JobKind, JobQueue
+from hivora.sites import core
+from hivora.sites.core import SITE_KIND
 from hivora.state import AppStatus, StateStore
 
-SITE_KIND = "static-site"
 TEMPLATE = "nginx"
-HTML_TARGET = "/usr/share/nginx/html"  # the nginx template's "html" volume
 MAX_UPLOAD = 200 * 1024**2  # a zip, as sent
-UPLOAD_TTL_S = 24 * 3600  # an upload left by an interrupted job is swept after this
 
 PAGE = """<!doctype html>
 <html>
@@ -52,10 +44,6 @@ PAGE = """<!doctype html>
 </body>
 </html>
 """
-
-
-class SiteNotFoundError(NotFoundError):
-    code = "site_not_found"
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,7 +102,7 @@ class SiteService:
     async def set_enabled(self, app_id: int, enabled: bool) -> Job:
         """Start or stop; refused (409) until the first deploy has run."""
         async with self.sessions() as session:
-            app = await self._get(session, app_id)
+            app = await core.get_site(session, app_id)
         job = await (self.lifecycle.start if enabled else self.lifecycle.stop)(app_id)
         topic = "site.enabled" if enabled else "site.disabled"
         self.bus.publish(topic, app=app.slug, job=job.id)
@@ -127,8 +115,8 @@ class SiteService:
         again before writing anything.
         """
         async with self.sessions() as session:
-            app = await self._get(session, app_id)
-            html_dir = await self._html_dir(session, app.id)
+            app = await core.get_site(session, app_id)
+            html_dir = await core.html_dir(session, app.id)
         root, s = self.settings.volumes_root, self.settings
         await asyncio.to_thread(ensure_dir, html_dir.parent, root, uid=s.puid, gid=s.pgid)
         upload = confined(html_dir.parent / f".hivora-upload-{secrets.token_hex(8)}.zip", root)
@@ -152,13 +140,6 @@ class SiteService:
         else:
             await self._initial(ctx)
 
-    async def _deployed_html(self, ctx: JobContext) -> tuple[Application, Path]:
-        async with self.sessions() as session:
-            app = await self._get(session, ctx.app_id or 0)
-            if app.current_revision_id is None:
-                raise ConflictError("site not deployed", slug=app.slug)
-            return app, await self._html_dir(session, app.id)
-
     def _inspect(self, upload: Path) -> archive.Plan:
         with archive.open_zip(upload) as zf:
             return archive.inspect(zf, self.limits)
@@ -173,7 +154,7 @@ class SiteService:
             asyncio.run_coroutine_threadsafe(ctx.progress(pct, "Extracting the site"), loop)
 
         def work(html_dir: Path) -> tuple[archive.Plan, int]:
-            _sweep(html_dir.parent, keep=upload)
+            core.sweep(html_dir.parent, keep=upload)
             with archive.open_zip(upload) as zf:
                 plan = archive.inspect(zf, self.limits)
                 written = archive.extract(zf, plan, staging, uid=s.puid, gid=s.pgid,
@@ -182,7 +163,7 @@ class SiteService:
             return plan, written
 
         try:
-            app, html_dir = await self._deployed_html(ctx)
+            app, html_dir = await core.deployed_html(self.sessions, ctx.app_id or 0)
             await ctx.log(f"extracting {ctx.params.get('filename') or upload.name}")
             plan, written = await asyncio.to_thread(work, html_dir)
         finally:
@@ -199,7 +180,7 @@ class SiteService:
 
     async def _initial(self, ctx: JobContext) -> None:
         """Write index.html once: an existing page is never replaced."""
-        app, html_dir = await self._deployed_html(ctx)
+        app, html_dir = await core.deployed_html(self.sessions, ctx.app_id or 0)
         root = self.settings.volumes_root
         ensure_dir(html_dir, root, uid=self.settings.puid, gid=self.settings.pgid)
         index = confined(html_dir / "index.html", root)
@@ -214,21 +195,6 @@ class SiteService:
             os.chown(index, self.settings.puid, self.settings.pgid)
         await ctx.log("index.html written")
 
-    async def _get(self, session: AsyncSession, app_id: int) -> Application:
-        app = await session.get(Application, app_id)
-        if app is None or app.kind != SITE_KIND:
-            raise SiteNotFoundError(str(app_id))
-        return app
-
-    async def _html_dir(self, session: AsyncSession, app_id: int) -> Path:
-        service = await session.scalar(
-            select(Service).where(Service.app_id == app_id).options(selectinload(Service.volumes))
-        )
-        for volume in service.volumes if service else []:
-            if volume.target == HTML_TARGET:
-                return Path(volume.source)
-        raise ConflictError("site has no html volume", app=app_id)
-
     async def _site(self, session: AsyncSession, app: Application) -> Site:
         revision = await latest_revision(session, app.id)
         port = revision.inputs.get("web_port") if revision else None
@@ -239,17 +205,3 @@ class SiteService:
             deployed=app.current_revision_id is not None,
             status=self.state.app(app.slug).status,
         )  # fmt: skip
-
-
-def _sweep(app_dir: Path, keep: Path) -> None:
-    """Leftovers of an interrupted replacement: staging folders, and uploads old enough
-    that no queued job can still be waiting for them (the lane runs one job at a time)."""
-    for stale in app_dir.glob(".hivora-*"):
-        if stale == keep:
-            continue
-        if stale.name.startswith(".hivora-staging-") and stale.is_dir() and not stale.is_symlink():
-            shutil.rmtree(stale)
-        elif stale.name.startswith(".hivora-upload-") and (
-            time.time() - stale.lstat().st_mtime > UPLOAD_TTL_S
-        ):
-            stale.unlink()
