@@ -8,10 +8,8 @@ from typing import Literal
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 
 from hivora.apps.api import JobRef, job_ref
-from hivora.backups.models import Backup, BackupSchedule
 from hivora.backups.service import BackupNotFoundError, BackupService
 from hivora.web.deps import Operator, RuntimeDep
 
@@ -55,10 +53,7 @@ async def overview(app_id: int, _: Operator, rt: RuntimeDep) -> BackupsOut:
     b = tools(rt)
     async with rt.sessions() as session:
         app = await rt.apps.get(session, app_id)
-        schedule = await session.get(BackupSchedule, app_id)
-        rows = await session.scalars(
-            select(Backup).where(Backup.app_id == app_id).order_by(Backup.created_at.desc())
-        )
+        schedule, rows = await b.listing(session, app_id)
         backups = [BackupOut(id=r.id, created_at=r.created_at, scheduled=r.scheduled,
                              status=r.status, name=Path(r.path).name, size=r.size)
                    for r in rows]  # fmt: skip

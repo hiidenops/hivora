@@ -134,6 +134,15 @@ class BackupService:
         s.jobs.wake()
         return job
 
+    async def listing(self, session: AsyncSession,
+                      app_id: int) -> tuple[BackupSchedule | None, list[Backup]]:  # fmt: skip
+        """The app's backup schedule (None: never set) and its backups, newest first."""
+        schedule = await session.get(BackupSchedule, app_id)
+        rows = await session.scalars(
+            select(Backup).where(Backup.app_id == app_id).order_by(Backup.created_at.desc())
+        )
+        return schedule, list(rows)
+
     async def get(self, session: AsyncSession, app_id: int, backup_id: int) -> Backup:
         backup = await session.get(Backup, backup_id)
         if backup is None or backup.app_id != app_id:
