@@ -26,6 +26,8 @@ class JobKind(StrEnum):
     WORLD_DELETE = "world_delete"
     BACKUP = "backup"
     BACKUP_RESTORE = "backup_restore"
+    SITE_CONTENT = "site_content"
+    SITE_FILE = "site_file"
 
 
 class JobStatus(StrEnum):

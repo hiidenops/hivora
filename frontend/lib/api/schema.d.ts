@@ -2487,7 +2487,7 @@ export interface components {
          * JobKind
          * @enum {string}
          */
-        JobKind: "deploy" | "update" | "remove" | "pull" | "start" | "stop" | "restart" | "rollback" | "adopt" | "convert" | "move_zone" | "world_import" | "world_delete" | "backup" | "backup_restore";
+        JobKind: "deploy" | "update" | "remove" | "pull" | "start" | "stop" | "restart" | "rollback" | "adopt" | "convert" | "move_zone" | "world_import" | "world_delete" | "backup" | "backup_restore" | "site_content" | "site_file";
         /** JobOut */
         JobOut: {
             /** App Id */

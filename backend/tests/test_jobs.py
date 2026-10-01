@@ -94,6 +94,26 @@ async def test_failure_is_recorded_redacted(queue: JobQueue) -> None:
     assert "topsecret" not in job.log
 
 
+async def test_site_job_kinds_run_and_are_stored(queue: JobQueue) -> None:
+    seen: list[JobKind] = []
+
+    async def handler(ctx: JobContext) -> None:
+        seen.append(ctx.kind)
+
+    queue.register(JobKind.SITE_CONTENT, handler)
+    queue.register(JobKind.SITE_FILE, handler)
+    sub = queue.bus.subscribe("job.finished")
+    await queue.start()
+    ids = [await add(queue, JobKind.SITE_CONTENT, app_id=1),
+           await add(queue, JobKind.SITE_FILE, app_id=1)]  # fmt: skip
+    await wait_finished(sub, 2)
+    assert (JobKind.SITE_CONTENT.value, JobKind.SITE_FILE.value) == ("site_content", "site_file")
+    assert seen == [JobKind.SITE_CONTENT, JobKind.SITE_FILE]  # same app: in order
+    for job_id, kind in zip(ids, seen, strict=True):
+        job = await get(queue.sessions, job_id)
+        assert (job.kind, job.status) == (kind, JobStatus.SUCCEEDED)
+
+
 async def test_same_app_jobs_are_serialized_other_apps_run_concurrently(queue: JobQueue) -> None:
     running: set[int | None] = set()
     order: list[str] = []

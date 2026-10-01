@@ -1896,7 +1896,9 @@
           "world_import",
           "world_delete",
           "backup",
-          "backup_restore"
+          "backup_restore",
+          "site_content",
+          "site_file"
         ],
         "title": "JobKind",
         "type": "string"

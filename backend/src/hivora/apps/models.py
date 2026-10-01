@@ -70,6 +70,7 @@ class Application(Base):
     )
     icon: Mapped[str | None] = mapped_column(String(200))
     notes: Mapped[str] = mapped_column(Text, default="")
+    kind: Mapped[str | None] = mapped_column(String(32))  # "static-site"; NULL otherwise
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
     services: Mapped[list["Service"]] = relationship(
