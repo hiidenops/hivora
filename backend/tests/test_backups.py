@@ -103,3 +103,47 @@ def test_backup_restore_schedule_and_retention(client: Any) -> None:
     assert client.delete(f"{API}/apps/{app_id}/backups/{first['id']}").status_code == 204
     gone = client.get(f"{API}/apps/{app_id}/backups/{first['id']}/download")
     assert gone.status_code == 404 and code(gone) == "backup_not_found"
+
+
+def test_backups_overview_lists_newest_first_and_404s_unknown_apps(client: Any) -> None:
+    """GET /apps/{id}/backups, pinned before its SQL moves into BackupService."""
+    from datetime import timedelta
+
+    from hivora.backups.models import Backup
+
+    admin(client)
+    body = {"template": "vaultwarden", "name": "Coffre", "inputs": {"web_port": 8091}}
+    deployed = client.post(f"{API}/apps", json=body).json()
+    assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
+    app_id = deployed["app"]["id"]
+    rt = client.app.state.runtime
+
+    # No schedule yet: the defaults, no next run, the server's time zone.
+    empty = client.get(f"{API}/apps/{app_id}/backups").json()
+    assert empty == {"schedule": {"enabled": False, "frequency": "daily", "hour": 4,
+                                  "minute": 0, "weekday": 0, "every_hours": 6, "keep": 7,
+                                  "stop": True},
+                     "next_run_at": None, "timezone": rt.settings.timezone,
+                     "volumes": ["data"], "backups": []}  # fmt: skip
+
+    # Rows inserted out of time order: the list follows created_at, newest first.
+    base = datetime(2026, 9, 1, 12, tzinfo=UTC)
+
+    async def insert() -> None:
+        async with rt.sessions() as session, session.begin():
+            for hours, scheduled, status in ((3, True, "ok"), (1, False, "failed"),
+                                             (2, False, "ok")):  # fmt: skip
+                session.add(Backup(app_id=app_id, created_at=base + timedelta(hours=hours),
+                                   scheduled=scheduled, status=status, size=hours * 10,
+                                   path=f"/backups/coffre/b{hours}.tar.gz"))  # fmt: skip
+
+    client.portal.call(insert)
+    rows = client.get(f"{API}/apps/{app_id}/backups").json()["backups"]
+    assert [b["name"] for b in rows] == ["b3.tar.gz", "b2.tar.gz", "b1.tar.gz"]
+    assert [b["id"] for b in rows] != sorted(b["id"] for b in rows)  # not the id order
+    assert [(b["scheduled"], b["status"], b["size"]) for b in rows] == [
+        (True, "ok", 30), (False, "ok", 20), (False, "failed", 10),
+    ]  # fmt: skip
+
+    missing = client.get(f"{API}/apps/999999/backups")
+    assert missing.status_code == 404 and code(missing) == "app_not_found"
