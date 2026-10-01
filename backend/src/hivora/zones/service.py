@@ -43,6 +43,12 @@ def _check(name: str, color: str, mode: NetworkMode) -> None:
         raise ValidationError("unsupported network mode", field="network_mode")
 
 
+async def find_zone(session: AsyncSession, slug: str) -> Zone | None:
+    """The zone with this slug, or None (no error: the caller decides)."""
+    zone: Zone | None = await session.scalar(select(Zone).where(Zone.slug == slug))
+    return zone
+
+
 async def get_zone(session: AsyncSession, slug: str) -> Zone:
     zone = await session.scalar(select(Zone).where(Zone.slug == slug))
     if zone is None:

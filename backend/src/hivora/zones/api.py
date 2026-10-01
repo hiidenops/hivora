@@ -2,11 +2,10 @@
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 
 from hivora.web.deps import Operator, RuntimeDep, Viewer
 from hivora.zones.models import NetworkMode, Zone
-from hivora.zones.service import create_zone, delete_zone, edit_zone, list_zones
+from hivora.zones.service import create_zone, delete_zone, edit_zone, find_zone, list_zones
 
 router = APIRouter(tags=["zones"])
 
@@ -64,7 +63,7 @@ async def edit(slug: str, body: ZoneIn, _: Operator, rt: RuntimeDep) -> ZoneOut:
 @router.delete("/{slug}", status_code=204)
 async def delete(slug: str, _: Operator, rt: RuntimeDep) -> None:
     async with rt.sessions() as session, session.begin():
-        zone = await session.scalar(select(Zone).where(Zone.slug == slug))
+        zone = await find_zone(session, slug)
         apps = (await rt.apps.apps_per_zone(session)).get(zone.id, 0) if zone else 0
         await delete_zone(session, slug, apps)
     await rt.gateway.remove_network(f"hivora-zone-{slug}")
