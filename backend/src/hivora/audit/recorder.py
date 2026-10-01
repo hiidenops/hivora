@@ -28,6 +28,7 @@ AUDITED_PREFIXES = (
     "console.",
     "settings.",
     "game.",
+    "site.",
 )
 _FAILED = {"auth.login_failed"}
 _BATCH_DELAY_S = 0.5

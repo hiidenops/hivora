@@ -3334,6 +3334,132 @@
         "title": "SettingsOut",
         "type": "object"
       },
+      "SiteCreatedOut": {
+        "properties": {
+          "content_job": {
+            "$ref": "#/components/schemas/JobRef"
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobRef"
+          },
+          "site": {
+            "$ref": "#/components/schemas/SiteOut"
+          }
+        },
+        "required": [
+          "site",
+          "job",
+          "content_job"
+        ],
+        "title": "SiteCreatedOut",
+        "type": "object"
+      },
+      "SiteEnabledIn": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "SiteEnabledIn",
+        "type": "object"
+      },
+      "SiteIn": {
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "title": "Name",
+            "type": "string"
+          },
+          "port": {
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "type": "integer"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          }
+        },
+        "required": [
+          "name",
+          "port"
+        ],
+        "title": "SiteIn",
+        "type": "object"
+      },
+      "SiteOut": {
+        "properties": {
+          "deployed": {
+            "title": "Deployed",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AppStatus"
+          },
+          "zone_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Id"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "port",
+          "zone_id",
+          "enabled",
+          "deployed",
+          "status"
+        ],
+        "title": "SiteOut",
+        "type": "object"
+      },
       "SummaryItemOut": {
         "properties": {
           "label": {
@@ -8680,6 +8806,122 @@
         "summary": "Steam Branches",
         "tags": [
           "options"
+        ]
+      }
+    },
+    "/api/v1/sites": {
+      "get": {
+        "operationId": "list_sites_api_v1_sites_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SiteOut"
+                  },
+                  "title": "Response List Sites Api V1 Sites Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Sites",
+        "tags": [
+          "sites"
+        ]
+      },
+      "post": {
+        "operationId": "create_site_api_v1_sites_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Site",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/sites/{app_id}/enabled": {
+      "put": {
+        "operationId": "set_enabled_api_v1_sites__app_id__enabled_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteEnabledIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Enabled",
+        "tags": [
+          "sites"
         ]
       }
     },

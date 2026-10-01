@@ -23,6 +23,7 @@ from hivora.pyapps.api import router as python_router
 from hivora.realtime.logs import router as logs_router
 from hivora.realtime.ws import router as ws_router
 from hivora.runtime import Runtime
+from hivora.sites.api import router as sites_router
 from hivora.system.api import router as system_router
 from hivora.tasks.api import router as tasks_router
 from hivora.templates.api import router as templates_router
@@ -73,6 +74,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
     app.include_router(backups_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(tasks_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(options_router, prefix=f"{API_PREFIX}/options")
+    app.include_router(sites_router, prefix=f"{API_PREFIX}/sites")
     app.include_router(ws_router)
     return app
 

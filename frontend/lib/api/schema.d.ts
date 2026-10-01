@@ -1436,6 +1436,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sites */
+        get: operations["list_sites_api_v1_sites_get"];
+        put?: never;
+        /** Create Site */
+        post: operations["create_site_api_v1_sites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{app_id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Enabled */
+        put: operations["set_enabled_api_v1_sites__app_id__enabled_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -3010,6 +3045,44 @@ export interface components {
             };
             /** Version */
             version: string;
+        };
+        /** SiteCreatedOut */
+        SiteCreatedOut: {
+            content_job: components["schemas"]["JobRef"];
+            job: components["schemas"]["JobRef"];
+            site: components["schemas"]["SiteOut"];
+        };
+        /** SiteEnabledIn */
+        SiteEnabledIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** SiteIn */
+        SiteIn: {
+            /** Name */
+            name: string;
+            /** Port */
+            port: number;
+            /** Zone */
+            zone?: string | null;
+        };
+        /** SiteOut */
+        SiteOut: {
+            /** Deployed */
+            deployed: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Port */
+            port: number | null;
+            /** Slug */
+            slug: string;
+            status: components["schemas"]["AppStatus"];
+            /** Zone Id */
+            zone_id: number | null;
         };
         /** SummaryItemOut */
         SummaryItemOut: {
@@ -6283,6 +6356,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OptionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sites_api_v1_sites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteOut"][];
+                };
+            };
+        };
+    };
+    create_site_api_v1_sites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_enabled_api_v1_sites__app_id__enabled_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteEnabledIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
                 };
             };
             /** @description Validation Error */

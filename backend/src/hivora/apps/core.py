@@ -68,6 +68,7 @@ class DeployRequest:
     inputs: dict[str, Any] = field(default_factory=dict)
     slug: str | None = None
     zone: str | None = None  # zone slug; None: "unclassified"
+    kind: str | None = None  # application.kind, e.g. "static-site"
 
 
 def slugify(text: str) -> str:

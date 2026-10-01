@@ -80,7 +80,8 @@ class Deployer:
                 slug=plan.slug, name=plan.name, zone_id=plan.zone.id if plan.zone else None,
                 origin=Origin.TEMPLATE, template_version_id=version.id,
                 desired_state=DesiredState.RUNNING, icon=None,
-                notes="", created_at=self.clock.now(), services=services_from(plan.compiled),
+                notes="", kind=req.kind, created_at=self.clock.now(),
+                services=services_from(plan.compiled),
             )  # fmt: skip
             session.add(app)
             await session.flush()
