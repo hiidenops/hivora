@@ -297,3 +297,46 @@ def test_files_become_compose_configs_with_secret_references() -> None:
         bad = minimal(services={"web": {"image": "x", "tag": "1", "files": [
             {"target": "/data/../etc/passwd", "content": "x"}]}})  # fmt: skip
         parse_template(yaml.safe_dump(bad), require_pinned=False)
+
+
+NGINX_DEFAULT_CONF = """\
+# Managed by Hivora (nginx template 1.1.0): do not edit.
+# The main site: the "html" volume, on the web port.
+server {
+    listen 80 default_server;
+    root /usr/share/nginx/html;
+    index index.html index.htm;
+    include /etc/nginx/hivora.d/main-*.conf;
+}
+# The other sites: one file each, written by Hivora.
+include /etc/nginx/hivora.d/site-*.conf;
+"""
+
+
+def test_nginx_serves_its_main_site_and_includes_the_sites(catalog: Catalog) -> None:
+    """nginx 1.1.0: a fixed default.conf (the main site on port 80, then the files Hivora
+    writes in the conf volume), the html, sites and conf volumes; html and sites saved."""
+    template = catalog.get("nginx").template
+    assert template.metadata.version == "1.1.0"
+    form = validate_inputs(template, {"web_port": 8095}, {"app": {"name": "Vitrine"}})
+    compiled = compile_template(
+        template, AppContext(slug="vitrine", name="Vitrine", revision=1),
+        HostInfo(lan_ip="192.168.1.10"), form, Path("/srv/hivora"),
+    )  # fmt: skip
+    compose = compiled.compose
+    svc = compose["services"]["server"]
+    assert compose["configs"] == {"server-file-0": {"content": NGINX_DEFAULT_CONF}}
+    assert svc["configs"] == [
+        {"source": "server-file-0", "target": "/etc/nginx/conf.d/default.conf"}
+    ]
+    assert "{{" not in template.services["server"].files[0].content  # fixed: no expression
+    assert svc["volumes"] == [
+        {"type": "bind", "source": "/srv/hivora/vitrine/html", "target": "/usr/share/nginx/html"},
+        {"type": "bind", "source": "/srv/hivora/vitrine/sites", "target": "/usr/share/nginx/sites"},
+        {"type": "bind", "source": "/srv/hivora/vitrine/conf", "target": "/etc/nginx/hivora.d"},
+    ]
+    assert svc["ports"] == [{"target": 80, "published": "8095", "protocol": "tcp",
+                             "host_ip": "192.168.1.10"}]  # fmt: skip
+    assert template.backup is not None and template.backup.volumes == ["html", "sites"]
+    assert [v.backup for v in template.services["server"].volumes] == [True, True, False]
+    assert compiled.access == {"web": "http://192.168.1.10:8095"}

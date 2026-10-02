@@ -82,3 +82,25 @@ def test_free_image_upgrade_follows_the_registry(client: Any) -> None:
     assert wait_job(client, job["id"])["status"] == "succeeded"
     assert compose_of(client, app_id)["services"]["app"]["image"].endswith("a" * 64)
     assert code(client.post(f"{API}/apps/{app_id}/revisions/0/plan")) == "not_found"
+
+
+def test_nginx_upgrade_to_1_1_0_adds_the_site_volumes(client: Any) -> None:
+    import sqlite3
+
+    admin(client)
+    body = {"template": "nginx", "name": "Vitrine", "inputs": {"web_port": 8095}}
+    deployed = client.post(f"{API}/apps", json=body).json()
+    assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
+    app_id = deployed["app"]["id"]
+    rt = client.app.state.runtime
+    with sqlite3.connect(rt.settings.db_path) as db:  # deployed from the 1.0.0 template
+        db.execute("UPDATE template_version SET version = '1.0.0' WHERE slug = 'nginx'")
+    status = client.get(f"{API}/apps/{app_id}/upgrade").json()
+    assert (status["available"], status["current"], status["latest"]) == (True, "1.0.0", "1.1.0")
+    job = client.post(f"{API}/apps/{app_id}/upgrade", json={}).json()
+    assert wait_job(client, job["id"])["status"] == "succeeded"
+    svc = compose_of(client, app_id)["services"]["server"]
+    assert [v["target"] for v in svc["volumes"]] == [
+        "/usr/share/nginx/html", "/usr/share/nginx/sites", "/etc/nginx/hivora.d",
+    ]  # fmt: skip
+    assert svc["configs"][0]["target"] == "/etc/nginx/conf.d/default.conf"

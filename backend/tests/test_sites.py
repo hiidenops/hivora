@@ -14,6 +14,10 @@ import pytest
 import yaml
 from helpers import API, STRONG, admin, code, login, other_user, wait_job
 
+# The bind-mounted folders of an nginx app (template 1.1.0): the main site, the added
+# sites, and the files Hivora writes for nginx. Nothing else is ever left next to them.
+VOLUMES = ["conf", "html", "sites"]
+
 
 def _spy(client: Any) -> tuple[list[tuple[str, dict[str, Any]]], Any]:
     """Record the events published; returns an undo."""
@@ -50,17 +54,16 @@ def test_catalog_nginx_deploy_reference(client: Any) -> None:
     done = wait_job(client, job["id"])
     assert done["status"] == "succeeded" and done["app_id"] == app["id"]
 
-    # The html volume is a bind mount under the volumes root, created on deploy.
-    html = settings.volumes_root / "vitrine" / "html"
-    assert html.is_dir()
+    # The volumes are bind mounts under the volumes root, created on deploy.
+    app_dir = settings.volumes_root / "vitrine"
+    assert all((app_dir / name).is_dir() for name in VOLUMES)
     compose = yaml.safe_load((settings.data_dir / "apps" / "vitrine" / "compose.yaml").read_text())
     [web] = compose["services"].values()
-    [volume] = web["volumes"]
-    assert (volume["type"], volume["source"], volume["target"]) == (
-        "bind",
-        str(html),
-        "/usr/share/nginx/html",
-    )
+    assert [(v["type"], v["source"], v["target"]) for v in web["volumes"]] == [
+        ("bind", str(app_dir / "html"), "/usr/share/nginx/html"),
+        ("bind", str(app_dir / "sites"), "/usr/share/nginx/sites"),
+        ("bind", str(app_dir / "conf"), "/etc/nginx/hivora.d"),
+    ]
     assert [(p["published"], p["target"]) for p in web["ports"]] == [("8180", 80)]
     assert [a["slug"] for a in client.get(f"{API}/apps").json()] == ["vitrine"]
 
@@ -328,8 +331,9 @@ def test_sites_routes_roles_and_unknown(client: Any) -> None:
 
 
 def test_site_html_dir_is_the_bind_mount_and_lives_next_to_uploads(client: Any) -> None:
-    """Only <slug>/html is mounted: files next to it (uploads, staging) are never served,
-    and they sit on the same filesystem, so moving them into html is a plain rename."""
+    """<slug>/html is the main site's mount; work files next to it (uploads, staging) are
+    never served, and they sit on the same filesystem, so moving them into html is a plain
+    rename. The other mounts (sites, conf) are their own folders, not inside html."""
     admin(client)
     settings = client.app.state.runtime.settings
     site = _site(client)["site"]
@@ -341,9 +345,11 @@ def test_site_html_dir_is_the_bind_mount_and_lives_next_to_uploads(client: Any) 
     )
     mounts = [v for svc in compose["services"].values() for v in svc.get("volumes", [])]
     assert [(m["type"], m["source"], m["target"]) for m in mounts] == [
-        ("bind", str(html), "/usr/share/nginx/html")
+        ("bind", str(html), "/usr/share/nginx/html"),
+        ("bind", str(app_dir / "sites"), "/usr/share/nginx/sites"),
+        ("bind", str(app_dir / "conf"), "/etc/nginx/hivora.d"),
     ]
-    assert sorted(p.name for p in app_dir.iterdir()) == ["html"]
+    assert sorted(p.name for p in app_dir.iterdir()) == VOLUMES
     assert html.is_dir() and not html.is_symlink()
     assert html.stat().st_dev == app_dir.stat().st_dev
     assert sorted(p.name for p in html.iterdir()) == ["index.html"]
@@ -394,7 +400,7 @@ def test_replace_content_from_a_zip(client: Any) -> None:
     assert _listing(html) == ["css", "css/a.css", "index.html"]
     assert (html / "index.html").read_text() == "<h1>new</h1>"
     assert html.stat().st_ino == inode  # still the bind-mount source
-    assert sorted(p.name for p in _app_dir(client).iterdir()) == ["html"]  # nothing left
+    assert sorted(p.name for p in _app_dir(client).iterdir()) == VOLUMES  # nothing left
     log = client.get(f"{API}/jobs/{job['id']}").json()["log"]
     assert "top folder mon-site/ removed" in log and "warning" not in log
     [(topic, payload)] = [(t, p) for t, p in published if t.startswith("site.")]
@@ -428,7 +434,7 @@ def test_bad_archives_are_refused_at_upload(client: Any) -> None:
         assert r.status_code == 422 and code(r) == error, (message, r.text)
         assert message in r.json()["error"]["message"]
     assert client.get(f"{API}/jobs").json() == jobs_before  # nothing queued
-    assert sorted(p.name for p in _app_dir(client).iterdir()) == ["html"]  # uploads removed
+    assert sorted(p.name for p in _app_dir(client).iterdir()) == VOLUMES  # uploads removed
     assert _listing(html) == ["index.html"] and (html / "index.html").read_text() == before
 
 
@@ -439,7 +445,7 @@ def test_too_large_upload_is_cut(client: Any) -> None:
     r = _upload(client, site["id"], _zip(("index.html", "x" * 1000)))
     assert r.status_code == 422 and code(r) == "archive_too_large"
     assert r.json()["error"]["details"] == {"limit": 100}
-    assert sorted(p.name for p in _app_dir(client).iterdir()) == ["html"]
+    assert sorted(p.name for p in _app_dir(client).iterdir()) == VOLUMES
 
 
 def test_archive_without_index_is_a_warning(client: Any) -> None:
@@ -470,7 +476,7 @@ def test_leftovers_of_an_interrupted_replacement_are_swept(client: Any) -> None:
     os.utime(old_upload, (day_ago, day_ago))
     job = wait_job(client, _upload(client, site["id"], _zip(("index.html", "i"))).json()["id"])
     assert job["status"] == "succeeded"
-    assert sorted(p.name for p in app_dir.iterdir()) == [".hivora-upload-new.zip", "html"]
+    assert sorted(p.name for p in app_dir.iterdir()) == [".hivora-upload-new.zip", *VOLUMES]
 
 
 def test_a_failed_replacement_leaves_the_site_as_it_was(
@@ -490,7 +496,7 @@ def test_a_failed_replacement_leaves_the_site_as_it_was(
     job = wait_job(client, _upload(client, site["id"], _zip(("index.html", "new"))).json()["id"])
     assert job["status"] == "failed" and "disk gone" in job["error"]
     assert _listing(html) == ["index.html"] and (html / "index.html").read_text() == before
-    assert sorted(p.name for p in _app_dir(client).iterdir()) == ["html"]  # upload, staging
+    assert sorted(p.name for p in _app_dir(client).iterdir()) == VOLUMES  # upload, staging
 
 
 def test_replacement_runs_after_the_deploy_and_the_first_page(client: Any) -> None:
@@ -544,7 +550,7 @@ def test_content_route_roles_and_unknown(client: Any) -> None:
     for app_id in (manual["app"]["id"], 9999):
         r = _upload(client, app_id, body)
         assert r.status_code == 404 and code(r) == "site_not_found"
-    assert sorted(p.name for p in _app_dir(client, "manuel").iterdir()) == ["html"]
+    assert sorted(p.name for p in _app_dir(client, "manuel").iterdir()) == VOLUMES
 
     client.post(f"{API}/users", json={"username": "victor", "role": "viewer",
                                       "password": "temporary-pass-1"})  # fmt: skip
@@ -553,7 +559,7 @@ def test_content_route_roles_and_unknown(client: Any) -> None:
         viewer.post(f"{API}/auth/password", json={"current": "temporary-pass-1", "new": STRONG})
         r = _upload(viewer, site["id"], body)
         assert r.status_code == 403 and code(r) == "insufficient_role"
-    assert sorted(p.name for p in _app_dir(client).iterdir()) == ["html"]
+    assert sorted(p.name for p in _app_dir(client).iterdir()) == VOLUMES
 
 
 # --- S3-c: reading and editing a site's text files ---------------------------------------
@@ -595,7 +601,7 @@ def test_edit_a_file_through_its_job(client: Any) -> None:
         undo()
     assert job["status"] == "succeeded", job["error"]
     assert (html / "index.html").read_text() == "<h1>Bienvenue</h1>"
-    assert sorted(p.name for p in _app_dir(client).iterdir()) == ["html"]  # nothing staged
+    assert sorted(p.name for p in _app_dir(client).iterdir()) == VOLUMES  # nothing staged
     events = [(t, p) for t, p in published if t.startswith("site.")]
     assert events == [("site.file_saved", {"app": "vitrine", "path": "index.html",
                                            "bytes": 18, "created": False})]  # fmt: skip
@@ -650,7 +656,7 @@ def test_bad_edits_are_refused_before_any_job(client: Any) -> None:
     for r, status, error in cases:
         assert (r.status_code, code(r)) == (status, error), r.text
     assert client.get(f"{API}/jobs").json() == jobs_before  # nothing queued
-    assert sorted(p.name for p in _app_dir(client).iterdir()) == ["html"]  # nothing staged
+    assert sorted(p.name for p in _app_dir(client).iterdir()) == VOLUMES  # nothing staged
     assert "<title>Vitrine</title>" in (html / "index.html").read_text()
 
 
@@ -667,7 +673,7 @@ def test_a_zip_applied_in_between_wins_over_a_stale_edit(client: Any) -> None:
     else:  # the zip was already applied: refused at once
         assert saved.status_code == 409 and code(saved) == "file_changed"
     assert (_app_dir(client) / "html" / "index.html").read_text() == "from the zip"
-    assert sorted(p.name for p in _app_dir(client).iterdir()) == ["html"]
+    assert sorted(p.name for p in _app_dir(client).iterdir()) == VOLUMES
 
 
 def test_old_staged_edits_are_swept(client: Any) -> None:
@@ -682,7 +688,7 @@ def test_old_staged_edits_are_swept(client: Any) -> None:
     base = _read(client, site["id"], "index.html").json()["sha256"]
     job = wait_job(client, _save(client, site["id"], "index.html", "x", base).json()["id"])
     assert job["status"] == "succeeded"
-    assert sorted(p.name for p in app_dir.iterdir()) == [".hivora-edit-new", "html"]
+    assert sorted(p.name for p in app_dir.iterdir()) == [".hivora-edit-new", *VOLUMES]
 
 
 def test_file_routes_roles_and_unknown(client: Any) -> None:
@@ -735,4 +741,4 @@ def test_a_staged_edit_is_removed_if_it_cannot_be_queued(
     monkeypatch.setattr(client.app.state.runtime.jobs, "add", broken)
     with pytest.raises(RuntimeError, match="queue unavailable"):
         _save(client, site["id"], "index.html", "x", base)
-    assert sorted(p.name for p in _app_dir(client).iterdir()) == ["html"]
+    assert sorted(p.name for p in _app_dir(client).iterdir()) == VOLUMES

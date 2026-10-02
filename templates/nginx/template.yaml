@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: nginx
   name: nginx
-  version: 1.0.0
+  version: 1.1.0
   category: services
   tags: [web, server, static]
   icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/nginx.svg" }
@@ -40,12 +40,30 @@ services:
       TZ: "{{ host.timezone }}"
     ports:
       - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    # Replaces the image's default.conf (read only). The main site is fixed here, so an
+    # nginx whose sites Hivora does not manage behaves as before; Hivora only writes the
+    # included files, in the "conf" volume (e.g. main-off.conf turns the main site off).
+    files:
+      - target: /etc/nginx/conf.d/default.conf
+        content: |
+          # Managed by Hivora (nginx template 1.1.0): do not edit.
+          # The main site: the "html" volume, on the web port.
+          server {
+              listen 80 default_server;
+              root /usr/share/nginx/html;
+              index index.html index.htm;
+              include /etc/nginx/hivora.d/main-*.conf;
+          }
+          # The other sites: one file each, written by Hivora.
+          include /etc/nginx/hivora.d/site-*.conf;
     volumes:
       - { name: html, target: /usr/share/nginx/html, backup: true }
+      - { name: sites, target: /usr/share/nginx/sites, backup: true }
+      - { name: conf, target: /etc/nginx/hivora.d }
 access:
   web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
 backup:
-  volumes: [html]
+  volumes: [html, sites]
 update:
   strategy: manual
 defaults:
