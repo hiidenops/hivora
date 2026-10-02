@@ -234,3 +234,90 @@ test("sites: site page, open link, replace the content from a zip", async ({ pag
   const index = await (await page.request.get(`/api/v1/sites/${id}/files/content?path=index.html`)).json();
   expect(index.content).toContain("Depuis le ZIP");
 });
+
+test("sites: read, edit, create a file, conflicts, and read only for viewers", async ({ page, browser }) => {
+  await page.goto("/login/");
+  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
+  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await page.getByRole("link", { name: "Sites" }).click();
+  await page.getByRole("article", { name: "Vitrine" }).getByRole("link", { name: "Vitrine" }).click();
+  await expect(page).toHaveURL(/\/site\/\?id=\d+$/);
+  const id = new URL(page.url()).searchParams.get("id");
+  const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
+  const headers = { "X-CSRF-Token": csrf_token };
+
+  // The files of the zip sent before; pick one, read it.
+  const list = page.getByRole("list", { name: "Fichiers" });
+  await expect(list.getByRole("button")).toHaveText([/css\/site\.css/, /index\.html/]);
+  await expect(page.getByText("Choisissez un fichier pour l'afficher.")).toBeVisible();
+  await list.getByRole("button", { name: /index\.html/ }).click();
+  const editor = page.getByLabel("Contenu de index.html");
+  await expect(editor).toHaveValue(/Depuis le ZIP/);
+  const save = page.getByRole("button", { name: "Enregistrer" });
+  await expect(save).toBeDisabled(); // nothing changed yet
+
+  // Edit and save: the job replaces the file, the editor takes the saved version.
+  await editor.fill("<h1>Bienvenue</h1>\n");
+  await expect(page.getByText("Modifications non enregistrées")).toBeVisible();
+  await save.click();
+  await expect(page.getByText("Enregistrement d'un fichier")).toBeVisible();
+  await expect(page.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Modifications non enregistrées")).toBeHidden();
+  await expect(save).toBeDisabled();
+
+  // Someone else saves the same file meanwhile: refused, then reloaded on request.
+  await editor.fill("<h1>Ma version</h1>\n");
+  const read = await (await page.request.get(`/api/v1/sites/${id}/files/content?path=index.html`)).json();
+  const other = await (await page.request.put(`/api/v1/sites/${id}/files/content`, {
+    headers, data: { path: "index.html", content: "<h1>Leur version</h1>\n", base_sha256: read.sha256 },
+  })).json(); // prettier-ignore
+  await expect
+    .poll(async () => (await (await page.request.get(`/api/v1/jobs/${other.id}`)).json()).status)
+    .toBe("succeeded");
+  await expect(editor).toHaveValue("<h1>Ma version</h1>\n"); // the draft is kept
+  await save.click();
+  await expect(page.getByText("Le fichier a changé depuis son ouverture.", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Recharger" }).click();
+  await expect(editor).toHaveValue("<h1>Leur version</h1>\n");
+
+  // A new file in a new folder; a file type that cannot be edited is refused.
+  await page.getByLabel("Nouveau fichier").fill("notes.txt");
+  await page.getByRole("button", { name: "Créer" }).click();
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(page.getByText("Seuls les fichiers .html, .css et .js peuvent être modifiés.")).toBeVisible();
+  await page.getByLabel("Nouveau fichier").fill("js/app.js");
+  await page.getByRole("button", { name: "Créer" }).click();
+  await expect(page.getByText("Nouveau fichier : il sera créé à l'enregistrement.")).toBeVisible();
+  await page.getByLabel("Contenu de js/app.js").fill("console.log('ok');\n");
+  await page.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(list.getByRole("button")).toHaveText([/css\/site\.css/, /index\.html/, /js\/app\.js/], { timeout: 20_000 });
+  await expectPointerCursors(page);
+
+  // A viewer reads the same page: no upload, no save, no new file, no switch.
+  await page.request.post("/api/v1/users", {
+    headers, data: { username: "vera", role: "viewer", password: "temporary-pass-1" },
+  }); // prettier-ignore
+  const viewer = await browser.newPage();
+  await viewer.goto("/login/");
+  await viewer.getByLabel("Identifiant", { exact: true }).fill("vera");
+  await viewer.getByLabel("Mot de passe", { exact: true }).fill("temporary-pass-1");
+  await viewer.getByRole("button", { name: "Se connecter" }).click();
+  await viewer.getByLabel("Mot de passe actuel", { exact: true }).fill("temporary-pass-1");
+  await viewer.getByLabel("Nouveau mot de passe", { exact: true }).fill(PASSWORD);
+  await viewer.getByLabel("Confirmer le nouveau mot de passe", { exact: true }).fill(PASSWORD);
+  await viewer.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(viewer.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await viewer.goto(`/site/?id=${id}`);
+  await viewer.getByRole("list", { name: "Fichiers" }).getByRole("button", { name: /js\/app\.js/ }).click();
+  const readOnly = viewer.getByLabel("Contenu de js/app.js");
+  await expect(readOnly).toHaveValue("console.log('ok');\n");
+  await expect(readOnly).toHaveAttribute("readonly", "");
+  await expect(viewer.getByText("Lecture seule")).toBeVisible();
+  await expect(viewer.getByRole("button", { name: "Enregistrer" })).toHaveCount(0);
+  await expect(viewer.getByLabel("Nouveau fichier")).toHaveCount(0);
+  await expect(viewer.getByRole("button", { name: "Remplacer le contenu" })).toHaveCount(0);
+  await expect(viewer.getByRole("switch", { name: "Site « Vitrine » actif" })).toBeDisabled();
+  await viewer.close();
+});

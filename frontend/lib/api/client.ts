@@ -32,6 +32,9 @@ export type Worlds = Schemas["WorldsOut"];
 export type Site = Schemas["SiteOut"];
 export type SiteIn = Schemas["SiteIn"];
 export type SiteCreated = Schemas["SiteCreatedOut"];
+export type SiteFiles = Schemas["SiteFilesOut"];
+export type SiteTextFile = Schemas["SiteTextFileOut"];
+export type SiteFileIn = Schemas["SiteFileIn"];
 
 /** Error returned by the backend: `code` is stable and translated by the UI. */
 export class ApiError extends Error {
