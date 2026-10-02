@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { expect, test, type Page } from "@playwright/test";
 
 const PASSWORD = "correct-horse-battery";
@@ -197,4 +199,38 @@ test("sites: create a site, then turn it off and on", async ({ page }) => {
   await expect(card.getByText("Actif")).toBeVisible();
   await expectPointerCursors(page);
   await expect(card.getByRole("link", { name: "Réglages de l'application" })).toHaveAttribute("href", /\/app\/\?id=\d+/);
+});
+
+test("sites: site page, open link, replace the content from a zip", async ({ page }) => {
+  await page.goto("/login/");
+  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
+  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Sites" }).click();
+  await page.getByRole("article", { name: "Vitrine" }).getByRole("link", { name: "Vitrine" }).click();
+  await expect(page).toHaveURL(/\/site\/\?id=\d+$/);
+  await expect(page.getByRole("heading", { name: "Vitrine" })).toBeVisible();
+  await expect(page.getByText("Port 8095")).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Site « Vitrine » actif" })).toBeChecked();
+  await expect(page.getByRole("link", { name: "Ouvrir le site" })).toHaveAttribute("href", /^http:\/\/[\d.]+:8095$/);
+  await expect(page.getByRole("link", { name: "Ouvrir le site" })).toHaveAttribute("target", "_blank");
+  await expect(page.getByRole("link", { name: "Réglages de l'application" })).toHaveAttribute("href", /\/app\/\?id=\d+/);
+
+  const replace = page.getByRole("button", { name: "Remplacer le contenu" });
+  await expect(replace).toBeDisabled();
+  await page.getByLabel("Archive .zip du site").setInputFiles(path.join(__dirname, "fixtures", "site.zip"));
+  page.once("dialog", (dialog) => void dialog.accept());
+  await replace.click();
+  await expect(page.getByText("Contenu du site")).toBeVisible();
+  await expect(page.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
+  await expectPointerCursors(page);
+
+  // The single top folder of the archive is removed: its files are at the site's root.
+  const id = new URL(page.url()).searchParams.get("id");
+  const files = await (await page.request.get(`/api/v1/sites/${id}/files`)).json();
+  expect(files.files.map((f: { path: string }) => f.path)).toEqual(["css/site.css", "index.html"]);
+  const index = await (await page.request.get(`/api/v1/sites/${id}/files/content?path=index.html`)).json();
+  expect(index.content).toContain("Depuis le ZIP");
 });

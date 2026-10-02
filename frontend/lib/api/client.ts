@@ -78,11 +78,15 @@ export async function api<T>(
 export function upload<T>(
   path: string,
   file: Blob,
-  { query, onProgress }: { query?: Record<string, string>; onProgress?: (fraction: number) => void } = {},
+  {
+    query,
+    onProgress,
+    method = "POST",
+  }: { query?: Record<string, string>; onProgress?: (fraction: number) => void; method?: "POST" | "PUT" } = {},
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `/api/v1${path}${query ? `?${new URLSearchParams(query)}` : ""}`);
+    xhr.open(method, `/api/v1${path}${query ? `?${new URLSearchParams(query)}` : ""}`);
     xhr.setRequestHeader("Content-Type", "application/zip");
     if (csrfToken) xhr.setRequestHeader("X-CSRF-Token", csrfToken);
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total);

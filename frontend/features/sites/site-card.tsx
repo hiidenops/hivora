@@ -19,8 +19,10 @@ export function SiteCard({ site, onJob }: { site: Site; onJob: (jobId: number) =
     <article aria-label={site.name} className="surface grid gap-4 rounded-xl border p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="grid gap-1">
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <Globe className="size-5 text-muted-foreground" /> {site.name}
+          <h2 className="text-lg font-semibold">
+            <Link href={`/site/?id=${site.id}`} className="flex items-center gap-2 hover:underline">
+              <Globe className="size-5 text-muted-foreground" /> {site.name}
+            </Link>
           </h2>
           {site.port !== null && <span className="font-mono text-sm text-muted-foreground">{t("sites.portValue", { port: site.port })}</span>}
         </div>

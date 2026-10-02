@@ -23,6 +23,7 @@ export default defineConfig({
       `rm -rf ${DATA} && cd ../backend && ` +
       `HIVORA_DATA_DIR=${DATA}/data HIVORA_VOLUMES_ROOT=${DATA}/srv HIVORA_CATALOG_DIR=../templates ` +
       `HIVORA_FRONTEND_DIR=../frontend/out HIVORA_DEV_INSECURE_COOKIES=true HIVORA_HOST_PUBLIC_IP=203.0.113.7 ` +
+      `HIVORA_HOST_LAN_IP=${HOST} ` + // as install.sh sets it: apps get a real address
       `uv run uvicorn --factory e2e_app:app --app-dir tests --host 0.0.0.0 --port ${PORT}`,
     url: `http://${HOST}:${PORT}/api/v1/system/health`,
     reuseExistingServer: false,
