@@ -160,3 +160,41 @@ test("removal goes back to the dashboard even if the app is gone before its job 
   await expect(page).toHaveURL(/\/$/, { timeout: 20_000 });
   await expect(page.getByText("Application introuvable.")).toBeHidden();
 });
+
+test("sites: create a site, then turn it off and on", async ({ page }) => {
+  await page.goto("/login/");
+  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
+  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Sites" }).click();
+  await expect(page.getByRole("heading", { name: "Sites" })).toBeVisible();
+  await expect(page.getByText("Aucun site pour l'instant.")).toBeVisible();
+  await expectPointerCursors(page);
+  await page.getByRole("button", { name: "Nouveau site" }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Nom", { exact: true }).fill("Vitrine");
+  await dialog.getByLabel("Port", { exact: true }).fill("8095");
+  await dialog.getByRole("button", { name: "Nouveau site" }).click();
+  await expect(dialog).toBeHidden();
+
+  // Two jobs: the deploy, then the first page.
+  await expect(page.getByText("Contenu du site")).toBeVisible();
+  await expect(page.getByText("Réussi")).toHaveCount(2, { timeout: 20_000 });
+  const card = page.getByRole("article", { name: "Vitrine" });
+  await expect(card.getByText("Port 8095")).toBeVisible();
+  await expect(card.getByText("Sain")).toBeVisible({ timeout: 10_000 });
+
+  const toggle = card.getByRole("switch", { name: "Site « Vitrine » actif" });
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).toBeChecked();
+  await toggle.click();
+  await expect(toggle).not.toBeChecked();
+  await expect(card.getByText("Désactivé")).toBeVisible();
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  await expect(card.getByText("Actif")).toBeVisible();
+  await expectPointerCursors(page);
+  await expect(card.getByRole("link", { name: "Réglages de l'application" })).toHaveAttribute("href", /\/app\/\?id=\d+/);
+});

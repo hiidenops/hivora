@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Boxes, BrickWall, LayoutGrid, LogOut, Network, Settings, Share2, Users } from "lucide-react";
+import { Activity, Boxes, BrickWall, Globe, LayoutGrid, LogOut, Network, Settings, Share2, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
@@ -36,6 +36,7 @@ export function useSession(): Session {
 const NAV: { href: string; label: MessageKey; icon: typeof LayoutGrid; role: Role }[] = [
   { href: "/", label: "nav.dashboard", icon: LayoutGrid, role: "viewer" },
   { href: "/catalog/", label: "nav.catalog", icon: Boxes, role: "viewer" },
+  { href: "/sites/", label: "nav.sites", icon: Globe, role: "viewer" },
   { href: "/zones/", label: "nav.zones", icon: Network, role: "viewer" },
   { href: "/topology/", label: "nav.topology", icon: Share2, role: "viewer" },
   { href: "/activity/", label: "nav.activity", icon: Activity, role: "viewer" },

@@ -29,6 +29,9 @@ export type Players = Schemas["PlayersOut"];
 export type GameCaps = Schemas["GameCapsOut"];
 export type GameLists = Schemas["ListsOut"];
 export type Worlds = Schemas["WorldsOut"];
+export type Site = Schemas["SiteOut"];
+export type SiteIn = Schemas["SiteIn"];
+export type SiteCreated = Schemas["SiteCreatedOut"];
 
 /** Error returned by the backend: `code` is stable and translated by the UI. */
 export class ApiError extends Error {
