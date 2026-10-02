@@ -116,3 +116,47 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await page.getByLabel("Langue", { exact: true }).selectOption("en");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 });
+
+// Regression: removal deletes the app before its job ends. If the page sees the 404 first,
+// it must still go back to the dashboard. Made deterministic by hiding the end of the job
+// from the page: its WebSocket event is dropped and its REST record shows it running.
+test("removal goes back to the dashboard even if the app is gone before its job ends", async ({ page }) => {
+  await page.routeWebSocket(/\/ws$/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((message) => server.send(message));
+    server.onMessage((message) => {
+      const msg = typeof message === "string" ? JSON.parse(message) : null;
+      if (msg?.channel === "jobs" && msg.type === "finished") return;
+      ws.send(message);
+    });
+  });
+  await page.route(/\/api\/v1\/jobs\/\d+$/, async (route) => {
+    const response = await route.fetch();
+    const job = await response.json();
+    const hidden = job.kind === "remove" ? { ...job, status: "running", finished_at: null } : job;
+    await route.fulfill({ response, json: hidden });
+  });
+
+  await page.goto("/login/");
+  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
+  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+
+  const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
+  const deployed = await (
+    await page.request.post("/api/v1/apps", {
+      headers: { "X-CSRF-Token": csrf_token },
+      data: { template: "nginx", name: "Témoin", inputs: { web_port: 8096 } },
+    })
+  ).json();
+  await expect
+    .poll(async () => (await (await page.request.get(`/api/v1/jobs/${deployed.job.id}`)).json()).status)
+    .toBe("succeeded");
+
+  await page.goto(`/app/?id=${deployed.app.id}`);
+  await page.getByRole("button", { name: "Supprimer" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Supprimer" }).click();
+  await expect(page).toHaveURL(/\/$/, { timeout: 20_000 });
+  await expect(page.getByText("Application introuvable.")).toBeHidden();
+});

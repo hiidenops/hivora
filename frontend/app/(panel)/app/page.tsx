@@ -4,7 +4,7 @@ import { Pencil } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { PageHeader, useSession } from "@/components/app-shell";
 import { JobProgress } from "@/components/job-progress";
@@ -43,7 +43,14 @@ function AppDetail() {
   const [removing, setRemoving] = useState(false);
   const { data: active } = useJob(activeJob);
   const status = useLiveStatus(app?.slug ?? "", app?.status ?? "missing");
+  // Removal deletes the app before its job ends: a 404 then means "removed", not an error
+  // (the job card, which redirects when the job ends, would be gone with the page).
+  const removed = removing && error instanceof ApiError && error.status === 404;
+  useEffect(() => {
+    if (removed) router.replace("/");
+  }, [removed, router]);
 
+  if (removed) return null;
   if (error) {
     return <Alert tone="danger">{error instanceof ApiError && error.status === 404 ? t("app.notFound") : errorMessage(error)}</Alert>;
   }
