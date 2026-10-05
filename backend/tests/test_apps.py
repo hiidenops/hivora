@@ -247,6 +247,43 @@ async def test_update_creates_revision_and_keeps_secrets(env: Env) -> None:
     assert [p.host_port for p in svc.ports] == [8095]
 
 
+async def test_ports_from_other_modules_are_published_not_stored(env: Env) -> None:
+    """AppPlanner.site_ports: compiled into every revision, never kept in its overrides."""
+    from hivora.templates.overrides import ExtraPort, Overrides
+
+    asked: list[str] = []
+
+    async def extra(session: AsyncSession, slug: str, overrides: Overrides) -> list[ExtraPort]:
+        asked.append(slug)
+        return [ExtraPort(container=9443, host=9443)]
+
+    env.service.planner.site_ports = extra
+    app, job = await env.service.deploy(DeployRequest("vaultwarden", "vw"))
+    assert (await run(env, job)).status is JobStatus.SUCCEEDED
+    async with env.sessions() as session:
+        settings = await env.service.current_settings(session, app.id)
+        upd = await env.service.plan_update(session, app.id, settings.values)
+    assert "published: '9443'" in upd.plan.compiled.compose_yaml
+    published = [p.host_port or 0 for s in upd.plan.compiled.services for p in s.ports]
+    assert sorted(published) == [8080, 9443]
+    assert upd.plan.overrides == Overrides()  # the revision keeps only the user's own
+    assert asked and set(asked) == {"vw"}
+    async with env.sessions() as session:
+        [rev] = (await session.scalars(select(AppRevision))).all()
+        [svc] = (await session.scalars(select(Service))).all()
+    assert "9443" in rev.compose_yaml and rev.overrides is None
+    assert sorted(p.host_port or 0 for p in svc.ports) == [8080, 9443]
+
+    # A port taken by another app: the usual conflict, with a free port suggested.
+    taken = (PublishedPort(9443, "tcp", "0.0.0.0", 9443),)
+    env.state.upsert(ContainerInfo(id="x", name="other", image="x", state=ContainerState.RUNNING,
+                                   ports=taken))  # fmt: skip
+    async with env.sessions() as session:
+        upd = await env.service.plan_update(session, app.id, settings.values)
+    assert [(c.port, c.used_by) for c in upd.plan.conflicts] == [(9443, "other")]
+    assert upd.plan.conflicts[0].suggestion not in (None, 9443)
+
+
 async def test_version_change_requires_confirmation_and_wipes_data(env: Env) -> None:
     app, job = await env.service.deploy(DeployRequest("minecraft", "mc", {"eula": True}))
     assert (await run(env, job)).status is JobStatus.SUCCEEDED

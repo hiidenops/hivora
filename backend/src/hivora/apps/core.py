@@ -3,7 +3,7 @@ compose, free images)."""
 
 import re
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -43,7 +43,7 @@ from hivora.templates import (
     validate_inputs,
 )
 from hivora.templates.models import TemplateVersion
-from hivora.templates.overrides import Overrides
+from hivora.templates.overrides import ExtraPort, Overrides, ServiceOverrides
 from hivora.zones import Zone, get_zone, zone_network
 
 LABEL_COMPOSE_SERVICE = "com.docker.compose.service"
@@ -185,9 +185,17 @@ def services_from(compiled: CompiledApp) -> list[Service]:
     return services
 
 
+# Ports published for an app on top of its revision (the sites an nginx hosts), from the
+# current database: (session, app slug, the revision's advanced settings) -> ports.
+SitePorts = Callable[[AsyncSession, str, Overrides], Awaitable[list[ExtraPort]]]
+
+
 class AppPlanner:
     """Compiles an app's template against its inputs, the host and the running state:
     the plan every deploy and settings change is reviewed and applied from."""
+
+    # Set by the composition root (Runtime): apps never imports the sites module.
+    site_ports: SitePorts | None = None
 
     def __init__(
         self, *, settings: Settings, catalog: Catalog, state: StateStore, box: SecretBox,
@@ -237,8 +245,18 @@ class AppPlanner:
         defaults_ctx = build_context(app_ctx, host, FormValues(), list(entry.template.services))
         form = validate_inputs(entry.template, inputs, defaults_ctx)
         overrides = overrides or Overrides()
+        # The sites' ports are compiled in but never stored in the revision's overrides:
+        # every compile (update, upgrade, restore) publishes the sites as they are now.
+        compiled_with = overrides
+        if self.site_ports and (extra := await self.site_ports(session, slug, overrides)):
+            main = entry.template.main_service
+            own = overrides.of(main) or ServiceOverrides()
+            with_sites = own.model_copy(update={"ports": [*own.ports, *extra]})
+            compiled_with = overrides.model_copy(
+                update={"services": {**overrides.services, main: with_sites}}
+            )
         compiled = compile_template(entry.template, app_ctx, host, form, self.settings.volumes_root,
-                                    overrides)  # fmt: skip
+                                    compiled_with)  # fmt: skip
         used = await used_ports(session, self.state, exclude_app=slug)
         conflicts = find_conflicts((p for s in compiled.services for p in s.ports), used)
         return DeployPlan(slug, name, entry, zone, compiled, form, conflicts, overrides)

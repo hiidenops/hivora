@@ -28,6 +28,7 @@ from hivora.metrics.host import HostMetrics
 from hivora.sites import SiteService
 from hivora.sites.config import SiteConfig
 from hivora.sites.files import SiteFiles
+from hivora.sites.ports import site_ports
 from hivora.state import StateService
 from hivora.system.public_address import PublicAddress
 from hivora.system.secrets import SecretSettings
@@ -139,6 +140,7 @@ class Runtime:
         site_config = SiteConfig(sessions=sessions, jobs=jobs, gateway=gateway, state=state.store,
                                  settings=settings, bus=bus)  # fmt: skip
         site_config.register()
+        apps.planner.site_ports = site_ports  # the hosts publish their sites' ports
         auth = AuthService(settings=settings, sessions=sessions, box=box, bus=bus, clock=clock)
         audit = AuditRecorder(sessions, bus)
         icons = IconCache(settings.data_dir / "icons")
