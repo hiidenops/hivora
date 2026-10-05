@@ -734,6 +734,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/{app_id}/sites/{site_id}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace Hosted Site Content
+         * @description Raw .zip body (streamed to disk, 200 MB max): this site's content is replaced by a
+         *     job, all at once, in its own folder. A single top folder in the archive is removed.
+         */
+        put: operations["replace_hosted_site_content_api_v1_apps__app_id__sites__site_id__content_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{app_id}/sites/{site_id}/enabled": {
         parameters: {
             query?: never;
@@ -747,6 +768,44 @@ export interface paths {
          * @description nginx's files only: the site's port stays published, nothing is recreated.
          */
         put: operations["set_hosted_site_enabled_api_v1_apps__app_id__sites__site_id__enabled_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/sites/{site_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Hosted Site Files */
+        get: operations["list_hosted_site_files_api_v1_apps__app_id__sites__site_id__files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/sites/{site_id}/files/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Hosted Site File */
+        get: operations["read_hosted_site_file_api_v1_apps__app_id__sites__site_id__files_content_get"];
+        /**
+         * Save Hosted Site File
+         * @description Saved by a job, all at once, if the file is still the one read (base_sha256).
+         */
+        put: operations["save_hosted_site_file_api_v1_apps__app_id__sites__site_id__files_content_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -5377,6 +5436,40 @@ export interface operations {
             };
         };
     };
+    replace_hosted_site_content_api_v1_apps__app_id__sites__site_id__content_put: {
+        parameters: {
+            query?: {
+                filename?: string;
+            };
+            header?: never;
+            path: {
+                app_id: number;
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_hosted_site_enabled_api_v1_apps__app_id__sites__site_id__enabled_put: {
         parameters: {
             query?: never;
@@ -5390,6 +5483,108 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SiteToggleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_hosted_site_files_api_v1_apps__app_id__sites__site_id__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteFilesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_hosted_site_file_api_v1_apps__app_id__sites__site_id__files_content_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                app_id: number;
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteTextFileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_hosted_site_file_api_v1_apps__app_id__sites__site_id__files_content_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteFileIn"];
             };
         };
         responses: {

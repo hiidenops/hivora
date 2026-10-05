@@ -3,12 +3,14 @@ app's (app -> sites), each on its own port. A change that moves a port first has
 (``recreate``: the container is recreated, every site stops about a second)."""
 
 from dataclasses import asdict
+from datetime import UTC, datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
 from hivora.apps.api import JobRef, job_ref
 from hivora.jobs import Job
+from hivora.sites.api import SiteFileIn, SiteFileOut, SiteFilesOut, SiteTextFileOut
 from hivora.sites.hosting import HostedSite, SiteHost, SitePlan
 from hivora.web.deps import Operator, RuntimeDep, Viewer
 
@@ -162,3 +164,46 @@ async def remove_hosted_site(
     """nginx stops serving it, then its port goes; its files stay unless remove_data."""
     config, update = await rt.site_hosting.remove(app_id, site_id, remove_data=remove_data)
     return _change(None, update, config)
+
+
+# --- one site's content and files: the same rules as the main site's, in its own folder ---
+
+
+@router.put("/{app_id}/sites/{site_id}/content", status_code=202)
+async def replace_hosted_site_content(
+    app_id: int, site_id: int, request: Request, _: Operator, rt: RuntimeDep,
+    filename: str = Query("", max_length=200),
+) -> JobRef:  # fmt: skip
+    """Raw .zip body (streamed to disk, 200 MB max): this site's content is replaced by a
+    job, all at once, in its own folder. A single top folder in the archive is removed."""
+    job = await rt.sites.replace_content(app_id, filename, request.stream(), site_id=site_id)
+    return job_ref(job)
+
+
+@router.get("/{app_id}/sites/{site_id}/files")
+async def list_hosted_site_files(
+    app_id: int, site_id: int, _: Viewer, rt: RuntimeDep
+) -> SiteFilesOut:
+    files, truncated = await rt.site_files.list(app_id, site_id=site_id)
+    return SiteFilesOut(
+        files=[SiteFileOut(path=f.path, size=f.size,
+                           modified=datetime.fromtimestamp(f.modified, UTC)) for f in files],
+        truncated=truncated,
+    )  # fmt: skip
+
+
+@router.get("/{app_id}/sites/{site_id}/files/content")
+async def read_hosted_site_file(
+    app_id: int, site_id: int, _: Viewer, rt: RuntimeDep, path: str = Query(max_length=1024)
+) -> SiteTextFileOut:
+    return SiteTextFileOut(**asdict(await rt.site_files.read(app_id, path, site_id=site_id)))
+
+
+@router.put("/{app_id}/sites/{site_id}/files/content", status_code=202)
+async def save_hosted_site_file(
+    app_id: int, site_id: int, body: SiteFileIn, _: Operator, rt: RuntimeDep
+) -> JobRef:
+    """Saved by a job, all at once, if the file is still the one read (base_sha256)."""
+    job = await rt.site_files.save(app_id, body.path, body.content, body.base_sha256,
+                                   site_id=site_id)  # fmt: skip
+    return job_ref(job)

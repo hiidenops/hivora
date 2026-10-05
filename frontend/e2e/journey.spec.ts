@@ -324,7 +324,7 @@ test("sites: read, edit, create a file, conflicts, and read only for viewers", a
 
 // The app -> sites model through the API only (no screen yet): a host, an added site on
 // its own port, then off and removed. The older /sites routes keep working beside it.
-test("hosted sites API: list, plan, add, turn off, remove", async ({ page }) => {
+test("hosted sites API: list, plan, add, edit a file, turn off, remove", async ({ page }) => {
   await page.goto("/login/");
   await page.getByLabel("Identifiant", { exact: true }).fill("admin");
   await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
@@ -357,6 +357,16 @@ test("hosted sites API: list, plan, add, turn off, remove", async ({ page }) => 
   expect(listed.sites.map((s: { slug: string; port: number }) => [s.slug, s.port])).toEqual([["main", 8200], ["docs", 8201]]);
 
   const docs = change.site.id;
+  // The added site's own files: one created, then read back.
+  const saved = await page.request.put(`/api/v1/apps/${app}/sites/${docs}/files/content`, {
+    headers, data: { path: "index.html", content: "<h1>Docs</h1>", base_sha256: null },
+  }); // prettier-ignore
+  expect(saved.status()).toBe(202);
+  await done((await saved.json()).id);
+  const files = await (await page.request.get(`/api/v1/apps/${app}/sites/${docs}/files`)).json();
+  expect(files.files.map((f: { path: string }) => f.path)).toEqual(["index.html"]);
+  const read = await (await page.request.get(`/api/v1/apps/${app}/sites/${docs}/files/content?path=index.html`)).json();
+  expect(read.content).toBe("<h1>Docs</h1>");
   const off = await page.request.put(`/api/v1/apps/${app}/sites/${docs}/enabled`, { headers, data: { enabled: false } });
   expect(off.status()).toBe(202);
   await done((await off.json()).id);
