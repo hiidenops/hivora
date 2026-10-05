@@ -114,6 +114,22 @@ async def test_site_job_kinds_run_and_are_stored(queue: JobQueue) -> None:
         assert (job.kind, job.status) == (kind, JobStatus.SUCCEEDED)
 
 
+async def test_site_config_job_kind_runs_and_is_stored(queue: JobQueue) -> None:
+    seen: list[JobKind] = []
+
+    async def handler(ctx: JobContext) -> None:
+        seen.append(ctx.kind)
+
+    queue.register(JobKind.SITE_CONFIG, handler)
+    sub = queue.bus.subscribe("job.finished")
+    await queue.start()
+    job_id = await add(queue, JobKind.SITE_CONFIG, app_id=1)
+    await wait_finished(sub)
+    assert JobKind.SITE_CONFIG.value == "site_config" and seen == [JobKind.SITE_CONFIG]
+    job = await get(queue.sessions, job_id)
+    assert (job.kind, job.status) == (JobKind.SITE_CONFIG, JobStatus.SUCCEEDED)
+
+
 async def test_same_app_jobs_are_serialized_other_apps_run_concurrently(queue: JobQueue) -> None:
     running: set[int | None] = set()
     order: list[str] = []

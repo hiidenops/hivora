@@ -560,6 +560,7 @@ export const en: Record<MessageKey, string> = {
   "job.kind.world_delete": "World deletion",
   "job.kind.site_content": "Site content",
   "job.kind.site_file": "File saved",
+  "job.kind.site_config": "nginx configuration",
   "job.kind.move_zone": "Zone change",
   "job.status.queued": "Queued",
   "job.status.running": "Running",

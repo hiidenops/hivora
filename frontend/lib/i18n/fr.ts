@@ -560,6 +560,7 @@ export const fr = {
   "job.kind.world_delete": "Suppression d'un monde",
   "job.kind.site_content": "Contenu du site",
   "job.kind.site_file": "Enregistrement d'un fichier",
+  "job.kind.site_config": "Configuration nginx",
   "job.status.queued": "En attente",
   "job.status.running": "En cours",
   "job.status.succeeded": "Réussi",

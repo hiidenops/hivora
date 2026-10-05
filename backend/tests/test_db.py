@@ -163,3 +163,37 @@ def test_migration_0016_sites_up_and_down(tmp_path: Path) -> None:
         assert sites == [(2, "main", "")]
         assert conn.execute(text("PRAGMA integrity_check")).scalar() == "ok"
     engine.dispose()
+
+
+def test_migration_0017_site_config_job_kind(tmp_path: Path) -> None:
+    db = tmp_path / "hivora.db"
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0016")
+    engine = make_sync_engine(db)
+    now = "2026-10-05 12:00:00"
+
+    def add_job(conn: Connection, kind: str) -> None:
+        conn.execute(text("INSERT INTO job (kind, params, status, progress, log, created_at)"
+                          " VALUES (:k, '{}', 'queued', 0, '', :t)"),
+                     {"k": kind, "t": now})  # fmt: skip
+
+    with engine.begin() as conn:
+        add_job(conn, "site_file")
+    with pytest.raises(IntegrityError), engine.begin() as conn:  # not a job kind yet
+        add_job(conn, "site_config")
+
+    command.upgrade(cfg, "0017")
+    with engine.begin() as conn:
+        add_job(conn, "site_config")
+    with pytest.raises(IntegrityError), engine.begin() as conn:  # the CHECK still holds
+        add_job(conn, "site_unknown")
+
+    command.downgrade(cfg, "0016")
+    with engine.connect() as conn:  # site_config jobs removed, the others kept
+        assert conn.execute(text("SELECT kind FROM job")).scalars().all() == ["site_file"]
+        assert conn.execute(text("PRAGMA integrity_check")).scalar() == "ok"
+
+    command.upgrade(cfg, "head")  # and back up again
+    with engine.begin() as conn:
+        add_job(conn, "site_config")
+    engine.dispose()

@@ -1898,7 +1898,8 @@
           "backup",
           "backup_restore",
           "site_content",
-          "site_file"
+          "site_file",
+          "site_config"
         ],
         "title": "JobKind",
         "type": "string"
