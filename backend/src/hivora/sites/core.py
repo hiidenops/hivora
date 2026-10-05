@@ -21,6 +21,7 @@ from hivora.sites.nginx import NginxSite
 SITE_KIND = "static-site"
 HTML_TARGET = "/usr/share/nginx/html"  # the nginx template's "html" volume
 CONF_TARGET = "/etc/nginx/hivora.d"  # its "conf" volume (template 1.1.0 and later)
+SITES_TARGET = "/usr/share/nginx/sites"  # its "sites" volume: one folder per added site
 UPLOAD_TTL_S = 24 * 3600  # an upload left by an interrupted job is swept after this
 _STAGED = (".hivora-upload-", ".hivora-edit-")  # files a queued job may still be waiting for
 _WORK_DIRS = (".hivora-staging-", ".hivora-conf-")  # folders of one running job only
@@ -60,6 +61,12 @@ async def html_dir(session: AsyncSession, app_id: int) -> Path:
 async def conf_dir(session: AsyncSession, app_id: int) -> Path:
     """The folder of the nginx files Hivora writes; only nginx 1.1.0 and later has it."""
     if (path := await _volume_source(session, app_id, CONF_TARGET)) is None:
+        raise HostUpgradeRequiredError("update this nginx to host several sites", app=app_id)
+    return path
+
+
+async def sites_dir(session: AsyncSession, app_id: int) -> Path:
+    if (path := await _volume_source(session, app_id, SITES_TARGET)) is None:
         raise HostUpgradeRequiredError("update this nginx to host several sites", app=app_id)
     return path
 

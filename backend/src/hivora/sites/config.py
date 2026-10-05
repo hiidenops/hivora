@@ -22,7 +22,7 @@ from hivora.apps.core import LABEL_COMPOSE_SERVICE
 from hivora.core.config import Settings
 from hivora.core.errors import ConflictError
 from hivora.core.events import EventBus
-from hivora.core.fs import confined
+from hivora.core.fs import confined, remove_tree
 from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
 from hivora.jobs import Job, JobContext, JobKind, JobQueue
 from hivora.sites import core
@@ -117,6 +117,8 @@ class SiteConfig:
             app = await core.get_site(session, ctx.app_id or 0)
             conf_path = await core.conf_dir(session, app.id)
             sites = await core.sites_of(session, app.id)
+            folders = ctx.params.get("remove_folders") or []
+            sites_path = await core.sites_dir(session, app.id) if folders else None
         want = desired_files(sites)  # refuses any value that is not whitelisted
         root, s = self.settings.volumes_root, self.settings
         conf = confined(conf_path, root)
@@ -125,6 +127,7 @@ class SiteConfig:
         have = await asyncio.to_thread(read_managed, conf)
         if have == want:
             await ctx.log("configuration already up to date")
+            await self._remove_folders(ctx, sites_path, folders)
             return
         changed = sorted(n for n, c in want.items() if have.get(n) != c)
         removed = sorted(have.keys() - want.keys())
@@ -167,3 +170,11 @@ class SiteConfig:
                     f"nginx could not reload: {out.strip()[-_OUTPUT:]}", app=app.slug
                 )
         self.bus.publish("site.config_applied", app=app.slug, files=changed, removed=removed)
+        await self._remove_folders(ctx, sites_path, folders)
+
+    async def _remove_folders(self, ctx: JobContext, sites: Path | None, roots: list[str]) -> None:
+        """A removed site's files, asked with remove_data: only once nginx no longer serves
+        it (after a configuration it accepted). Each one confined to the sites volume."""
+        for root in roots:
+            if sites is not None and await asyncio.to_thread(remove_tree, sites / root, sites):
+                await ctx.log(f"removed the files of {root}")

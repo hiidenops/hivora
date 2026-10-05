@@ -28,6 +28,7 @@ from hivora.metrics.host import HostMetrics
 from hivora.sites import SiteService
 from hivora.sites.config import SiteConfig
 from hivora.sites.files import SiteFiles
+from hivora.sites.hosting import SiteHosting
 from hivora.sites.ports import site_ports
 from hivora.state import StateService
 from hivora.system.public_address import PublicAddress
@@ -69,6 +70,7 @@ class Runtime:
     sites: SiteService
     site_files: SiteFiles
     site_config: SiteConfig
+    site_hosting: SiteHosting
     hostfw: "HostFirewall" = field(init=False)
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
@@ -141,6 +143,8 @@ class Runtime:
                                  settings=settings, bus=bus)  # fmt: skip
         site_config.register()
         apps.planner.site_ports = site_ports  # the hosts publish their sites' ports
+        site_hosting = SiteHosting(sessions=sessions, revisions=apps.revisions, jobs=jobs,
+                                   bus=bus, clock=clock)  # fmt: skip
         auth = AuthService(settings=settings, sessions=sessions, box=box, bus=bus, clock=clock)
         audit = AuditRecorder(sessions, bus)
         icons = IconCache(settings.data_dir / "icons")
@@ -148,7 +152,7 @@ class Runtime:
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
                    public_address, AppMetrics(gateway, state.store, bus), backups,
-                   sites, site_files, site_config)  # fmt: skip
+                   sites, site_files, site_config, site_hosting)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.

@@ -142,37 +142,47 @@ class Revisions:
         overrides: Overrides | None = None,
     ) -> Job:  # fmt: skip
         async with self.sessions() as session, session.begin():
-            upd = await self.plan_update(session, app_id, inputs, entry, overrides)
-            plan = upd.plan
-            if upd.reset_fields and not reset_data:
-                raise DataResetRequiredError(
-                    "this change erases the app data and must be confirmed",
-                    fields=upd.reset_fields,
-                )
-            if plan.conflicts:
-                raise PortConflictError(
-                    "host ports already in use",
-                    conflicts=[conflict_dict(c) for c in plan.conflicts],
-                )
-            app = await get_app(session, app_id)
-            version = await self.planner.template_version(session, plan.entry)
-            app.template_version_id = version.id
-            await session.execute(delete(AppSecret).where(AppSecret.app_id == app.id))
-            store_secrets(session, self.box, app.id, plan.form.secrets)
-            revision = AppRevision(
-                app_id=app.id, number=upd.number, inputs=plan.form.values,
-                compose_yaml=plan.compiled.compose_yaml, diff_from_previous=upd.diff,
-                template_version_id=version.id,
-                overrides=plan.overrides.model_dump(exclude_defaults=True) or None,
-                created_at=self.clock.now(), status=RevisionStatus.PENDING,
-            )  # fmt: skip
-            job = await queue_revision(
-                session, self.jobs, app, revision, services_from(plan.compiled),
-                {"reset_volumes": upd.reset_volumes} if upd.reset_fields else None,
-            )  # fmt: skip
+            job, number = await self.queue_update(session, app_id, inputs, reset_data=reset_data,
+                                                  entry=entry, overrides=overrides)  # fmt: skip
         self.jobs.wake()
-        self.bus.publish(event, app=app.slug, revision=upd.number, job=job.id)
+        self.bus.publish(event, app=job.app_slug, revision=number, job=job.id)
         return job
+
+    async def queue_update(
+        self, session: AsyncSession, app_id: int, inputs: dict[str, Any], *,
+        reset_data: bool = False, entry: CatalogEntry | None = None,
+        overrides: Overrides | None = None,
+    ) -> tuple[Job, int]:  # fmt: skip
+        """The new revision and its job, in the caller's transaction (not yet woken)."""
+        upd = await self.plan_update(session, app_id, inputs, entry, overrides)
+        plan = upd.plan
+        if upd.reset_fields and not reset_data:
+            raise DataResetRequiredError(
+                "this change erases the app data and must be confirmed",
+                fields=upd.reset_fields,
+            )
+        if plan.conflicts:
+            raise PortConflictError(
+                "host ports already in use",
+                conflicts=[conflict_dict(c) for c in plan.conflicts],
+            )
+        app = await get_app(session, app_id)
+        version = await self.planner.template_version(session, plan.entry)
+        app.template_version_id = version.id
+        await session.execute(delete(AppSecret).where(AppSecret.app_id == app.id))
+        store_secrets(session, self.box, app.id, plan.form.secrets)
+        revision = AppRevision(
+            app_id=app.id, number=upd.number, inputs=plan.form.values,
+            compose_yaml=plan.compiled.compose_yaml, diff_from_previous=upd.diff,
+            template_version_id=version.id,
+            overrides=plan.overrides.model_dump(exclude_defaults=True) or None,
+            created_at=self.clock.now(), status=RevisionStatus.PENDING,
+        )  # fmt: skip
+        job = await queue_revision(
+            session, self.jobs, app, revision, services_from(plan.compiled),
+            {"reset_volumes": upd.reset_volumes} if upd.reset_fields else None,
+        )  # fmt: skip
+        return job, upd.number
 
     async def upgrade_status(self, session: AsyncSession, app_id: int) -> UpgradeStatus:
         """Is a newer template version (or, for a free image, a newer image) available?"""
