@@ -26,6 +26,7 @@ from hivora.core.fs import confined, ensure_dir
 from hivora.jobs import Job, JobContext, JobKind, JobQueue
 from hivora.sites import core
 from hivora.sites.core import SITE_KIND
+from hivora.sites.models import Site as SiteRow
 from hivora.state import AppStatus, StateStore
 
 TEMPLATE = "nginx"
@@ -86,12 +87,17 @@ class SiteService:
             return [await self._site(session, app) for app in apps]
 
     async def create(self, name: str, port: int, zone: str | None) -> tuple[Site, Job, Job]:
-        """The deploy job, then the first page's job in the same lane."""
+        """The deploy job, then the first page's job in the same lane. The new host's main
+        site (its html volume, on its web port) is recorded with that second job."""
         req = DeployRequest(TEMPLATE, name, {"web_port": port}, zone=zone, kind=SITE_KIND)
         app, deploy = await self.deployer.deploy(req)
         # ponytail: a second transaction; a crash in between leaves a site without its
-        # first page (nginx answers 403) until its content is replaced (lot S2).
+        # first page (nginx answers 403) until its content is replaced (lot S2), and
+        # without its main site row.
         async with self.sessions() as session, session.begin():
+            main = SiteRow(app_id=app.id, slug="main", name=app.name, root="", port=None,
+                           server_name=None, enabled=True, created_at=app.created_at)  # fmt: skip
+            session.add(main)
             content = self.jobs.add(session, JobKind.SITE_CONTENT, app_id=app.id,
                                     app_slug=app.slug)  # fmt: skip
         self.jobs.wake()

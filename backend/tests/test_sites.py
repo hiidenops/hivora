@@ -742,3 +742,47 @@ def test_a_staged_edit_is_removed_if_it_cannot_be_queued(
     with pytest.raises(RuntimeError, match="queue unavailable"):
         _save(client, site["id"], "index.html", "x", base)
     assert sorted(p.name for p in _app_dir(client).iterdir()) == VOLUMES
+
+
+# --- M1-b: a new site host records its main site ------------------------------------------
+
+
+def _site_rows(client: Any) -> list[tuple[Any, ...]]:
+    from sqlalchemy import select
+
+    from hivora.apps.models import Application
+    from hivora.sites.models import Site
+
+    rt = client.app.state.runtime
+
+    async def read() -> list[tuple[Any, ...]]:
+        async with rt.sessions() as session:
+            rows = await session.execute(
+                select(Application.slug, Site.slug, Site.name, Site.root, Site.port,
+                       Site.server_name, Site.enabled, Site.created_at == Application.created_at)
+                .join(Application, Application.id == Site.app_id).order_by(Site.id)
+            )  # fmt: skip
+            return [tuple(r) for r in rows]
+
+    result: list[tuple[Any, ...]] = client.portal.call(read)
+    return result
+
+
+def test_create_site_records_its_main_site(client: Any) -> None:
+    admin(client)
+    manual = _nginx(client, "Manuel", 8180).json()
+    wait_job(client, manual["job"]["id"])
+    assert _site_rows(client) == []  # a catalog nginx has no site row
+
+    created = _site(client)
+    # One row: the main site, the html volume on the app's web port (no port of its own).
+    assert _site_rows(client) == [("vitrine", "main", "Vitrine", "", None, None, True, True)]
+
+    # A refused creation records nothing; the API answers as before.
+    taken = client.post(f"{API}/sites", json={"name": "Autre", "port": 8190})
+    assert taken.status_code == 409 and code(taken) == "port_conflict"
+    assert len(_site_rows(client)) == 1
+    [listed] = client.get(f"{API}/sites").json()
+    app_id = next(a["id"] for a in client.get(f"{API}/apps").json() if a["slug"] == "vitrine")
+    assert listed["id"] == created["site"]["id"] == app_id  # still the app's id
+    assert set(listed) == {"id", "slug", "name", "port", "zone_id", "enabled", "deployed", "status"}
