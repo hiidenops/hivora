@@ -13,7 +13,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.core import DeployRequest, latest_revision
@@ -21,6 +21,7 @@ from hivora.apps.lifecycle import Deployer, Lifecycle
 from hivora.apps.models import Application, DesiredState
 from hivora.core import archive, fs
 from hivora.core.config import Settings
+from hivora.core.errors import ConflictError
 from hivora.core.events import EventBus
 from hivora.core.fs import confined, ensure_dir
 from hivora.jobs import Job, JobContext, JobKind, JobQueue
@@ -45,6 +46,10 @@ PAGE = """<!doctype html>
 </body>
 </html>
 """
+
+
+class HostHasSitesError(ConflictError):
+    code = "site_host_has_sites"
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,9 +111,20 @@ class SiteService:
         return site, deploy, content
 
     async def set_enabled(self, app_id: int, enabled: bool) -> Job:
-        """Start or stop; refused (409) until the first deploy has run."""
+        """Start or stop; refused (409) until the first deploy has run.
+
+        This older switch starts or stops the whole container: refused (409) once the app
+        hosts added sites, which it would cut too; each site has its own switch then.
+        """
         async with self.sessions() as session:
             app = await core.get_site(session, app_id)
+            added = await session.scalar(
+                select(func.count()).select_from(SiteRow)
+                .where(SiteRow.app_id == app.id, SiteRow.root != "")
+            )  # fmt: skip
+        if added:
+            raise HostHasSitesError("this nginx hosts other sites: turn each site on or off",
+                                    app=app.slug, sites=added)  # fmt: skip
         job = await (self.lifecycle.start if enabled else self.lifecycle.stop)(app_id)
         topic = "site.enabled" if enabled else "site.disabled"
         self.bus.publish(topic, app=app.slug, job=job.id)

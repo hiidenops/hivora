@@ -3,6 +3,7 @@ exists: a site is an nginx app deployed from the catalog, then started and stopp
 
 import io
 import os
+import sqlite3
 import stat
 import time
 import zipfile
@@ -786,3 +787,42 @@ def test_create_site_records_its_main_site(client: Any) -> None:
     app_id = next(a["id"] for a in client.get(f"{API}/apps").json() if a["slug"] == "vitrine")
     assert listed["id"] == created["site"]["id"] == app_id  # still the app's id
     assert set(listed) == {"id", "slug", "name", "port", "zone_id", "enabled", "deployed", "status"}
+
+
+# --- M4-d: the older switch never stops a host that has added sites ---------------------
+
+
+def test_old_switch_refused_once_the_host_has_added_sites(client: Any) -> None:
+    admin(client)
+    site = _site(client)["site"]
+    base = f"{API}/sites/{site['id']}"
+    db = client.app.state.runtime.settings.db_path
+
+    # Its main site only: the switch starts and stops the app, as before.
+    off = client.put(f"{base}/enabled", json={"enabled": False})
+    assert off.status_code == 202 and off.json()["kind"] == "stop"
+    wait_job(client, off.json()["id"])
+    on = client.put(f"{base}/enabled", json={"enabled": True})
+    assert on.status_code == 202 and on.json()["kind"] == "start"
+    wait_job(client, on.json()["id"])
+
+    # An added site (on or off): the switch would cut it too, so it is refused.
+    with sqlite3.connect(db) as conn:
+        conn.execute("INSERT INTO site (app_id, slug, name, root, port, enabled, created_at)"
+                     " VALUES (?, 'blog', 'Blog', 'blog', 8096, 0, '2026-10-05 12:00:00.000000')",
+                     (site["id"],))  # fmt: skip
+    jobs = client.get(f"{API}/jobs").json()
+    for enabled in (False, True):
+        refused = client.put(f"{base}/enabled", json={"enabled": enabled})
+        assert refused.status_code == 409 and code(refused) == "site_host_has_sites"
+        assert refused.json()["error"]["details"] == {"app": "vitrine", "sites": 1}
+    assert client.get(f"{API}/jobs").json() == jobs  # nothing queued
+    assert client.get(f"{API}/sites").json()[0]["enabled"] is True  # intent untouched
+    # The other older routes still work on the main site.
+    assert client.get(f"{base}/files").json()["files"][0]["path"] == "index.html"
+
+    # The added site gone: the switch is back.
+    with sqlite3.connect(db) as conn:
+        conn.execute("DELETE FROM site WHERE slug = 'blog'")
+    again = client.put(f"{base}/enabled", json={"enabled": False})
+    assert again.status_code == 202 and again.json()["kind"] == "stop"
