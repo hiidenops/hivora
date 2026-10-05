@@ -239,31 +239,37 @@ class SiteFiles:
     def register(self) -> None:
         self.jobs.register(JobKind.SITE_FILE, self.save_job)
 
-    async def _html(self, app_id: int) -> Path:
+    async def _folder(self, app_id: int, site_id: int | None) -> Path:
         async with self.sessions() as session:
             app = await core.get_site(session, app_id)
-            return await core.html_dir(session, app.id)
+            folder, _ = await core.site_root(session, app.id, site_id)
+            return folder
 
-    async def list(self, app_id: int) -> tuple[list[SiteFile], bool]:
-        return await asyncio.to_thread(list_files, await self._html(app_id))
+    async def list(self, app_id: int, site_id: int | None = None) -> tuple[list[SiteFile], bool]:
+        """``site_id``: one of the app's sites (None: its main site), each its own root."""
+        return await asyncio.to_thread(list_files, await self._folder(app_id, site_id))
 
-    async def read(self, app_id: int, rel: str) -> TextFile:
-        return await asyncio.to_thread(read_file, await self._html(app_id), rel)
+    async def read(self, app_id: int, rel: str, site_id: int | None = None) -> TextFile:
+        return await asyncio.to_thread(read_file, await self._folder(app_id, site_id), rel)
 
-    async def save(self, app_id: int, rel: str, content: str, base_sha256: str | None) -> Job:
+    async def save(self, app_id: int, rel: str, content: str, base_sha256: str | None,
+                   site_id: int | None = None) -> Job:  # fmt: skip
         """Check and stage the new content next to the site, then queue its move.
 
         Refused here (nothing queued) if the path, the content or the base is wrong; the
         job checks the base again before moving the file into place.
         """
-        app, html_dir = await core.deployed_html(self.sessions, app_id)
+        app, folder, app_dir = await core.deployed_root(self.sessions, app_id, site_id)
         root, s = self.settings.volumes_root, self.settings
-        await asyncio.to_thread(ensure_dir, html_dir.parent, root, uid=s.puid, gid=s.pgid)
-        edit = confined(html_dir.parent / f".hivora-edit-{secrets.token_hex(8)}", root)
+        await asyncio.to_thread(ensure_dir, app_dir, root, uid=s.puid, gid=s.pgid)
+        edit = confined(app_dir / f".hivora-edit-{secrets.token_hex(8)}", root)
         try:
-            size = await asyncio.to_thread(stage_edit, html_dir, rel, content, base_sha256,
+            size = await asyncio.to_thread(stage_edit, folder, rel, content, base_sha256,
                                            edit, uid=s.puid, gid=s.pgid)  # fmt: skip
-            params = {"path": rel, "edit": str(edit), "base_sha256": base_sha256, "bytes": size}
+            params: dict[str, object] = {"path": rel, "edit": str(edit),
+                                         "base_sha256": base_sha256, "bytes": size}  # fmt: skip
+            if site_id is not None:
+                params["site_id"] = site_id
             async with self.sessions() as session, session.begin():
                 job = self.jobs.add(session, JobKind.SITE_FILE, app_id=app.id,
                                     app_slug=app.slug, params=params)  # fmt: skip
@@ -276,15 +282,20 @@ class SiteFiles:
     async def save_job(self, ctx: JobContext) -> None:
         """The site_file job: move a staged file into place, if the file is unchanged."""
         s, rel = self.settings, ctx.params["path"]
+        site_id = ctx.params.get("site_id")  # absent: the main site (jobs queued before)
         edit = confined(Path(ctx.params["edit"]), s.volumes_root)
         try:
-            app, html_dir = await core.deployed_html(self.sessions, ctx.app_id or 0)
-            await asyncio.to_thread(core.sweep, html_dir.parent, edit)
+            app, folder, app_dir = await core.deployed_root(self.sessions, ctx.app_id or 0, site_id)
+            await asyncio.to_thread(core.sweep, app_dir, edit)
+            # An added site's first file: its folder (the main site's always exists).
+            await asyncio.to_thread(ensure_dir, folder, s.volumes_root, uid=s.puid, gid=s.pgid)
             base = ctx.params["base_sha256"]
-            created = await asyncio.to_thread(apply_edit, html_dir, rel, edit, base,
+            created = await asyncio.to_thread(apply_edit, folder, rel, edit, base,
                                               uid=s.puid, gid=s.pgid)  # fmt: skip
         finally:
             edit.unlink(missing_ok=True)
         size = ctx.params.get("bytes", 0)
         await ctx.log(f"{'created' if created else 'saved'} {rel} ({size} bytes)")
-        self.bus.publish("site.file_saved", app=app.slug, path=rel, bytes=size, created=created)
+        extra = {"site_id": site_id} if site_id is not None else {}
+        self.bus.publish("site.file_saved", app=app.slug, path=rel, bytes=size, created=created,
+                         **extra)  # fmt: skip

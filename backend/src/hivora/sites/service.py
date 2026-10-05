@@ -114,22 +114,27 @@ class SiteService:
         self.bus.publish(topic, app=app.slug, job=job.id)
         return job
 
-    async def replace_content(self, app_id: int, filename: str, body: AsyncIterator[bytes]) -> Job:
+    async def replace_content(
+        self, app_id: int, filename: str, body: AsyncIterator[bytes], site_id: int | None = None
+    ) -> Job:
         """Receive a zip next to the site, check it, then queue its replacement.
 
         A bad archive is refused here (422), before anything is queued; the job checks it
-        again before writing anything.
+        again before writing anything. ``site_id``: one of the app's sites (None: its main
+        site, as before sites had rows).
         """
         async with self.sessions() as session:
             app = await core.get_site(session, app_id)
-            html_dir = await core.html_dir(session, app.id)
+            _, work = await core.site_root(session, app.id, site_id)
         root, s = self.settings.volumes_root, self.settings
-        await asyncio.to_thread(ensure_dir, html_dir.parent, root, uid=s.puid, gid=s.pgid)
-        upload = confined(html_dir.parent / f".hivora-upload-{secrets.token_hex(8)}.zip", root)
+        await asyncio.to_thread(ensure_dir, work, root, uid=s.puid, gid=s.pgid)
+        upload = confined(work / f".hivora-upload-{secrets.token_hex(8)}.zip", root)
         await fs.receive_upload(body, upload, limit=self.max_upload)
         try:
             await asyncio.to_thread(self._inspect, upload)
-            params = {"upload": str(upload), "filename": filename[:100]}
+            params: dict[str, object] = {"upload": str(upload), "filename": filename[:100]}
+            if site_id is not None:
+                params["site_id"] = site_id
             async with self.sessions() as session, session.begin():
                 job = self.jobs.add(session, JobKind.SITE_CONTENT, app_id=app.id,
                                     app_slug=app.slug, params=params)  # fmt: skip
@@ -159,19 +164,21 @@ class SiteService:
         def progress(pct: int) -> None:
             asyncio.run_coroutine_threadsafe(ctx.progress(pct, "Extracting the site"), loop)
 
-        def work(html_dir: Path) -> tuple[archive.Plan, int]:
-            core.sweep(html_dir.parent, keep=upload)
+        def work(folder: Path, app_dir: Path) -> tuple[archive.Plan, int]:
+            core.sweep(app_dir, keep=upload)
+            ensure_dir(folder, root, uid=s.puid, gid=s.pgid)  # an added site's first content
             with archive.open_zip(upload) as zf:
                 plan = archive.inspect(zf, self.limits)
                 written = archive.extract(zf, plan, staging, uid=s.puid, gid=s.pgid,
                                           limits=self.limits, progress=progress)  # fmt: skip
-            fs.replace_contents(html_dir, staging, root)
+            fs.replace_contents(folder, staging, root)
             return plan, written
 
+        site_id = ctx.params.get("site_id")  # absent: the main site (jobs queued before)
         try:
-            app, html_dir = await core.deployed_html(self.sessions, ctx.app_id or 0)
+            app, folder, app_dir = await core.deployed_root(self.sessions, ctx.app_id or 0, site_id)
             await ctx.log(f"extracting {ctx.params.get('filename') or upload.name}")
-            plan, written = await asyncio.to_thread(work, html_dir)
+            plan, written = await asyncio.to_thread(work, folder, app_dir)
         finally:
             upload.unlink(missing_ok=True)
             fs.remove_tree(staging, root)  # left as it was after a rollback
@@ -181,8 +188,9 @@ class SiteService:
         if "index.html" not in files:
             await ctx.log("warning: no index.html at the root: nginx will answer 403")
         await ctx.log(f"content replaced: {len(files)} files, {written} bytes")
-        self.bus.publish("site.content_replaced", app=app.slug, files=len(files),
-                         bytes=written, filename=ctx.params.get("filename", ""))  # fmt: skip
+        extra = {"site_id": site_id} if site_id is not None else {}
+        self.bus.publish("site.content_replaced", app=app.slug, files=len(files), bytes=written,
+                         filename=ctx.params.get("filename", ""), **extra)  # fmt: skip
 
     async def _initial(self, ctx: JobContext) -> None:
         """Write index.html once: an existing page is never replaced."""

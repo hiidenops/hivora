@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from hivora.apps.models import Application, Service
-from hivora.core.errors import ConflictError, NotFoundError
+from hivora.core.errors import ConflictError, NotFoundError, PermissionDeniedError
 from hivora.sites.models import Site
 from hivora.sites.nginx import NginxSite
 
@@ -69,6 +69,37 @@ async def sites_dir(session: AsyncSession, app_id: int) -> Path:
     if (path := await _volume_source(session, app_id, SITES_TARGET)) is None:
         raise HostUpgradeRequiredError("update this nginx to host several sites", app=app_id)
     return path
+
+
+async def site_root(session: AsyncSession, app_id: int, site_id: int | None) -> tuple[Path, Path]:
+    """The folder of one site's files, and the app's folder (where work files go: same
+    filesystem, outside the mounts). None, or the main site's id: the html volume, as
+    before any site row existed. An added site: its folder in the sites volume, which
+    must not be a link (it could lead into another site)."""
+    html = await html_dir(session, app_id)
+    if site_id is None:
+        return html, html.parent
+    site = await session.get(Site, site_id)
+    if site is None or site.app_id != app_id:
+        raise SiteNotFoundError(str(site_id))
+    if site.root == "":
+        return html, html.parent
+    folder = await sites_dir(session, app_id) / site.root
+    if folder.is_symlink():
+        raise PermissionDeniedError("a site's folder cannot be a link", site=site.slug)
+    return folder, html.parent
+
+
+async def deployed_root(
+    sessions: async_sessionmaker[AsyncSession], app_id: int, site_id: int | None
+) -> tuple[Application, Path, Path]:
+    """As deployed_html, for any site of the app: the app, the site's folder, the app's."""
+    async with sessions() as session:
+        app = await get_site(session, app_id)
+        if app.current_revision_id is None:
+            raise ConflictError("site not deployed", slug=app.slug)
+        folder, work = await site_root(session, app.id, site_id)
+        return app, folder, work
 
 
 async def sites_of(session: AsyncSession, app_id: int) -> list[NginxSite]:
