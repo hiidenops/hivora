@@ -76,6 +76,9 @@ test("first start: forced password change, deploy, remove, users", async ({ page
 
   // Changing a flagged setting (server type) erases the data: confirmed explicitly.
   await page.getByRole("link", { name: "Parcourir le catalogue" }).click();
+  // The catalog page itself, not the dashboard's link caught mid-navigation.
+  await expect(page).toHaveURL(/\/catalog\/$/);
+  await expect(page.getByRole("link", { name: /^Jeux/ })).toBeVisible();
   await expectPointerCursors(page);
   await page.getByRole("link", { name: /^Jeux/ }).click();
   await page.getByRole("article", { name: "Minecraft Java" }).getByRole("link", { name: "Déployer" }).click();
