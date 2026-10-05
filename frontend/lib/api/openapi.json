@@ -1588,6 +1588,120 @@
         "title": "HostSampleOut",
         "type": "object"
       },
+      "HostedSiteIn": {
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "title": "Name",
+            "type": "string"
+          },
+          "port": {
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "type": "integer"
+          },
+          "server_name": {
+            "anyOf": [
+              {
+                "maxLength": 253,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Name"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          }
+        },
+        "required": [
+          "name",
+          "port"
+        ],
+        "title": "HostedSiteIn",
+        "type": "object"
+      },
+      "HostedSiteOut": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "main": {
+            "title": "Main",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "server_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Name"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "main",
+          "port",
+          "server_name",
+          "enabled",
+          "url"
+        ],
+        "title": "HostedSiteOut",
+        "type": "object"
+      },
       "ImageOut": {
         "properties": {
           "compatible": {
@@ -3335,6 +3449,40 @@
         "title": "SettingsOut",
         "type": "object"
       },
+      "SiteChangeOut": {
+        "properties": {
+          "config_job": {
+            "$ref": "#/components/schemas/JobRef"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "site": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HostedSiteOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "site",
+          "job",
+          "config_job"
+        ],
+        "title": "SiteChangeOut",
+        "type": "object"
+      },
       "SiteCreatedOut": {
         "properties": {
           "content_job": {
@@ -3446,6 +3594,52 @@
         "title": "SiteFilesOut",
         "type": "object"
       },
+      "SiteHostOut": {
+        "properties": {
+          "app_id": {
+            "title": "App Id",
+            "type": "integer"
+          },
+          "max_sites": {
+            "title": "Max Sites",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sites": {
+            "items": {
+              "$ref": "#/components/schemas/HostedSiteOut"
+            },
+            "title": "Sites",
+            "type": "array"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "stopped": {
+            "title": "Stopped",
+            "type": "boolean"
+          },
+          "upgrade_required": {
+            "title": "Upgrade Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "app_id",
+          "slug",
+          "name",
+          "upgrade_required",
+          "stopped",
+          "max_sites",
+          "sites"
+        ],
+        "title": "SiteHostOut",
+        "type": "object"
+      },
       "SiteIn": {
         "properties": {
           "name": {
@@ -3539,6 +3733,88 @@
         "title": "SiteOut",
         "type": "object"
       },
+      "SitePlanOut": {
+        "properties": {
+          "diff": {
+            "title": "Diff",
+            "type": "string"
+          },
+          "ports_after": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ports After",
+            "type": "array"
+          },
+          "ports_before": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Ports Before",
+            "type": "array"
+          },
+          "recreate": {
+            "title": "Recreate",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          }
+        },
+        "required": [
+          "recreate",
+          "revision",
+          "diff",
+          "ports_before",
+          "ports_after"
+        ],
+        "title": "SitePlanOut",
+        "type": "object"
+      },
+      "SitePortIn": {
+        "properties": {
+          "port": {
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "port"
+        ],
+        "title": "SitePortIn",
+        "type": "object"
+      },
+      "SiteServerNameIn": {
+        "properties": {
+          "server_name": {
+            "anyOf": [
+              {
+                "maxLength": 253,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Name"
+          }
+        },
+        "required": [
+          "server_name"
+        ],
+        "title": "SiteServerNameIn",
+        "type": "object"
+      },
       "SiteTextFileOut": {
         "properties": {
           "content": {
@@ -3565,6 +3841,19 @@
           "size"
         ],
         "title": "SiteTextFileOut",
+        "type": "object"
+      },
+      "SiteToggleIn": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "SiteToggleIn",
         "type": "object"
       },
       "SummaryItemOut": {
@@ -6795,6 +7084,551 @@
         "summary": "Plan Settings",
         "tags": [
           "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/sites": {
+      "get": {
+        "operationId": "list_hosted_sites_api_v1_apps__app_id__sites_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteHostOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Hosted Sites",
+        "tags": [
+          "sites"
+        ]
+      },
+      "post": {
+        "operationId": "add_hosted_site_api_v1_apps__app_id__sites_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostedSiteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Hosted Site",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/sites/hosting": {
+      "post": {
+        "description": "An nginx from the catalog starts hosting sites (no change if it already does).",
+        "operationId": "enable_site_hosting_api_v1_apps__app_id__sites_hosting_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteHostOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enable Site Hosting",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/sites/plan": {
+      "post": {
+        "operationId": "plan_hosted_site_api_v1_apps__app_id__sites_plan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostedSiteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Hosted Site",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/sites/{site_id}": {
+      "delete": {
+        "description": "nginx stops serving it, then its port goes; its files stay unless remove_data.",
+        "operationId": "remove_hosted_site_api_v1_apps__app_id__sites__site_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "remove_data",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Remove Data",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Hosted Site",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/sites/{site_id}/enabled": {
+      "put": {
+        "description": "nginx's files only: the site's port stays published, nothing is recreated.",
+        "operationId": "set_hosted_site_enabled_api_v1_apps__app_id__sites__site_id__enabled_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteToggleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Hosted Site Enabled",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/sites/{site_id}/port": {
+      "put": {
+        "operationId": "change_hosted_site_port_api_v1_apps__app_id__sites__site_id__port_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SitePortIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Hosted Site Port",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/sites/{site_id}/port/plan": {
+      "post": {
+        "operationId": "plan_hosted_site_port_api_v1_apps__app_id__sites__site_id__port_plan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SitePortIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Hosted Site Port",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/sites/{site_id}/removal-plan": {
+      "get": {
+        "operationId": "plan_hosted_site_removal_api_v1_apps__app_id__sites__site_id__removal_plan_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan Hosted Site Removal",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/sites/{site_id}/server-name": {
+      "put": {
+        "operationId": "set_hosted_site_server_name_api_v1_apps__app_id__sites__site_id__server_name_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "site_id",
+            "required": true,
+            "schema": {
+              "title": "Site Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteServerNameIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Hosted Site Server Name",
+        "tags": [
+          "sites"
         ]
       }
     },

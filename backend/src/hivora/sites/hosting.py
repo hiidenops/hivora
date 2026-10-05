@@ -16,10 +16,12 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from hivora.apps.core import PortConflictError, conflict_dict, latest_revision, slugify
+from hivora.apps.core import PortConflictError, conflict_dict, get_app, latest_revision, slugify
 from hivora.apps.models import Application, DesiredState
+from hivora.apps.queries import template_slug
 from hivora.apps.revisions import Revisions
 from hivora.core.clock import Clock
+from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, NotFoundError
 from hivora.core.events import EventBus
 from hivora.jobs import Job, JobKind, JobQueue
@@ -51,6 +53,33 @@ class HostedSiteNotFoundError(NotFoundError):
     code = "site_not_found"
 
 
+class NotNginxError(ConflictError):
+    code = "not_a_nginx_app"
+
+
+@dataclass(frozen=True, slots=True)
+class HostedSite:
+    id: int
+    slug: str
+    name: str
+    main: bool
+    port: int | None  # the main site: the app's web port
+    server_name: str | None
+    enabled: bool
+    url: str | None  # on the host's LAN address, when it is known
+
+
+@dataclass(frozen=True, slots=True)
+class SiteHost:
+    app_id: int
+    slug: str
+    name: str
+    upgrade_required: bool  # nginx still on template 1.0.0: only its main site
+    stopped: bool  # port changes are refused until it is started
+    max_sites: int
+    sites: list[HostedSite]
+
+
 @dataclass(frozen=True, slots=True)
 class SitePlan:
     recreate: bool  # the container is recreated: every site of this nginx stops ~1 s
@@ -66,13 +95,61 @@ Change = Callable[[AsyncSession, int], Awaitable[Site]]  # one change to a host'
 class SiteHosting:
     def __init__(
         self, *, sessions: async_sessionmaker[AsyncSession], revisions: Revisions,
-        jobs: JobQueue, bus: EventBus, clock: Clock,
+        jobs: JobQueue, bus: EventBus, clock: Clock, settings: Settings,
     ) -> None:  # fmt: skip
         self.sessions = sessions
         self.revisions = revisions
         self.jobs = jobs
         self.bus = bus
         self.clock = clock
+        self.settings = settings
+
+    # --- reading, and turning an nginx into a host ---------------------------------
+
+    async def view(self, app_id: int) -> SiteHost:
+        """A host and its sites, the main one first (404 for an app that hosts none)."""
+        async with self.sessions() as session:
+            return await self._view(session, app_id)
+
+    async def _view(self, session: AsyncSession, app_id: int) -> SiteHost:
+        app = await core.get_site(session, app_id)
+        try:
+            await core.conf_dir(session, app.id)
+            upgrade_required = False
+        except core.HostUpgradeRequiredError:
+            upgrade_required = True
+        rows = await session.scalars(
+            select(Site).where(Site.app_id == app.id).order_by(Site.root != "", Site.id)
+        )
+        web_port = (await _inputs(session, app.id)).get("web_port")
+        lan = self.settings.host_lan_ip
+        sites = []
+        main_port = int(web_port) if web_port is not None else None
+        for r in rows:
+            port = main_port if r.root == "" else r.port
+            url = f"http://{lan}:{port}" if lan and port else None
+            sites.append(HostedSite(r.id, r.slug, r.name, r.root == "", port, r.server_name,
+                                    r.enabled, url))  # fmt: skip
+        return SiteHost(app.id, app.slug, app.name, upgrade_required,
+                        app.desired_state is DesiredState.STOPPED, MAX_SITES, sites)  # fmt: skip
+
+    async def enable_hosting(self, app_id: int) -> SiteHost:
+        """An nginx deployed from the catalog becomes a host: its html volume is its main
+        site. Nothing is redeployed; a host already is one (no change)."""
+        async with self.sessions() as session, session.begin():
+            app = await get_app(session, app_id)
+            if await template_slug(session, app) != "nginx":
+                raise NotNginxError("only an nginx app can host sites", app=app.slug)
+            app.kind = core.SITE_KIND
+            if not await session.scalar(select(Site.id).where(Site.app_id == app.id,
+                                                              Site.root == "")):  # fmt: skip
+                now = self.clock.now()
+                main = Site(app_id=app.id, slug="main", name=app.name, root="", port=None,
+                            server_name=None, enabled=True, created_at=now)  # fmt: skip
+                session.add(main)
+                self.bus.publish("site.hosting_enabled", app=app.slug)
+            await session.flush()
+            return await self._view(session, app.id)
 
     # --- previews ---------------------------------------------------------------------
 

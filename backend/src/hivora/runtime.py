@@ -144,7 +144,7 @@ class Runtime:
         site_config.register()
         apps.planner.site_ports = site_ports  # the hosts publish their sites' ports
         site_hosting = SiteHosting(sessions=sessions, revisions=apps.revisions, jobs=jobs,
-                                   bus=bus, clock=clock)  # fmt: skip
+                                   bus=bus, clock=clock, settings=settings)  # fmt: skip
         auth = AuthService(settings=settings, sessions=sessions, box=box, bus=bus, clock=clock)
         audit = AuditRecorder(sessions, bus)
         icons = IconCache(settings.data_dir / "icons")

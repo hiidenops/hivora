@@ -659,6 +659,169 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/{app_id}/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Hosted Sites */
+        get: operations["list_hosted_sites_api_v1_apps__app_id__sites_get"];
+        put?: never;
+        /** Add Hosted Site */
+        post: operations["add_hosted_site_api_v1_apps__app_id__sites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/sites/hosting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable Site Hosting
+         * @description An nginx from the catalog starts hosting sites (no change if it already does).
+         */
+        post: operations["enable_site_hosting_api_v1_apps__app_id__sites_hosting_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/sites/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plan Hosted Site */
+        post: operations["plan_hosted_site_api_v1_apps__app_id__sites_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/sites/{site_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Hosted Site
+         * @description nginx stops serving it, then its port goes; its files stay unless remove_data.
+         */
+        delete: operations["remove_hosted_site_api_v1_apps__app_id__sites__site_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/sites/{site_id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Hosted Site Enabled
+         * @description nginx's files only: the site's port stays published, nothing is recreated.
+         */
+        put: operations["set_hosted_site_enabled_api_v1_apps__app_id__sites__site_id__enabled_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/sites/{site_id}/port": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change Hosted Site Port */
+        put: operations["change_hosted_site_port_api_v1_apps__app_id__sites__site_id__port_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/sites/{site_id}/port/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Plan Hosted Site Port */
+        post: operations["plan_hosted_site_port_api_v1_apps__app_id__sites__site_id__port_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/sites/{site_id}/removal-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plan Hosted Site Removal */
+        get: operations["plan_hosted_site_removal_api_v1_apps__app_id__sites__site_id__removal_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/sites/{site_id}/server-name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Hosted Site Server Name */
+        put: operations["set_hosted_site_server_name_api_v1_apps__app_id__sites__site_id__server_name_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{app_id}/start": {
         parameters: {
             query?: never;
@@ -2490,6 +2653,36 @@ export interface components {
             /** Ts */
             ts: number;
         };
+        /** HostedSiteIn */
+        HostedSiteIn: {
+            /** Name */
+            name: string;
+            /** Port */
+            port: number;
+            /** Server Name */
+            server_name?: string | null;
+            /** Slug */
+            slug?: string | null;
+        };
+        /** HostedSiteOut */
+        HostedSiteOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: number;
+            /** Main */
+            main: boolean;
+            /** Name */
+            name: string;
+            /** Port */
+            port: number | null;
+            /** Server Name */
+            server_name: string | null;
+            /** Slug */
+            slug: string;
+            /** Url */
+            url: string | null;
+        };
         /** ImageOut */
         ImageOut: {
             /** Compatible */
@@ -3105,6 +3298,12 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** SiteChangeOut */
+        SiteChangeOut: {
+            config_job: components["schemas"]["JobRef"];
+            job: components["schemas"]["JobRef"] | null;
+            site: components["schemas"]["HostedSiteOut"] | null;
+        };
         /** SiteCreatedOut */
         SiteCreatedOut: {
             content_job: components["schemas"]["JobRef"];
@@ -3144,6 +3343,23 @@ export interface components {
             /** Truncated */
             truncated: boolean;
         };
+        /** SiteHostOut */
+        SiteHostOut: {
+            /** App Id */
+            app_id: number;
+            /** Max Sites */
+            max_sites: number;
+            /** Name */
+            name: string;
+            /** Sites */
+            sites: components["schemas"]["HostedSiteOut"][];
+            /** Slug */
+            slug: string;
+            /** Stopped */
+            stopped: boolean;
+            /** Upgrade Required */
+            upgrade_required: boolean;
+        };
         /** SiteIn */
         SiteIn: {
             /** Name */
@@ -3171,6 +3387,29 @@ export interface components {
             /** Zone Id */
             zone_id: number | null;
         };
+        /** SitePlanOut */
+        SitePlanOut: {
+            /** Diff */
+            diff: string;
+            /** Ports After */
+            ports_after: number[];
+            /** Ports Before */
+            ports_before: number[];
+            /** Recreate */
+            recreate: boolean;
+            /** Revision */
+            revision: number | null;
+        };
+        /** SitePortIn */
+        SitePortIn: {
+            /** Port */
+            port: number;
+        };
+        /** SiteServerNameIn */
+        SiteServerNameIn: {
+            /** Server Name */
+            server_name: string | null;
+        };
         /** SiteTextFileOut */
         SiteTextFileOut: {
             /** Content */
@@ -3181,6 +3420,11 @@ export interface components {
             sha256: string;
             /** Size */
             size: number;
+        };
+        /** SiteToggleIn */
+        SiteToggleIn: {
+            /** Enabled */
+            enabled: boolean;
         };
         /** SummaryItemOut */
         SummaryItemOut: {
@@ -4954,6 +5198,348 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UpdatePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_hosted_sites_api_v1_apps__app_id__sites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteHostOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_hosted_site_api_v1_apps__app_id__sites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HostedSiteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_site_hosting_api_v1_apps__app_id__sites_hosting_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteHostOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_hosted_site_api_v1_apps__app_id__sites_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HostedSiteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SitePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_hosted_site_api_v1_apps__app_id__sites__site_id__delete: {
+        parameters: {
+            query?: {
+                remove_data?: boolean;
+            };
+            header?: never;
+            path: {
+                app_id: number;
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_hosted_site_enabled_api_v1_apps__app_id__sites__site_id__enabled_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteToggleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_hosted_site_port_api_v1_apps__app_id__sites__site_id__port_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SitePortIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_hosted_site_port_api_v1_apps__app_id__sites__site_id__port_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SitePortIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SitePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plan_hosted_site_removal_api_v1_apps__app_id__sites__site_id__removal_plan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SitePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_hosted_site_server_name_api_v1_apps__app_id__sites__site_id__server_name_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                site_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteServerNameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
                 };
             };
             /** @description Validation Error */

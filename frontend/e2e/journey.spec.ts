@@ -321,3 +321,53 @@ test("sites: read, edit, create a file, conflicts, and read only for viewers", a
   await expect(viewer.getByRole("switch", { name: "Site « Vitrine » actif" })).toBeDisabled();
   await viewer.close();
 });
+
+// The app -> sites model through the API only (no screen yet): a host, an added site on
+// its own port, then off and removed. The older /sites routes keep working beside it.
+test("hosted sites API: list, plan, add, turn off, remove", async ({ page }) => {
+  await page.goto("/login/");
+  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
+  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
+  const headers = { "X-CSRF-Token": csrf_token };
+  const done = async (id: number) =>
+    expect.poll(async () => (await (await page.request.get(`/api/v1/jobs/${id}`)).json()).status, {
+      timeout: 20_000,
+    }).toBe("succeeded");
+
+  const created = await (await page.request.post("/api/v1/sites", { headers, data: { name: "Annexe", port: 8200 } })).json();
+  await done(created.job.id);
+  await done(created.content_job.id);
+  const app = created.site.id;
+  const host = await (await page.request.get(`/api/v1/apps/${app}/sites`)).json();
+  expect(host.sites.map((s: { slug: string; main: boolean }) => [s.slug, s.main])).toEqual([["main", true]]);
+
+  const site = { name: "Docs", port: 8201 };
+  const plan = await (await page.request.post(`/api/v1/apps/${app}/sites/plan`, { headers, data: site })).json();
+  expect([plan.recreate, plan.ports_after]).toEqual([true, [8201]]);
+  const added = await page.request.post(`/api/v1/apps/${app}/sites`, { headers, data: site });
+  expect(added.status()).toBe(202);
+  const change = await added.json();
+  expect([change.job.kind, change.config_job.kind]).toEqual(["update", "site_config"]);
+  await done(change.job.id);
+  await done(change.config_job.id);
+  const listed = await (await page.request.get(`/api/v1/apps/${app}/sites`)).json();
+  expect(listed.sites.map((s: { slug: string; port: number }) => [s.slug, s.port])).toEqual([["main", 8200], ["docs", 8201]]);
+
+  const docs = change.site.id;
+  const off = await page.request.put(`/api/v1/apps/${app}/sites/${docs}/enabled`, { headers, data: { enabled: false } });
+  expect(off.status()).toBe(202);
+  await done((await off.json()).id);
+  const removal = await (await page.request.get(`/api/v1/apps/${app}/sites/${docs}/removal-plan`)).json();
+  expect(removal.ports_after).toEqual([]);
+  const gone = await page.request.delete(`/api/v1/apps/${app}/sites/${docs}`, { headers });
+  expect(gone.status()).toBe(202);
+  await done((await gone.json()).job.id);
+  const after = await (await page.request.get(`/api/v1/apps/${app}/sites`)).json();
+  expect(after.sites.map((s: { slug: string }) => s.slug)).toEqual(["main"]);
+  // The older model still answers for the same host.
+  const old = await (await page.request.get("/api/v1/sites")).json();
+  expect(old.map((s: { slug: string }) => s.slug)).toContain("annexe");
+});
