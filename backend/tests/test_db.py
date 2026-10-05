@@ -84,3 +84,82 @@ def test_migration_0015_static_sites_up_and_down(tmp_path: Path) -> None:
     command.upgrade(cfg, "head")  # and back up again
     assert "kind" in columns()
     engine.dispose()
+
+
+def test_migration_0016_sites_up_and_down(tmp_path: Path) -> None:
+    db = tmp_path / "hivora.db"
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0015")
+    engine = make_sync_engine(db)
+    now = "2026-10-02 12:00:00.000000"
+    apps = [  # (id, slug, name, kind): two static sites (one stopped), a catalog nginx
+        (1, "vitrine", "Vitrine", "static-site", "running"),
+        (2, "blog", "Mon blog", "static-site", "stopped"),
+        (3, "manuel", "Manuel", None, "running"),
+    ]
+    with engine.begin() as conn:
+        for app_id, slug, name, kind, state in apps:
+            conn.execute(text("INSERT INTO application (id, slug, name, origin, desired_state,"
+                              " notes, created_at, kind) VALUES (:i, :s, :n, 'template', :d, '',"
+                              " :t, :k)"),
+                         dict(i=app_id, s=slug, n=name, d=state, t=now, k=kind))  # fmt: skip
+
+    command.upgrade(cfg, "0016")
+    with engine.connect() as conn:
+        rows = conn.execute(text("SELECT app_id, slug, name, root, port, server_name, enabled,"
+                                 " created_at FROM site ORDER BY app_id")).all()  # fmt: skip
+    # One main site per static site, none for the catalog nginx; the app's state is not copied.
+    assert [tuple(r) for r in rows] == [
+        (1, "main", "Vitrine", "", None, None, 1, now),
+        (2, "main", "Mon blog", "", None, None, 1, now),
+    ]
+
+    def add(conn: Connection, app_id: int, slug: str, root: str, port: int | None) -> None:
+        conn.execute(text("INSERT INTO site (app_id, slug, name, root, port, created_at)"
+                          " VALUES (:a, :s, :s, :r, :p, :t)"),
+                     {"a": app_id, "s": slug, "r": root, "p": port, "t": now})  # fmt: skip
+
+    with engine.begin() as conn:  # added sites: their own folder and port
+        add(conn, 1, "docs", "docs", 9001)
+        add(conn, 2, "docs", "docs", 9001)  # same slug and port on another app: allowed
+        assert conn.execute(
+            text("SELECT enabled FROM site WHERE slug = 'docs'")
+        ).scalars().all() == [1, 1]
+    refused = [
+        (1, "main2", "", None),  # a second main site (same root "")
+        (1, "main", "main", 9002),  # same slug on the same app
+        (1, "wiki", "wiki", 9001),  # same port on the same app
+        (1, "wiki", "", 9003),  # the main site with a port of its own
+        (1, "wiki", "wiki", None),  # an added site without a port
+        (1, "wiki", "wiki", 70000),  # out of range
+        (1, "wiki", "other", 9004),  # a folder that is not the slug
+        (1, "", "", None),  # an empty slug
+        (99, "wiki", "wiki", 9005),  # an unknown app
+    ]
+    for app_id, slug, root, port in refused:
+        with pytest.raises(IntegrityError), engine.begin() as conn:
+            add(conn, app_id, slug, root, port)
+
+    with engine.begin() as conn:  # removing an app removes its sites
+        conn.execute(text("DELETE FROM application WHERE id = 1"))
+    with engine.connect() as conn:
+        left = conn.execute(text("SELECT app_id, slug FROM site ORDER BY id"))
+        assert [tuple(r) for r in left] == [
+            (2, "main"), (2, "docs"),
+        ]  # fmt: skip
+        assert conn.execute(text("PRAGMA integrity_check")).scalar() == "ok"
+        assert conn.execute(text("PRAGMA foreign_key_check")).all() == []
+
+    command.downgrade(cfg, "0015")
+    with engine.connect() as conn:
+        assert "site" not in inspect(engine).get_table_names()
+        assert conn.execute(text("SELECT slug FROM application ORDER BY id")).scalars().all() == [
+            "blog", "manuel",
+        ]  # fmt: skip
+
+    command.upgrade(cfg, "head")  # and back up again: the main site is taken over again
+    with engine.connect() as conn:
+        sites = [tuple(r) for r in conn.execute(text("SELECT app_id, slug, root FROM site"))]
+        assert sites == [(2, "main", "")]
+        assert conn.execute(text("PRAGMA integrity_check")).scalar() == "ok"
+    engine.dispose()
