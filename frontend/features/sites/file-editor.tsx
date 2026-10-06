@@ -12,8 +12,8 @@ import { useSaveSiteFile, useSiteFile } from "./hooks";
 type Loaded = { base: string | null; original: string; draft: string };
 
 /** One text file in a textarea. Saved by a job, if the file is still the one read. */
-export function FileEditor({ siteId, path, exists, canEdit, onJob, onDirty }: {
-  siteId: number;
+export function FileEditor({ base, path, exists, canEdit, onJob, onDirty }: {
+  base: string; // siteApi(…)
   path: string;
   exists: boolean; // false: a new file, created when saved
   canEdit: boolean;
@@ -21,8 +21,8 @@ export function FileEditor({ siteId, path, exists, canEdit, onJob, onDirty }: {
   onDirty: (dirty: boolean) => void;
 }) {
   const { t, errorMessage } = useI18n();
-  const file = useSiteFile(siteId, path, exists);
-  const save = useSaveSiteFile(siteId);
+  const file = useSiteFile(base, path, exists);
+  const save = useSaveSiteFile(base);
   const [state, setState] = useState<Loaded>({ base: null, original: "", draft: "" });
   const dirty = state.draft !== state.original;
   const conflict = save.error instanceof ApiError && save.error.code === "file_changed";

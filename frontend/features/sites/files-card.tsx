@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
 import { FileEditor } from "./file-editor";
 import { useSiteFiles } from "./hooks";
 
-/** The site's .html, .css and .js files: pick one to read or edit, or start a new one. */
-export function FilesCard({ siteId, canEdit, onJob }: { siteId: number; canEdit: boolean; onJob: (jobId: number) => void }) {
+/** The site's .html, .css and .js files: pick one to read or edit, or start a new one. `base`: siteApi(…). */
+export function FilesCard({ base, canEdit, onJob }: { base: string; canEdit: boolean; onJob: (jobId: number) => void }) {
   const { t, lang, errorMessage } = useI18n();
-  const { data, error } = useSiteFiles(siteId);
+  const { data, error } = useSiteFiles(base);
   const [path, setPath] = useState<string | null>(null);
   const [newPath, setNewPath] = useState("");
   const [dirty, setDirty] = useState(false);
@@ -81,7 +81,7 @@ export function FilesCard({ siteId, canEdit, onJob }: { siteId: number; canEdit:
         {path ? (
           <FileEditor
             key={path}
-            siteId={siteId}
+            base={base}
             path={path}
             exists={files.some((f) => f.path === path)}
             canEdit={canEdit}

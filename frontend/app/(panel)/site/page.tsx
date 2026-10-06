@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ContentCard } from "@/features/sites/content-card";
 import { EnabledSwitch } from "@/features/sites/enabled-switch";
 import { FilesCard } from "@/features/sites/files-card";
-import { useSites } from "@/features/sites/hooks";
+import { siteApi, useSites } from "@/features/sites/hooks";
 import { JobsCard } from "@/features/sites/jobs-card";
 import { useApp } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
@@ -69,8 +69,8 @@ function SiteDetail() {
       </div>
       <div className="stagger grid items-start gap-4 lg:grid-cols-2">
         <JobsCard jobs={jobs} className="animate-enter lg:col-span-2" />
-        {can("operator") && <ContentCard siteId={site.id} onJob={(jobId) => setJobs([jobId])} />}
-        <FilesCard siteId={site.id} canEdit={can("operator")} onJob={(jobId) => setJobs([jobId])} />
+        {can("operator") && <ContentCard base={siteApi(site.id)} onJob={(jobId) => setJobs([jobId])} />}
+        <FilesCard base={siteApi(site.id)} canEdit={can("operator")} onJob={(jobId) => setJobs([jobId])} />
       </div>
     </>
   );

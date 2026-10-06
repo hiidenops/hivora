@@ -37,19 +37,27 @@ export function useSetSiteEnabled() {
   });
 }
 
-export const useSiteFiles = (id: number) =>
-  useQuery({ queryKey: [...sitesKey, id, "files"], queryFn: () => api<SiteFiles>(`/sites/${id}/files`) });
+/**
+ * The API base of one site's content and files: an app's main site in the older model
+ * (`/sites/{app}`), or one site an nginx hosts (`/apps/{app}/sites/{site}`). Both answer
+ * the same `/content`, `/files` and `/files/content` routes.
+ */
+export const siteApi = (appId: number, siteId?: number) =>
+  siteId === undefined ? `/sites/${appId}` : `/apps/${appId}/sites/${siteId}`;
 
-export const useSiteFile = (id: number, path: string, enabled: boolean) =>
+export const useSiteFiles = (base: string) =>
+  useQuery({ queryKey: [...sitesKey, base, "files"], queryFn: () => api<SiteFiles>(`${base}/files`) });
+
+export const useSiteFile = (base: string, path: string, enabled: boolean) =>
   useQuery({
-    queryKey: [...sitesKey, id, "file", path],
-    queryFn: () => api<SiteTextFile>(`/sites/${id}/files/content?${new URLSearchParams({ path })}`),
+    queryKey: [...sitesKey, base, "file", path],
+    queryFn: () => api<SiteTextFile>(`${base}/files/content?${new URLSearchParams({ path })}`),
     enabled,
   });
 
 /** Queues the save; the file is replaced by the job (base_sha256: null creates it). */
-export function useSaveSiteFile(id: number) {
+export function useSaveSiteFile(base: string) {
   return useMutation({
-    mutationFn: (body: SiteFileIn) => api<JobRef>(`/sites/${id}/files/content`, { method: "PUT", body }),
+    mutationFn: (body: SiteFileIn) => api<JobRef>(`${base}/files/content`, { method: "PUT", body }),
   });
 }

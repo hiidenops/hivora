@@ -12,8 +12,8 @@ import { useI18n } from "@/lib/i18n";
 
 const MAX_UPLOAD = 200 * 1024 ** 2; // the backend's limit: refused before sending
 
-/** Replace the whole site with a .zip: sent, checked, then extracted by a job. */
-export function ContentCard({ siteId, onJob }: { siteId: number; onJob: (jobId: number) => void }) {
+/** Replace the whole site with a .zip: sent, checked, then extracted by a job. `base`: siteApi(…). */
+export function ContentCard({ base, onJob }: { base: string; onJob: (jobId: number) => void }) {
   const { t, errorMessage } = useI18n();
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -24,7 +24,7 @@ export function ContentCard({ siteId, onJob }: { siteId: number; onJob: (jobId: 
     setError(null);
     try {
       if (file.size > MAX_UPLOAD) throw new ApiError(413, "archive_too_large", "");
-      const job = await upload<JobRef>(`/sites/${siteId}/content`, file, {
+      const job = await upload<JobRef>(`${base}/content`, file, {
         method: "PUT",
         query: { filename: file.name },
         onProgress: setProgress,
