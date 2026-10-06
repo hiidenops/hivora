@@ -63,14 +63,16 @@ export function HostedSitesCard({ appId, onJob }: { appId: number; onJob: (jobId
   const added = host.sites.filter((s) => !s.main).length;
   const full = added >= host.max_sites;
   return (
-    <Card className="lg:col-span-2">
+    // Above the next cards: the page's entry animation makes each card a stacking context,
+    // and the last site's menu runs over the card below.
+    <Card className="relative z-10 lg:col-span-2">
       {title}
       <CardContent className="grid gap-3">
         {host.upgrade_required && <Alert tone="warn">{t("hosting.upgradeRequired")}</Alert>}
         {host.stopped && !host.upgrade_required && <Alert tone="info">{t("hosting.stopped")}</Alert>}
         <ul className="divide-y" aria-label={t("hosting.title")}>
           {host.sites.map((site) => (
-            <HostedSiteRow key={site.id} appId={appId} site={site} locked={host.upgrade_required} onJob={onJob} />
+            <HostedSiteRow key={site.id} appId={appId} site={site} locked={host.upgrade_required} stopped={host.stopped} onJob={onJob} />
           ))}
         </ul>
         {operator && (

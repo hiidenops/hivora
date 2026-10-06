@@ -4,21 +4,19 @@ import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { useSession } from "@/components/app-shell";
-import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Input, Label } from "@/components/ui/input";
-import { ApiError, type HostedSiteIn } from "@/lib/api/client";
+import type { HostedSiteIn } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
 import { useAddSite, usePlanSite } from "./hooks";
+import { PortError } from "./port-dialog";
 import { RestartNotice } from "./restart-notice";
-
-type Conflict = { port: number; protocol: string; used_by: string; suggestion: number | null };
 
 /** A new site on its own port: checked first (conflicts, restart notice), then added. */
 export function AddSiteDialog({ appId, disabled, onJob }: { appId: number; disabled: boolean; onJob: (jobId: number) => void }) {
-  const { t, errorMessage } = useI18n();
+  const { t } = useI18n();
   const { advanced } = useSession();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -28,10 +26,6 @@ export function AddSiteDialog({ appId, disabled, onJob }: { appId: number; disab
   const plan = usePlanSite(appId);
   const add = useAddSite(appId);
   const error = add.error ?? plan.error;
-  const conflicts =
-    error instanceof ApiError && error.code === "port_conflict"
-      ? ((error.details.conflicts as Conflict[] | undefined) ?? [])
-      : [];
 
   const body = (): HostedSiteIn => ({
     name: name.trim(),
@@ -104,17 +98,7 @@ export function AddSiteDialog({ appId, disabled, onJob }: { appId: number; disab
               </div>
             </>
           )}
-          {conflicts.map((c) => (
-            <Alert key={`${c.port}/${c.protocol}`} tone="danger">
-              {t("deploy.conflict", { port: c.port, protocol: c.protocol, owner: c.used_by })}
-              {c.suggestion !== null && (
-                <Button type="button" variant="outline" size="sm" className="ml-2" onClick={() => changed(setPort)(String(c.suggestion))}>
-                  {t("sites.useSuggested", { port: c.suggestion })}
-                </Button>
-              )}
-            </Alert>
-          ))}
-          {error && conflicts.length === 0 && <Alert tone="danger">{errorMessage(error)}</Alert>}
+          <PortError error={error} onUse={(p) => changed(setPort)(String(p))} />
           {plan.data && <RestartNotice plan={plan.data} />}
           <Button type="submit" className="justify-self-end" disabled={plan.isPending || add.isPending || !name.trim() || !port}>
             {plan.data ? t("hosting.addConfirm") : t("hosting.check")}

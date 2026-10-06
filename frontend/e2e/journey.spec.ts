@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
@@ -471,5 +472,127 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
   await expect(viewer.getByRole("list", { name: "Sites" }).getByRole("listitem")).toHaveCount(2);
   await expect(viewer.getByRole("button", { name: "Ajouter un site" })).toHaveCount(0);
   await expect(viewer.getByRole("switch", { name: "Site « Blog » actif" })).toBeDisabled();
+  await expect(viewer.getByRole("button", { name: /^Actions du site/ })).toHaveCount(0); // no port, name or removal
   await viewer.close();
+});
+
+// An added site's menu on the nginx app's page: its port (conflict, suggested port, restart
+// notice, compose diff in advanced mode), its domain name (advanced mode only), its removal
+// with or without its files. The main site has no menu.
+test("nginx sites card: change a port, a domain name, remove a site", async ({ page }) => {
+  await page.goto("/login/");
+  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
+  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
+  const headers = { "X-CSRF-Token": csrf_token };
+  const done = async (id: number) =>
+    expect.poll(async () => (await (await page.request.get(`/api/v1/jobs/${id}`)).json()).status, {
+      timeout: 20_000,
+    }).toBe("succeeded");
+
+  // A host with two added sites, each with a file (set up through the API).
+  const created = await (await page.request.post("/api/v1/apps", {
+    headers, data: { template: "nginx", name: "Pages", inputs: { web_port: 8310 } },
+  })).json(); // prettier-ignore
+  await done(created.job.id);
+  const app = created.app.id;
+  expect((await page.request.post(`/api/v1/apps/${app}/sites/hosting`, { headers })).status()).toBe(200);
+  for (const [name, port] of [["Blog", 8311], ["Wiki", 8312]] as const) {
+    const change = await (await page.request.post(`/api/v1/apps/${app}/sites`, { headers, data: { name, port } })).json();
+    await done(change.config_job.id);
+    const saved = await page.request.put(`/api/v1/apps/${app}/sites/${change.site.id}/files/content`, {
+      headers, data: { path: "index.html", content: `<h1>${name}</h1>`, base_sha256: null },
+    }); // prettier-ignore
+    await done((await saved.json()).id);
+  }
+  const folder = (slug: string) => `/tmp/hivora-e2e/srv/pages/sites/${slug}/index.html`;
+  expect([existsSync(folder("blog")), existsSync(folder("wiki"))]).toEqual([true, true]);
+
+  await page.goto(`/app/?id=${app}`);
+  const sites = page.getByRole("list", { name: "Sites" });
+  const blog = sites.getByRole("listitem", { name: "Blog" });
+  await expect(blog.getByText("Port 8311")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Actions du site « Pages »" })).toHaveCount(0); // the main site
+  const menu = async (site: string, item: string) => {
+    await page.getByRole("button", { name: `Actions du site « ${site} »` }).click();
+    await page.getByRole("menuitem", { name: item }).click();
+  };
+
+  // Simple mode: no domain name in the menu.
+  await page.getByRole("button", { name: "Actions du site « Blog »" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText(["Changer le port", "Supprimer"]);
+  await page.keyboard.press("Escape");
+
+  // Port: Wiki's port is taken (no suggestion); the other nginx's port (the previous test's)
+  // too, and a free one is suggested; then the restart is announced.
+  await menu("Blog", "Changer le port");
+  const dialog = page.getByRole("dialog");
+  const newPort = dialog.getByLabel("Nouveau port", { exact: true });
+  await expect(newPort).toHaveValue("8311");
+  await newPort.fill("8312");
+  await dialog.getByRole("button", { name: "Vérifier" }).click();
+  await expect(dialog.getByText("Le port 8312/tcp est déjà utilisé par site wiki", { exact: false })).toBeVisible();
+  await newPort.fill("8300");
+  await dialog.getByRole("button", { name: "Vérifier" }).click();
+  await expect(dialog.getByText("Le port 8300/tcp est déjà utilisé", { exact: false })).toBeVisible();
+  const suggested = dialog.getByRole("button", { name: /^Utiliser le port \d+$/ });
+  const port = (await suggested.textContent())!.match(/\d+/)![0];
+  await suggested.click();
+  await expect(newPort).toHaveValue(port);
+  await dialog.getByRole("button", { name: "Vérifier" }).click();
+  await expect(dialog.getByText("pour publier ce port : tous ses sites seront indisponibles", { exact: false })).toBeVisible();
+  await expect(dialog.locator("pre")).toHaveCount(0); // the compose diff: advanced mode only
+  await dialog.getByRole("button", { name: "Changer le port" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(blog.getByText(`Port ${port}`)).toBeVisible({ timeout: 20_000 });
+
+  // Advanced mode: the compose diff before a port change, the domain name.
+  await page.getByText("Mode avancé", { exact: true }).click();
+  await menu("Wiki", "Changer le port");
+  await newPort.fill("8319");
+  await dialog.getByRole("button", { name: "Vérifier" }).click();
+  await expect(dialog.getByText("tous ses sites seront indisponibles", { exact: false })).toBeVisible();
+  await expect(dialog.locator("pre")).toContainText("8319"); // the compose diff
+  await page.keyboard.press("Escape"); // nothing changed
+  await expect(dialog).toBeHidden();
+  await expect(sites.getByRole("listitem", { name: "Wiki" }).getByText("Port 8312")).toBeVisible();
+
+  await menu("Blog", "Nom de domaine");
+  await expect(dialog.getByText("aucun site n'est coupé", { exact: false })).toBeVisible();
+  await dialog.getByLabel("Nom de domaine", { exact: true }).fill("blog;x");
+  await dialog.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(dialog.getByRole("alert")).toBeVisible(); // invalid_site_config
+  await dialog.getByLabel("Nom de domaine", { exact: true }).fill("blog.example.com");
+  await dialog.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(blog.getByText("blog.example.com")).toBeVisible({ timeout: 20_000 });
+
+  // Removal, files kept (the default), then removal with its files.
+  const remove = async (site: string, withData: boolean) => {
+    await menu(site, "Supprimer");
+    await expect(dialog.getByText("Son port", { exact: false })).toBeVisible();
+    await expect(dialog.getByText("pour retirer ce port", { exact: false })).toBeVisible();
+    const data = dialog.getByRole("switch", { name: "Supprimer aussi ses fichiers" });
+    await expect(data).not.toBeChecked();
+    await expect(dialog.getByText(`sites/${site.toLowerCase()}`)).toBeVisible();
+    if (withData) {
+      await data.click();
+      await expect(dialog.getByText("Irréversible", { exact: false })).toBeVisible();
+    }
+    const sent = page.waitForResponse((r) => r.request().method() === "DELETE");
+    await dialog.getByRole("button", { name: "Supprimer", exact: true }).click();
+    const response = await sent;
+    expect(new URL(response.url()).searchParams.get("remove_data")).toBe(String(withData));
+    await done((await response.json()).job.id);
+    await expect(dialog).toBeHidden();
+    await expect(sites.getByRole("listitem", { name: site })).toHaveCount(0);
+  };
+  await remove("Wiki", false);
+  expect(existsSync(folder("wiki"))).toBe(true);
+  await remove("Blog", true);
+  expect(existsSync(folder("blog"))).toBe(false);
+  await expect(sites.getByRole("listitem")).toHaveCount(1); // the main site stays
+  await expectPointerCursors(page);
 });
