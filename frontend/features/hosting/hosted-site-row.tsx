@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink, MoreHorizontal } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { useSession } from "@/components/app-shell";
@@ -49,7 +50,9 @@ export function HostedSiteRow({ appId, site, locked, stopped, onJob }: {
     <li aria-label={site.name} className="grid gap-1 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <span className="font-medium">{site.name}</span>
+          <Link href={`/app/site/?app=${appId}&site=${site.id}`} className="font-medium hover:underline">
+            {site.name}
+          </Link>
           {site.main && <Badge>{t("hosting.main")}</Badge>}
           {site.port !== null && <span className="font-mono text-sm text-muted-foreground">{t("sites.portValue", { port: site.port })}</span>}
           {advanced && site.server_name && <span className="font-mono text-xs text-muted-foreground">{site.server_name}</span>}

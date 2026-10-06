@@ -1,85 +1,33 @@
 "use client";
 
-import { ExternalLink, Settings2 } from "lucide-react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect } from "react";
 
-import { PageHeader, useSession } from "@/components/app-shell";
-import { StatusBadge } from "@/components/status-badge";
-import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ContentCard } from "@/features/sites/content-card";
-import { EnabledSwitch } from "@/features/sites/enabled-switch";
-import { FilesCard } from "@/features/sites/files-card";
-import { siteApi, useSites } from "@/features/sites/hooks";
-import { JobsCard } from "@/features/sites/jobs-card";
-import { useApp } from "@/lib/api/hooks";
+import { useHostedSites } from "@/features/hosting/hooks";
 import { useI18n } from "@/lib/i18n";
-import { useLiveStatus } from "@/lib/realtime";
 
-function SiteDetail() {
-  const { t, errorMessage } = useI18n();
-  const { can } = useSession();
+/** Older bookmarks (/site/?id={app}): the main site of that nginx, on its hosted site page;
+ *  its app page if it hosts no sites. */
+function OldSiteRedirect() {
+  const { t } = useI18n();
+  const router = useRouter();
   const id = Number(useSearchParams().get("id") ?? 0);
-  const { data: sites, isPending, error } = useSites();
-  const site = sites?.find((s) => s.id === id);
-  const { data: app } = useApp(site?.deployed ? id : 0); // the URL to open it
-  const status = useLiveStatus(site?.slug ?? "", site?.status ?? "missing");
-  const [jobs, setJobs] = useState<number[]>([]);
+  const { data: host, error } = useHostedSites(id);
+  const main = host?.sites.find((s) => s.main);
 
-  if (error) return <Alert tone="danger">{errorMessage(error)}</Alert>;
-  if (isPending) {
-    return (
-      <div role="status" aria-label={t("common.loading")} className="grid gap-4">
-        <Skeleton className="h-10 w-1/3" />
-        <Skeleton className="h-48" />
-      </div>
-    );
-  }
-  if (!site) return <Alert tone="danger">{t("error.site_not_found")}</Alert>;
-  const url = app?.access.web ?? Object.values(app?.access ?? {})[0];
+  useEffect(() => {
+    if (main) router.replace(`/app/site/?app=${id}&site=${main.id}`);
+    else if (host || error) router.replace(`/app/?id=${id}`);
+  }, [main, host, error, id, router]);
 
-  return (
-    <>
-      <PageHeader
-        title={site.name}
-        actions={
-          <>
-            {url && (
-              <Button variant="outline" size="sm" asChild>
-                <a href={url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink /> {t("sites.open")}
-                </a>
-              </Button>
-            )}
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/app/?id=${site.id}`}>
-                <Settings2 /> {t("sites.appSettings")}
-              </Link>
-            </Button>
-          </>
-        }
-      />
-      <div className="mb-6 flex flex-wrap items-center gap-6">
-        {site.deployed ? <StatusBadge status={status} /> : <span className="text-sm text-muted-foreground">{t("sites.deploying")}</span>}
-        {site.port !== null && <span className="font-mono text-sm text-muted-foreground">{t("sites.portValue", { port: site.port })}</span>}
-        <EnabledSwitch site={site} onJob={(jobId) => setJobs([jobId])} />
-      </div>
-      <div className="stagger grid items-start gap-4 lg:grid-cols-2">
-        <JobsCard jobs={jobs} className="animate-enter lg:col-span-2" />
-        {can("operator") && <ContentCard base={siteApi(site.id)} onJob={(jobId) => setJobs([jobId])} />}
-        <FilesCard base={siteApi(site.id)} canEdit={can("operator")} onJob={(jobId) => setJobs([jobId])} />
-      </div>
-    </>
-  );
+  return <Skeleton role="status" aria-label={t("common.loading")} className="h-10 w-1/3" />;
 }
 
-export default function SitePage() {
+export default function OldSitePage() {
   return (
     <Suspense>
-      <SiteDetail />
+      <OldSiteRedirect />
     </Suspense>
   );
 }

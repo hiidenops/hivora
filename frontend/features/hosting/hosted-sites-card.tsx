@@ -1,6 +1,7 @@
 "use client";
 
 import { Globe } from "lucide-react";
+import Link from "next/link";
 
 import { useSession } from "@/components/app-shell";
 import { Alert } from "@/components/ui/alert";
@@ -14,8 +15,9 @@ import { useEnableHosting, useHostedSites } from "./hooks";
 import { HostedSiteRow } from "./hosted-site-row";
 
 /** The sites an nginx app hosts (app -> sites): each on its own port, each with its own
- *  switch; "Add a site" first shows what the change does. */
-export function HostedSitesCard({ appId, onJob }: { appId: number; onJob: (jobId: number) => void }) {
+ *  switch; "Add a site" first shows what the change does. `title`: the nginx's name, linked
+ *  to its page (the sites index), instead of "Sites" (its own page). */
+export function HostedSitesCard({ appId, title: name, onJob }: { appId: number; title?: string; onJob: (jobId: number) => void }) {
   const { t, errorMessage } = useI18n();
   const { can } = useSession();
   const { data: host, error, isPending, notHost } = useHostedSites(appId);
@@ -25,7 +27,14 @@ export function HostedSitesCard({ appId, onJob }: { appId: number; onJob: (jobId
   const title = (
     <CardHeader>
       <CardTitle className="flex items-center gap-2">
-        <Globe className="size-5" /> {t("hosting.title")}
+        <Globe className="size-5" />{" "}
+        {name ? (
+          <Link href={`/app/?id=${appId}`} className="hover:underline">
+            {name}
+          </Link>
+        ) : (
+          t("hosting.title")
+        )}
       </CardTitle>
     </CardHeader>
   );
@@ -70,7 +79,7 @@ export function HostedSitesCard({ appId, onJob }: { appId: number; onJob: (jobId
       <CardContent className="grid gap-3">
         {host.upgrade_required && <Alert tone="warn">{t("hosting.upgradeRequired")}</Alert>}
         {host.stopped && !host.upgrade_required && <Alert tone="info">{t("hosting.stopped")}</Alert>}
-        <ul className="divide-y" aria-label={t("hosting.title")}>
+        <ul className="divide-y" aria-label={name ?? t("hosting.title")}>
           {host.sites.map((site) => (
             <HostedSiteRow key={site.id} appId={appId} site={site} locked={host.upgrade_required} stopped={host.stopped} onJob={onJob} />
           ))}

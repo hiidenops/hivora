@@ -167,163 +167,73 @@ test("removal goes back to the dashboard even if the app is gone before its job 
   await expect(page.getByText("Application introuvable.")).toBeHidden();
 });
 
-test("sites: create a site, then turn it off and on", async ({ page }) => {
+// The sites index (/sites): one Sites card per nginx, each site a link to its page; an nginx
+// that hosts no sites yet offers to; older bookmarks (/site/?id=) reach the main site.
+test("sites index: grouped by nginx, host sites, site links, older bookmarks", async ({ page }) => {
   await page.goto("/login/");
   await page.getByLabel("Identifiant", { exact: true }).fill("admin");
   await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Se connecter" }).click();
   await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
-
-  await page.getByRole("link", { name: "Sites" }).click();
-  await expect(page.getByRole("heading", { name: "Sites" })).toBeVisible();
-  await expect(page.getByText("Aucun site pour l'instant.")).toBeVisible();
-  await expectPointerCursors(page);
-  await page.getByRole("button", { name: "Nouveau site" }).first().click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Nom", { exact: true }).fill("Vitrine");
-  await dialog.getByLabel("Port", { exact: true }).fill("8095");
-  await dialog.getByRole("button", { name: "Nouveau site" }).click();
-  await expect(dialog).toBeHidden();
-
-  // Two jobs: the deploy, then the first page.
-  await expect(page.getByText("Contenu du site")).toBeVisible();
-  await expect(page.getByText("Réussi")).toHaveCount(2, { timeout: 20_000 });
-  const card = page.getByRole("article", { name: "Vitrine" });
-  await expect(card.getByText("Port 8095")).toBeVisible();
-  await expect(card.getByText("Sain")).toBeVisible({ timeout: 10_000 });
-
-  const toggle = card.getByRole("switch", { name: "Site « Vitrine » actif" });
-  await expect(toggle).toBeEnabled();
-  await expect(toggle).toBeChecked();
-  await toggle.click();
-  await expect(toggle).not.toBeChecked();
-  await expect(card.getByText("Désactivé")).toBeVisible();
-  await toggle.click();
-  await expect(toggle).toBeChecked();
-  await expect(card.getByText("Actif")).toBeVisible();
-  await expectPointerCursors(page);
-  await expect(card.getByRole("link", { name: "Réglages de l'application" })).toHaveAttribute("href", /\/app\/\?id=\d+/);
-});
-
-test("sites: site page, open link, replace the content from a zip", async ({ page }) => {
-  await page.goto("/login/");
-  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
-  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
-
-  await page.getByRole("link", { name: "Sites" }).click();
-  await page.getByRole("article", { name: "Vitrine" }).getByRole("link", { name: "Vitrine" }).click();
-  await expect(page).toHaveURL(/\/site\/\?id=\d+$/);
-  await expect(page.getByRole("heading", { name: "Vitrine" })).toBeVisible();
-  await expect(page.getByText("Port 8095")).toBeVisible();
-  await expect(page.getByRole("switch", { name: "Site « Vitrine » actif" })).toBeChecked();
-  await expect(page.getByRole("link", { name: "Ouvrir le site" })).toHaveAttribute("href", /^http:\/\/[\d.]+:8095$/);
-  await expect(page.getByRole("link", { name: "Ouvrir le site" })).toHaveAttribute("target", "_blank");
-  await expect(page.getByRole("link", { name: "Réglages de l'application" })).toHaveAttribute("href", /\/app\/\?id=\d+/);
-
-  const replace = page.getByRole("button", { name: "Remplacer le contenu" });
-  await expect(replace).toBeDisabled();
-  await page.getByLabel("Archive .zip du site").setInputFiles(path.join(__dirname, "fixtures", "site.zip"));
-  page.once("dialog", (dialog) => void dialog.accept());
-  await replace.click();
-  await expect(page.getByText("Contenu du site")).toBeVisible();
-  await expect(page.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
-  await expectPointerCursors(page);
-
-  // The single top folder of the archive is removed: its files are at the site's root.
-  const id = new URL(page.url()).searchParams.get("id");
-  const files = await (await page.request.get(`/api/v1/sites/${id}/files`)).json();
-  expect(files.files.map((f: { path: string }) => f.path)).toEqual(["css/site.css", "index.html"]);
-  const index = await (await page.request.get(`/api/v1/sites/${id}/files/content?path=index.html`)).json();
-  expect(index.content).toContain("Depuis le ZIP");
-});
-
-test("sites: read, edit, create a file, conflicts, and read only for viewers", async ({ page, browser }) => {
-  await page.goto("/login/");
-  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
-  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
-  await page.getByRole("link", { name: "Sites" }).click();
-  await page.getByRole("article", { name: "Vitrine" }).getByRole("link", { name: "Vitrine" }).click();
-  await expect(page).toHaveURL(/\/site\/\?id=\d+$/);
-  const id = new URL(page.url()).searchParams.get("id");
   const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
   const headers = { "X-CSRF-Token": csrf_token };
+  const done = async (id: number) =>
+    expect.poll(async () => (await (await page.request.get(`/api/v1/jobs/${id}`)).json()).status, {
+      timeout: 20_000,
+    }).toBe("succeeded");
 
-  // The files of the zip sent before; pick one, read it.
-  const list = page.getByRole("list", { name: "Fichiers" });
-  await expect(list.getByRole("button")).toHaveText([/css\/site\.css/, /index\.html/]);
-  await expect(page.getByText("Choisissez un fichier pour l'afficher.")).toBeVisible();
-  await list.getByRole("button", { name: /index\.html/ }).click();
-  const editor = page.getByLabel("Contenu de index.html");
-  await expect(editor).toHaveValue(/Depuis le ZIP/);
-  const save = page.getByRole("button", { name: "Enregistrer" });
-  await expect(save).toBeDisabled(); // nothing changed yet
-
-  // Edit and save: the job replaces the file, the editor takes the saved version.
-  await editor.fill("<h1>Bienvenue</h1>\n");
-  await expect(page.getByText("Modifications non enregistrées")).toBeVisible();
-  await save.click();
-  await expect(page.getByText("Enregistrement d'un fichier")).toBeVisible();
-  await expect(page.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText("Modifications non enregistrées")).toBeHidden();
-  await expect(save).toBeDisabled();
-
-  // Someone else saves the same file meanwhile: refused, then reloaded on request.
-  await editor.fill("<h1>Ma version</h1>\n");
-  const read = await (await page.request.get(`/api/v1/sites/${id}/files/content?path=index.html`)).json();
-  const other = await (await page.request.put(`/api/v1/sites/${id}/files/content`, {
-    headers, data: { path: "index.html", content: "<h1>Leur version</h1>\n", base_sha256: read.sha256 },
-  })).json(); // prettier-ignore
-  await expect
-    .poll(async () => (await (await page.request.get(`/api/v1/jobs/${other.id}`)).json()).status)
-    .toBe("succeeded");
-  await expect(editor).toHaveValue("<h1>Ma version</h1>\n"); // the draft is kept
-  await save.click();
-  await expect(page.getByText("Le fichier a changé depuis son ouverture.", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: "Recharger" }).click();
-  await expect(editor).toHaveValue("<h1>Leur version</h1>\n");
-
-  // A new file in a new folder; a file type that cannot be edited is refused.
-  await page.getByLabel("Nouveau fichier").fill("notes.txt");
-  await page.getByRole("button", { name: "Créer" }).click();
-  await page.getByRole("button", { name: "Enregistrer" }).click();
-  await expect(page.getByText("Seuls les fichiers .html, .css et .js peuvent être modifiés.")).toBeVisible();
-  await page.getByLabel("Nouveau fichier").fill("js/app.js");
-  await page.getByRole("button", { name: "Créer" }).click();
-  await expect(page.getByText("Nouveau fichier : il sera créé à l'enregistrement.")).toBeVisible();
-  await page.getByLabel("Contenu de js/app.js").fill("console.log('ok');\n");
-  await page.getByRole("button", { name: "Enregistrer" }).click();
-  await expect(list.getByRole("button")).toHaveText([/css\/site\.css/, /index\.html/, /js\/app\.js/], { timeout: 20_000 });
+  // No nginx yet: the way to deploy one.
+  await page.getByRole("link", { name: "Sites" }).click();
+  await expect(page.getByRole("heading", { name: "Sites", level: 1 })).toBeVisible();
+  await expect(page.getByText("Aucun nginx pour l'instant", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Nouveau nginx" }).first()).toHaveAttribute("href", "/deploy/?template=nginx");
   await expectPointerCursors(page);
 
-  // A viewer reads the same page: no upload, no save, no new file, no switch.
-  await page.request.post("/api/v1/users", {
-    headers, data: { username: "vera", role: "viewer", password: "temporary-pass-1" },
-  }); // prettier-ignore
-  const viewer = await browser.newPage();
-  await viewer.goto("/login/");
-  await viewer.getByLabel("Identifiant", { exact: true }).fill("vera");
-  await viewer.getByLabel("Mot de passe", { exact: true }).fill("temporary-pass-1");
-  await viewer.getByRole("button", { name: "Se connecter" }).click();
-  await viewer.getByLabel("Mot de passe actuel", { exact: true }).fill("temporary-pass-1");
-  await viewer.getByLabel("Nouveau mot de passe", { exact: true }).fill(PASSWORD);
-  await viewer.getByLabel("Confirmer le nouveau mot de passe", { exact: true }).fill(PASSWORD);
-  await viewer.getByRole("button", { name: "Enregistrer" }).click();
-  await expect(viewer.getByRole("heading", { name: "Applications" })).toBeVisible();
-  await viewer.goto(`/site/?id=${id}`);
-  await viewer.getByRole("list", { name: "Fichiers" }).getByRole("button", { name: /js\/app\.js/ }).click();
-  const readOnly = viewer.getByLabel("Contenu de js/app.js");
-  await expect(readOnly).toHaveValue("console.log('ok');\n");
-  await expect(readOnly).toHaveAttribute("readonly", "");
-  await expect(viewer.getByText("Lecture seule")).toBeVisible();
-  await expect(viewer.getByRole("button", { name: "Enregistrer" })).toHaveCount(0);
-  await expect(viewer.getByLabel("Nouveau fichier")).toHaveCount(0);
-  await expect(viewer.getByRole("button", { name: "Remplacer le contenu" })).toHaveCount(0);
-  await expect(viewer.getByRole("switch", { name: "Site « Vitrine » actif" })).toBeDisabled();
-  await viewer.close();
+  // Two nginx (through the API): Vitrine serves one site, Galerie hosts an added one.
+  const nginx = async (name: string, port: number) => {
+    const created = await (await page.request.post("/api/v1/apps", {
+      headers, data: { template: "nginx", name, inputs: { web_port: port } },
+    })).json(); // prettier-ignore
+    await done(created.job.id);
+    return created.app.id as number;
+  };
+  const vitrine = await nginx("Vitrine", 8095);
+  const galerie = await nginx("Galerie", 8096);
+  await page.request.post(`/api/v1/apps/${galerie}/sites/hosting`, { headers });
+  const photos = await (await page.request.post(`/api/v1/apps/${galerie}/sites`, { headers, data: { name: "Photos", port: 8097 } })).json();
+  await done(photos.config_job.id);
+
+  await page.reload();
+  const vitrineSites = page.getByRole("list", { name: "Vitrine" });
+  const galerieSites = page.getByRole("list", { name: "Galerie" });
+  await expect(galerieSites.getByRole("listitem")).toHaveText([/Galerie.*Site principal.*Port 8096/, /Photos.*Port 8097/]);
+  await expect(page.getByRole("link", { name: "Galerie", exact: true }).first()).toHaveAttribute("href", `/app/?id=${galerie}`);
+  await expect(vitrineSites).toHaveCount(0);
+  await expect(page.getByText("Ce nginx sert un seul site", { exact: false })).toBeVisible();
+
+  // Vitrine starts hosting from the index; its main site, off then on.
+  await page.getByRole("button", { name: "Héberger des sites" }).click();
+  await expect(vitrineSites.getByRole("listitem")).toHaveText([/Vitrine.*Site principal.*Port 8095/]);
+  const toggle = vitrineSites.getByRole("switch", { name: "Site « Vitrine » actif" });
+  await toggle.click();
+  await expect(toggle).not.toBeChecked({ timeout: 20_000 });
+  await expect(vitrineSites.getByText("Désactivé (répond 503)")).toBeVisible();
+  await toggle.click();
+  await expect(toggle).toBeChecked({ timeout: 20_000 });
+  await expectPointerCursors(page);
+
+  // Each site is a link to its page.
+  await galerieSites.getByRole("link", { name: "Photos", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/app/site/\\?app=${galerie}&site=${photos.site.id}$`));
+  await expect(page.getByRole("heading", { name: "Photos", level: 1 })).toBeVisible();
+
+  // Older bookmarks: the main site of that nginx.
+  const host = await (await page.request.get(`/api/v1/apps/${vitrine}/sites`)).json();
+  const main = host.sites.find((s: { main: boolean }) => s.main).id;
+  await page.goto(`/site/?id=${vitrine}`);
+  await expect(page).toHaveURL(new RegExp(`/app/site/\\?app=${vitrine}&site=${main}$`));
+  await expect(page.getByRole("heading", { name: "Vitrine", level: 1 })).toBeVisible();
+  await expect(page.getByText("Site principal")).toBeVisible();
 });
 
 // The app -> sites model through the API only (no screen yet): a host, an added site on
@@ -698,12 +608,19 @@ test("hosted site page: zip, read, create, edit, conflict, viewer, back to the n
   await expect(page).toHaveURL(new RegExp(`/app/\\?id=${app}$`));
   await expect(page.getByRole("list", { name: "Sites" }).getByRole("listitem", { name: "Docs" })).toBeVisible();
 
-  // A viewer (from an earlier test) reads, writes nothing.
+  // A viewer reads, writes nothing.
+  await page.request.post("/api/v1/users", {
+    headers, data: { username: "vera", role: "viewer", password: "temporary-pass-1" },
+  }); // prettier-ignore
   const viewer = await browser.newPage();
   await viewer.goto("/login/");
   await viewer.getByLabel("Identifiant", { exact: true }).fill("vera");
-  await viewer.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await viewer.getByLabel("Mot de passe", { exact: true }).fill("temporary-pass-1");
   await viewer.getByRole("button", { name: "Se connecter" }).click();
+  await viewer.getByLabel("Mot de passe actuel", { exact: true }).fill("temporary-pass-1");
+  await viewer.getByLabel("Nouveau mot de passe", { exact: true }).fill(PASSWORD);
+  await viewer.getByLabel("Confirmer le nouveau mot de passe", { exact: true }).fill(PASSWORD);
+  await viewer.getByRole("button", { name: "Enregistrer" }).click();
   await expect(viewer.getByRole("heading", { name: "Applications" })).toBeVisible();
   await viewer.goto(`/app/site/?app=${app}&site=${site}`);
   await viewer.getByRole("list", { name: "Fichiers" }).getByRole("button", { name: /js\/app\.js/ }).click();
