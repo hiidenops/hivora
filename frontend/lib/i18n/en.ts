@@ -102,6 +102,8 @@ export const en: Record<MessageKey, string> = {
   "hosting.removePort": "Its port {port}, no longer published.",
   "hosting.removeData": "Also delete its files",
   "hosting.restartNoticeRemove": "This nginx restarts to withdraw this port: all its sites are unavailable for a short moment (usually under a second).",
+  "hosting.breadcrumb": "Breadcrumb",
+  "hosting.hostStopped": "This nginx is stopped: the site does not answer.",
   "logs.title": "Logs",
   "logs.service": "Service",
   "logs.allServices": "All services",

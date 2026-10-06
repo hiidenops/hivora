@@ -101,6 +101,8 @@ export const fr = {
   "hosting.removePort": "Son port {port}, qui n'est plus publié.",
   "hosting.removeData": "Supprimer aussi ses fichiers",
   "hosting.restartNoticeRemove": "Ce nginx va redémarrer pour retirer ce port : tous ses sites seront indisponibles un court instant (moins d'une seconde en général).",
+  "hosting.breadcrumb": "Fil d'Ariane",
+  "hosting.hostStopped": "Ce nginx est arrêté : le site ne répond pas.",
   "logs.title": "Logs",
   "logs.service": "Service",
   "logs.allServices": "Tous les services",
