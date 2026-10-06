@@ -35,6 +35,11 @@ export type SiteCreated = Schemas["SiteCreatedOut"];
 export type SiteFiles = Schemas["SiteFilesOut"];
 export type SiteTextFile = Schemas["SiteTextFileOut"];
 export type SiteFileIn = Schemas["SiteFileIn"];
+export type SiteHost = Schemas["SiteHostOut"];
+export type HostedSite = Schemas["HostedSiteOut"];
+export type HostedSiteIn = Schemas["HostedSiteIn"];
+export type SitePlan = Schemas["SitePlanOut"];
+export type SiteChange = Schemas["SiteChangeOut"];
 
 /** Error returned by the backend: `code` is stable and translated by the UI. */
 export class ApiError extends Error {

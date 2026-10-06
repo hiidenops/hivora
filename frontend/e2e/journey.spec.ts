@@ -384,3 +384,92 @@ test("hosted sites API: list, plan, add, edit a file, turn off, remove", async (
   const old = await (await page.request.get("/api/v1/sites")).json();
   expect(old.map((s: { slug: string }) => s.slug)).toContain("annexe");
 });
+
+// The app -> sites model on the nginx app's page: host sites, add one after its preview
+// (the restart is announced), turn it off; an nginx on template 1.0.0; a viewer.
+test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", async ({ page, browser }) => {
+  await page.goto("/login/");
+  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
+  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+
+  // An nginx from the catalog serves one site.
+  await page.getByRole("link", { name: "Catalogue" }).click();
+  // Not anchored: until the catalog's icons are downloaded, their letters come first.
+  await page.getByRole("link", { name: /Applications/ }).click();
+  await page.getByRole("article", { name: "nginx" }).getByRole("link", { name: "Déployer" }).click();
+  await page.getByLabel("Port web", { exact: true }).fill("8300");
+  await page.getByRole("button", { name: "Vérifier" }).click();
+  await page.getByRole("button", { name: "Déployer", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Application en ligne" })).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("link", { name: "Voir l'application" }).click();
+  await expect(page).toHaveURL(/\/app\/\?id=\d+$/);
+  const appId = new URL(page.url()).searchParams.get("id");
+  await expect(page.getByText("Ce nginx sert un seul site", { exact: false })).toBeVisible();
+
+  // It hosts sites: its main site is listed, then a site is added after its preview.
+  await page.getByRole("button", { name: "Héberger des sites" }).click();
+  const sites = page.getByRole("list", { name: "Sites" });
+  await expect(sites.getByText("Site principal")).toBeVisible();
+  await expect(sites.getByText("Port 8300")).toBeVisible();
+  await page.getByRole("button", { name: "Ajouter un site" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Nom", { exact: true }).fill("Blog");
+  await dialog.getByLabel("Port", { exact: true }).fill("8301");
+  await dialog.getByRole("button", { name: "Vérifier" }).click();
+  await expect(dialog.getByText("tous ses sites seront indisponibles un court instant", { exact: false })).toBeVisible();
+  await dialog.getByRole("button", { name: "Ajouter le site" }).click();
+  await expect(dialog).toBeHidden();
+  const blog = sites.getByRole("listitem", { name: "Blog" });
+  await expect(blog.getByText("Port 8301")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
+
+  // Its own switch: no restart notice, only this site.
+  const toggle = blog.getByRole("switch", { name: "Site « Blog » actif" });
+  await expect(toggle).toBeChecked();
+  await toggle.click();
+  await expect(toggle).not.toBeChecked({ timeout: 20_000 });
+  await expect(blog.getByText("Désactivé", { exact: true })).toBeVisible();
+  await expect(page.getByText("tous ses sites seront indisponibles", { exact: false })).toHaveCount(0);
+  await expectPointerCursors(page);
+
+  // A stopped nginx: no site added (its revision would start it), each switch still works.
+  await page.getByRole("button", { name: "Arrêter", exact: true }).click();
+  await expect(page.getByText("Ce nginx est arrêté", { exact: false })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: "Ajouter un site" })).toBeDisabled();
+  await expect(toggle).toBeEnabled();
+
+  // An nginx still on template 1.0.0 (answer replaced): told to update, nothing to add or switch.
+  await page.route(`**/api/v1/apps/${appId}/sites`, async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), upgrade_required: true } });
+  });
+  await page.reload();
+  await expect(page.getByText("doit être mis à jour (version 1.1.0)", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ajouter un site" })).toBeDisabled();
+  await expect(page.getByRole("switch", { name: "Site « Blog » actif" })).toBeDisabled();
+  await page.unroute(`**/api/v1/apps/${appId}/sites`);
+
+  // A viewer sees the sites, changes nothing.
+  const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
+  await page.request.post("/api/v1/users", {
+    headers: { "X-CSRF-Token": csrf_token },
+    data: { username: "valerie", role: "viewer", password: "temporary-pass-1" },
+  });
+  const viewer = await browser.newPage();
+  await viewer.goto("/login/");
+  await viewer.getByLabel("Identifiant", { exact: true }).fill("valerie");
+  await viewer.getByLabel("Mot de passe", { exact: true }).fill("temporary-pass-1");
+  await viewer.getByRole("button", { name: "Se connecter" }).click();
+  await viewer.getByLabel("Mot de passe actuel", { exact: true }).fill("temporary-pass-1");
+  await viewer.getByLabel("Nouveau mot de passe", { exact: true }).fill(PASSWORD);
+  await viewer.getByLabel("Confirmer le nouveau mot de passe", { exact: true }).fill(PASSWORD);
+  await viewer.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(viewer.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await viewer.goto(`/app/?id=${appId}`);
+  await expect(viewer.getByRole("list", { name: "Sites" }).getByRole("listitem")).toHaveCount(2);
+  await expect(viewer.getByRole("button", { name: "Ajouter un site" })).toHaveCount(0);
+  await expect(viewer.getByRole("switch", { name: "Site « Blog » actif" })).toBeDisabled();
+  await viewer.close();
+});

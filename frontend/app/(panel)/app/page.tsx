@@ -28,6 +28,7 @@ const TasksCard = dynamic(() => import("@/features/tasks/tasks-card").then((m) =
 const BackupsCard = dynamic(() => import("@/features/backups/backups-card").then((m) => m.BackupsCard));
 const UpgradeBanner = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.UpgradeBanner));
 const AdvancedCards = dynamic(() => import("@/features/apps/advanced-cards").then((m) => m.AdvancedCards));
+const HostedSitesCard = dynamic(() => import("@/features/hosting/hosted-sites-card").then((m) => m.HostedSitesCard));
 import { ApiError } from "@/lib/api/client";
 import { useApp, useJob } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
@@ -114,6 +115,7 @@ function AppDetail() {
         )}
         <StatusHero app={app} status={status} />
         {can("operator") && app.template && <UpgradeBanner appId={app.id} onJob={setActiveJob} />}
+        {app.template === "nginx" && <HostedSitesCard appId={app.id} onJob={setActiveJob} />}
         {["healthy", "starting", "degraded"].includes(status) && <AppUsage slug={app.slug} />}
         {app.game && (
           <GamePanel
