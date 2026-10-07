@@ -1,8 +1,11 @@
 """HTTP helpers shared by the API tests."""
 
+import io
 import time
-from collections.abc import Iterator
+import zipfile
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, cast
 
 from fastapi.testclient import TestClient
@@ -84,3 +87,91 @@ def nginx_host(c: TestClient, name: str = "Vitrine", port: int = 8190, *,
             time.sleep(0.02)
     app_id: int = app["id"]
     return app_id
+
+
+# --- the sites' tests ---------------------------------------------------------------------
+
+
+def deploy_nginx(c: TestClient, name: str, port: int) -> Any:
+    """POST /apps for an nginx from the catalog (not waited for, not hosting sites)."""
+    return c.post(f"{API}/apps", json={"template": "nginx", "name": name,
+                                       "inputs": {"web_port": port}})  # fmt: skip
+
+
+# The bind-mounted folders of an nginx app (template 1.1.0): the main site, the added
+# sites, and the files Hivora writes for nginx. Nothing else is ever left next to them.
+NGINX_VOLUMES = ["conf", "html", "sites"]
+
+
+def spy_events(c: TestClient) -> tuple[list[tuple[str, dict[str, Any]]], Callable[[], None]]:
+    """Record the events published; returns them and an undo."""
+    bus = cast(Any, c.app).state.runtime.bus
+    published: list[tuple[str, dict[str, Any]]] = []
+    real_publish = bus.publish
+
+    def publish(topic: str, **payload: Any) -> Any:
+        published.append((topic, payload))
+        return real_publish(topic, **payload)
+
+    bus.publish = publish
+
+    def undo() -> None:
+        bus.publish = real_publish
+
+    return published, undo
+
+
+def zip_bytes(*members: Any) -> bytes:
+    """A zip in memory. Members: (name, data) or (ZipInfo, data)."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in members:
+            zf.writestr(name, data)
+    return buf.getvalue()
+
+
+def volumes_of(c: TestClient, slug: str = "vitrine") -> Path:
+    """An app's folder under the volumes root (its bind mounts, and Hivora's work files)."""
+    path: Path = cast(Any, c.app).state.runtime.settings.volumes_root / slug
+    return path
+
+
+def paths_under(path: Path) -> list[str]:
+    return sorted(str(p.relative_to(path)) for p in path.rglob("*"))
+
+
+def main_site_url(c: TestClient) -> str:
+    """A host (nginx_host) whose main site has a page: the main site's base on the hosted
+    routes (/apps/{app}/sites/{site})."""
+    app_id = nginx_host(c)
+    (volumes_of(c) / "html" / "index.html").write_text(MAIN_PAGE)
+    main = c.get(f"{API}/apps/{app_id}/sites").json()["sites"][0]["id"]
+    return f"{API}/apps/{app_id}/sites/{main}"
+
+
+def site_id_of(url: str) -> int:
+    """The site's id, last in its base."""
+    return int(url.rsplit("/", 1)[1])
+
+
+def host_before_deploy(c: TestClient, app_id: int) -> str:
+    """An nginx whose deploy has not run yet starts hosting: its main site's base."""
+    hosted = c.post(f"{API}/apps/{app_id}/sites/hosting")
+    assert hosted.status_code == 200, hosted.text
+    return f"{API}/apps/{app_id}/sites/{hosted.json()['sites'][0]['id']}"
+
+
+def upload_zip(c: TestClient, url: str, body: bytes, filename: str = "site.zip") -> Any:
+    """A site's content replaced from a zip (PUT {url}/content)."""
+    return c.put(f"{url}/content", params={"filename": filename}, content=body,
+                 headers={"content-type": "application/zip"})  # fmt: skip
+
+
+def read_file(c: TestClient, url: str, path: str) -> Any:
+    return c.get(f"{url}/files/content", params={"path": path})
+
+
+def save_file(c: TestClient, url: str, path: str, content: str, base: str | None) -> Any:
+    """``base``: the sha256 read (None: a new file)."""
+    return c.put(f"{url}/files/content",
+                 json={"path": path, "content": content, "base_sha256": base})  # fmt: skip

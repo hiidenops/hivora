@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from helpers import API, admin, nginx_host, wait_job
+from helpers import API, admin, nginx_host, spy_events, wait_job
 
 from hivora.core.errors import HivoraError
 from hivora.sites import nginx
@@ -66,19 +66,6 @@ def _leftovers(conf: Path) -> list[str]:
     return sorted(p.name for p in conf.parent.iterdir() if p.name.startswith(".hivora-conf-"))
 
 
-def _spy(client: Any) -> tuple[list[tuple[str, dict[str, Any]]], Any]:
-    bus = client.app.state.runtime.bus
-    published: list[tuple[str, dict[str, Any]]] = []
-    real = bus.publish
-
-    def publish(topic: str, **payload: Any) -> Any:
-        published.append((topic, payload))
-        return real(topic, **payload)
-
-    bus.publish = publish
-    return published, lambda: setattr(bus, "publish", real)
-
-
 def _log(client: Any, job: dict[str, Any]) -> str:
     log: str = client.get(f"{API}/jobs/{job['id']}").json()["log"]
     return log
@@ -88,7 +75,7 @@ def test_writes_then_checks_then_reloads(client: Any) -> None:
     app_id, conf = _host(client)
     gw = client.app.state.runtime.gateway
     _add_site(client, app_id, **BLOG)
-    published, undo = _spy(client)
+    published, undo = spy_events(client)
     try:
         job = _apply(client, app_id)
     finally:

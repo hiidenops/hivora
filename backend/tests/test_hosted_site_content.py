@@ -2,15 +2,13 @@
 no site_id (and jobs queued before sites had rows) still means the main site."""
 
 import functools
-import io
 import sqlite3
-import zipfile
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
 import pytest
-from helpers import MAIN_PAGE, admin, nginx_host, wait_job
+from helpers import MAIN_PAGE, admin, nginx_host, wait_job, zip_bytes
 
 from hivora.core.errors import HivoraError
 
@@ -29,14 +27,6 @@ def _host(client: Any) -> tuple[int, Path, dict[str, int]]:
                          (app_id, slug, slug, slug, port))  # fmt: skip
         ids = dict(conn.execute("SELECT slug, id FROM site WHERE app_id = ?", (app_id,)).fetchall())
     return app_id, rt.settings.volumes_root / "vitrine", ids
-
-
-def _zip(*members: tuple[str, str]) -> bytes:
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w") as zf:
-        for name, data in members:
-            zf.writestr(name, data)
-    return buf.getvalue()
 
 
 def _replace(client: Any, app_id: int, body: bytes, site_id: int | None) -> Any:
@@ -79,7 +69,7 @@ def test_a_zip_on_an_added_site_fills_its_folder_only(client: Any) -> None:
 
     bus.publish = spy
     try:
-        job = _replace(client, app_id, _zip(("blog/index.html", "<h1>blog</h1>"),
+        job = _replace(client, app_id, zip_bytes(("blog/index.html", "<h1>blog</h1>"),
                                             ("blog/css/a.css", "a{}")), ids["blog"])  # fmt: skip
         done = wait_job(client, job.id)
     finally:
@@ -132,7 +122,7 @@ def test_no_way_from_one_site_into_another(client: Any) -> None:
     _refused(client, "permission_denied", "list", app_id, site_id=blog)
     _refused(client, "permission_denied", "save", app_id, "x.html", "x", None, site_id=blog)
     with pytest.raises(HivoraError) as err:
-        _replace(client, app_id, _zip(("index.html", "x")), blog)
+        _replace(client, app_id, zip_bytes(("index.html", "x")), blog)
     assert err.value.code == "permission_denied"
     assert _tree(sites / "wiki") == {"secret.html": "wiki"}
 

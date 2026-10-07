@@ -15,6 +15,9 @@ const HOST =
 export default defineConfig({
   testDir: "e2e",
   timeout: 60_000,
+  // One server and one database for every file: the files run one after another, in name
+  // order (apps.spec.ts first: its first-start test needs the fresh instance).
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   use: { baseURL: `http://${HOST}:${PORT}`, locale: "fr-FR", trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
