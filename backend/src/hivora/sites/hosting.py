@@ -22,11 +22,10 @@ from hivora.apps.queries import template_slug
 from hivora.apps.revisions import Revisions
 from hivora.core.clock import Clock
 from hivora.core.config import Settings
-from hivora.core.errors import ConflictError, NotFoundError
+from hivora.core.errors import ConflictError
 from hivora.core.events import EventBus
 from hivora.jobs import Job, JobKind, JobQueue
 from hivora.sites import core, nginx
-from hivora.sites.config import SERVICE
 from hivora.sites.models import Site
 from hivora.templates.overrides import Overrides
 
@@ -47,10 +46,6 @@ class MainSiteError(ConflictError):
 
 class HostStoppedError(ConflictError):
     code = "site_host_stopped"
-
-
-class HostedSiteNotFoundError(NotFoundError):
-    code = "site_not_found"
 
 
 class NotNginxError(ConflictError):
@@ -185,27 +180,17 @@ class SiteHosting:
                   server_name: str | None = None) -> tuple[int, Job, Job]:  # fmt: skip
         """The site's row, the revision publishing its port (job: recreate), then its
         nginx files (job: site_config). Returns the site's id and both jobs."""
-        async with self.sessions() as session, session.begin():
-            app = await self._host(session, app_id, recreates=True)
-            site = await self._adding(name, port, slug, server_name)(session, app_id)
-            update, number = await self.revisions.queue_update(
-                session, app_id, await _inputs(session, app_id)
-            )
-            config = self._config(session, app.id, app.slug)
-        self.jobs.wake()
+        app, site, update, config, number = await self._republish(
+            app_id, self._adding(name, port, slug, server_name)
+        )
         self.bus.publish("site.added", app=app.slug, site=site.slug, port=site.port,
                          revision=number, job=update.id)  # fmt: skip
         return site.id, update, config
 
     async def change_port(self, app_id: int, site_id: int, port: int) -> tuple[Job, Job]:
-        async with self.sessions() as session, session.begin():
-            app = await self._host(session, app_id, recreates=True)
-            site = await self._moving(site_id, port)(session, app_id)
-            update, number = await self.revisions.queue_update(
-                session, app_id, await _inputs(session, app_id)
-            )
-            config = self._config(session, app.id, app.slug)
-        self.jobs.wake()
+        app, site, update, config, number = await self._republish(
+            app_id, self._moving(site_id, port)
+        )
         self.bus.publish("site.port_changed", app=app.slug, site=site.slug, port=port,
                          revision=number, job=update.id)  # fmt: skip
         return update, config
@@ -215,44 +200,72 @@ class SiteHosting:
     ]:  # fmt: skip
         """nginx stops serving it first (no cut for the others), then the revision without
         its port recreates the container. Its files are kept unless remove_data."""
-        async with self.sessions() as session, session.begin():
-            app = await self._host(session, app_id, recreates=True)
-            site = await self._removing(site_id)(session, app_id)
-            folders = [site.root] if remove_data else []
-            config = self._config(session, app.id, app.slug, remove_folders=folders)
-            update, number = await self.revisions.queue_update(
-                session, app_id, await _inputs(session, app_id)
-            )
-        self.jobs.wake()
+        app, site, update, config, number = await self._republish(
+            app_id, self._removing(site_id), removal=True, remove_data=remove_data
+        )
         self.bus.publish("site.removed", app=app.slug, site=site.slug, data_removed=remove_data,
                          revision=number, job=update.id)  # fmt: skip
         return config, update
 
     async def set_enabled(self, app_id: int, site_id: int, enabled: bool) -> Job:
         """Only nginx's files: the port stays published, nothing is recreated."""
-        async with self.sessions() as session, session.begin():
-            app = await self._host(session, app_id)
-            site = await self._site(session, app_id, site_id)
+
+        def edit(site: Site) -> None:
             site.enabled = enabled
-            config = self._config(session, app.id, app.slug)
-        self.jobs.wake()
+
+        app, site, config = await self._reconfigure(app_id, site_id, edit)
         self.bus.publish("site.enabled" if enabled else "site.disabled", app=app.slug,
                          site=site.slug, job=config.id)  # fmt: skip
         return config
 
     async def set_server_name(self, app_id: int, site_id: int, server_name: str | None) -> Job:
-        async with self.sessions() as session, session.begin():
-            app = await self._host(session, app_id)
-            site = await self._site(session, app_id, site_id)
+        def edit(site: Site) -> None:
             if site.root == "":
                 raise MainSiteError("the main site is served by any name", site=site.id)
             nginx.check(_nginx_site(site.slug, site.port, server_name))
             site.server_name = server_name
-            config = self._config(session, app.id, app.slug)
-        self.jobs.wake()
+
+        app, site, config = await self._reconfigure(app_id, site_id, edit)
         self.bus.publish("site.server_name_changed", app=app.slug, site=site.slug,
                          server_name=server_name, job=config.id)  # fmt: skip
         return config
+
+    # --- the two sequences every change goes through -----------------------------------
+
+    async def _republish(
+        self, app_id: int, change: Change, *, removal: bool = False, remove_data: bool = False
+    ) -> tuple[Application, Site, Job, Job, int]:
+        """A change that moves a port, in one transaction: the change, the revision that
+        publishes the ports as they now are (its job recreates the container), and nginx's
+        files (site_config). The files go after the revision, except for a removal: nginx
+        stops serving the site first. Returns the app, the site, both jobs and the
+        revision's number."""
+        async with self.sessions() as session, session.begin():
+            app = await self._host(session, app_id, recreates=True)
+            site = await change(session, app_id)
+            first = None
+            if removal:
+                folders = [site.root] if remove_data else []
+                first = self._config(session, app.id, app.slug, remove_folders=folders)
+            update, number = await self.revisions.queue_update(
+                session, app_id, await _inputs(session, app_id)
+            )
+            config = first or self._config(session, app.id, app.slug)
+        self.jobs.wake()
+        return app, site, update, config, number
+
+    async def _reconfigure(
+        self, app_id: int, site_id: int, edit: Callable[[Site], None]
+    ) -> tuple[Application, Site, Job]:
+        """A change of nginx's files only (no port moves), in one transaction: the site's
+        row edited, then the site_config job."""
+        async with self.sessions() as session, session.begin():
+            app = await self._host(session, app_id)
+            site = await self._site(session, app_id, site_id)
+            edit(site)
+            config = self._config(session, app.id, app.slug)
+        self.jobs.wake()
+        return app, site, config
 
     # --- the changes themselves (run inside a transaction) ----------------------------
 
@@ -318,7 +331,7 @@ class SiteHosting:
     async def _site(self, session: AsyncSession, app_id: int, site_id: int) -> Site:
         site = await session.get(Site, site_id)
         if site is None or site.app_id != app_id:
-            raise HostedSiteNotFoundError(str(site_id))
+            raise core.SiteNotFoundError(str(site_id))
         return site
 
     async def _ports(self, session: AsyncSession, app_id: int) -> list[int]:
@@ -334,7 +347,7 @@ class SiteHosting:
                                                                  Site.port == port)):  # fmt: skip
             raise _conflict(port, f"site {other}")
         latest = await latest_revision(session, app_id)
-        own = Overrides.model_validate(latest.overrides or {}).of(SERVICE) if latest else None
+        own = Overrides.model_validate(latest.overrides or {}).of(core.SERVICE) if latest else None
         if own and any(port in (p.container, p.host) for p in own.ports):
             raise _conflict(port, "advanced settings")
 

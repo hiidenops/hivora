@@ -29,7 +29,6 @@ from hivora.sites import core
 from hivora.sites.nginx import MANAGED, desired_files
 from hivora.state import StateStore
 
-SERVICE = "server"  # the nginx template's main service
 CHECK = ["nginx", "-t"]
 RELOAD = ["nginx", "-s", "reload"]
 _OUTPUT = 2000  # characters of nginx's output kept in a job error
@@ -101,7 +100,7 @@ class SiteConfig:
     def _container(self, slug: str) -> ContainerInfo | None:
         running = [c for c in self.state.app(slug).containers
                    if c.state is ContainerState.RUNNING
-                   and c.labels.get(LABEL_COMPOSE_SERVICE) == SERVICE]  # fmt: skip
+                   and c.labels.get(LABEL_COMPOSE_SERVICE) == core.SERVICE]  # fmt: skip
         return running[0] if running else None
 
     async def _exec(self, ctx: JobContext, container: ContainerInfo, cmd: list[str]) -> tuple[

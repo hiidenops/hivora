@@ -18,7 +18,7 @@ from hivora.sites import core
 MAX_UPLOAD = 200 * 1024**2  # a zip, as sent
 
 
-class SiteService:
+class SiteContent:
     max_upload = MAX_UPLOAD
     limits = archive.DEFAULT_LIMITS  # 10 000 files, 1 GiB once extracted
 

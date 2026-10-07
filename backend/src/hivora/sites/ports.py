@@ -10,8 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hivora.apps.models import Application
-from hivora.sites.config import SERVICE
-from hivora.sites.core import SITE_KIND
+from hivora.sites.core import SERVICE, SITE_KIND
 from hivora.sites.models import Site
 from hivora.templates.overrides import ExtraPort, Overrides
 

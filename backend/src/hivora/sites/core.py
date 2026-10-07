@@ -19,6 +19,7 @@ from hivora.sites.models import Site
 from hivora.sites.nginx import NginxSite
 
 SITE_KIND = "static-site"
+SERVICE = "server"  # the nginx template's main service
 HTML_TARGET = "/usr/share/nginx/html"  # the nginx template's "html" volume
 CONF_TARGET = "/etc/nginx/hivora.d"  # its "conf" volume (template 1.1.0 and later)
 SITES_TARGET = "/usr/share/nginx/sites"  # its "sites" volume: one folder per added site

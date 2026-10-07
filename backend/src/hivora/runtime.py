@@ -25,7 +25,7 @@ from hivora.games.worlds import WorldJobs
 from hivora.jobs import JobQueue
 from hivora.metrics.apps import AppMetrics
 from hivora.metrics.host import HostMetrics
-from hivora.sites import SiteService
+from hivora.sites import SiteContent
 from hivora.sites.config import SiteConfig
 from hivora.sites.files import SiteFiles
 from hivora.sites.hosting import SiteHosting
@@ -67,7 +67,7 @@ class Runtime:
     public_address: PublicAddress
     app_metrics: AppMetrics
     backups: BackupService
-    sites: SiteService
+    sites: SiteContent
     site_files: SiteFiles
     site_config: SiteConfig
     site_hosting: SiteHosting
@@ -134,7 +134,7 @@ class Runtime:
         WorldJobs(apps).register()
         backups = BackupService(apps)
         backups.register()
-        sites = SiteService(sessions=sessions, jobs=jobs, settings=settings, bus=bus)
+        sites = SiteContent(sessions=sessions, jobs=jobs, settings=settings, bus=bus)
         sites.register()
         site_files = SiteFiles(sessions=sessions, jobs=jobs, settings=settings, bus=bus)
         site_files.register()
