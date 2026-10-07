@@ -10,19 +10,18 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from helpers import API, admin, wait_job
+from helpers import MAIN_PAGE, admin, nginx_host, wait_job
 
 from hivora.core.errors import HivoraError
 
 
 def _host(client: Any) -> tuple[int, Path, dict[str, int]]:
-    """A host with two added sites (rows only, as SiteHosting writes them)."""
+    """A host with two added sites (rows only, as SiteHosting writes them); its main site
+    has a page."""
     admin(client)
     rt = client.app.state.runtime
-    created = client.post(f"{API}/sites", json={"name": "Vitrine", "port": 8190}).json()
-    wait_job(client, created["job"]["id"])
-    wait_job(client, created["content_job"]["id"])
-    app_id = created["site"]["id"]
+    app_id = nginx_host(client)
+    (rt.settings.volumes_root / "vitrine" / "html" / "index.html").write_text(MAIN_PAGE)
     with sqlite3.connect(rt.settings.db_path) as conn:
         for slug, port in (("blog", 8096), ("wiki", 8097)):
             conn.execute("INSERT INTO site (app_id, slug, name, root, port, enabled, created_at)"
@@ -141,9 +140,8 @@ def test_no_way_from_one_site_into_another(client: Any) -> None:
 def test_a_site_of_another_app_or_unknown_is_not_found(client: Any) -> None:
     app_id, _, ids = _host(client)
     _refused(client, "site_not_found", "list", app_id, site_id=9999)
-    other = client.post(f"{API}/sites", json={"name": "Autre", "port": 8191}).json()
-    wait_job(client, other["job"]["id"])
-    _refused(client, "site_not_found", "list", other["site"]["id"], site_id=ids["blog"])
+    other = nginx_host(client, "Autre", 8191)
+    _refused(client, "site_not_found", "list", other, site_id=ids["blog"])
 
 
 def test_no_site_id_and_the_main_site_id_both_mean_the_main_site(client: Any) -> None:

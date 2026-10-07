@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from helpers import API, admin, wait_job
+from helpers import API, admin, nginx_host, wait_job
 
 from hivora.core.errors import HivoraError
 from hivora.sites import nginx
@@ -21,24 +21,9 @@ WIKI = {"slug": "wiki", "root": "wiki", "port": 8097, "server_name": None}
 
 def _host(client: Any, running: bool = True) -> tuple[int, Path]:
     """A site host (nginx 1.1.0), with its nginx container running unless asked."""
-    from hivora.docker_gateway import ContainerInfo, ContainerState
-
     admin(client)
-    rt = client.app.state.runtime
-    created = client.post(f"{API}/sites", json={"name": "Vitrine", "port": 8190}).json()
-    wait_job(client, created["job"]["id"])
-    wait_job(client, created["content_job"]["id"])
-    if running:
-        rt.gateway.put(ContainerInfo(
-            id="ctr-vitrine", name="vitrine-server-1", image="nginx",
-            state=ContainerState.RUNNING,
-            labels={"io.hivora.app": "vitrine", "com.docker.compose.service": "server"},
-        ), "start")  # fmt: skip
-        deadline = time.monotonic() + 3
-        while not rt.state.store.app("vitrine").containers:
-            assert time.monotonic() < deadline
-            time.sleep(0.02)
-    return created["site"]["id"], rt.settings.volumes_root / "vitrine" / "conf"
+    app_id = nginx_host(client, running=running)
+    return app_id, client.app.state.runtime.settings.volumes_root / "vitrine" / "conf"
 
 
 def _add_site(client: Any, app_id: int, **fields: Any) -> None:

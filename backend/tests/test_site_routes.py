@@ -2,32 +2,16 @@
 to the older /sites routes, which stay as they were."""
 
 import sqlite3
-import time
 from typing import Any
 
-from helpers import API, STRONG, admin, code, login, other_user, wait_job
+from helpers import API, STRONG, admin, code, login, nginx_host, other_user, wait_job
 
 LAN = "192.168.1.10"  # the test settings' host LAN address
 
 
 def _host(client: Any) -> int:
-    from hivora.docker_gateway import ContainerInfo, ContainerState
-
     admin(client)
-    rt = client.app.state.runtime
-    created = client.post(f"{API}/sites", json={"name": "Vitrine", "port": 8190}).json()
-    wait_job(client, created["job"]["id"])
-    wait_job(client, created["content_job"]["id"])
-    rt.gateway.put(ContainerInfo(
-        id="ctr-vitrine", name="vitrine-server-1", image="nginx", state=ContainerState.RUNNING,
-        labels={"io.hivora.app": "vitrine", "com.docker.compose.service": "server"},
-    ), "start")  # fmt: skip
-    deadline = time.monotonic() + 3
-    while not rt.state.store.app("vitrine").containers:
-        assert time.monotonic() < deadline
-        time.sleep(0.02)
-    app_id: int = created["site"]["id"]
-    return app_id
+    return nginx_host(client, running=True)
 
 
 def _state(client: Any) -> tuple[Any, ...]:

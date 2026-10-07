@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 import yaml
-from helpers import API, admin, wait_job
+from helpers import API, admin, nginx_host, wait_job
 
 from hivora.core.errors import HivoraError
 from hivora.sites.config import CHECK, RELOAD
@@ -18,22 +18,9 @@ from hivora.sites.config import CHECK, RELOAD
 
 def _host(client: Any) -> tuple[int, Path]:
     """A site host (nginx 1.1.0), its nginx container running."""
-    from hivora.docker_gateway import ContainerInfo, ContainerState
-
     admin(client)
-    rt = client.app.state.runtime
-    created = client.post(f"{API}/sites", json={"name": "Vitrine", "port": 8190}).json()
-    wait_job(client, created["job"]["id"])
-    wait_job(client, created["content_job"]["id"])
-    rt.gateway.put(ContainerInfo(
-        id="ctr-vitrine", name="vitrine-server-1", image="nginx", state=ContainerState.RUNNING,
-        labels={"io.hivora.app": "vitrine", "com.docker.compose.service": "server"},
-    ), "start")  # fmt: skip
-    deadline = time.monotonic() + 3
-    while not rt.state.store.app("vitrine").containers:
-        assert time.monotonic() < deadline
-        time.sleep(0.02)
-    return created["site"]["id"], rt.settings.volumes_root / "vitrine"
+    app_id = nginx_host(client, running=True)
+    return app_id, client.app.state.runtime.settings.volumes_root / "vitrine"
 
 
 def _call(client: Any, method: str, *args: Any, **kwargs: Any) -> Any:

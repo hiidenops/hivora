@@ -6,18 +6,14 @@ import sqlite3
 from typing import Any
 
 import yaml
-from helpers import API, admin, code, wait_job
+from helpers import API, admin, code, nginx_host, wait_job
 
 from hivora.templates.overrides import ExtraPort, Overrides, ServiceOverrides
 
 
 def _host(client: Any) -> int:
     admin(client)
-    created = client.post(f"{API}/sites", json={"name": "Vitrine", "port": 8190}).json()
-    wait_job(client, created["job"]["id"])
-    wait_job(client, created["content_job"]["id"])
-    app_id: int = created["site"]["id"]
-    return app_id
+    return nginx_host(client)
 
 
 def _add(client: Any, app_id: int, slug: str, port: int, enabled: bool = True) -> None:

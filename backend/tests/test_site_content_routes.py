@@ -3,38 +3,25 @@ the same rules as the main site's routes (/sites/{app_id}/...), in the site's ow
 never in another site's."""
 
 import io
-import time
 import zipfile
 from pathlib import Path
 from typing import Any
 
-from helpers import API, STRONG, admin, code, login, other_user, wait_job
+from helpers import API, MAIN_PAGE, STRONG, admin, code, login, nginx_host, other_user, wait_job
 
 
 def _host(client: Any) -> tuple[int, Path, dict[str, int]]:
-    """A host with two added sites, blog and wiki."""
-    from hivora.docker_gateway import ContainerInfo, ContainerState
-
+    """A host with two added sites, blog and wiki; its main site has a page."""
     admin(client)
-    rt = client.app.state.runtime
-    created = client.post(f"{API}/sites", json={"name": "Vitrine", "port": 8190}).json()
-    wait_job(client, created["job"]["id"])
-    wait_job(client, created["content_job"]["id"])
-    rt.gateway.put(ContainerInfo(
-        id="ctr-vitrine", name="vitrine-server-1", image="nginx", state=ContainerState.RUNNING,
-        labels={"io.hivora.app": "vitrine", "com.docker.compose.service": "server"},
-    ), "start")  # fmt: skip
-    deadline = time.monotonic() + 3
-    while not rt.state.store.app("vitrine").containers:
-        assert time.monotonic() < deadline
-        time.sleep(0.02)
-    app_id: int = created["site"]["id"]
+    app_id = nginx_host(client, running=True)
+    app_dir: Path = client.app.state.runtime.settings.volumes_root / "vitrine"
+    (app_dir / "html" / "index.html").write_text(MAIN_PAGE)
     for name, port in (("Blog", 8096), ("Wiki", 8097)):
         added = client.post(f"{API}/apps/{app_id}/sites", json={"name": name, "port": port})
         assert added.status_code == 202, added.text
         wait_job(client, added.json()["config_job"]["id"])
     sites = client.get(f"{API}/apps/{app_id}/sites").json()["sites"]
-    return app_id, rt.settings.volumes_root / "vitrine", {s["slug"]: s["id"] for s in sites}
+    return app_id, app_dir, {s["slug"]: s["id"] for s in sites}
 
 
 def _zip(*members: tuple[str, str]) -> bytes:
@@ -140,9 +127,7 @@ def test_no_way_from_one_site_into_another(client: Any) -> None:
 
 def test_unknown_sites_and_sites_of_other_apps(client: Any) -> None:
     app_id, _, ids = _host(client)
-    other = client.post(f"{API}/sites", json={"name": "Autre", "port": 8191}).json()
-    wait_job(client, other["job"]["id"])
-    other_id = other["site"]["id"]
+    other_id = nginx_host(client, "Autre", 8191)
     for url in (_base(app_id, 9999), _base(other_id, ids["blog"])):
         for r in (
             client.get(f"{url}/files"),

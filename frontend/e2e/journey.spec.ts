@@ -236,8 +236,8 @@ test("sites index: grouped by nginx, host sites, site links, older bookmarks", a
   await expect(page.getByText("Site principal")).toBeVisible();
 });
 
-// The app -> sites model through the API only (no screen yet): a host, an added site on
-// its own port, then off and removed. The older /sites routes keep working beside it.
+// The app -> sites model through the API only: an nginx from the catalog starts hosting,
+// an added site on its own port, then off and removed.
 test("hosted sites API: list, plan, add, edit a file, turn off, remove", async ({ page }) => {
   await page.goto("/login/");
   await page.getByLabel("Identifiant", { exact: true }).fill("admin");
@@ -251,10 +251,13 @@ test("hosted sites API: list, plan, add, edit a file, turn off, remove", async (
       timeout: 20_000,
     }).toBe("succeeded");
 
-  const created = await (await page.request.post("/api/v1/sites", { headers, data: { name: "Annexe", port: 8200 } })).json();
+  const created = await (await page.request.post("/api/v1/apps", {
+    headers, data: { template: "nginx", name: "Annexe", inputs: { web_port: 8200 } },
+  })).json(); // prettier-ignore
   await done(created.job.id);
-  await done(created.content_job.id);
-  const app = created.site.id;
+  const app = created.app.id;
+  const hosting = await page.request.post(`/api/v1/apps/${app}/sites/hosting`, { headers });
+  expect(hosting.status()).toBe(200);
   const host = await (await page.request.get(`/api/v1/apps/${app}/sites`)).json();
   expect(host.sites.map((s: { slug: string; main: boolean }) => [s.slug, s.main])).toEqual([["main", true]]);
 
@@ -291,9 +294,6 @@ test("hosted sites API: list, plan, add, edit a file, turn off, remove", async (
   await done((await gone.json()).job.id);
   const after = await (await page.request.get(`/api/v1/apps/${app}/sites`)).json();
   expect(after.sites.map((s: { slug: string }) => s.slug)).toEqual(["main"]);
-  // The older model still answers for the same host.
-  const old = await (await page.request.get("/api/v1/sites")).json();
-  expect(old.map((s: { slug: string }) => s.slug)).toContain("annexe");
 });
 
 // The app -> sites model on the nginx app's page: host sites, add one after its preview
