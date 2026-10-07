@@ -147,3 +147,27 @@ def test_suggested_ports_are_really_free(client: Any) -> None:
     assert conflict(added) == ("autre", 8202)
     # This nginx's own web port: the next free one, past it.
     assert conflict(client.post(f"{base}/plan", json={"name": "Docs", "port": 8190}))[1] == 8191
+
+
+def test_a_restored_host_gets_its_configuration_again(client: Any) -> None:
+    """Its "conf" volume is not in its backups: applied again after a restore."""
+    admin(client)
+    client.app.state.runtime.site_config.start_wait = 0.5
+    app_id = nginx_host(client, running=True)
+    _add(client, app_id, "Blog", 8096)
+    backup = client.post(f"{API}/apps/{app_id}/backups").json()
+    assert wait_job(client, backup["id"])["status"] == "succeeded"
+    [saved] = client.get(f"{API}/apps/{app_id}/backups").json()["backups"]
+    last = _sites(client, app_id)["config"]["job_id"]
+    (_conf(client) / "site-blog.conf").unlink()  # as on a new machine
+
+    restore = client.post(f"{API}/apps/{app_id}/backups/{saved['id']}/restore").json()
+    assert wait_job(client, restore["id"])["status"] == "succeeded"
+    deadline = time.monotonic() + 10
+    while (config := _sites(client, app_id)["config"])["job_id"] == last or config["status"] in (
+        "queued", "running",
+    ):  # fmt: skip
+        assert time.monotonic() < deadline, config
+        time.sleep(0.05)
+    assert config["status"] == "succeeded"
+    assert (_conf(client) / "site-blog.conf").is_file()

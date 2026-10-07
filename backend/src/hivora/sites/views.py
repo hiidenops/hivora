@@ -68,16 +68,33 @@ async def host_view(session: AsyncSession, app_id: int, lan: str | None) -> Site
     rows = await session.scalars(
         select(Site).where(Site.app_id == app.id).order_by(Site.root != "", Site.id)
     )
-    web_port = (await core.current_inputs(session, app.id)).get("web_port")
-    sites = []
-    main_port = int(web_port) if web_port is not None else None
-    for r in rows:
-        port = main_port if r.root == "" else r.port
-        url = f"http://{lan}:{port}" if lan and port else None
-        sites.append(HostedSite(r.id, r.slug, r.name, r.root == "", port, r.server_name,
-                                r.enabled, url))  # fmt: skip
+    main_port = await _web_port(session, app.id)
+    sites = [_hosted(r, main_port, lan) for r in rows]
     last = await last_job(session, app.id, JobKind.SITE_CONFIG)
     config = ConfigState(last.id, last.status.value, last.error) if last else None
     return SiteHost(app.id, app.slug, app.name, upgrade_required,
                     app.desired_state is DesiredState.STOPPED, core.MAX_SITES, sites,
                     config)  # fmt: skip
+
+
+async def site_view(
+    session: AsyncSession, app_id: int, site_id: int, lan: str | None
+) -> HostedSite:
+    """One site of a host, as ``host_view`` lists it (without reading the others)."""
+    row = await session.get(Site, site_id)
+    if row is None or row.app_id != app_id:
+        raise core.SiteNotFoundError(str(site_id))
+    return _hosted(row, await _web_port(session, app_id), lan)
+
+
+async def _web_port(session: AsyncSession, app_id: int) -> int | None:
+    """The app's web port: the main site's."""
+    web_port = (await core.current_inputs(session, app_id)).get("web_port")
+    return int(web_port) if web_port is not None else None
+
+
+def _hosted(row: Site, main_port: int | None, lan: str | None) -> HostedSite:
+    port = main_port if row.root == "" else row.port
+    url = f"http://{lan}:{port}" if lan and port else None
+    return HostedSite(row.id, row.slug, row.name, row.root == "", port, row.server_name,
+                      row.enabled, url)  # fmt: skip

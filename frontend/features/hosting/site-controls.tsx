@@ -1,6 +1,7 @@
 "use client";
 
 import { MoreHorizontal } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useState } from "react";
 
 import { useSession } from "@/components/app-shell";
@@ -17,9 +18,11 @@ import type { HostedSite } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
 import { useSetHostedSiteEnabled } from "./hooks";
-import { PortDialog } from "./port-dialog";
-import { RemoveSiteDialog } from "./remove-site-dialog";
-import { ServerNameDialog } from "./server-name-dialog";
+
+// Loaded when opened: a site's page stays light.
+const PortDialog = dynamic(() => import("./port-dialog").then((m) => m.PortDialog));
+const RemoveSiteDialog = dynamic(() => import("./remove-site-dialog").then((m) => m.RemoveSiteDialog));
+const ServerNameDialog = dynamic(() => import("./server-name-dialog").then((m) => m.ServerNameDialog));
 
 type Controls = {
   appId: number;

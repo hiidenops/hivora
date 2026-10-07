@@ -11,18 +11,16 @@ import {
 } from "@/lib/api/client";
 import { keys } from "@/lib/api/hooks";
 
-// Refreshed when a job ends (a zip, a save), not when a container's state changes.
-export const sitesKey = keys.siteFiles;
 
 /** The API base of one site's content and files: a site an nginx hosts. */
 export const siteApi = (appId: number, siteId: number) => `/apps/${appId}/sites/${siteId}`;
 
 export const useSiteFiles = (base: string) =>
-  useQuery({ queryKey: [...sitesKey, base, "files"], queryFn: () => api<SiteFiles>(`${base}/files`) });
+  useQuery({ queryKey: [...keys.siteFiles, base, "files"], queryFn: () => api<SiteFiles>(`${base}/files`) });
 
 export const useSiteFile = (base: string, path: string, enabled: boolean) =>
   useQuery({
-    queryKey: [...sitesKey, base, "file", path],
+    queryKey: [...keys.siteFiles, base, "file", path],
     queryFn: () => api<SiteTextFile>(`${base}/files/content?${new URLSearchParams({ path })}`),
     enabled,
   });

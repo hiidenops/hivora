@@ -99,6 +99,7 @@ export const en: Record<MessageKey, string> = {
   "hosting.configApplying": "Applying nginx's configuration…",
   "hosting.dataReused": "A site created again with the same identifier gets these files back.",
   "hosting.emptySite": "This site is empty: send a .zip archive, or create a first file (index.html, say) below.",
+  "hosting.createIndex": "Create index.html",
   "logs.title": "Logs",
   "logs.service": "Service",
   "logs.allServices": "All services",

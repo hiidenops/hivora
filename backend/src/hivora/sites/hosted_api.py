@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from hivora.apps.api import JobRef, job_ref
 from hivora.jobs import Job
 from hivora.sites.files import MAX_FILE
-from hivora.sites.views import HostedSite, SiteHost, SitePlan
+from hivora.sites.views import SiteHost, SitePlan
 from hivora.web.deps import Operator, RuntimeDep, Viewer
 
 router = APIRouter(tags=["sites"])
@@ -89,10 +89,7 @@ def _plan(plan: SitePlan) -> SitePlanOut:
 
 
 async def _site(rt: RuntimeDep, app_id: int, site_id: int) -> HostedSiteOut:
-    site: HostedSite = next(
-        s for s in (await rt.site_hosting.view(app_id)).sites if s.id == site_id
-    )
-    return HostedSiteOut(**asdict(site))
+    return HostedSiteOut(**asdict(await rt.site_hosting.site(app_id, site_id)))
 
 
 def _change(site: HostedSiteOut | None, job: Job | None, config: Job) -> SiteChangeOut:

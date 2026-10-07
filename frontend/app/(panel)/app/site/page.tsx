@@ -10,11 +10,12 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfigStatus } from "@/features/hosting/config-status";
 import { useHostedSites } from "@/features/hosting/hooks";
 import { SiteActions, SiteSwitch } from "@/features/hosting/site-controls";
 import { ContentCard } from "@/features/sites/content-card";
 import { FilesCard } from "@/features/sites/files-card";
-import { siteApi, useSiteFiles } from "@/features/sites/hooks";
+import { siteApi, useSaveSiteFile, useSiteFiles } from "@/features/sites/hooks";
 import { JobsCard } from "@/features/sites/jobs-card";
 import { useI18n } from "@/lib/i18n";
 
@@ -31,6 +32,7 @@ function HostedSiteDetail() {
   const site = host?.sites.find((s) => s.id === siteId);
   const base = siteApi(appId, siteId);
   const { data: files } = useSiteFiles(base);
+  const create = useSaveSiteFile(base);
   const [jobs, setJobs] = useState<number[]>(() => (params.get("job") ? [Number(params.get("job"))] : []));
 
   if (error) return <Alert tone="danger">{errorMessage(error)}</Alert>;
@@ -48,6 +50,10 @@ function HostedSiteDetail() {
   return (
     <>
       <nav aria-label={t("hosting.breadcrumb")} className="mb-2 flex items-center gap-1 text-sm text-muted-foreground">
+        <Link href="/sites/" className="hover:text-foreground">
+          {t("nav.sites")}
+        </Link>
+        <ChevronRight className="size-3.5" />
         <Link href={`/app/?id=${appId}`} className="hover:text-foreground">
           {host.name}
         </Link>
@@ -82,11 +88,25 @@ function HostedSiteDetail() {
         {site.port !== null && <span className="font-mono text-muted-foreground">{t("sites.portValue", { port: site.port })}</span>}
         {host.stopped && <span className="text-muted-foreground">{t("hosting.hostStopped")}</span>}
       </div>
-      {can("operator") && files?.files.length === 0 && (
-        <Alert tone="info" className="mb-6">
-          {t("hosting.emptySite")}
-        </Alert>
-      )}
+      <div className="mb-6 grid gap-3 empty:hidden">
+        <ConfigStatus appId={appId} host={host} always={false} onJob={follow} />
+        {can("operator") && files?.files.length === 0 && (
+          <Alert tone="info" className="grid justify-items-start gap-2">
+            <span>{t("hosting.emptySite")}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={create.isPending}
+              onClick={() =>
+                create.mutate({ path: "index.html", content: starterPage(site.name), base_sha256: null }, { onSuccess: (job) => follow(job.id) })
+              }
+            >
+              {t("hosting.createIndex")}
+            </Button>
+            {create.error && <span className="text-danger">{errorMessage(create.error)}</span>}
+          </Alert>
+        )}
+      </div>
       <div className="stagger grid items-start gap-4 lg:grid-cols-2">
         <JobsCard jobs={jobs} className="animate-enter lg:col-span-2" />
         {can("operator") && <ContentCard base={base} onJob={follow} />}
@@ -94,6 +114,12 @@ function HostedSiteDetail() {
       </div>
     </>
   );
+}
+
+/** A first page for an empty site, titled with its name (escaped). */
+function starterPage(name: string): string {
+  const safe = name.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+  return `<!doctype html>\n<html>\n<head>\n<meta charset="utf-8">\n<title>${safe}</title>\n</head>\n<body>\n<h1>${safe}</h1>\n</body>\n</html>\n`;
 }
 
 export default function HostedSitePage() {

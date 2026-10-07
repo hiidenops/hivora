@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import {
   api,
@@ -31,7 +31,8 @@ export const keys = {
   me: ["me"] as const,
   apps: ["apps"] as const,
   app: (id: number) => ["apps", id] as const,
-  // Sites: refreshed when a job ends, not on every container state change (realtime).
+  // Sites: refreshed when a job of their app ends (invalidateSitesOf), not on every
+  // container state change.
   siteHosts: ["site-hosts"] as const,
   siteFiles: ["site-files"] as const,
   templates: ["templates"] as const,
@@ -42,6 +43,22 @@ export const keys = {
   zones: ["zones"] as const,
   audit: ["audit"] as const,
 };
+
+/** A job of the app `slug` ended: its hosted sites and their files read again, no other
+ *  host's (the hosts in cache tell which app ids that slug is). */
+export function invalidateSitesOf(qc: QueryClient, slug: string | undefined) {
+  if (!slug) return;
+  const ids = qc
+    .getQueriesData<{ app_id?: number; slug?: string }>({ queryKey: keys.siteHosts })
+    .flatMap(([, host]) => (host?.slug === slug && host.app_id !== undefined ? [host.app_id] : []));
+  for (const id of ids) {
+    void qc.invalidateQueries({ queryKey: [...keys.siteHosts, id] });
+    void qc.invalidateQueries({
+      queryKey: keys.siteFiles,
+      predicate: (q) => String(q.queryKey[1]).startsWith(`/apps/${id}/`),
+    });
+  }
+}
 
 export function useMe() {
   return useQuery({

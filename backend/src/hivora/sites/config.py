@@ -36,6 +36,10 @@ from hivora.state import StateStore
 
 logger = logging.getLogger(__name__)
 
+# Jobs after which a host's configuration is applied again: its container (re)started,
+# its volumes restored (the "conf" volume is not backed up), or the app deployed again.
+AFTER = (JobKind.START, JobKind.RESTART, JobKind.BACKUP_RESTORE, JobKind.DEPLOY)
+
 CHECK = ["nginx", "-t"]
 RELOAD = ["nginx", "-s", "reload"]
 _OUTPUT = 2000  # characters of nginx's output kept in a job error
@@ -109,8 +113,9 @@ class SiteConfig:
                 await self._task
 
     async def _follow_starts(self, sub: Any) -> None:
-        """A host started (or restarted): its configuration applied again, so nginx
-        serves the sites as recorded even if its "conf" volume was lost or changed."""
+        """A host started, restarted, restored or deployed again (AFTER): its configuration
+        applied again, so nginx serves the sites as recorded even if its "conf" volume was
+        lost or changed."""
         async with sub:
             async for event in sub:
                 try:
@@ -124,7 +129,7 @@ class SiteConfig:
         async with self.sessions() as session:
             job = await get_job(session, job_id)
             if (job is None or job.app_id is None or job.status is not JobStatus.SUCCEEDED
-                    or job.kind not in (JobKind.START, JobKind.RESTART)):  # fmt: skip
+                    or job.kind not in AFTER):  # fmt: skip
                 return
             app_id = job.app_id
         await self.request(app_id, after_start=True)

@@ -7,6 +7,7 @@ Work files (uploads, staging folders) live next to the ``html`` folder: same fil
 
 import shutil
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.core import latest_revision
 from hivora.apps.models import HOSTING_KIND, Application
-from hivora.apps.queries import hosting_app, volume_source
+from hivora.apps.queries import hosting_app, volume_sources
 from hivora.core.errors import ConflictError, NotFoundError, PermissionDeniedError
 from hivora.sites.models import Site
 from hivora.sites.nginx import NginxSite
@@ -59,23 +60,46 @@ async def added_ports(session: AsyncSession, app_id: int) -> list[int]:
     return [p for p in ports if p is not None]
 
 
+@dataclass(frozen=True, slots=True)
+class HostDirs:
+    """A host's bind-mounted folders, read at once (one query)."""
+
+    app_id: int
+    found: dict[str, Path]  # by target in the container
+
+    def html(self) -> Path:
+        if (path := self.found.get(HTML_TARGET)) is None:
+            raise ConflictError("site has no html volume", app=self.app_id)
+        return path
+
+    def conf(self) -> Path:
+        """The folder of the nginx files Hivora writes; only nginx 1.1.0 and later has it."""
+        return self._hosting(CONF_TARGET)
+
+    def sites(self) -> Path:
+        return self._hosting(SITES_TARGET)
+
+    def _hosting(self, target: str) -> Path:
+        if (path := self.found.get(target)) is None:
+            raise HostUpgradeRequiredError("update this nginx to host several sites",
+                                           app=self.app_id)  # fmt: skip
+        return path
+
+
+async def host_dirs(session: AsyncSession, app_id: int) -> HostDirs:
+    return HostDirs(app_id, await volume_sources(session, app_id))
+
+
 async def html_dir(session: AsyncSession, app_id: int) -> Path:
-    if (path := await volume_source(session, app_id, HTML_TARGET)) is None:
-        raise ConflictError("site has no html volume", app=app_id)
-    return path
+    return (await host_dirs(session, app_id)).html()
 
 
 async def conf_dir(session: AsyncSession, app_id: int) -> Path:
-    """The folder of the nginx files Hivora writes; only nginx 1.1.0 and later has it."""
-    if (path := await volume_source(session, app_id, CONF_TARGET)) is None:
-        raise HostUpgradeRequiredError("update this nginx to host several sites", app=app_id)
-    return path
+    return (await host_dirs(session, app_id)).conf()
 
 
 async def sites_dir(session: AsyncSession, app_id: int) -> Path:
-    if (path := await volume_source(session, app_id, SITES_TARGET)) is None:
-        raise HostUpgradeRequiredError("update this nginx to host several sites", app=app_id)
-    return path
+    return (await host_dirs(session, app_id)).sites()
 
 
 async def site_root(session: AsyncSession, app_id: int, site_id: int | None) -> tuple[Path, Path]:
@@ -83,7 +107,8 @@ async def site_root(session: AsyncSession, app_id: int, site_id: int | None) -> 
     filesystem, outside the mounts). None, or the main site's id: the html volume, as
     before any site row existed. An added site: its folder in the sites volume, which
     must not be a link (it could lead into another site)."""
-    html = await html_dir(session, app_id)
+    dirs = await host_dirs(session, app_id)
+    html = dirs.html()
     if site_id is None:
         return html, html.parent
     site = await session.get(Site, site_id)
@@ -91,7 +116,7 @@ async def site_root(session: AsyncSession, app_id: int, site_id: int | None) -> 
         raise SiteNotFoundError(str(site_id))
     if site.root == "":
         return html, html.parent
-    folder = await sites_dir(session, app_id) / site.root
+    folder = dirs.sites() / site.root
     if folder.is_symlink():
         raise PermissionDeniedError("a site's folder cannot be a link", site=site.slug)
     return folder, html.parent

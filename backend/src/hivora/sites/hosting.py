@@ -27,7 +27,7 @@ from hivora.jobs import Job, JobKind, JobQueue
 from hivora.sites import core, nginx
 from hivora.sites.models import Site
 from hivora.sites.port_check import PortCheck
-from hivora.sites.views import SiteHost, SitePlan, host_view
+from hivora.sites.views import HostedSite, SiteHost, SitePlan, host_view, site_view
 from hivora.state import StateStore
 
 
@@ -73,6 +73,11 @@ class SiteHosting:
         """A host and its sites, the main one first (404 for an app that hosts none)."""
         async with self.sessions() as session:
             return await host_view(session, app_id, self.settings.host_lan_ip)
+
+    async def site(self, app_id: int, site_id: int) -> HostedSite:
+        """One site, as ``view`` lists it."""
+        async with self.sessions() as session:
+            return await site_view(session, app_id, site_id, self.settings.host_lan_ip)
 
     async def enable_hosting(self, app_id: int) -> SiteHost:
         """An nginx deployed from the catalog becomes a host: its html volume is its main
@@ -272,8 +277,9 @@ class SiteHosting:
     async def _host(self, session: AsyncSession, app_id: int, *, recreates: bool = False
                     ) -> Application:  # fmt: skip
         app = await core.get_site(session, app_id)
-        await core.conf_dir(session, app.id)  # 409 on an nginx still on template 1.0.0
-        await core.sites_dir(session, app.id)
+        dirs = await core.host_dirs(session, app.id)
+        dirs.conf()  # 409 on an nginx still on template 1.0.0
+        dirs.sites()
         if recreates and app.desired_state is DesiredState.STOPPED:
             # A revision's job always starts the container: start the app first.
             raise HostStoppedError("start this nginx before changing its sites' ports",

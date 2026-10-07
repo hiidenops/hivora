@@ -98,6 +98,7 @@ export const fr = {
   "hosting.configApplying": "Configuration de nginx en cours d'application…",
   "hosting.dataReused": "Un site recréé avec le même identifiant retrouvera ces fichiers.",
   "hosting.emptySite": "Ce site est vide : envoyez une archive .zip, ou créez un premier fichier (par exemple index.html) ci-dessous.",
+  "hosting.createIndex": "Créer index.html",
   "logs.title": "Logs",
   "logs.service": "Service",
   "logs.allServices": "Tous les services",

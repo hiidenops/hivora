@@ -73,12 +73,9 @@ async def hosting_app_id(session: AsyncSession, slug: str) -> int | None:
     return app_id
 
 
-async def volume_source(session: AsyncSession, app_id: int, target: str) -> Path | None:
-    """The host folder bound to ``target`` in the app's (first) service, if any."""
+async def volume_sources(session: AsyncSession, app_id: int) -> dict[str, Path]:
+    """The host folders bound in the app's (first) service, by target, in one query."""
     service = await session.scalar(
         select(Service).where(Service.app_id == app_id).options(selectinload(Service.volumes))
     )
-    for volume in service.volumes if service else []:
-        if volume.target == target:
-            return Path(volume.source)
-    return None
+    return {v.target: Path(v.source) for v in service.volumes} if service else {}

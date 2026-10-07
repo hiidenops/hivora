@@ -248,6 +248,17 @@ test("sites index: grouped by nginx, host sites, site links, older bookmarks", a
   await expect(toggle).toBeChecked({ timeout: 20_000 });
   await expectPointerCursors(page);
 
+  // A job of one host reads its sites again, not the other host's.
+  const asked: string[] = [];
+  page.on("request", (r) => {
+    const url = new URL(r.url()).pathname;
+    if (url.endsWith("/sites")) asked.push(url);
+  });
+  const restart = await (await page.request.post(`/api/v1/apps/${galerie}/restart`, { headers })).json();
+  await done(restart.id);
+  await expect.poll(() => asked, { timeout: 10_000 }).toContain(`/api/v1/apps/${galerie}/sites`);
+  expect(asked).not.toContain(`/api/v1/apps/${vitrine}/sites`);
+
   // Each site is a link to its page.
   await galerieSites.getByRole("link", { name: "Photos", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/app/site/\\?app=${galerie}&site=${photos.site.id}$`));
@@ -357,10 +368,10 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
   await expect(page.getByRole("heading", { name: "Blog", level: 1 })).toBeVisible();
   await expect(page.getByText("Ce site est vide", { exact: false })).toBeVisible();
   await expect(page.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole("link", { name: "Sites", exact: true })).toHaveClass(/font-medium/);
+  await expect(page.getByRole("complementary").getByRole("link", { name: "Sites", exact: true })).toHaveClass(/font-medium/);
   await expect(page.getByRole("switch", { name: "Site « Blog » actif" })).toBeChecked();
   await expect(page.getByRole("button", { name: "Actions du site « Blog »" })).toBeVisible();
-  await page.getByRole("navigation", { name: "Fil d'Ariane" }).getByRole("link").click();
+  await page.getByRole("navigation", { name: "Fil d'Ariane" }).getByRole("link").last().click(); // the nginx
   const blog = sites.getByRole("listitem", { name: "Blog" });
   await expect(blog.getByText("Port 8301")).toBeVisible({ timeout: 20_000 });
 
@@ -597,6 +608,14 @@ test("hosted site page: zip, read, create, edit, conflict, viewer, back to the n
   await expect(open).toHaveAttribute("href", /^http:\/\/[\d.]+:8321$/);
   await expect(open).toHaveAttribute("target", "_blank");
   await expect(page.getByText("Aucun fichier", { exact: false })).toBeVisible(); // a new site: empty folder
+  await expect(crumbs.getByRole("link", { name: "Sites", exact: true })).toHaveAttribute("href", "/sites/");
+
+  // An empty site: a first page in one click, titled with its name.
+  await page.getByRole("button", { name: "Créer index.html" }).click();
+  await expect(page.getByRole("list", { name: "Fichiers" }).getByRole("button")).toHaveText([/index\.html/], { timeout: 20_000 });
+  await expect.poll(() => existsSync(`${disk}/sites/docs/index.html`)).toBe(true);
+  expect(readFileSync(`${disk}/sites/docs/index.html`, "utf8")).toContain("<h1>Docs</h1>");
+  await expect(page.getByText("Ce site est vide", { exact: false })).toBeHidden();
 
   // A zip: in the site's own folder, the main site untouched.
   const mainTree = () => (existsSync(`${disk}/html`) ? readdirSync(`${disk}/html`, { recursive: true }).sort() : []);

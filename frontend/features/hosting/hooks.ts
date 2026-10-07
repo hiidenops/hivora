@@ -16,8 +16,7 @@ import { keys } from "@/lib/api/hooks";
 // Refreshed when a job ends or after a change made here, not on every state change.
 export const hostKey = (appId: number) => [...keys.siteHosts, appId] as const;
 
-/** The sites an nginx hosts. `hosting`: the app's flag (GET /apps); false: not asked for.
- *  `notHost`: it serves one site only (also a 404 site_not_found, if the flag was stale). */
+/** The sites an nginx hosts. `hosting`: the app's flag (GET /apps); false: not asked for. */
 export function useHostedSites(appId: number, hosting = true) {
   const query = useQuery({
     queryKey: hostKey(appId),
@@ -25,8 +24,7 @@ export function useHostedSites(appId: number, hosting = true) {
     enabled: hosting,
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
   });
-  const notHost = !hosting || (query.error instanceof ApiError && query.error.code === "site_not_found");
-  return { ...query, notHost };
+  return { ...query, notHost: !hosting };
 }
 
 /** A change to a host: its sites, and the apps (the hosting flag), read again. */

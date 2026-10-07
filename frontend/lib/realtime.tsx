@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 
-import { keys } from "@/lib/api/hooks";
+import { invalidateSitesOf, keys } from "@/lib/api/hooks";
 import type { AppStatus, HostSample } from "@/lib/api/client";
 
 export interface LiveJob {
@@ -190,11 +190,10 @@ export function RealtimeProvider({ enabled, children }: { enabled: boolean; chil
   useEffect(() => {
     const s = store.current!;
     if (!enabled) return;
-    s.onJobFinished = () => {
+    s.onJobFinished = (msg) => {
       void qc.invalidateQueries({ queryKey: keys.apps });
       void qc.invalidateQueries({ queryKey: keys.jobs });
-      void qc.invalidateQueries({ queryKey: keys.siteHosts });
-      void qc.invalidateQueries({ queryKey: keys.siteFiles });
+      invalidateSitesOf(qc, msg.app as string | undefined);
     };
     s.onAppChanged = () => void qc.invalidateQueries({ queryKey: keys.apps });
     s.connect();
