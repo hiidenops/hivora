@@ -21,7 +21,6 @@ from hivora.apps.core import decrypt_secrets, get_app
 from hivora.core.redact import Redactor
 from hivora.docker_gateway import ContainerInfo, ContainerState
 from hivora.runtime import Runtime
-from hivora.state import app_key
 from hivora.web.deps import Operator, RuntimeDep
 
 logger = logging.getLogger(__name__)
@@ -53,7 +52,7 @@ def service_of(c: ContainerInfo) -> str:
 
 
 def app_containers(rt: Runtime, slug: str) -> list[ContainerInfo]:
-    return [c for c in rt.state.store.containers() if app_key(c) == slug]
+    return [c for c in rt.state.store.containers() if rt.state.store.key_of(c) == slug]
 
 
 class LogStream:

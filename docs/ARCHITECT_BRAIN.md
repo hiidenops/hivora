@@ -279,7 +279,7 @@ Second rang :
    - `clock` est toujours injecté, jamais `datetime.now()` direct dans un service, pour que les tests puissent figer le temps.
 5. **Pas d'état global de module pour du nouveau code.**
    - Un verrou, un cache, un registre appartiennent à une instance de service.
-   - *Dettes connues* : `state._adopted` (`set_adopted`), `templates._detected_arch` (`set_host_arch`). (`vpn._LOCK` : remplacé par un verrou d'instance le 07/10, lot M10-b5.)
+   - *Dette connue* : `templates._detected_arch` (`set_host_arch`). (`vpn._LOCK` : remplacé par un verrou d'instance le 07/10, lot M10-b5 ; `state._adopted` : porté par `StateStore` le 07/10, lot M10-c1.)
    - *Correction du 29/09* : `auth._totp_used`, listé ici auparavant, est un attribut d'instance (`self._totp_used`), pas un état global.
 6. **Un service transverse qui grossit se découpe comme un module métier.** Il n'a pas de statut spécial.
 

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hivora.apps.models import Application, PortBinding, Service
-from hivora.state import StateStore, app_key
+from hivora.state import StateStore
 from hivora.templates import PortPlan
 
 MAX_PORT = 65535
@@ -31,7 +31,7 @@ async def used_ports(
     """
     used: dict[tuple[int, str], str] = {}
     for container in state.containers():
-        owner = app_key(container) or container.name
+        owner = state.key_of(container) or container.name
         if owner == exclude_app:
             continue
         for p in container.ports:

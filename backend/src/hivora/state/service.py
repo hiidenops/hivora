@@ -20,7 +20,7 @@ from hivora.docker_gateway import (
     DockerGateway,
 )
 from hivora.state.status import AppStatus
-from hivora.state.store import StateStore, app_key, app_key_from_labels
+from hivora.state.store import StateStore
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ class StateService:
             return
         # Labels are immutable for a container's lifetime: its app never changes.
         known = self.store.get(event.actor_id)
-        key = app_key(known) if known else app_key_from_labels(event.attributes)
+        key = self.store.key_of(known) if known else self.store.key_from_labels(event.attributes)
         before = self.store.app(key).status if key else None
 
         # `docker stop` emits kill -> die -> stop; a crash only emits die.
@@ -155,7 +155,7 @@ class StateService:
         self.bus.publish(
             "state.container.changed",
             id=container.id,
-            app=app_key(container),
+            app=self.store.key_of(container),
             state=container.state.value,
             health=container.health.value,
         )

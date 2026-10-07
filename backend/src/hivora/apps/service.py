@@ -55,7 +55,7 @@ from hivora.crypto.cipher import SecretBox
 from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
 from hivora.images.registry import ImageInfo, Registry
 from hivora.jobs import Job, JobQueue
-from hivora.state import StateStore, app_key
+from hivora.state import StateStore
 from hivora.templates import (
     AppContext,
     Catalog,
@@ -141,7 +141,7 @@ class AppService:
         main = entry.template.main_service if entry else None
         running = [
             c for c in self.state.containers()
-            if app_key(c) == app.slug and c.state is ContainerState.RUNNING
+            if self.state.key_of(c) == app.slug and c.state is ContainerState.RUNNING
             and (main is None or c.labels.get(LABEL_COMPOSE_SERVICE) == main)
         ]  # fmt: skip
         return app, entry, running[0] if running else None
@@ -180,7 +180,7 @@ class AppService:
         for key in unpublished:
             access.pop(key)
         if unpublished and await self.planner.vpns_reaching(session, app.slug):
-            ip = next((ip for c in self.state.containers() if app_key(c) == app.slug
+            ip = next((ip for c in self.state.containers() if self.state.key_of(c) == app.slug
                        for net, ip in zip(c.networks, c.ips, strict=False)
                        if net == f"{app.slug}_default"), None)  # fmt: skip
             if ip:

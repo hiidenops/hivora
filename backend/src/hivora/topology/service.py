@@ -18,7 +18,7 @@ from hivora.apps.adoption import Adoption
 from hivora.apps.models import Application, AppRevision, Exposure, Origin
 from hivora.apps.planner import AppPlanner
 from hivora.hostfw.service import HostFirewall, listening
-from hivora.state import StateStore, app_key
+from hivora.state import StateStore
 from hivora.templates import Catalog
 from hivora.templates.catalog import host_arch
 from hivora.templates.icons import IconCache
@@ -225,7 +225,7 @@ class GraphBuilder:
 def _address_on(store: StateStore, slug: str, network: str) -> str | None:
     """The app's main container address on one Docker network (what VPN clients use)."""
     for c in store.containers():
-        if app_key(c) == slug and network in c.networks:
+        if store.key_of(c) == slug and network in c.networks:
             ips = dict(zip(c.networks, c.ips, strict=False))
             if ip := ips.get(network):
                 return ip

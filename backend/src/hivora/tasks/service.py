@@ -26,7 +26,7 @@ from hivora.core.redact import Redactor
 from hivora.core.schedule import local_zone, next_run
 from hivora.crypto.cipher import SecretBox
 from hivora.docker_gateway import ContainerState, DockerGateway
-from hivora.state import StateStore, app_key
+from hivora.state import StateStore
 from hivora.tasks.models import ScheduledTask
 
 logger = logging.getLogger(__name__)
@@ -147,8 +147,8 @@ class TaskTools:
             secrets = await decrypt_secrets(session, self.box, app.id)
         container = main
         if task.service:
-            running = (c for c in self.store.containers()
-                       if app_key(c) == app.slug and c.state is ContainerState.RUNNING)  # fmt: skip
+            running = (c for c in self.store.containers() if self.store.key_of(c) == app.slug
+                       and c.state is ContainerState.RUNNING)  # fmt: skip
             container = next((c for c in running if c.labels.get(SERVICE_LABEL) == task.service),
                              None)  # fmt: skip
         if container is None:

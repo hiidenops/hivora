@@ -21,7 +21,7 @@ from hivora.core.clock import Clock
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.core.events import EventBus
 from hivora.docker_gateway import ContainerInfo, ContainerState
-from hivora.state import StateStore, app_key, set_adopted
+from hivora.state import StateStore
 from hivora.zones import get_zone
 
 LABEL_COMPOSE_PROJECT = "com.docker.compose.project"
@@ -54,7 +54,7 @@ class Adoption:
             project = c.labels.get(LABEL_COMPOSE_PROJECT)
             if not project or c.labels.get("io.hivora.app") or c.labels.get("io.hivora.self"):
                 continue
-            if app_key(c) != f"compose:{project}":
+            if self.state.key_of(c) != f"compose:{project}":
                 continue  # already adopted
             groups.setdefault(project, []).append(c)
         out = []
@@ -98,7 +98,7 @@ class Adoption:
             slugs = await session.scalars(
                 select(Application.slug).where(Application.origin == Origin.ADOPTED)
             )
-            set_adopted(set(slugs))
+            self.state.set_adopted(set(slugs))
 
 
 def _services_from_containers(containers: list[ContainerInfo]) -> list[Service]:
