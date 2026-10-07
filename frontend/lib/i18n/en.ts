@@ -725,7 +725,6 @@ export const en: Record<MessageKey, string> = {
   "error.site_host_stopped": "Start this nginx before adding, moving or removing a site.",
   "error.host_upgrade_required": "Update this nginx first (version 1.1.0).",
   "error.not_a_nginx_app": "Only an nginx application can host sites.",
-  "error.site_host_has_sites": "This nginx hosts other sites: turn each site on or off separately.",
   "error.nginx_config_rejected": "nginx refused the configuration: nothing changed. {message}",
   "worlds.title": "Worlds",
   "worlds.active": "active",

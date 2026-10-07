@@ -1,5 +1,4 @@
-"""Routes of the sites an nginx hosts (/apps/{app_id}/sites): the app -> sites model, next
-to the older /sites routes, which stay as they were."""
+"""Routes of the sites an nginx hosts (/apps/{app_id}/sites): the app -> sites model."""
 
 import sqlite3
 from typing import Any
@@ -142,7 +141,6 @@ def test_a_catalog_nginx_starts_hosting(client: Any) -> None:
     ]
     again = client.post(f"{API}/apps/{app_id}/sites/hosting").json()  # no change
     assert [s["id"] for s in again["sites"]] == [s["id"] for s in hosted.json()["sites"]]
-    assert [s["slug"] for s in client.get(f"{API}/sites").json()] == ["manuel"]  # old list too
 
     vw = client.post(f"{API}/apps", json={"template": "vaultwarden", "name": "vw"}).json()
     wait_job(client, vw["job"]["id"])

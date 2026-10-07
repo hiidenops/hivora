@@ -1,67 +1,21 @@
-"""Static sites: an nginx app marked ``static-site``, created with a first page.
-
-A site is only ever an app this service created (``application.kind``): an nginx deployed
-by hand from the catalog is not a site. Deploy, start and stop are the apps' own; the
-site's files are written by its jobs, in the app's lane.
-"""
+"""A site's content from a zip: received next to the site, checked, then put in place by
+a site_content job, in the app's lane (one site of an nginx that hosts sites)."""
 
 import asyncio
-import html
-import os
 import secrets
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from hivora.apps.core import DeployRequest, latest_revision
-from hivora.apps.lifecycle import Deployer, Lifecycle
-from hivora.apps.models import Application, DesiredState
 from hivora.core import archive, fs
 from hivora.core.config import Settings
-from hivora.core.errors import ConflictError
 from hivora.core.events import EventBus
 from hivora.core.fs import confined, ensure_dir
 from hivora.jobs import Job, JobContext, JobKind, JobQueue
 from hivora.sites import core
-from hivora.sites.core import SITE_KIND
-from hivora.sites.models import Site as SiteRow
-from hivora.state import AppStatus, StateStore
 
-TEMPLATE = "nginx"
 MAX_UPLOAD = 200 * 1024**2  # a zip, as sent
-
-PAGE = """<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{title}</title>
-</head>
-<body>
-<h1>{title}</h1>
-<p>Site prêt. / Site ready.</p>
-</body>
-</html>
-"""
-
-
-class HostHasSitesError(ConflictError):
-    code = "site_host_has_sites"
-
-
-@dataclass(frozen=True, slots=True)
-class Site:
-    id: int
-    slug: str
-    name: str
-    port: int | None
-    zone_id: int | None
-    enabled: bool
-    deployed: bool  # its first deploy has run: it can be enabled or disabled
-    status: AppStatus
 
 
 class SiteService:
@@ -69,66 +23,16 @@ class SiteService:
     limits = archive.DEFAULT_LIMITS  # 10 000 files, 1 GiB once extracted
 
     def __init__(
-        self, *, sessions: async_sessionmaker[AsyncSession], deployer: Deployer,
-        lifecycle: Lifecycle, jobs: JobQueue, settings: Settings, state: StateStore,
+        self, *, sessions: async_sessionmaker[AsyncSession], jobs: JobQueue, settings: Settings,
         bus: EventBus,
     ) -> None:  # fmt: skip
         self.sessions = sessions
-        self.deployer = deployer
-        self.lifecycle = lifecycle
         self.jobs = jobs
         self.settings = settings
-        self.state = state
         self.bus = bus
 
     def register(self) -> None:
         self.jobs.register(JobKind.SITE_CONTENT, self.content)
-
-    async def list(self) -> list[Site]:
-        async with self.sessions() as session:
-            apps = await session.scalars(
-                select(Application).where(Application.kind == SITE_KIND).order_by(Application.name)
-            )
-            return [await self._site(session, app) for app in apps]
-
-    async def create(self, name: str, port: int, zone: str | None) -> tuple[Site, Job, Job]:
-        """The deploy job, then the first page's job in the same lane. The new host's main
-        site (its html volume, on its web port) is recorded with that second job."""
-        req = DeployRequest(TEMPLATE, name, {"web_port": port}, zone=zone, kind=SITE_KIND)
-        app, deploy = await self.deployer.deploy(req)
-        # ponytail: a second transaction; a crash in between leaves a site without its
-        # first page (nginx answers 403) until its content is replaced (lot S2), and
-        # without its main site row.
-        async with self.sessions() as session, session.begin():
-            main = SiteRow(app_id=app.id, slug="main", name=app.name, root="", port=None,
-                           server_name=None, enabled=True, created_at=app.created_at)  # fmt: skip
-            session.add(main)
-            content = self.jobs.add(session, JobKind.SITE_CONTENT, app_id=app.id,
-                                    app_slug=app.slug)  # fmt: skip
-        self.jobs.wake()
-        async with self.sessions() as session:
-            site = await self._site(session, await session.get_one(Application, app.id))
-        return site, deploy, content
-
-    async def set_enabled(self, app_id: int, enabled: bool) -> Job:
-        """Start or stop; refused (409) until the first deploy has run.
-
-        This older switch starts or stops the whole container: refused (409) once the app
-        hosts added sites, which it would cut too; each site has its own switch then.
-        """
-        async with self.sessions() as session:
-            app = await core.get_site(session, app_id)
-            added = await session.scalar(
-                select(func.count()).select_from(SiteRow)
-                .where(SiteRow.app_id == app.id, SiteRow.root != "")
-            )  # fmt: skip
-        if added:
-            raise HostHasSitesError("this nginx hosts other sites: turn each site on or off",
-                                    app=app.slug, sites=added)  # fmt: skip
-        job = await (self.lifecycle.start if enabled else self.lifecycle.stop)(app_id)
-        topic = "site.enabled" if enabled else "site.disabled"
-        self.bus.publish(topic, app=app.slug, job=job.id)
-        return job
 
     async def replace_content(
         self, app_id: int, filename: str, body: AsyncIterator[bytes], site_id: int | None = None
@@ -161,11 +65,12 @@ class SiteService:
         return job
 
     async def content(self, ctx: JobContext) -> None:
-        """The site_content job: a zip's content if one was sent, else the first page."""
-        if "upload" in ctx.params:
-            await self._replace(ctx)
-        else:
-            await self._initial(ctx)
+        """The site_content job: the zip sent. A job without one was queued for a first page
+        by the older site creation (removed): it ends without writing anything."""
+        if "upload" not in ctx.params:
+            await ctx.log("no archive: nothing to do (first page no longer written)")
+            return
+        await self._replace(ctx)
 
     def _inspect(self, upload: Path) -> archive.Plan:
         with archive.open_zip(upload) as zf:
@@ -207,31 +112,3 @@ class SiteService:
         extra = {"site_id": site_id} if site_id is not None else {}
         self.bus.publish("site.content_replaced", app=app.slug, files=len(files), bytes=written,
                          filename=ctx.params.get("filename", ""), **extra)  # fmt: skip
-
-    async def _initial(self, ctx: JobContext) -> None:
-        """Write index.html once: an existing page is never replaced."""
-        app, html_dir = await core.deployed_html(self.sessions, ctx.app_id or 0)
-        root = self.settings.volumes_root
-        ensure_dir(html_dir, root, uid=self.settings.puid, gid=self.settings.pgid)
-        index = confined(html_dir / "index.html", root)
-        try:
-            with index.open("x", encoding="utf-8") as f:  # "x": never overwrites
-                f.write(PAGE.format(title=html.escape(app.name)))
-        except FileExistsError:
-            await ctx.log("index.html already there: kept")
-            return
-        index.chmod(0o644)
-        if os.geteuid() == 0:
-            os.chown(index, self.settings.puid, self.settings.pgid)
-        await ctx.log("index.html written")
-
-    async def _site(self, session: AsyncSession, app: Application) -> Site:
-        revision = await latest_revision(session, app.id)
-        port = revision.inputs.get("web_port") if revision else None
-        return Site(
-            id=app.id, slug=app.slug, name=app.name,
-            port=int(port) if port is not None else None, zone_id=app.zone_id,
-            enabled=app.desired_state is DesiredState.RUNNING,
-            deployed=app.current_revision_id is not None,
-            status=self.state.app(app.slug).status,
-        )  # fmt: skip

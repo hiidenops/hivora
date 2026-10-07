@@ -725,7 +725,6 @@ export const fr = {
   "error.site_host_stopped": "Démarrez ce nginx avant d'ajouter, déplacer ou supprimer un site.",
   "error.host_upgrade_required": "Mettez d'abord ce nginx à jour (version 1.1.0).",
   "error.not_a_nginx_app": "Seule une application nginx peut héberger des sites.",
-  "error.site_host_has_sites": "Ce nginx héberge d'autres sites : activez ou désactivez chaque site séparément.",
   "error.nginx_config_rejected": "nginx a refusé la configuration : rien n'a changé. {message}",
   "worlds.title": "Mondes",
   "worlds.active": "actif",

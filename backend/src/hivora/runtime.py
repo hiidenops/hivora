@@ -134,8 +134,7 @@ class Runtime:
         WorldJobs(apps).register()
         backups = BackupService(apps)
         backups.register()
-        sites = SiteService(sessions=sessions, deployer=apps.deployer, lifecycle=apps.lifecycle,
-                            jobs=jobs, settings=settings, state=state.store, bus=bus)  # fmt: skip
+        sites = SiteService(sessions=sessions, jobs=jobs, settings=settings, bus=bus)
         sites.register()
         site_files = SiteFiles(sessions=sessions, jobs=jobs, settings=settings, bus=bus)
         site_files.register()

@@ -93,7 +93,7 @@ async def site_root(session: AsyncSession, app_id: int, site_id: int | None) -> 
 async def deployed_root(
     sessions: async_sessionmaker[AsyncSession], app_id: int, site_id: int | None
 ) -> tuple[Application, Path, Path]:
-    """As deployed_html, for any site of the app: the app, the site's folder, the app's."""
+    """A deployed host, and one of its sites: the app, the site's folder, the app's."""
     async with sessions() as session:
         app = await get_site(session, app_id)
         if app.current_revision_id is None:
@@ -105,16 +105,6 @@ async def deployed_root(
 async def sites_of(session: AsyncSession, app_id: int) -> list[NginxSite]:
     rows = await session.scalars(select(Site).where(Site.app_id == app_id).order_by(Site.id))
     return [NginxSite(r.id, r.slug, r.root, r.port, r.server_name, r.enabled) for r in rows]
-
-
-async def deployed_html(
-    sessions: async_sessionmaker[AsyncSession], app_id: int
-) -> tuple[Application, Path]:
-    async with sessions() as session:
-        app = await get_site(session, app_id)
-        if app.current_revision_id is None:
-            raise ConflictError("site not deployed", slug=app.slug)
-        return app, await html_dir(session, app.id)
 
 
 def sweep(app_dir: Path, keep: Path) -> None:

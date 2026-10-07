@@ -1,6 +1,5 @@
 """Content and files of one hosted site through the API (/apps/{app_id}/sites/{site_id}/...):
-the same rules as the main site's routes (/sites/{app_id}/...), in the site's own folder,
-never in another site's."""
+in the site's own folder, never in another site's."""
 
 import io
 import zipfile
@@ -136,21 +135,6 @@ def test_unknown_sites_and_sites_of_other_apps(client: Any) -> None:
             _upload(client, url, _zip(("index.html", "x"))),
         ):
             assert (r.status_code, code(r)) == (404, "site_not_found"), (url, r.text)
-
-
-def test_the_main_site_answers_as_on_the_older_routes(client: Any) -> None:
-    app_id, app_dir, ids = _host(client)
-    new, old = _base(app_id, ids["main"]), f"{API}/sites/{app_id}"
-    assert client.get(f"{new}/files").json() == client.get(f"{old}/files").json()
-    params = {"path": "index.html"}
-    read = client.get(f"{new}/files/content", params=params).json()
-    assert read == client.get(f"{old}/files/content", params=params).json()
-    saved = _save(client, new, "index.html", "<h1>par la nouvelle route</h1>", read["sha256"])
-    assert wait_job(client, saved.json()["id"])["status"] == "succeeded"
-    assert (app_dir / "html" / "index.html").read_text() == "<h1>par la nouvelle route</h1>"
-    assert client.get(f"{old}/files/content", params=params).json()["content"] == (
-        "<h1>par la nouvelle route</h1>"
-    )
 
 
 def test_viewers_read_operators_write(client: Any) -> None:

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from hivora.apps.api import JobRef, job_ref
 from hivora.jobs import Job
-from hivora.sites.api import SiteFileIn, SiteFileOut, SiteFilesOut, SiteTextFileOut
+from hivora.sites.files import MAX_FILE
 from hivora.sites.hosting import HostedSite, SiteHost, SitePlan
 from hivora.web.deps import Operator, RuntimeDep, Viewer
 
@@ -166,7 +166,31 @@ async def remove_hosted_site(
     return _change(None, update, config)
 
 
-# --- one site's content and files: the same rules as the main site's, in its own folder ---
+# --- one site's content and files, in its own folder ---
+
+
+class SiteFileOut(BaseModel):
+    path: str
+    size: int
+    modified: datetime
+
+
+class SiteFilesOut(BaseModel):
+    files: list[SiteFileOut]  # .html, .css and .js only, sorted by path
+    truncated: bool  # more files than listed
+
+
+class SiteTextFileOut(BaseModel):
+    path: str
+    content: str
+    sha256: str  # send it back as base_sha256 to save
+    size: int
+
+
+class SiteFileIn(BaseModel):
+    path: str = Field(max_length=1024)
+    content: str = Field(max_length=MAX_FILE)  # characters here; bytes checked after
+    base_sha256: str | None = Field(pattern=r"^[0-9a-f]{64}$")  # None: a new file
 
 
 @router.put("/{app_id}/sites/{site_id}/content", status_code=202)
