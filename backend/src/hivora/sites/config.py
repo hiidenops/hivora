@@ -29,6 +29,7 @@ from hivora.core.events import EventBus
 from hivora.core.fs import confined, remove_tree
 from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
 from hivora.jobs import Job, JobContext, JobKind, JobQueue, JobStatus
+from hivora.jobs.queries import get_job
 from hivora.sites import core
 from hivora.sites.nginx import MANAGED, NginxSite, desired_files
 from hivora.state import StateStore
@@ -121,7 +122,7 @@ class SiteConfig:
 
     async def _after_start(self, job_id: int) -> None:
         async with self.sessions() as session:
-            job = await session.get(Job, job_id)
+            job = await get_job(session, job_id)
             if (job is None or job.app_id is None or job.status is not JobStatus.SUCCEEDED
                     or job.kind not in (JobKind.START, JobKind.RESTART)):  # fmt: skip
                 return

@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from hivora.apps.api import JobRef, job_ref
 from hivora.jobs import Job
 from hivora.sites.files import MAX_FILE
-from hivora.sites.hosting import HostedSite, SiteHost, SitePlan
+from hivora.sites.views import HostedSite, SiteHost, SitePlan
 from hivora.web.deps import Operator, RuntimeDep, Viewer
 
 router = APIRouter(tags=["sites"])

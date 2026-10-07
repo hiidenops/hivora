@@ -9,8 +9,8 @@ container; a site turned off keeps its port (turning it on again recreates nothi
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hivora.apps.models import Application
-from hivora.sites.core import SERVICE, SITE_KIND
+from hivora.apps.queries import hosting_app_id
+from hivora.sites.core import SERVICE
 from hivora.sites.models import Site
 from hivora.templates.overrides import ExtraPort, Overrides
 
@@ -22,11 +22,10 @@ async def site_ports(session: AsyncSession, slug: str, overrides: Overrides) -> 
     exposure = main.publish.get(MAIN_PORT_KEY, "lan") if main else "lan"
     if exposure == "none":  # the main site is not published: neither are the others
         return []
+    if (app_id := await hosting_app_id(session, slug)) is None:
+        return []
     ports = await session.scalars(
-        select(Site.port)
-        .join(Application, Application.id == Site.app_id)
-        .where(Application.slug == slug, Application.kind == SITE_KIND, Site.root != "")
-        .order_by(Site.id)
+        select(Site.port).where(Site.app_id == app_id, Site.root != "").order_by(Site.id)
     )
     return [ExtraPort(container=p, host=p, protocol="tcp", exposure=exposure)
             for p in ports if p is not None]  # fmt: skip

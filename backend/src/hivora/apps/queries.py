@@ -1,10 +1,13 @@
 """Read-only queries behind the app read routes (`apps/api/queries.py`): no state, the
 caller's session is used, so a route keeps all its reads in one session."""
 
+from pathlib import Path
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from hivora.apps.models import Application, AppRevision
+from hivora.apps.models import HOSTING_KIND, Application, AppRevision, Service
 from hivora.core.errors import NotFoundError
 from hivora.templates.models import TemplateVersion
 
@@ -51,3 +54,31 @@ async def revisions_of(session: AsyncSession, app_id: int) -> list[AppRevision]:
         .order_by(AppRevision.number.desc())
     )  # fmt: skip
     return list(rows)
+
+
+# --- for the sites (an nginx that hosts sites) -----------------------------------------
+
+
+async def hosting_app(session: AsyncSession, app_id: int) -> Application | None:
+    """The app if it hosts sites (``application.kind``), else None."""
+    app = await session.get(Application, app_id)
+    return app if app is not None and app.kind == HOSTING_KIND else None
+
+
+async def hosting_app_id(session: AsyncSession, slug: str) -> int | None:
+    """The id of the app with this slug if it hosts sites, else None."""
+    app_id: int | None = await session.scalar(
+        select(Application.id).where(Application.slug == slug, Application.kind == HOSTING_KIND)
+    )
+    return app_id
+
+
+async def volume_source(session: AsyncSession, app_id: int, target: str) -> Path | None:
+    """The host folder bound to ``target`` in the app's (first) service, if any."""
+    service = await session.scalar(
+        select(Service).where(Service.app_id == app_id).options(selectinload(Service.volumes))
+    )
+    for volume in service.volumes if service else []:
+        if volume.target == target:
+            return Path(volume.source)
+    return None

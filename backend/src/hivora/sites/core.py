@@ -8,18 +8,21 @@ Work files (uploads, staging folders) live next to the ``html`` folder: same fil
 import shutil
 import time
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.orm import selectinload
 
-from hivora.apps.models import HOSTING_KIND, Application, Service
+from hivora.apps.core import latest_revision
+from hivora.apps.models import HOSTING_KIND, Application
+from hivora.apps.queries import hosting_app, volume_source
 from hivora.core.errors import ConflictError, NotFoundError, PermissionDeniedError
 from hivora.sites.models import Site
 from hivora.sites.nginx import NginxSite
 
 SITE_KIND = HOSTING_KIND
 SERVICE = "server"  # the nginx template's main service
+MAX_SITES = 30  # added sites per host (the main site aside)
 HTML_TARGET = "/usr/share/nginx/html"  # the nginx template's "html" volume
 CONF_TARGET = "/etc/nginx/hivora.d"  # its "conf" volume (template 1.1.0 and later)
 SITES_TARGET = "/usr/share/nginx/sites"  # its "sites" volume: one folder per added site
@@ -37,37 +40,40 @@ class HostUpgradeRequiredError(ConflictError):
 
 
 async def get_site(session: AsyncSession, app_id: int) -> Application:
-    app = await session.get(Application, app_id)
-    if app is None or app.kind != SITE_KIND:
+    if (app := await hosting_app(session, app_id)) is None:
         raise SiteNotFoundError(str(app_id))
     return app
 
 
-async def _volume_source(session: AsyncSession, app_id: int, target: str) -> Path | None:
-    service = await session.scalar(
-        select(Service).where(Service.app_id == app_id).options(selectinload(Service.volumes))
+async def current_inputs(session: AsyncSession, app_id: int) -> dict[str, Any]:
+    """The app's current settings: a site change keeps them as they are."""
+    latest = await latest_revision(session, app_id)
+    return dict(latest.inputs) if latest else {}
+
+
+async def added_ports(session: AsyncSession, app_id: int) -> list[int]:
+    """The ports of the host's added sites, in order."""
+    ports = await session.scalars(
+        select(Site.port).where(Site.app_id == app_id, Site.root != "").order_by(Site.port)
     )
-    for volume in service.volumes if service else []:
-        if volume.target == target:
-            return Path(volume.source)
-    return None
+    return [p for p in ports if p is not None]
 
 
 async def html_dir(session: AsyncSession, app_id: int) -> Path:
-    if (path := await _volume_source(session, app_id, HTML_TARGET)) is None:
+    if (path := await volume_source(session, app_id, HTML_TARGET)) is None:
         raise ConflictError("site has no html volume", app=app_id)
     return path
 
 
 async def conf_dir(session: AsyncSession, app_id: int) -> Path:
     """The folder of the nginx files Hivora writes; only nginx 1.1.0 and later has it."""
-    if (path := await _volume_source(session, app_id, CONF_TARGET)) is None:
+    if (path := await volume_source(session, app_id, CONF_TARGET)) is None:
         raise HostUpgradeRequiredError("update this nginx to host several sites", app=app_id)
     return path
 
 
 async def sites_dir(session: AsyncSession, app_id: int) -> Path:
-    if (path := await _volume_source(session, app_id, SITES_TARGET)) is None:
+    if (path := await volume_source(session, app_id, SITES_TARGET)) is None:
         raise HostUpgradeRequiredError("update this nginx to host several sites", app=app_id)
     return path
 

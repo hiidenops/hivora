@@ -226,6 +226,23 @@ Situation au 29/09/2026 (commit `e283b3f`, après les deux découpages) :
 | `apps/api/` | 8 fichiers, 35 à 225 lignes | **résolu** (647 → 56 pour `__init__.py`) |
 | `hostfw/service.py` | 355 lignes | sous les seuils |
 
+Situation au 07/10/2026 (lot M8-a ; mesures de `wc -l`, classes par `ast`) :
+
+| Fichier | Taille | Niveau |
+|---|---|---|
+| `features/topology/topology-view.tsx` | 541 lignes | **bloquant** (inchangé) |
+| `templates/schema.py` | 496 lignes | alerte (inchangé) |
+| `vpn/service.py` | 491 lignes | alerte (inchangé) |
+| `auth/service.py` | 424 lignes | alerte (inchangé) |
+| `features/firewall/firewall-panel.tsx` | 372 lignes | alerte (inchangé) |
+| `apps/core.py` | 358 lignes | alerte (socle > 300 ; 340 au 29/09) |
+| `features/deploy/generated-form.tsx` | 343 lignes | alerte (inchangé) |
+| `features/activity/host-charts.tsx` | 321 lignes | alerte (inchangé) |
+| `sites/files.py` | 301 lignes | sous le seuil ; fonctions pures et service `SiteFiles` (75 lignes) à séparer s'il grossit |
+| `sites/hosting.py` | 295 lignes, classe `SiteHosting` 235, 10 méthodes publiques | **résolu** (417 et 306 au 07/10, avant M8-a) : vérifications de port dans `sites/port_check.py`, types et vue dans `sites/views.py` |
+
+Accès inter-modules du module `sites` (§9.9) : **résolu** en M8-a. `sites` lit les apps par `apps.queries` (`hosting_app`, `hosting_app_id`, `volume_source`) et `apps.core.latest_revision`, marque un hôte par `Application.mark_hosting()`, lit les jobs par `jobs.queries` (`get_job`, `last_job`) ; il ne fait plus de requête sur les tables `application`, `service` ni `job`.
+
 Priorités techniques (bilan du 29/09) :
 
 - **PRIORITÉ 1 : routes fines.**

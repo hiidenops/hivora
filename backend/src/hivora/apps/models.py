@@ -80,6 +80,10 @@ class Application(Base):
         cascade="all, delete-orphan", passive_deletes=True, lazy="selectin"
     )
 
+    def mark_hosting(self) -> None:
+        """This nginx now hosts sites (``/apps/{id}/sites``)."""
+        self.kind = HOSTING_KIND
+
 
 class AppRevision(Base):
     __tablename__ = "app_revision"
