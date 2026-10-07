@@ -7,7 +7,6 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from hivora.tasks.models import ScheduledTask
-from hivora.tasks.service import TaskTools
 from hivora.web.deps import Operator, RuntimeDep
 
 router = APIRouter(tags=["tasks"])
@@ -53,7 +52,7 @@ def out(t: ScheduledTask) -> TaskOut:
 
 @router.get("/{app_id}/tasks")
 async def list_tasks(app_id: int, _: Operator, rt: RuntimeDep) -> TasksOut:
-    tasks = [out(t) for t in await TaskTools(rt).list(app_id)]
+    tasks = [out(t) for t in await rt.tasks.list(app_id)]
     async with rt.sessions() as session:
         app, entry, _c = await rt.apps.main_container(session, app_id)
     game = entry.template.game if entry else None
@@ -63,20 +62,20 @@ async def list_tasks(app_id: int, _: Operator, rt: RuntimeDep) -> TasksOut:
 
 @router.post("/{app_id}/tasks", status_code=201)
 async def create(app_id: int, body: TaskIn, _: Operator, rt: RuntimeDep) -> dict[str, int]:
-    return {"id": await TaskTools(rt).save(app_id, body.model_dump())}
+    return {"id": await rt.tasks.save(app_id, body.model_dump())}
 
 
 @router.put("/{app_id}/tasks/{task_id}", status_code=204)
 async def update(app_id: int, task_id: int, body: TaskIn, _: Operator, rt: RuntimeDep) -> None:
-    await TaskTools(rt).save(app_id, body.model_dump(), task_id)
+    await rt.tasks.save(app_id, body.model_dump(), task_id)
 
 
 @router.delete("/{app_id}/tasks/{task_id}", status_code=204)
 async def delete(app_id: int, task_id: int, _: Operator, rt: RuntimeDep) -> None:
-    await TaskTools(rt).delete(app_id, task_id)
+    await rt.tasks.delete(app_id, task_id)
 
 
 @router.post("/{app_id}/tasks/{task_id}/run")
 async def run_now(app_id: int, task_id: int, _: Operator, rt: RuntimeDep) -> RunOut:
-    status, output = await TaskTools(rt).run(app_id, task_id)
+    status, output = await rt.tasks.run(app_id, task_id)
     return RunOut(status=status, output=output[-4000:])

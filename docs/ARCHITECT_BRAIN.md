@@ -256,7 +256,7 @@ Priorités techniques (bilan du 29/09) :
   - Plus de lecture directe de `apps.models`.
   - Verrou d'instance à la place de `_LOCK`.
   - Découpage de `vpn/service.py` (491 lignes) : socle `addressing` / `acl` purs, application par exec à part.
-- **PRIORITÉ 3 : sortir `Runtime` des services métier restants** (~~`topology`~~ fait le 07/10, lot M10-b1 ; `tasks`, `pyapps`, `games.engine`). Cela supprime les 4 cycles masqués de `runtime.py` (§8.2).
+- **PRIORITÉ 3 : sortir `Runtime` des services métier restants** (~~`topology`~~ fait le 07/10, lot M10-b1 ; ~~`tasks`~~ fait le 07/10, lot M10-b2 ; `pyapps`, `games.engine`). Cela supprime les 4 cycles masqués de `runtime.py` (§8.2).
 
 Second rang :
 
@@ -271,7 +271,7 @@ Second rang :
 
 1. **`Runtime` est la racine de composition, pas un annuaire.** Son rôle est de construire les services (`build`), de les démarrer et de les arrêter. Il ne doit pas être passé aux services métier.
 2. **Aucun nouveau service ne reçoit `Runtime`.** Il reçoit ses dépendances explicites, comme `AppService`, `AppPlanner`, `CustomImages`, `Adoption`, `ComposeEdit`, `Revisions`, `Deployer`, `Lifecycle`.
-   - *Dette connue* (vérifiée le 29/09, mise à jour le 07/10) : 5 services métier reçoivent `Runtime` : `tasks`, `vpn`, `hostfw`, `pyapps`, `games.engine` (plus `realtime`, toléré, voir point 3). `topology` ne le reçoit plus (lot M10-b1 : `GraphBuilder`, dépendances explicites, construit par sa route). `runtime.py` les importe en différé (`realtime.console`, `hostfw.service`, `tasks.service`, `vpn.service`), soit 4 cycles masqués. À corriger module par module, en commençant par ceux qui n'utilisent que 2 ou 3 attributs.
+   - *Dette connue* (vérifiée le 29/09, mise à jour le 07/10) : 4 services métier reçoivent `Runtime` : `vpn`, `hostfw`, `pyapps`, `games.engine` (plus `realtime`, toléré, voir point 3). Ne le reçoivent plus : `topology` (lot M10-b1 : `GraphBuilder`, construit par sa route) et `tasks` (lot M10-b2 : `TaskTools`, construit une fois par `Runtime`, qui l'importe désormais en tête). `runtime.py` importe encore en différé `realtime.console`, `hostfw.service` et `vpn.service`, soit 3 cycles masqués (4 au 29/09). À corriger module par module, en commençant par ceux qui n'utilisent que 2 ou 3 attributs.
 3. **Exception tolérée : les adaptateurs de sortie** (`realtime/ws`, `realtime/console`, `realtime/logs`, routes FastAPI via `RuntimeDep`). Ils sont en bordure du système et ne sont importés par aucun service.
 4. **Services transverses** (`core.events.EventBus`, `core.clock`, `core.redact`, `crypto`, `audit`) :
    - ils ne dépendent d'aucun module métier ;

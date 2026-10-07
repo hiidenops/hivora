@@ -33,6 +33,7 @@ from hivora.sites.ports import site_ports
 from hivora.state import StateService
 from hivora.system.public_address import PublicAddress
 from hivora.system.secrets import SecretSettings
+from hivora.tasks.service import TaskTools, run_scheduler
 from hivora.templates import Catalog
 from hivora.templates.catalog import set_host_arch
 from hivora.templates.icons import IconCache
@@ -71,6 +72,7 @@ class Runtime:
     site_files: SiteFiles
     site_config: SiteConfig
     site_hosting: SiteHosting
+    tasks: TaskTools
     hostfw: "HostFirewall" = field(init=False)
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
@@ -149,11 +151,13 @@ class Runtime:
         auth = AuthService(settings=settings, sessions=sessions, box=box, bus=bus, clock=clock)
         audit = AuditRecorder(sessions, bus)
         icons = IconCache(settings.data_dir / "icons")
+        tasks = TaskTools(sessions=sessions, clock=clock, bus=bus, settings=settings, apps=apps,
+                          backups=backups, box=box, store=state.store, gateway=gateway)  # fmt: skip
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
                    public_address, AppMetrics(gateway, state.store, bus), backups,
-                   sites, site_files, site_config, site_hosting)  # fmt: skip
+                   sites, site_files, site_config, site_hosting, tasks)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
@@ -172,21 +176,18 @@ class Runtime:
         except Exception:
             logger.warning("Docker did not report its architecture; using the local one")
         await self.state.start()
-        from hivora.tasks.service import run_scheduler  # needs Runtime itself
         from hivora.vpn.service import expire_clients, follow_deploys
 
         self._vpn_tasks = [
             asyncio.create_task(follow_deploys(self), name="vpn-follow"),
             asyncio.create_task(expire_clients(self), name="vpn-expiry"),
-            asyncio.create_task(run_scheduler(self), name="task-scheduler"),
+            asyncio.create_task(run_scheduler(self.tasks), name="task-scheduler"),
         ]
         await self.jobs.start()
 
     async def tasks_tick(self) -> None:
         """Run the scheduled tasks that are due (the scheduler calls this every minute)."""
-        from hivora.tasks.service import TaskTools
-
-        await TaskTools(self).tick()
+        await self.tasks.tick()
 
     async def _warm_icons(self) -> None:
         try:

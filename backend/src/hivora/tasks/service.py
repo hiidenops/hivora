@@ -13,15 +13,20 @@ import shlex
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.core import decrypt_secrets, get_app
+from hivora.apps.service import AppService
+from hivora.backups.service import BackupService
+from hivora.core.clock import Clock
+from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
+from hivora.core.events import EventBus
 from hivora.core.redact import Redactor
 from hivora.core.schedule import local_zone, next_run
-from hivora.docker_gateway import ContainerState
-from hivora.runtime import Runtime
-from hivora.state import app_key
+from hivora.crypto.cipher import SecretBox
+from hivora.docker_gateway import ContainerState, DockerGateway
+from hivora.state import StateStore, app_key
 from hivora.tasks.models import ScheduledTask
 
 logger = logging.getLogger(__name__)
@@ -41,8 +46,20 @@ class TaskFailedError(ConflictError):
 
 
 class TaskTools:
-    def __init__(self, rt: Runtime) -> None:
-        self.rt = rt
+    def __init__(
+        self, *, sessions: async_sessionmaker[AsyncSession], clock: Clock, bus: EventBus,
+        settings: Settings, apps: AppService, backups: BackupService, box: SecretBox,
+        store: StateStore, gateway: DockerGateway,
+    ) -> None:  # fmt: skip
+        self.sessions = sessions
+        self.clock = clock
+        self.bus = bus
+        self.settings = settings
+        self.apps = apps
+        self.backups = backups
+        self.box = box
+        self.store = store
+        self.gateway = gateway
 
     async def get(self, session: AsyncSession, app_id: int, task_id: int) -> ScheduledTask:
         task = await session.get(ScheduledTask, task_id)
@@ -51,7 +68,7 @@ class TaskTools:
         return task
 
     async def list(self, app_id: int) -> list[ScheduledTask]:
-        async with self.rt.sessions() as session:
+        async with self.sessions() as session:
             await get_app(session, app_id)
             rows = await session.scalars(
                 select(ScheduledTask).where(ScheduledTask.app_id == app_id)
@@ -64,73 +81,73 @@ class TaskTools:
             if not str(values.get("command") or "").strip():
                 raise ValidationError("a command is required", field="command")
             if values.get("mode") == "console":
-                _, entry, _ = await self.rt.apps.main_container(session, app_id)
+                _, entry, _ = await self.apps.main_container(session, app_id)
                 game = entry.template.game if entry else None
                 if not (game and game.console):
                     raise ValidationError("this app has no game console", field="mode")
 
     async def save(self, app_id: int, values: dict[str, Any], task_id: int | None = None) -> int:
-        async with self.rt.sessions() as session, session.begin():
+        async with self.sessions() as session, session.begin():
             app = await get_app(session, app_id)
             await self._check(session, app_id, values)
             task = await self.get(session, app_id, task_id) if task_id else ScheduledTask(
                 app_id=app_id, last_output="")  # fmt: skip
             for key, value in values.items():
                 setattr(task, key, value)
-            now = self.rt.clock.now()
+            now = self.clock.now()
             task.next_run_at = next_run(task, now, self._tz) if task.enabled else None
             session.add(task)
             await session.flush()
             tid = task.id
-        self.rt.bus.publish("task.saved", app=app.slug, target=values.get("name"))
+        self.bus.publish("task.saved", app=app.slug, target=values.get("name"))
         return tid
 
     async def delete(self, app_id: int, task_id: int) -> None:
-        async with self.rt.sessions() as session, session.begin():
+        async with self.sessions() as session, session.begin():
             task = await self.get(session, app_id, task_id)
             await session.delete(task)
-        self.rt.bus.publish("task.deleted", app_id=app_id, target=task.name)
+        self.bus.publish("task.deleted", app_id=app_id, target=task.name)
 
     @property
     def _tz(self) -> Any:
-        return local_zone(self.rt.settings.timezone)
+        return local_zone(self.settings.timezone)
 
     # --- running ----------------------------------------------------------------
     async def run(self, app_id: int, task_id: int) -> tuple[str, str]:
         """Run now; returns (status, output). Lifecycle and backups are queued jobs."""
-        async with self.rt.sessions() as session:
+        async with self.sessions() as session:
             task = await self.get(session, app_id, task_id)
         try:
             status, output = await self._execute(task)
         except Exception as exc:  # recorded on the task, shown on the card
             status, output = "failed", str(exc)[:OUTPUT_MAX]
-        async with self.rt.sessions() as session, session.begin():
+        async with self.sessions() as session, session.begin():
             row = await self.get(session, app_id, task_id)
             row.last_run_at, row.last_status, row.last_output = (
-                self.rt.clock.now(),
+                self.clock.now(),
                 status,
                 output[-OUTPUT_MAX:],
             )
-        self.rt.bus.publish("task.ran", app_id=app_id, target=task.name, status=status)
+        self.bus.publish("task.ran", app_id=app_id, target=task.name, status=status)
         return status, output
 
     async def _execute(self, task: ScheduledTask) -> tuple[str, str]:
-        apps = self.rt.apps
+        apps = self.apps
         if task.action in ("restart", "stop", "start"):
             job = await getattr(apps.lifecycle, task.action)(task.app_id)
             return "queued", f"job #{job.id}"
         if task.action == "backup":
-            job = await self.rt.backups.request(task.app_id, scheduled=True)
+            job = await self.backups.request(task.app_id, scheduled=True)
             return "queued", f"job #{job.id}"
         return await self._command(task)
 
     async def _command(self, task: ScheduledTask) -> tuple[str, str]:
-        async with self.rt.sessions() as session:
-            app, entry, main = await self.rt.apps.main_container(session, task.app_id)
-            secrets = await decrypt_secrets(session, self.rt.box, app.id)
+        async with self.sessions() as session:
+            app, entry, main = await self.apps.main_container(session, task.app_id)
+            secrets = await decrypt_secrets(session, self.box, app.id)
         container = main
         if task.service:
-            running = (c for c in self.rt.state.store.containers()
+            running = (c for c in self.store.containers()
                        if app_key(c) == app.slug and c.state is ContainerState.RUNNING)  # fmt: skip
             container = next((c for c in running if c.labels.get(SERVICE_LABEL) == task.service),
                              None)  # fmt: skip
@@ -142,19 +159,19 @@ class TaskTools:
             if not (game and game.console):
                 raise TaskFailedError("this app has no game console")
             argv = [*game.console, *shlex.split(task.command)]
-            s = self.rt.settings
+            s = self.settings
             user = f"{s.puid}:{s.pgid}" if game.run_as == "app" else None
         else:
             argv = ["sh", "-c", task.command]
         async with asyncio.timeout(COMMAND_TIMEOUT_S):
-            code, out = await self.rt.gateway.exec_run(container.id, argv, user)
+            code, out = await self.gateway.exec_run(container.id, argv, user)
         out = Redactor(secrets.values())(out)
         return ("ok" if code == 0 else "failed"), out if code == 0 else f"exit {code}\n{out}"
 
     # --- scheduler ----------------------------------------------------------------
     async def tick(self) -> None:
-        now = self.rt.clock.now()
-        async with self.rt.sessions() as session, session.begin():
+        now = self.clock.now()
+        async with self.sessions() as session, session.begin():
             due = list(await session.scalars(select(ScheduledTask).where(
                 ScheduledTask.enabled.is_(True), ScheduledTask.next_run_at <= now
             )))  # fmt: skip
@@ -165,10 +182,10 @@ class TaskTools:
             await self.run(app_id, task_id)
 
 
-async def run_scheduler(rt: Runtime) -> None:
+async def run_scheduler(tasks: TaskTools) -> None:
     while True:
         await asyncio.sleep(60)
         try:
-            await TaskTools(rt).tick()
+            await tasks.tick()
         except Exception:
             logger.exception("task scheduler failed")
