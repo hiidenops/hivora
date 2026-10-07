@@ -74,13 +74,13 @@ class ZoneIn(BaseModel):
 @zone_router.put("/{app_id}/zone", status_code=202)
 async def move_zone(app_id: int, body: ZoneIn, _: Operator, rt: RuntimeDep) -> JobRef:
     """New revision in the target zone (joins its network if it shares one)."""
-    return job_ref(await rt.apps.move_zone(app_id, body.zone))
+    return job_ref(await rt.apps.revisions.move_zone(app_id, body.zone))
 
 
 @router.get("/{app_id}/settings")
 async def get_settings(app_id: int, _: Operator, rt: RuntimeDep) -> SettingsOut:
     async with rt.sessions() as session:
-        st = await rt.apps.current_settings(session, app_id)
+        st = await rt.apps.planner.current_settings(session, app_id)
         latest = await latest_revision(session, app_id)
     t = st.entry.template
     return SettingsOut(template=st.entry.slug, version=t.metadata.version,
@@ -107,15 +107,15 @@ async def plan_settings(
 ) -> UpdatePlanOut:
     """Preview: new compose and its diff against the current revision. Nothing is written."""
     async with rt.sessions() as session:
-        return update_plan_out(
-            await rt.apps.plan_update(session, app_id, body.inputs, overrides=body.overrides)
-        )
+        plan = await rt.apps.revisions.plan_update(session, app_id, body.inputs,
+                                                   overrides=body.overrides)  # fmt: skip
+        return update_plan_out(plan)
 
 
 @router.put("/{app_id}/settings", status_code=202)
 async def update_settings(app_id: int, body: SettingsIn, _: Operator, rt: RuntimeDep) -> JobRef:
     """New revision from these inputs, applied by a job (secrets left empty are kept)."""
-    return job_ref(await rt.apps.update(app_id, body.inputs, reset_data=body.reset_data,
+    return job_ref(await rt.apps.revisions.update(app_id, body.inputs, reset_data=body.reset_data,
                                         overrides=body.overrides))  # fmt: skip
 
 
@@ -123,30 +123,30 @@ async def update_settings(app_id: int, body: SettingsIn, _: Operator, rt: Runtim
 async def upgrade_status(app_id: int, _: Viewer, rt: RuntimeDep) -> UpgradeOut:
     """Newer template version, or newer image for a free image (asks its registry)."""
     async with rt.sessions() as session:
-        st = await rt.apps.upgrade_status(session, app_id)
+        st = await rt.apps.revisions.upgrade_status(session, app_id)
     return UpgradeOut(kind=st.kind, current=st.current, latest=st.latest, available=st.available)
 
 
 @router.post("/{app_id}/upgrade/plan")
 async def plan_upgrade(app_id: int, _: Operator, rt: RuntimeDep) -> UpdatePlanOut:
     async with rt.sessions() as session:
-        return update_plan_out(await rt.apps.plan_upgrade(session, app_id))
+        return update_plan_out(await rt.apps.revisions.plan_upgrade(session, app_id))
 
 
 @router.post("/{app_id}/upgrade", status_code=202)
 async def upgrade(app_id: int, body: ApplyIn, _: Operator, rt: RuntimeDep) -> JobRef:
     """Same settings, newest template (or image): a new revision."""
-    return job_ref(await rt.apps.upgrade(app_id, reset_data=body.reset_data))
+    return job_ref(await rt.apps.revisions.upgrade(app_id, reset_data=body.reset_data))
 
 
 @router.post("/{app_id}/revisions/{number}/plan")
 async def plan_restore(app_id: int, number: int, _: Operator, rt: RuntimeDep) -> UpdatePlanOut:
     async with rt.sessions() as session:
-        return update_plan_out(await rt.apps.plan_restore(session, app_id, number))
+        return update_plan_out(await rt.apps.revisions.plan_restore(session, app_id, number))
 
 
 @router.post("/{app_id}/revisions/{number}/restore", status_code=202)
 async def restore(app_id: int, number: int, body: ApplyIn, _: Operator,
                   rt: RuntimeDep) -> JobRef:  # fmt: skip
     """A new revision with that revision's settings and template version."""
-    return job_ref(await rt.apps.restore(app_id, number, reset_data=body.reset_data))
+    return job_ref(await rt.apps.revisions.restore(app_id, number, reset_data=body.reset_data))

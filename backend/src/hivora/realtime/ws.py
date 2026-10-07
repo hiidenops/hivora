@@ -35,6 +35,7 @@ from urllib.parse import urlsplit
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from hivora.apps.core import decrypt_secrets
 from hivora.auth.models import Role, User
 from hivora.core.context import Actor, current_actor
 from hivora.core.errors import HivoraError
@@ -138,7 +139,7 @@ class Connection:
         try:
             async with self.rt.sessions() as session:
                 app, entry, _ = await self.rt.apps.main_container(session, int(msg["app"]))
-                secrets = await self.rt.apps.decrypt_secrets(session, app.id)
+                secrets = await decrypt_secrets(session, self.rt.box, app.id)
         except HivoraError as exc:
             await self.send(error(exc.code))
             return

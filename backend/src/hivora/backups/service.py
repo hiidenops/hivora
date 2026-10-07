@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hivora.apps.core import get_app
 from hivora.apps.models import Application, DesiredState
 from hivora.apps.service import AppService
 from hivora.backups.models import Backup, BackupSchedule
@@ -158,7 +159,7 @@ class BackupService:
 
     async def set_schedule(self, app_id: int, **values: object) -> BackupSchedule:
         async with self.apps.sessions() as session, session.begin():
-            await self.apps.get(session, app_id)
+            await get_app(session, app_id)
             row = await session.get(BackupSchedule, app_id) or BackupSchedule(app_id=app_id)
             for key, value in values.items():
                 setattr(row, key, value)
@@ -170,7 +171,7 @@ class BackupService:
     # --- jobs ---------------------------------------------------------------
     async def _app(self, ctx: JobContext) -> tuple[Application, Backup, dict[str, Path]]:
         async with self.apps.sessions() as session:
-            app = await self.apps.get(session, int(ctx.app_id or 0))
+            app = await get_app(session, int(ctx.app_id or 0))
             backup = await self.get(session, app.id, int(ctx.params["backup_id"]))
             return app, backup, await self.volumes(app)
 

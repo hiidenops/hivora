@@ -38,7 +38,7 @@ def to_request(body: DeployIn) -> DeployRequest:
 async def plan(body: DeployIn, _: Operator, rt: RuntimeDep) -> PlanOut:
     """Preview: generated compose, ports, conflicts. Nothing is written."""
     async with rt.sessions() as session:
-        return plan_out(await rt.apps.plan_deploy(session, to_request(body)))
+        return plan_out(await rt.apps.deployer.plan_deploy(session, to_request(body)))
 
 
 class CustomPortIn(BaseModel):
@@ -93,7 +93,7 @@ async def inspect_image(_: Operator, rt: RuntimeDep, ref: str = Query(max_length
 
 
 async def _custom(rt: RuntimeDep, body: CustomIn) -> DeployRequest:
-    return await rt.apps.custom_request(
+    return await rt.apps.custom.request(
         body.name, body.image, body.zone,
         [CustomPort(p.container, p.host, p.protocol, p.exposure, p.web) for p in body.ports],
         body.volumes, [CustomEnv(e.key, e.value, e.secret) for e in body.env],
@@ -105,16 +105,16 @@ async def plan_custom(body: CustomIn, _: Operator, rt: RuntimeDep) -> PlanOut:
     """Preview the compose generated for a free image. Nothing is written."""
     req = await _custom(rt, body)
     async with rt.sessions() as session:
-        return plan_out(await rt.apps.plan_deploy(session, req))
+        return plan_out(await rt.apps.deployer.plan_deploy(session, req))
 
 
 @router.post("/custom", status_code=202)
 async def deploy_custom(body: CustomIn, _: Operator, rt: RuntimeDep) -> DeployOut:
     req = await _custom(rt, body)
-    app, job = await rt.apps.deploy(req)
+    app, job = await rt.apps.deployer.deploy(req)
     return DeployOut(app=app_out(rt, app, req.template), job=job_ref(job))
 
 
 async def deploy(body: DeployIn, _: Operator, rt: RuntimeDep) -> DeployOut:
-    app, job = await rt.apps.deploy(to_request(body))
+    app, job = await rt.apps.deployer.deploy(to_request(body))
     return DeployOut(app=app_out(rt, app, body.template), job=job_ref(job))

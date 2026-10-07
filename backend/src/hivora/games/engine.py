@@ -128,7 +128,7 @@ class GameTools:
 
     async def _values(self, app_id: int) -> dict[str, Any]:
         async with self.rt.sessions() as session:
-            return (await self.rt.apps.current_settings(session, app_id)).values
+            return (await self.rt.apps.planner.current_settings(session, app_id)).values
 
     async def _run(self, srv: _Server, cmd: list[str]) -> str:
         if srv.container is None:
@@ -229,7 +229,7 @@ class GameTools:
         if not gl.enabled_field:
             raise GameFeatureMissingError(f"list {list_id!r} cannot be turned off")
         values = await self._values(app_id)
-        return await self.rt.apps.update(app_id, {**values, gl.enabled_field: enabled})
+        return await self.rt.apps.revisions.update(app_id, {**values, gl.enabled_field: enabled})
 
     # --- worlds -----------------------------------------------------------
     async def _saves(self, app_id: int) -> tuple[_Server, GameSaves, Path, str]:
@@ -277,7 +277,7 @@ class GameTools:
         if name == active:
             raise w.ActiveWorldError("this world is already active", name=name)
         values = await self._values(app_id)
-        return await self.rt.apps.update(app_id, {**values, saves.active_field: name})
+        return await self.rt.apps.revisions.update(app_id, {**values, saves.active_field: name})
 
     async def delete_world(self, app_id: int, name: str) -> Job:
         srv, saves, data, active = await self._saves(app_id)

@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from hivora.apps.api.common import AppOut, PortOut, app_out
+from hivora.apps.core import get_app as app_by_id  # get_app: this module's route
 from hivora.apps.models import RevisionStatus
 from hivora.apps.queries import (
     applied_compose,
@@ -107,7 +108,7 @@ async def app_summary(
         return []
     if t is None or not t.summary:
         return []
-    values = (await rt.apps.current_settings(session, app_id)).values
+    values = (await rt.apps.planner.current_settings(session, app_id)).values
     fields = {f.id: f for f in t.form.fields}
     items = []
     for fid in t.summary:
@@ -155,7 +156,7 @@ async def list_apps(_: Viewer, rt: RuntimeDep) -> list[AppOut]:
 @router.get("/{app_id}")
 async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
     async with rt.sessions() as session:
-        app = await rt.apps.get(session, app_id)
+        app = await app_by_id(session, app_id)
         template = await template_slug(session, app)
         revision_number = await applied_revision_number(session, app)
         state = rt.state.store.app(app.slug)
@@ -190,14 +191,14 @@ async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
 @router.get("/{app_id}/compose")
 async def get_compose(app_id: int, _: Viewer, rt: RuntimeDep) -> dict[str, str]:
     async with rt.sessions() as session:
-        app = await rt.apps.get(session, app_id)
+        app = await app_by_id(session, app_id)
         return {"compose_yaml": await applied_compose(session, app)}
 
 
 @router.get("/{app_id}/revisions")
 async def list_revisions(app_id: int, _: Viewer, rt: RuntimeDep) -> list[RevisionOut]:
     async with rt.sessions() as session:
-        await rt.apps.get(session, app_id)
+        await app_by_id(session, app_id)
         rows = await revisions_of(session, app_id)
         return [
             RevisionOut(

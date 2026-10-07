@@ -5,6 +5,7 @@ from pathlib import Path
 import yaml
 from sqlalchemy import update
 
+from hivora.apps.core import decrypt_secrets, get_app
 from hivora.apps.models import Application, AppRevision, Origin, RevisionStatus
 from hivora.apps.service import AppService, UnsupportedArchitectureError
 from hivora.compose_runner import ComposeError, ProgressEvent, ProgressStatus
@@ -96,7 +97,7 @@ class AppJobHandlers:
     async def _adopted(self, ctx: JobContext, verb: str) -> bool:
         """Adopted stacks are driven by project name (their file stays with the user)."""
         async with self.s.sessions() as session:
-            app = await self.s.get(session, _app_id(ctx))
+            app = await get_app(session, _app_id(ctx))
         if app.origin is not Origin.ADOPTED:
             return False
         async with self.s.runner.lock(app.slug):
@@ -137,7 +138,7 @@ class AppJobHandlers:
             else:
                 slug = ""
         if slug:
-            await s.load_adopted()
+            await s.adoption.load()
             await ctx.log(f"{slug} is no longer managed by Hivora; its containers keep running")
             s.bus.publish("app.removed", app=slug, data_removed=False)
             return
@@ -219,8 +220,8 @@ class AppJobHandlers:
 
     async def _slug_and_secrets(self, ctx: JobContext) -> tuple[str, list[str]]:
         async with self.s.sessions() as session:
-            app = await self.s.get(session, _app_id(ctx))
-            secrets = list((await self.s.decrypt_secrets(session, app.id)).values())
+            app = await get_app(session, _app_id(ctx))
+            secrets = list((await decrypt_secrets(session, self.s.box, app.id)).values())
         ctx.add_secrets(secrets)
         return app.slug, secrets
 

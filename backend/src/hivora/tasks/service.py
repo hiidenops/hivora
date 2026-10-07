@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hivora.apps.core import decrypt_secrets, get_app
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.core.redact import Redactor
 from hivora.core.schedule import local_zone, next_run
@@ -51,7 +52,7 @@ class TaskTools:
 
     async def list(self, app_id: int) -> list[ScheduledTask]:
         async with self.rt.sessions() as session:
-            await self.rt.apps.get(session, app_id)
+            await get_app(session, app_id)
             rows = await session.scalars(
                 select(ScheduledTask).where(ScheduledTask.app_id == app_id)
                 .order_by(ScheduledTask.id)
@@ -70,7 +71,7 @@ class TaskTools:
 
     async def save(self, app_id: int, values: dict[str, Any], task_id: int | None = None) -> int:
         async with self.rt.sessions() as session, session.begin():
-            app = await self.rt.apps.get(session, app_id)
+            app = await get_app(session, app_id)
             await self._check(session, app_id, values)
             task = await self.get(session, app_id, task_id) if task_id else ScheduledTask(
                 app_id=app_id, last_output="")  # fmt: skip
@@ -116,7 +117,7 @@ class TaskTools:
     async def _execute(self, task: ScheduledTask) -> tuple[str, str]:
         apps = self.rt.apps
         if task.action in ("restart", "stop", "start"):
-            job = await getattr(apps, task.action)(task.app_id)
+            job = await getattr(apps.lifecycle, task.action)(task.app_id)
             return "queued", f"job #{job.id}"
         if task.action == "backup":
             job = await self.rt.backups.request(task.app_id, scheduled=True)
@@ -126,7 +127,7 @@ class TaskTools:
     async def _command(self, task: ScheduledTask) -> tuple[str, str]:
         async with self.rt.sessions() as session:
             app, entry, main = await self.rt.apps.main_container(session, task.app_id)
-            secrets = await self.rt.apps.decrypt_secrets(session, app.id)
+            secrets = await decrypt_secrets(session, self.rt.box, app.id)
         container = main
         if task.service:
             running = (c for c in self.rt.state.store.containers()

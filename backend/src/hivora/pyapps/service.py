@@ -308,7 +308,7 @@ class PythonProjects:
                                 only_code=True, uid=s.puid, gid=s.pgid)  # fmt: skip
         path.unlink(missing_ok=True)
         self.rt.bus.publish("app.python_code_updated", app=app.slug)
-        return await self.rt.apps.restart(app_id)
+        return await self.rt.apps.lifecycle.restart(app_id)
 
 
 async def _capped(chunks: AsyncIterator[bytes], limit: int) -> AsyncIterator[bytes]:

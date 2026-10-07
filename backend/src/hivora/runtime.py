@@ -126,10 +126,11 @@ class Runtime:
             box=box,
             bus=bus,
             clock=clock,
-            secret_settings=secrets,
-            public_address=public_address.current,
-            gateway=gateway,
         )
+        # What only the planner and the job handlers use, given to them here.
+        apps.planner.secret_settings = secrets
+        apps.planner.public_address = public_address.current
+        apps.gateway = gateway
         AppJobHandlers(apps).register()
         WorldJobs(apps).register()
         backups = BackupService(apps)
@@ -164,8 +165,8 @@ class Runtime:
         await self.backups.start()
         await self.site_config.start()
         await self.auth.ensure_initial_admin()
-        await self.apps.load_custom_templates()
-        await self.apps.load_adopted()
+        await self.apps.custom.load_templates()
+        await self.apps.adoption.load()
         try:
             set_host_arch(await self.gateway.architecture())
         except Exception:

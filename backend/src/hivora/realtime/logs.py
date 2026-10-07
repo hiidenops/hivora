@@ -17,6 +17,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import PlainTextResponse
 
+from hivora.apps.core import decrypt_secrets, get_app
 from hivora.core.redact import Redactor
 from hivora.docker_gateway import ContainerInfo, ContainerState
 from hivora.runtime import Runtime
@@ -164,8 +165,8 @@ async def download(
 ) -> PlainTextResponse:  # fmt: skip
     """Logs of the app's containers as text (last ``tail`` lines each), secrets masked."""
     async with rt.sessions() as session:
-        app = await rt.apps.get(session, app_id)
-        secrets = list((await rt.apps.decrypt_secrets(session, app.id)).values())
+        app = await get_app(session, app_id)
+        secrets = list((await decrypt_secrets(session, rt.box, app.id)).values())
     lines = await snapshot(rt, app.slug, secrets, tail=tail, service=service)
     rt.bus.publish("app.logs_downloaded", app=app.slug, service=service)
     stamp = rt.clock.now().strftime("%Y%m%d-%H%M")

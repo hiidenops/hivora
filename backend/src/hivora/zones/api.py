@@ -55,7 +55,7 @@ async def edit(slug: str, body: ZoneIn, _: Operator, rt: RuntimeDep) -> ZoneOut:
         zone, changed = await edit_zone(session, slug, body.name, body.color, body.network_mode)
         out = _out(zone, (await rt.apps.apps_per_zone(session)).get(zone.id, 0))
     if changed:
-        await rt.apps.redeploy_zone(out.id)
+        await rt.apps.revisions.redeploy_zone(out.id)
     rt.bus.publish("zone.updated", target=slug, network_changed=changed)
     return out
 

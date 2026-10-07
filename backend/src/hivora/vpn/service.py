@@ -108,7 +108,7 @@ class VpnTools:
             spec = entry.template.vpn if entry else None
             if entry is None or spec is None:
                 raise NotAVpnError("this app is not a managed VPN", slug=app.slug)
-            values = (await self.rt.apps.current_settings(session, app_id)).values
+            values = (await self.rt.apps.planner.current_settings(session, app_id)).values
         main = entry.template.services[entry.template.main_service]
         target = next(v.target for v in main.volumes if v.name == spec.volume)
         volume = self.rt.apps.volumes_dir(app.slug) / spec.volume
@@ -448,7 +448,7 @@ class VpnTools:
         if not vpn.spec.zones_field:
             raise NotAVpnError("this VPN cannot reach zones")
         inputs = {**vpn.values, vpn.spec.zones_field: ",".join(zones)}
-        job = await self.rt.apps.update(app_id, inputs)
+        job = await self.rt.apps.revisions.update(app_id, inputs)
         self.rt.bus.publish("vpn.zones_changed", app=vpn.slug, zones=zones)
         return job
 

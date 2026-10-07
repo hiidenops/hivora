@@ -77,7 +77,7 @@ async def build(rt: Runtime) -> Graph:
                     for key, value in (svc.get("publish") or {}).items()
                 }  # fmt: skip
             if vpn and vpn.zones_field:
-                values = (await rt.apps.current_settings(session, app.id)).values
+                values = (await rt.apps.planner.current_settings(session, app.id)).values
                 vpn_reach[app.id] = [z for z in str(values.get(vpn.zones_field) or "").split(",")
                                      if z]  # fmt: skip
 
@@ -172,7 +172,7 @@ async def build(rt: Runtime) -> Graph:
                 graph.edges.append({"source": key, "target": f"app:{app_by_slug[slug[1:]]}",
                                     "kind": "vpn", "label": "VPN"})  # fmt: skip
 
-    unmanaged = len(rt.state.store.unmanaged()) + len(rt.apps.candidates())
+    unmanaged = len(rt.state.store.unmanaged()) + len(rt.apps.adoption.candidates())
     if unmanaged:
         graph.alerts.append({"level": "info", "code": "unmanaged", "target": None,
                              "count": unmanaged})  # fmt: skip

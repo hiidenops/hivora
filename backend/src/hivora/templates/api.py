@@ -70,7 +70,8 @@ async def get_template(slug: str, _: Viewer, rt: RuntimeDep) -> TemplateDetail:
     entry = rt.catalog.get(slug)
     t = entry.template
     form = t.form.model_dump(by_alias=True, exclude_none=True)
-    host = {"host": build_context(AppContext("", "", 0), rt.apps.host, FormValues(), [])["host"]}
+    context = build_context(AppContext("", "", 0), rt.apps.planner.host, FormValues(), [])
+    host = {"host": context["host"]}
     for f in (f for part in form.values() if isinstance(part, list) for f in part):
         d = f.get("default")
         # Host facts are known now: show them in the form (app.* stays for the backend).

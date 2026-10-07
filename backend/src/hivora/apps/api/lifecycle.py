@@ -23,26 +23,26 @@ class RemovalPlanOut(BaseModel):
 
 @router.post("/{app_id}/start", status_code=202)
 async def start(app_id: int, _: Operator, rt: RuntimeDep) -> JobRef:
-    return job_ref(await rt.apps.start(app_id))
+    return job_ref(await rt.apps.lifecycle.start(app_id))
 
 
 @router.post("/{app_id}/stop", status_code=202)
 async def stop(app_id: int, _: Operator, rt: RuntimeDep) -> JobRef:
-    return job_ref(await rt.apps.stop(app_id))
+    return job_ref(await rt.apps.lifecycle.stop(app_id))
 
 
 @router.post("/{app_id}/restart", status_code=202)
 async def restart(app_id: int, _: Operator, rt: RuntimeDep) -> JobRef:
-    return job_ref(await rt.apps.restart(app_id))
+    return job_ref(await rt.apps.lifecycle.restart(app_id))
 
 
 @removal_router.get("/{app_id}/removal-plan")
 async def removal_plan(app_id: int, _: Operator, rt: RuntimeDep) -> RemovalPlanOut:
-    p = await rt.apps.removal_plan(app_id)
+    p = await rt.apps.lifecycle.removal_plan(app_id)
     return RemovalPlanOut(slug=p.slug, containers=p.containers, files=p.files, data=p.data)
 
 
 @removal_router.delete("/{app_id}", status_code=202)
 async def remove(app_id: int, _: Operator, rt: RuntimeDep, remove_data: bool = False) -> JobRef:
     """Data is kept unless ``remove_data=true`` is passed explicitly."""
-    return job_ref(await rt.apps.remove(app_id, remove_data=remove_data))
+    return job_ref(await rt.apps.lifecycle.remove(app_id, remove_data=remove_data))

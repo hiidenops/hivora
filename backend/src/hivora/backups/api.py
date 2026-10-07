@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from hivora.apps.api import JobRef, job_ref
+from hivora.apps.core import get_app
 from hivora.backups.service import BackupNotFoundError, BackupService
 from hivora.web.deps import Operator, RuntimeDep
 
@@ -52,7 +53,7 @@ def tools(rt: RuntimeDep) -> BackupService:
 async def overview(app_id: int, _: Operator, rt: RuntimeDep) -> BackupsOut:
     b = tools(rt)
     async with rt.sessions() as session:
-        app = await rt.apps.get(session, app_id)
+        app = await get_app(session, app_id)
         schedule, rows = await b.listing(session, app_id)
         backups = [BackupOut(id=r.id, created_at=r.created_at, scheduled=r.scheduled,
                              status=r.status, name=Path(r.path).name, size=r.size)

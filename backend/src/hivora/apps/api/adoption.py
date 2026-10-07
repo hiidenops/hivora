@@ -27,11 +27,11 @@ async def discover(_: Operator, rt: RuntimeDep) -> list[CandidateOut]:
     """Compose stacks running on this Docker that Hivora does not manage yet."""
     return [CandidateOut(project=c.project, services=c.services, running=c.running,
                          containers=c.containers, working_dir=c.working_dir)
-            for c in rt.apps.candidates()]  # fmt: skip
+            for c in rt.apps.adoption.candidates()]  # fmt: skip
 
 
 @router.post("/adopt", status_code=201)
 async def adopt(body: AdoptIn, _: Operator, rt: RuntimeDep) -> dict[str, int]:
     """Manage a running stack from Hivora: metadata only, nothing is redeployed."""
-    app = await rt.apps.adopt(body.project, body.name.strip(), body.zone)
+    app = await rt.apps.adoption.adopt(body.project, body.name.strip(), body.zone)
     return {"id": app.id}
