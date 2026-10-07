@@ -7,7 +7,6 @@ from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
-from hivora.vpn.service import VpnTools
 from hivora.web.deps import Operator, RuntimeDep
 
 router = APIRouter(tags=["vpn"])
@@ -96,14 +95,14 @@ def _check_ips(ips: list[str] | None) -> None:
 
 @router.get("/{app_id}/vpn")
 async def overview(app_id: int, _: Operator, rt: RuntimeDep) -> VpnOut:
-    return VpnOut(**await VpnTools(rt).overview(app_id))
+    return VpnOut(**await rt.vpn.overview(app_id))
 
 
 @router.post("/{app_id}/vpn/clients", status_code=201)
 async def create(app_id: int, body: ClientIn, _: Operator, rt: RuntimeDep) -> dict[str, int]:
     _check_ips(body.allowed_ips)
     extra = body.model_dump(include={"access", "routing", "expires_at"}, exclude_unset=True)
-    return {"id": await VpnTools(rt).create(app_id, body.name, body.allowed_ips, body.address,
+    return {"id": await rt.vpn.create(app_id, body.name, body.allowed_ips, body.address,
                                             **extra)}  # fmt: skip
 
 
@@ -115,23 +114,23 @@ async def update(app_id: int, cid: int, body: ClientUpdateIn, _: Operator, rt: R
         changes.pop("name", None)
     if changes.get("routing") is None:
         changes.pop("routing", None)
-    await VpnTools(rt).update(app_id, cid, **changes)
+    await rt.vpn.update(app_id, cid, **changes)
 
 
 @router.delete("/{app_id}/vpn/clients/{cid}", status_code=204)
 async def delete(app_id: int, cid: int, _: Operator, rt: RuntimeDep) -> None:
-    await VpnTools(rt).delete(app_id, cid)
+    await rt.vpn.delete(app_id, cid)
 
 
 @router.post("/{app_id}/vpn/clients/{cid}/renew")
 async def renew(app_id: int, cid: int, _: Operator, rt: RuntimeDep) -> dict[str, int]:
     """New key pair (the client must import its new configuration)."""
-    return {"id": await VpnTools(rt).renew(app_id, cid)}
+    return {"id": await rt.vpn.renew(app_id, cid)}
 
 
 @router.get("/{app_id}/vpn/clients/{cid}/config")
 async def config(app_id: int, cid: int, _: Operator, rt: RuntimeDep) -> PlainTextResponse:
-    text = await VpnTools(rt).configuration(app_id, cid)
+    text = await rt.vpn.configuration(app_id, cid)
     return PlainTextResponse(text, headers={
         "Content-Disposition": f'attachment; filename="wireguard-{cid}.conf"',
         "Cache-Control": "no-store",
@@ -140,7 +139,7 @@ async def config(app_id: int, cid: int, _: Operator, rt: RuntimeDep) -> PlainTex
 
 @router.get("/{app_id}/vpn/clients/{cid}/qrcode")
 async def qrcode(app_id: int, cid: int, _: Operator, rt: RuntimeDep) -> Response:
-    svg = await VpnTools(rt).qrcode(app_id, cid)
+    svg = await rt.vpn.qrcode(app_id, cid)
     return Response(svg, media_type="image/svg+xml", headers={
         "Content-Security-Policy": "sandbox", "Cache-Control": "no-store",
     })  # fmt: skip
@@ -149,5 +148,5 @@ async def qrcode(app_id: int, cid: int, _: Operator, rt: RuntimeDep) -> Response
 @router.put("/{app_id}/vpn/zones", status_code=202)
 async def zones(app_id: int, body: ZonesIn, _: Operator, rt: RuntimeDep) -> JobRefOut:
     """Join these zones' networks (new revision); clients then reach their apps."""
-    job = await VpnTools(rt).set_zones(app_id, body.zones)
+    job = await rt.vpn.set_zones(app_id, body.zones)
     return JobRefOut(id=job.id, kind=job.kind.value, status=job.status.value)

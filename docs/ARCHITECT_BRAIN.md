@@ -252,9 +252,9 @@ Priorités techniques (bilan du 29/09) :
   - Déplacement pur, contrat OpenAPI identique.
 - **PRIORITÉ 2 : assainir `vpn`, puis `hostfw`.**
   - Mutations par `jobs`, avec le verrou de l'app.
-  - Dépendances explicites à la place de `Runtime`.
+  - Dépendances explicites à la place de `Runtime`. *`vpn` : fait le 07/10 (lot M10-b5).*
   - Plus de lecture directe de `apps.models`.
-  - Verrou d'instance à la place de `_LOCK`.
+  - Verrou d'instance à la place de `_LOCK`. *`vpn` : fait le 07/10 (lot M10-b5) : `VpnTools._lock`, une seule instance par Hivora.*
   - Découpage de `vpn/service.py` (491 lignes) : socle `addressing` / `acl` purs, application par exec à part.
 - **PRIORITÉ 3 : sortir `Runtime` des services métier restants** (~~`topology`~~ fait le 07/10, lot M10-b1 ; ~~`tasks`~~ fait le 07/10, lot M10-b2 ; ~~`pyapps`~~ fait le 07/10, lot M10-b3 ; ~~`games.engine`~~ fait le 07/10, lot M10-b4). Cela supprime les 4 cycles masqués de `runtime.py` (§8.2).
 
@@ -271,7 +271,7 @@ Second rang :
 
 1. **`Runtime` est la racine de composition, pas un annuaire.** Son rôle est de construire les services (`build`), de les démarrer et de les arrêter. Il ne doit pas être passé aux services métier.
 2. **Aucun nouveau service ne reçoit `Runtime`.** Il reçoit ses dépendances explicites, comme `AppService`, `AppPlanner`, `CustomImages`, `Adoption`, `ComposeEdit`, `Revisions`, `Deployer`, `Lifecycle`.
-   - *Dette connue* (vérifiée le 29/09, mise à jour le 07/10) : 2 services métier reçoivent `Runtime` : `vpn`, `hostfw` (plus `realtime`, toléré, voir point 3). Ne le reçoivent plus : `topology` (lot M10-b1 : `GraphBuilder`, construit par sa route), `tasks` (lot M10-b2 : `TaskTools`, construit une fois par `Runtime`, qui l'importe désormais en tête), `pyapps` (lot M10-b3 : `PythonProjects`, construit par sa route) et `games.engine` (lot M10-b4 : `GameTools`, construit par sa route). `runtime.py` importe encore en différé `realtime.console`, `hostfw.service` et `vpn.service`, soit 3 cycles masqués (4 au 29/09). À corriger module par module, en commençant par ceux qui n'utilisent que 2 ou 3 attributs.
+   - *Dette connue* (vérifiée le 29/09, mise à jour le 07/10) : 1 service métier reçoit `Runtime` : `hostfw` (plus `realtime`, toléré, voir point 3). Ne le reçoivent plus : `topology` (lot M10-b1 : `GraphBuilder`, construit par sa route), `tasks` (lot M10-b2 : `TaskTools`, construit une fois par `Runtime`, qui l'importe désormais en tête), `pyapps` (lot M10-b3 : `PythonProjects`, construit par sa route) `games.engine` (lot M10-b4 : `GameTools`, construit par sa route) et `vpn` (lot M10-b5 : `VpnTools`, construit une fois par `Runtime`, qui l'importe désormais en tête). `runtime.py` importe encore en différé `realtime.console` et `hostfw.service`, soit 2 cycles masqués (4 au 29/09). À corriger module par module, en commençant par ceux qui n'utilisent que 2 ou 3 attributs.
 3. **Exception tolérée : les adaptateurs de sortie** (`realtime/ws`, `realtime/console`, `realtime/logs`, routes FastAPI via `RuntimeDep`). Ils sont en bordure du système et ne sont importés par aucun service.
 4. **Services transverses** (`core.events.EventBus`, `core.clock`, `core.redact`, `crypto`, `audit`) :
    - ils ne dépendent d'aucun module métier ;
@@ -279,7 +279,7 @@ Second rang :
    - `clock` est toujours injecté, jamais `datetime.now()` direct dans un service, pour que les tests puissent figer le temps.
 5. **Pas d'état global de module pour du nouveau code.**
    - Un verrou, un cache, un registre appartiennent à une instance de service.
-   - *Dettes connues* : `vpn._LOCK`, `state._adopted` (`set_adopted`), `templates._detected_arch` (`set_host_arch`).
+   - *Dettes connues* : `state._adopted` (`set_adopted`), `templates._detected_arch` (`set_host_arch`). (`vpn._LOCK` : remplacé par un verrou d'instance le 07/10, lot M10-b5.)
    - *Correction du 29/09* : `auth._totp_used`, listé ici auparavant, est un attribut d'instance (`self._totp_used`), pas un état global.
 6. **Un service transverse qui grossit se découpe comme un module métier.** Il n'a pas de statut spécial.
 

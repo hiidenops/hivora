@@ -37,6 +37,7 @@ from hivora.tasks.service import TaskTools, run_scheduler
 from hivora.templates import Catalog
 from hivora.templates.catalog import set_host_arch
 from hivora.templates.icons import IconCache
+from hivora.vpn.service import VpnTools, expire_clients, follow_deploys
 
 if TYPE_CHECKING:
     from hivora.hostfw.service import HostFirewall
@@ -73,6 +74,7 @@ class Runtime:
     site_config: SiteConfig
     site_hosting: SiteHosting
     tasks: TaskTools
+    vpn: VpnTools
     hostfw: "HostFirewall" = field(init=False)
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
@@ -153,11 +155,13 @@ class Runtime:
         icons = IconCache(settings.data_dir / "icons")
         tasks = TaskTools(sessions=sessions, clock=clock, bus=bus, settings=settings, apps=apps,
                           backups=backups, box=box, store=state.store, gateway=gateway)  # fmt: skip
+        vpn = VpnTools(sessions=sessions, apps=apps, box=box, bus=bus, clock=clock,
+                       gateway=gateway)  # fmt: skip
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
                    public_address, AppMetrics(gateway, state.store, bus), backups,
-                   sites, site_files, site_config, site_hosting, tasks)  # fmt: skip
+                   sites, site_files, site_config, site_hosting, tasks, vpn)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
@@ -176,11 +180,9 @@ class Runtime:
         except Exception:
             logger.warning("Docker did not report its architecture; using the local one")
         await self.state.start()
-        from hivora.vpn.service import expire_clients, follow_deploys
-
         self._vpn_tasks = [
-            asyncio.create_task(follow_deploys(self), name="vpn-follow"),
-            asyncio.create_task(expire_clients(self), name="vpn-expiry"),
+            asyncio.create_task(follow_deploys(self.vpn), name="vpn-follow"),
+            asyncio.create_task(expire_clients(self.vpn), name="vpn-expiry"),
             asyncio.create_task(run_scheduler(self.tasks), name="task-scheduler"),
         ]
         await self.jobs.start()
