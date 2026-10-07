@@ -230,7 +230,7 @@ Situation au 07/10/2026 (lot M8-a ; mesures de `wc -l`, classes par `ast`) :
 
 | Fichier | Taille | Niveau |
 |---|---|---|
-| `features/topology/topology-view.tsx` | 541 lignes | **bloquant** (inchangé) |
+| `features/topology/topology-view.tsx` | 236 lignes | **résolu** en M9-b2 (541 avant) : `inspector.tsx` 181, `toolbar.tsx` 128, `pending-panel.tsx` 34, `connect.ts` 39 (règles de connexion, fonction pure), `export.ts` 29 ; couvert par `e2e/topology.spec.ts` (M9-b1) |
 | `templates/schema.py` | 496 lignes | alerte (inchangé) |
 | `vpn/service.py` | 491 lignes | alerte (inchangé) |
 | `auth/service.py` | 424 lignes | alerte (inchangé) |
@@ -258,7 +258,7 @@ Priorités techniques (bilan du 29/09) :
 
 Second rang :
 
-1. `topology-view.tsx` (seuil bloquant) : extraire le panneau d'inspection, le gestionnaire de liens et l'export.
+1. ~~`topology-view.tsx` (seuil bloquant) : extraire le panneau d'inspection, le gestionnaire de liens et l'export.~~ fait le 07/10 (lots M9-b1 et M9-b2) : 541 → 236 lignes.
 2. ~~`AppPlanner` dans `apps/planner.py` : `core.py` repasse sous 300 lignes.~~ fait le 07/10 (lot M9-a) : `core.py` 116 lignes, `planner.py` 260.
 3. Étape 7 de `AppService` : brancher les appelants sur les sous-services, puis supprimer les relais ; c'est ce qui fera baisser ses liens dans Graphify (§13).
 4. ~~`core/fs` pour `confined`, `tree_size`, `remove_tree` et `receive_upload` (§4.5)~~ fait le 01/10 (lot S0) ; reste `_Zip` à rendre public (§9.11).

@@ -5,6 +5,7 @@ import type { components } from "@/lib/api/schema";
 export type Graph = components["schemas"]["GraphOut"];
 export type GNode = Record<string, unknown> & { key: string; type: string; label?: string | null; parent?: string };
 export type Level = "zones" | "apps" | "all";
+export type Port = { port: number; container: number; protocol: string; exposure: string; service: string; override?: string | null; default?: string | null };
 
 export const APP_W = 170;
 const APP_H = { apps: 40, all: 62 };
