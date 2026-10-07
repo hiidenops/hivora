@@ -14,6 +14,11 @@ from hivora.web.deps import Operator, RuntimeDep
 router = APIRouter(tags=["python"])
 
 
+def projects(rt: RuntimeDep) -> PythonProjects:
+    return PythonProjects(settings=rt.settings, sessions=rt.sessions, catalog=rt.catalog,
+                          apps=rt.apps, bus=rt.bus)  # fmt: skip
+
+
 class MountIO(BaseModel):
     source: str = Field(max_length=200)  # folder in the project ("" = all of it)
     target: str = Field(max_length=200)  # path in the container
@@ -66,7 +71,7 @@ class ProjectIn(BaseModel):
 async def analyze(request: Request, _: Operator, rt: RuntimeDep,
                   filename: str = Query("project.zip", max_length=200)) -> AnalysisOut:  # fmt: skip
     """Upload a project's .zip (request body): what Hivora found in it."""
-    token, a = await PythonProjects(rt).analyze(request.stream(), filename)
+    token, a = await projects(rt).analyze(request.stream(), filename)
     data: dict[str, Any] = asdict(a)
     return AnalysisOut(token=token, **data)
 
@@ -80,11 +85,11 @@ async def deploy(body: ProjectIn, _: Operator, rt: RuntimeDep) -> DeployOut:
         env=[e.model_dump() for e in body.env], ports=[p.model_dump() for p in body.ports],
         apt=body.apt,
     )  # fmt: skip
-    app, job = await PythonProjects(rt).deploy(body.token, spec, body.zone)
+    app, job = await projects(rt).deploy(body.token, spec, body.zone)
     return DeployOut(app=app_out(rt, app, f"custom-{app.slug}"), job=job_ref(job))
 
 
 @router.post("/{app_id}/python/code", status_code=202)
 async def update_code(app_id: int, request: Request, _: Operator, rt: RuntimeDep) -> JobRef:
     """New code (request body: the project's .zip): code folders replaced, data kept."""
-    return job_ref(await PythonProjects(rt).update_code(app_id, request.stream()))
+    return job_ref(await projects(rt).update_code(app_id, request.stream()))

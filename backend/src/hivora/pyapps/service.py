@@ -23,14 +23,17 @@ from typing import Any
 
 import yaml
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.models import Application
-from hivora.apps.service import DeployRequest, slugify
+from hivora.apps.service import AppService, DeployRequest, slugify
+from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
+from hivora.core.events import EventBus
 from hivora.core.fs import confined, receive_upload
 from hivora.jobs import Job
 from hivora.pyapps.analyze import Analysis, Mount, ProjectError, _Zip, analyze, volume_name
-from hivora.runtime import Runtime
+from hivora.templates import Catalog
 from hivora.templates.catalog import TemplateInvalidError
 
 IMAGES = {
@@ -227,12 +230,19 @@ def extract(path: Path, mounts: list[Mount], base: Path, *, only_code: bool, uid
 
 
 class PythonProjects:
-    def __init__(self, rt: Runtime) -> None:
-        self.rt = rt
+    def __init__(
+        self, *, settings: Settings, sessions: async_sessionmaker[AsyncSession], catalog: Catalog,
+        apps: AppService, bus: EventBus,
+    ) -> None:  # fmt: skip
+        self.settings = settings
+        self.sessions = sessions
+        self.catalog = catalog
+        self.apps = apps
+        self.bus = bus
 
     @property
     def uploads(self) -> Path:
-        return self.rt.settings.data_dir / "uploads"
+        return self.settings.data_dir / "uploads"
 
     def _upload(self, token: str) -> Path:
         if not re.fullmatch(r"[a-f0-9]{32}", token):
@@ -264,31 +274,31 @@ class PythonProjects:
     async def deploy(self, token: str, spec: ProjectSpec, zone: str | None) -> tuple[Any, Job]:
         check(spec)
         path = self._upload(token)
-        apps = self.rt.apps
+        apps = self.apps
         slug = slugify(spec.name)
-        async with self.rt.sessions() as session:
+        async with self.sessions() as session:
             if await session.scalar(select(Application.id).where(Application.slug == slug)):
                 raise ConflictError("an app already uses this name", slug=slug)
         text = manifest(slug, spec, version=f"1.0.{int(time.time())}")
         try:
-            entry = self.rt.catalog.add_custom(text)
+            entry = self.catalog.add_custom(text)
         except TemplateInvalidError as exc:
             raise InvalidProjectError(str(exc)[:300]) from exc
-        s = self.rt.settings
+        s = self.settings
         await asyncio.to_thread(extract, path, spec.mounts, apps.volumes_dir(slug),
                                 only_code=False, uid=s.puid, gid=s.pgid)  # fmt: skip
         path.unlink(missing_ok=True)
         inputs: dict[str, Any] = {f"env_{i}": e.get("value") or "" for i, e in enumerate(spec.env)}
         inputs |= {f"port_{i}": int(p["host"]) for i, p in enumerate(spec.ports)}
-        app, job = await apps.deploy(DeployRequest(entry.slug, spec.name, inputs, slug=slug,
-                                                   zone=zone))  # fmt: skip
-        self.rt.bus.publish("app.python_deployed", app=slug, files=spec.entry)
+        request = DeployRequest(entry.slug, spec.name, inputs, slug=slug, zone=zone)
+        app, job = await apps.deployer.deploy(request)
+        self.bus.publish("app.python_deployed", app=slug, files=spec.entry)
         return app, job
 
     async def update_code(self, app_id: int, chunks: AsyncIterator[bytes]) -> Job:
         """New code for a Python app: its code folders are replaced, data kept, restart."""
-        async with self.rt.sessions() as session:
-            app, entry, _ = await self.rt.apps.main_container(session, app_id)
+        async with self.sessions() as session:
+            app, entry, _ = await self.apps.main_container(session, app_id)
         if entry is None or TAG not in entry.template.metadata.tags:
             raise NotAPythonAppError("this app is not a Python project", slug=app.slug)
         mounted = {v.name: v.target for v in entry.template.services["app"].volumes}
@@ -303,12 +313,12 @@ class PythonProjects:
         if not mounts:
             path.unlink(missing_ok=True)
             raise InvalidProjectError("the new archive does not match this app's folders")
-        s = self.rt.settings
-        await asyncio.to_thread(extract, path, mounts, self.rt.apps.volumes_dir(app.slug),
+        s = self.settings
+        await asyncio.to_thread(extract, path, mounts, self.apps.volumes_dir(app.slug),
                                 only_code=True, uid=s.puid, gid=s.pgid)  # fmt: skip
         path.unlink(missing_ok=True)
-        self.rt.bus.publish("app.python_code_updated", app=app.slug)
-        return await self.rt.apps.lifecycle.restart(app_id)
+        self.bus.publish("app.python_code_updated", app=app.slug)
+        return await self.apps.lifecycle.restart(app_id)
 
 
 async def _capped(chunks: AsyncIterator[bytes], limit: int) -> AsyncIterator[bytes]:
