@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from hivora.topology.declared import DeclaredLayer
-from hivora.topology.service import build
+from hivora.topology.service import GraphBuilder
 from hivora.web.deps import Operator, RuntimeDep, Viewer
 
 router = APIRouter(tags=["topology"])
@@ -49,7 +49,11 @@ def declared(rt: RuntimeDep) -> DeclaredLayer:
 
 @router.get("")
 async def graph(_: Viewer, rt: RuntimeDep) -> GraphOut:
-    g = await build(rt)
+    g = await GraphBuilder(
+        lan_ip=rt.settings.host_lan_ip, public_ip=rt.public_address.current,
+        sessions=rt.sessions, catalog=rt.catalog, planner=rt.apps.planner, hostfw=rt.hostfw,
+        store=rt.state.store, icons=rt.icons, adoption=rt.apps.adoption,
+    ).build()  # fmt: skip
     return GraphOut(host=g.host, nodes=g.nodes, edges=g.edges, alerts=g.alerts,
                     positions=g.positions)  # fmt: skip
 
