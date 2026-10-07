@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from hivora.apps.models import Application, DesiredState
+from hivora.apps.models import HOSTING_KIND, Application, DesiredState
 from hivora.apps.service import DeployPlan
 from hivora.jobs import Job
 from hivora.state import AppStatus
@@ -59,6 +59,7 @@ class AppOut(BaseModel):
     desired_state: DesiredState
     status: AppStatus
     drift: bool  # intent and reality disagree
+    hosting: bool  # an nginx that hosts sites (/apps/{id}/sites)
     created_at: datetime
 
 
@@ -91,6 +92,7 @@ def app_out(rt: RuntimeDep, app: Application, template: str | None) -> AppOut:
         desired_state=app.desired_state,
         status=status,
         drift=has_drift(app.desired_state, status),
+        hosting=app.kind == HOSTING_KIND,
         created_at=app.created_at,
     )
 

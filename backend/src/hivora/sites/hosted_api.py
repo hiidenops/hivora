@@ -28,6 +28,12 @@ class HostedSiteOut(BaseModel):
     url: str | None
 
 
+class SiteConfigOut(BaseModel):
+    job_id: int  # the host's last site_config job
+    status: str  # queued, running, succeeded, failed, cancelled
+    error: str | None  # failed: nginx may not serve the sites as listed
+
+
 class SiteHostOut(BaseModel):
     app_id: int
     slug: str
@@ -36,6 +42,7 @@ class SiteHostOut(BaseModel):
     stopped: bool  # port changes refused until the app is started
     max_sites: int
     sites: list[HostedSiteOut]
+    config: SiteConfigOut | None  # None: no configuration applied yet
 
 
 class HostedSiteIn(BaseModel):
@@ -101,6 +108,12 @@ async def list_hosted_sites(app_id: int, _: Viewer, rt: RuntimeDep) -> SiteHostO
 async def enable_site_hosting(app_id: int, _: Operator, rt: RuntimeDep) -> SiteHostOut:
     """An nginx from the catalog starts hosting sites (no change if it already does)."""
     return _host(await rt.site_hosting.enable_hosting(app_id))
+
+
+@router.post("/{app_id}/sites/config", status_code=202)
+async def reapply_site_config(app_id: int, _: Operator, rt: RuntimeDep) -> JobRef:
+    """nginx's files written again from the sites as recorded, checked, then reloaded."""
+    return job_ref(await rt.site_config.request(app_id))
 
 
 @router.post("/{app_id}/sites/plan")

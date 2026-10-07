@@ -31,6 +31,9 @@ export const keys = {
   me: ["me"] as const,
   apps: ["apps"] as const,
   app: (id: number) => ["apps", id] as const,
+  // Sites: refreshed when a job ends, not on every container state change (realtime).
+  siteHosts: ["site-hosts"] as const,
+  siteFiles: ["site-files"] as const,
   templates: ["templates"] as const,
   template: (slug: string) => ["templates", slug] as const,
   jobs: ["jobs"] as const,

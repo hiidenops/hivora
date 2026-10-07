@@ -19,7 +19,7 @@ export default function SitesPage() {
   const { data: apps, isPending } = useApps();
   const [jobs, setJobs] = useState<number[]>([]);
   const hosts = apps?.filter((a) => a.template === "nginx") ?? [];
-  // ponytail: one request per nginx (GET /apps/{id}/sites), fine for a homelab's few nginx.
+  // One request per nginx that hosts sites (GET /apps/{id}/sites); none for the others.
   const deploy = (
     <Button asChild>
       <Link href="/deploy/?template=nginx">
@@ -42,7 +42,7 @@ export default function SitesPage() {
       )}
       <div className="stagger grid gap-4">
         {hosts.map((a) => (
-          <HostedSitesCard key={a.id} appId={a.id} title={a.name} onJob={(id) => setJobs([id])} />
+          <HostedSitesCard key={a.id} appId={a.id} hosting={a.hosting} title={a.name} onJob={(id) => setJobs([id])} />
         ))}
       </div>
     </>

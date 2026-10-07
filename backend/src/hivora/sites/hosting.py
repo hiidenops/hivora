@@ -9,15 +9,16 @@ published. Each change is one transaction (rows, revision, jobs) or nothing at a
 ``plan`` shows a change, recreation included, without writing anything.
 """
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.core import PortConflictError, conflict_dict, get_app, latest_revision, slugify
 from hivora.apps.models import Application, DesiredState
+from hivora.apps.ports import used_ports
 from hivora.apps.queries import template_slug
 from hivora.apps.revisions import Revisions
 from hivora.core.clock import Clock
@@ -27,6 +28,7 @@ from hivora.core.events import EventBus
 from hivora.jobs import Job, JobKind, JobQueue
 from hivora.sites import core, nginx
 from hivora.sites.models import Site
+from hivora.state import StateStore
 from hivora.templates.overrides import Overrides
 
 MAX_SITES = 30  # added sites per host (the main site aside)
@@ -65,6 +67,15 @@ class HostedSite:
 
 
 @dataclass(frozen=True, slots=True)
+class ConfigState:
+    """The host's last site_config job: whether nginx serves the sites as recorded."""
+
+    job_id: int
+    status: str  # queued, running, succeeded, failed, cancelled
+    error: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class SiteHost:
     app_id: int
     slug: str
@@ -73,6 +84,7 @@ class SiteHost:
     stopped: bool  # port changes are refused until it is started
     max_sites: int
     sites: list[HostedSite]
+    config: ConfigState | None  # None: no configuration applied yet
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,10 +102,11 @@ Change = Callable[[AsyncSession, int], Awaitable[Site]]  # one change to a host'
 class SiteHosting:
     def __init__(
         self, *, sessions: async_sessionmaker[AsyncSession], revisions: Revisions,
-        jobs: JobQueue, bus: EventBus, clock: Clock, settings: Settings,
+        jobs: JobQueue, bus: EventBus, clock: Clock, settings: Settings, state: StateStore,
     ) -> None:  # fmt: skip
         self.sessions = sessions
         self.revisions = revisions
+        self.state = state
         self.jobs = jobs
         self.bus = bus
         self.clock = clock
@@ -125,8 +138,14 @@ class SiteHosting:
             url = f"http://{lan}:{port}" if lan and port else None
             sites.append(HostedSite(r.id, r.slug, r.name, r.root == "", port, r.server_name,
                                     r.enabled, url))  # fmt: skip
+        last = await session.scalar(
+            select(Job).where(Job.app_id == app.id, Job.kind == JobKind.SITE_CONFIG)
+            .order_by(Job.id.desc()).limit(1)
+        )  # fmt: skip
+        config = ConfigState(last.id, last.status.value, last.error) if last else None
         return SiteHost(app.id, app.slug, app.name, upgrade_required,
-                        app.desired_state is DesiredState.STOPPED, MAX_SITES, sites)  # fmt: skip
+                        app.desired_state is DesiredState.STOPPED, MAX_SITES, sites,
+                        config)  # fmt: skip
 
     async def enable_hosting(self, app_id: int) -> SiteHost:
         """An nginx deployed from the catalog becomes a host: its html volume is its main
@@ -171,7 +190,7 @@ class SiteHosting:
                 return SitePlan(False, None, "", before, after)
             upd = await self.revisions.plan_update(session, app_id, await _inputs(session, app_id))
             if conflicts := [conflict_dict(c) for c in upd.plan.conflicts]:
-                raise PortConflictError("host ports already in use", conflicts=conflicts)
+                raise await self._conflict(session, app_id, conflicts, before)
         return SitePlan(True, upd.number, upd.diff, before, after)
 
     # --- changes ------------------------------------------------------------------------
@@ -242,14 +261,19 @@ class SiteHosting:
         revision's number."""
         async with self.sessions() as session, session.begin():
             app = await self._host(session, app_id, recreates=True)
+            before = await self._ports(session, app_id)
             site = await change(session, app_id)
             first = None
             if removal:
                 folders = [site.root] if remove_data else []
                 first = self._config(session, app.id, app.slug, remove_folders=folders)
-            update, number = await self.revisions.queue_update(
-                session, app_id, await _inputs(session, app_id)
-            )
+            try:
+                update, number = await self.revisions.queue_update(
+                    session, app_id, await _inputs(session, app_id)
+                )
+            except PortConflictError as err:
+                conflicts = cast(list[dict[str, Any]], err.details["conflicts"])
+                raise await self._conflict(session, app_id, conflicts, before) from None
             config = first or self._config(session, app.id, app.slug)
         self.jobs.wake()
         return app, site, update, config, number
@@ -345,11 +369,38 @@ class SiteHosting:
         rule), or one of the user's own extra ports in the advanced settings."""
         if other := await session.scalar(select(Site.slug).where(Site.app_id == app_id,
                                                                  Site.port == port)):  # fmt: skip
-            raise _conflict(port, f"site {other}")
+            used_by = f"site {other}"
+        elif port in await self._own_ports(session, app_id):
+            used_by = "advanced settings"
+        else:
+            return
+        conflict = {"port": port, "protocol": "tcp", "used_by": used_by, "suggestion": None}
+        raise await self._conflict(session, app_id, [conflict], [])
+
+    async def _conflict(
+        self, session: AsyncSession, app_id: int, conflicts: list[dict[str, Any]],
+        also: Iterable[int],
+    ) -> PortConflictError:  # fmt: skip
+        """The conflicts, each with a port really free as its suggestion: not used by
+        another app, nor by this nginx (its web port, its sites' ports as they were
+        before the change, the moved site's included, its advanced settings' ports)."""
+        app = await core.get_site(session, app_id)
+        used = await used_ports(session, self.state, exclude_app=app.slug)
+        taken = {p for p, protocol in used if protocol == "tcp"} | set(also)
+        taken |= set(await self._ports(session, app_id)) | await self._own_ports(session, app_id)
+        if (web := (await _inputs(session, app_id)).get("web_port")) is not None:
+            taken.add(int(web))
+        taken.add(nginx.MAIN_PORT)  # the main site's port inside the container
+        for c in conflicts:
+            c["suggestion"] = next((p for p in range(c["port"] + 1, 65536) if p not in taken),
+                                   None)  # fmt: skip
+        return PortConflictError("host ports already in use", conflicts=conflicts)
+
+    async def _own_ports(self, session: AsyncSession, app_id: int) -> set[int]:
+        """The ports of this nginx's advanced settings (inside and outside)."""
         latest = await latest_revision(session, app_id)
         own = Overrides.model_validate(latest.overrides or {}).of(core.SERVICE) if latest else None
-        if own and any(port in (p.container, p.host) for p in own.ports):
-            raise _conflict(port, "advanced settings")
+        return {q for p in own.ports for q in (p.container, p.host) if q} if own else set()
 
     def _config(self, session: AsyncSession, app_id: int, slug: str, **params: Any) -> Job:
         return self.jobs.add(session, JobKind.SITE_CONFIG, app_id=app_id, app_slug=slug,
@@ -358,11 +409,6 @@ class SiteHosting:
 
 def _nginx_site(slug: str, port: int | None, server_name: str | None) -> nginx.NginxSite:
     return nginx.NginxSite(0, slug, slug, port, server_name, True)
-
-
-def _conflict(port: int, used_by: str) -> PortConflictError:
-    return PortConflictError("host ports already in use", conflicts=[
-        {"port": port, "protocol": "tcp", "used_by": used_by, "suggestion": None}])  # fmt: skip
 
 
 async def _inputs(session: AsyncSession, app_id: int) -> dict[str, Any]:

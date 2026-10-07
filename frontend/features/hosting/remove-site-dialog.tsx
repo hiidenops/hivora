@@ -51,7 +51,7 @@ export function RemoveSiteDialog({ appId, site, open, onOpenChange, onJob }: {
                 </Alert>
               ) : (
                 <p className="text-muted-foreground">
-                  {t("remove.dataKept")} <span className="font-mono text-xs">{folder}</span>
+                  {t("remove.dataKept")} <span className="font-mono text-xs">{folder}</span>. {t("hosting.dataReused")}
                 </p>
               )}
             </div>

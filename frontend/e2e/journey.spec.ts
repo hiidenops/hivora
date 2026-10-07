@@ -5,6 +5,26 @@ import { expect, test, type Page } from "@playwright/test";
 
 const PASSWORD = "correct-horse-battery";
 
+/** Signed in as admin, whatever ran before: the forced first password change is done here
+ *  through the API if no earlier test did it (each test can run alone). */
+async function signIn(page: Page) {
+  const login = (password: string) => page.request.post("/api/v1/auth/login", { data: { username: "admin", password } });
+  if (!(await login(PASSWORD)).ok()) {
+    const first = await login("admin");
+    expect(first.ok()).toBe(true);
+    const changed = await page.request.post("/api/v1/auth/password", {
+      headers: { "X-CSRF-Token": (await first.json()).csrf_token },
+      data: { current: "admin", new: PASSWORD },
+    });
+    expect(changed.ok()).toBe(true);
+  }
+  await page.goto("/login/");
+  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
+  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Se connecter" }).click();
+  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+}
+
 /** Everything clickable on the page shows the hand (disabled controls excepted). */
 async function expectPointerCursors(page: Page) {
   const arrows = await page.$$eval(
@@ -47,7 +67,8 @@ test("first start: forced password change, deploy, remove, users", async ({ page
 
   // Catalog -> deploy wizard -> review (compose shown, secrets referenced) -> deploy.
   await page.getByRole("link", { name: "Parcourir le catalogue" }).click();
-  await page.getByRole("link", { name: /^Applications/ }).click();
+  // Not anchored: until the catalog's icons are downloaded, their letters come first.
+  await page.getByRole("link", { name: /Applications/ }).click();
   await page.getByRole("article", { name: "Vaultwarden" }).getByRole("link", { name: "Déployer" }).click();
   await expect(page.getByRole("heading", { name: "Déployer Vaultwarden" })).toBeVisible();
   await page.getByRole("button", { name: "Vérifier" }).click();
@@ -143,21 +164,19 @@ test("removal goes back to the dashboard even if the app is gone before its job 
     await route.fulfill({ response, json: hidden });
   });
 
-  await page.goto("/login/");
-  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
-  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await signIn(page);
 
   const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
   const deployed = await (
     await page.request.post("/api/v1/apps", {
       headers: { "X-CSRF-Token": csrf_token },
-      data: { template: "nginx", name: "Témoin", inputs: { web_port: 8096 } },
+      data: { template: "nginx", name: "Témoin", inputs: { web_port: 8090 } },
     })
   ).json();
   await expect
-    .poll(async () => (await (await page.request.get(`/api/v1/jobs/${deployed.job.id}`)).json()).status)
+    .poll(async () => (await (await page.request.get(`/api/v1/jobs/${deployed.job.id}`)).json()).status, {
+      timeout: 20_000,
+    })
     .toBe("succeeded");
 
   await page.goto(`/app/?id=${deployed.app.id}`);
@@ -170,11 +189,7 @@ test("removal goes back to the dashboard even if the app is gone before its job 
 // The sites index (/sites): one Sites card per nginx, each site a link to its page; an nginx
 // that hosts no sites yet offers to; older bookmarks (/site/?id=) reach the main site.
 test("sites index: grouped by nginx, host sites, site links, older bookmarks", async ({ page }) => {
-  await page.goto("/login/");
-  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
-  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await signIn(page);
   const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
   const headers = { "X-CSRF-Token": csrf_token };
   const done = async (id: number) =>
@@ -182,7 +197,18 @@ test("sites index: grouped by nginx, host sites, site links, older bookmarks", a
       timeout: 20_000,
     }).toBe("succeeded");
 
-  // No nginx yet: the way to deploy one.
+  // Asked only for the nginx that host sites: no expected 404 any more.
+  const missing: string[] = [];
+  page.on("response", (r) => {
+    if (r.status() === 404 && r.url().includes("/api/v1/")) missing.push(r.url());
+  });
+
+  // No nginx yet (an earlier test's may still be going): the way to deploy one.
+  await expect
+    .poll(async () => (await (await page.request.get("/api/v1/apps")).json()).filter((a: { template: string }) => a.template === "nginx").length, {
+      timeout: 20_000,
+    })
+    .toBe(0);
   await page.getByRole("link", { name: "Sites" }).click();
   await expect(page.getByRole("heading", { name: "Sites", level: 1 })).toBeVisible();
   await expect(page.getByText("Aucun nginx pour l'instant", { exact: false })).toBeVisible();
@@ -234,16 +260,13 @@ test("sites index: grouped by nginx, host sites, site links, older bookmarks", a
   await expect(page).toHaveURL(new RegExp(`/app/site/\\?app=${vitrine}&site=${main}$`));
   await expect(page.getByRole("heading", { name: "Vitrine", level: 1 })).toBeVisible();
   await expect(page.getByText("Site principal")).toBeVisible();
+  expect(missing).toEqual([]);
 });
 
 // The app -> sites model through the API only: an nginx from the catalog starts hosting,
 // an added site on its own port, then off and removed.
 test("hosted sites API: list, plan, add, edit a file, turn off, remove", async ({ page }) => {
-  await page.goto("/login/");
-  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
-  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await signIn(page);
   const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
   const headers = { "X-CSRF-Token": csrf_token };
   const done = async (id: number) =>
@@ -299,11 +322,7 @@ test("hosted sites API: list, plan, add, edit a file, turn off, remove", async (
 // The app -> sites model on the nginx app's page: host sites, add one after its preview
 // (the restart is announced), turn it off; an nginx on template 1.0.0; a viewer.
 test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", async ({ page, browser }) => {
-  await page.goto("/login/");
-  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
-  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await signIn(page);
 
   // An nginx from the catalog serves one site.
   await page.getByRole("link", { name: "Catalogue" }).click();
@@ -331,10 +350,19 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
   await dialog.getByRole("button", { name: "Vérifier" }).click();
   await expect(dialog.getByText("tous ses sites seront indisponibles un court instant", { exact: false })).toBeVisible();
   await dialog.getByRole("button", { name: "Ajouter le site" }).click();
-  await expect(dialog).toBeHidden();
+
+  // Straight to the new site's page: empty, its content invited, its configuration followed;
+  // the Sites menu entry is the current one, the site's own controls are here too.
+  await expect(page).toHaveURL(/\/app\/site\/\?app=\d+&site=\d+&job=\d+$/);
+  await expect(page.getByRole("heading", { name: "Blog", level: 1 })).toBeVisible();
+  await expect(page.getByText("Ce site est vide", { exact: false })).toBeVisible();
+  await expect(page.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("link", { name: "Sites", exact: true })).toHaveClass(/font-medium/);
+  await expect(page.getByRole("switch", { name: "Site « Blog » actif" })).toBeChecked();
+  await expect(page.getByRole("button", { name: "Actions du site « Blog »" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Fil d'Ariane" }).getByRole("link").click();
   const blog = sites.getByRole("listitem", { name: "Blog" });
   await expect(blog.getByText("Port 8301")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
 
   // Its own switch: no restart notice, only this site.
   const toggle = blog.getByRole("switch", { name: "Site « Blog » actif" });
@@ -350,6 +378,10 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
   await expect(page.getByText("Ce nginx est arrêté", { exact: false })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("button", { name: "Ajouter un site" })).toBeDisabled();
   await expect(toggle).toBeEnabled();
+  await page.getByRole("button", { name: "Actions du site « Blog »" }).click();
+  await expect(page.getByRole("menuitem", { name: "Changer le port" })).toBeDisabled();
+  await expect(page.getByRole("menuitem", { name: "Supprimer" })).toBeDisabled();
+  await page.keyboard.press("Escape");
 
   // An nginx still on template 1.0.0 (answer replaced): told to update, nothing to add or switch.
   await page.route(`**/api/v1/apps/${appId}/sites`, async (route) => {
@@ -360,6 +392,22 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
   await expect(page.getByText("doit être mis à jour (version 1.1.0)", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ajouter un site" })).toBeDisabled();
   await expect(page.getByRole("switch", { name: "Site « Blog » actif" })).toBeDisabled();
+  await page.unroute(`**/api/v1/apps/${appId}/sites`);
+
+  // nginx refused its last configuration (answer replaced): said, with nginx's words, and
+  // applied again on request.
+  await page.route(`**/api/v1/apps/${appId}/sites`, async (route) => {
+    const response = await route.fetch();
+    const host = await response.json();
+    const config = { ...host.config, status: "failed", error: "nginx refused the configuration: [emerg] boom" };
+    await route.fulfill({ response, json: { ...host, config } });
+  });
+  await page.reload();
+  await expect(page.getByText("La dernière configuration de nginx a échoué", { exact: false })).toBeVisible();
+  await expect(page.getByText("[emerg] boom", { exact: false })).toBeVisible();
+  const reapplied = page.waitForResponse((r) => r.url().endsWith(`/apps/${appId}/sites/config`));
+  await page.getByRole("button", { name: "Réappliquer la configuration" }).click();
+  expect((await reapplied).status()).toBe(202);
   await page.unroute(`**/api/v1/apps/${appId}/sites`);
 
   // A viewer sees the sites, changes nothing.
@@ -390,11 +438,7 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
 // notice, compose diff in advanced mode), its domain name (advanced mode only), its removal
 // with or without its files. The main site has no menu.
 test("nginx sites card: change a port, a domain name, remove a site", async ({ page }) => {
-  await page.goto("/login/");
-  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
-  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await signIn(page);
   const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
   const headers = { "X-CSRF-Token": csrf_token };
   const done = async (id: number) =>
@@ -417,6 +461,10 @@ test("nginx sites card: change a port, a domain name, remove a site", async ({ p
     }); // prettier-ignore
     await done((await saved.json()).id);
   }
+  const neighbour = await (await page.request.post("/api/v1/apps", {
+    headers, data: { template: "nginx", name: "Voisin", inputs: { web_port: 8315 } },
+  })).json(); // prettier-ignore
+  await done(neighbour.job.id);
   const folder = (slug: string) => `/tmp/hivora-e2e/srv/pages/sites/${slug}/index.html`;
   expect([existsSync(folder("blog")), existsSync(folder("wiki"))]).toEqual([true, true]);
 
@@ -435,8 +483,8 @@ test("nginx sites card: change a port, a domain name, remove a site", async ({ p
   await expect(page.getByRole("menuitem")).toHaveText(["Changer le port", "Supprimer"]);
   await page.keyboard.press("Escape");
 
-  // Port: Wiki's port is taken (no suggestion); the other nginx's port (the previous test's)
-  // too, and a free one is suggested; then the restart is announced.
+  // Port: Wiki's port is taken, and so is the neighbour nginx's: each time a really free one
+  // is suggested (never one of this nginx's); then the restart is announced.
   await menu("Blog", "Changer le port");
   const dialog = page.getByRole("dialog");
   const newPort = dialog.getByLabel("Nouveau port", { exact: true });
@@ -444,12 +492,12 @@ test("nginx sites card: change a port, a domain name, remove a site", async ({ p
   await newPort.fill("8312");
   await dialog.getByRole("button", { name: "Vérifier" }).click();
   await expect(dialog.getByText("Le port 8312/tcp est déjà utilisé par site wiki", { exact: false })).toBeVisible();
-  await newPort.fill("8300");
+  await expect(dialog.getByRole("button", { name: "Utiliser le port 8313" })).toBeVisible();
+  await newPort.fill("8315");
   await dialog.getByRole("button", { name: "Vérifier" }).click();
-  await expect(dialog.getByText("Le port 8300/tcp est déjà utilisé", { exact: false })).toBeVisible();
-  const suggested = dialog.getByRole("button", { name: /^Utiliser le port \d+$/ });
-  const port = (await suggested.textContent())!.match(/\d+/)![0];
-  await suggested.click();
+  await expect(dialog.getByText("Le port 8315/tcp est déjà utilisé par voisin", { exact: false })).toBeVisible();
+  const port = "8316";
+  await dialog.getByRole("button", { name: `Utiliser le port ${port}` }).click();
   await expect(newPort).toHaveValue(port);
   await dialog.getByRole("button", { name: "Vérifier" }).click();
   await expect(dialog.getByText("pour publier ce port : tous ses sites seront indisponibles", { exact: false })).toBeVisible();
@@ -487,6 +535,7 @@ test("nginx sites card: change a port, a domain name, remove a site", async ({ p
     const data = dialog.getByRole("switch", { name: "Supprimer aussi ses fichiers" });
     await expect(data).not.toBeChecked();
     await expect(dialog.getByText(`sites/${site.toLowerCase()}`)).toBeVisible();
+    if (!withData) await expect(dialog.getByText("retrouvera ces fichiers", { exact: false })).toBeVisible();
     if (withData) {
       await data.click();
       await expect(dialog.getByText("Irréversible", { exact: false })).toBeVisible();
@@ -510,11 +559,7 @@ test("nginx sites card: change a port, a domain name, remove a site", async ({ p
 // The page of one site an nginx hosts (/app/site/?app=&site=): the content and file cards
 // on /apps/{app}/sites/{site}, never on the older /sites routes; the site's own folder only.
 test("hosted site page: zip, read, create, edit, conflict, viewer, back to the nginx", async ({ page, browser }) => {
-  await page.goto("/login/");
-  await page.getByLabel("Identifiant", { exact: true }).fill("admin");
-  await page.getByLabel("Mot de passe", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await signIn(page);
   const { csrf_token } = await (await page.request.get("/api/v1/auth/me")).json();
   const headers = { "X-CSRF-Token": csrf_token };
   const done = async (id: number) =>

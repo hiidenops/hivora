@@ -14,9 +14,8 @@ import { RestartNotice } from "./restart-notice";
 
 type Conflict = { port: number; protocol: string; used_by: string; suggestion: number | null };
 
-/** A port_conflict: who uses the port, and a free one to take instead (not the site's current
- *  port, which a move frees and the server may suggest). Any other error as text. */
-export function PortError({ error, current, onUse }: { error: Error | null; current?: number | null; onUse: (port: number) => void }) {
+/** A port_conflict: who uses the port, and a free one to take instead. Any other error as text. */
+export function PortError({ error, onUse }: { error: Error | null; onUse: (port: number) => void }) {
   const { t, errorMessage } = useI18n();
   if (!error) return null;
   if (!(error instanceof ApiError && error.code === "port_conflict")) return <Alert tone="danger">{errorMessage(error)}</Alert>;
@@ -24,7 +23,7 @@ export function PortError({ error, current, onUse }: { error: Error | null; curr
   return conflicts.map((c) => (
     <Alert key={`${c.port}/${c.protocol}`} tone="danger">
       {t("deploy.conflict", { port: c.port, protocol: c.protocol, owner: c.used_by })}
-      {c.suggestion !== null && c.suggestion !== current && (
+      {c.suggestion !== null && (
         <Button type="button" variant="outline" size="sm" className="ml-2" onClick={() => onUse(c.suggestion!)}>
           {t("sites.useSuggested", { port: c.suggestion })}
         </Button>
@@ -73,7 +72,7 @@ export function PortDialog({ appId, site, open, onOpenChange, onJob }: {
             <Input id="site-port" type="number" min={1} max={65535} required value={port} className="max-w-40 font-mono" onChange={(e) => changed(e.target.value)} />
             <p className="text-xs text-muted-foreground">{t("hosting.portHelp")}</p>
           </div>
-          <PortError error={change.error ?? plan.error} current={site.port} onUse={(p) => changed(String(p))} />
+          <PortError error={change.error ?? plan.error} onUse={(p) => changed(String(p))} />
           {plan.data && <RestartNotice plan={plan.data} />}
           <Button type="submit" className="justify-self-end" disabled={plan.isPending || change.isPending || !port || Number(port) === site.port}>
             {plan.data ? t("hosting.portConfirm") : t("hosting.check")}

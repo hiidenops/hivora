@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe } from "lucide-react";
+import { Globe, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
 import { useSession } from "@/components/app-shell";
@@ -11,17 +11,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/lib/i18n";
 
 import { AddSiteDialog } from "./add-site-dialog";
-import { useEnableHosting, useHostedSites } from "./hooks";
+import { useEnableHosting, useHostedSites, useReapplyConfig } from "./hooks";
 import { HostedSiteRow } from "./hosted-site-row";
 
 /** The sites an nginx app hosts (app -> sites): each on its own port, each with its own
  *  switch; "Add a site" first shows what the change does. `title`: the nginx's name, linked
  *  to its page (the sites index), instead of "Sites" (its own page). */
-export function HostedSitesCard({ appId, title: name, onJob }: { appId: number; title?: string; onJob: (jobId: number) => void }) {
+export function HostedSitesCard({ appId, hosting, title: name, onJob }: {
+  appId: number;
+  hosting: boolean; // the app's flag: no request for an nginx that hosts no sites
+  title?: string;
+  onJob: (jobId: number) => void;
+}) {
   const { t, errorMessage } = useI18n();
-  const { can } = useSession();
-  const { data: host, error, isPending, notHost } = useHostedSites(appId);
+  const { can, advanced } = useSession();
+  const { data: host, error, isPending, notHost } = useHostedSites(appId, hosting);
   const enable = useEnableHosting(appId);
+  const reapply = useReapplyConfig(appId);
   const operator = can("operator");
 
   const title = (
@@ -71,6 +77,13 @@ export function HostedSitesCard({ appId, title: name, onJob }: { appId: number; 
 
   const added = host.sites.filter((s) => !s.main).length;
   const full = added >= host.max_sites;
+  const failed = host.config?.status === "failed";
+  const applying = host.config?.status === "queued" || host.config?.status === "running";
+  const again = (
+    <Button size="sm" variant="outline" disabled={reapply.isPending || applying} onClick={() => reapply.mutate(undefined, { onSuccess: (job) => onJob(job.id) })}>
+      <RefreshCw /> {t("hosting.reapply")}
+    </Button>
+  );
   return (
     // Above the next cards: the page's entry animation makes each card a stacking context,
     // and the last site's menu runs over the card below.
@@ -79,6 +92,15 @@ export function HostedSitesCard({ appId, title: name, onJob }: { appId: number; 
       <CardContent className="grid gap-3">
         {host.upgrade_required && <Alert tone="warn">{t("hosting.upgradeRequired")}</Alert>}
         {host.stopped && !host.upgrade_required && <Alert tone="info">{t("hosting.stopped")}</Alert>}
+        {failed && (
+          <Alert tone="danger" className="grid justify-items-start gap-2">
+            <span>{t("hosting.configFailed")}</span>
+            {host.config?.error && <span className="font-mono text-xs">{host.config.error}</span>}
+            {operator && again}
+          </Alert>
+        )}
+        {applying && <p className="text-xs text-muted-foreground">{t("hosting.configApplying")}</p>}
+        {reapply.error && <Alert tone="danger">{errorMessage(reapply.error)}</Alert>}
         <ul className="divide-y" aria-label={name ?? t("hosting.title")}>
           {host.sites.map((site) => (
             <HostedSiteRow key={site.id} appId={appId} site={site} locked={host.upgrade_required} stopped={host.stopped} onJob={onJob} />
@@ -86,8 +108,9 @@ export function HostedSitesCard({ appId, title: name, onJob }: { appId: number; 
         </ul>
         {operator && (
           <div className="flex flex-wrap items-center gap-3">
-            <AddSiteDialog appId={appId} disabled={host.upgrade_required || host.stopped || full} onJob={onJob} />
+            <AddSiteDialog appId={appId} disabled={host.upgrade_required || host.stopped || full} />
             {full && <span className="text-xs text-muted-foreground">{t("hosting.full", { n: host.max_sites })}</span>}
+            {advanced && !failed && !host.upgrade_required && again}
           </div>
         )}
       </CardContent>

@@ -677,6 +677,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/{app_id}/sites/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reapply Site Config
+         * @description nginx's files written again from the sites as recorded, checked, then reloaded.
+         */
+        post: operations["reapply_site_config_api_v1_apps__app_id__sites_config_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{app_id}/sites/hosting": {
         parameters: {
             query?: never;
@@ -2127,6 +2147,8 @@ export interface components {
             /** Drift */
             drift: boolean;
             game: components["schemas"]["GameCapsOut"] | null;
+            /** Hosting */
+            hosting: boolean;
             /** Icon Url */
             icon_url: string | null;
             /** Id */
@@ -2170,6 +2192,8 @@ export interface components {
             desired_state: components["schemas"]["DesiredState"];
             /** Drift */
             drift: boolean;
+            /** Hosting */
+            hosting: boolean;
             /** Icon Url */
             icon_url: string | null;
             /** Id */
@@ -3269,6 +3293,15 @@ export interface components {
             job: components["schemas"]["JobRef"] | null;
             site: components["schemas"]["HostedSiteOut"] | null;
         };
+        /** SiteConfigOut */
+        SiteConfigOut: {
+            /** Error */
+            error: string | null;
+            /** Job Id */
+            job_id: number;
+            /** Status */
+            status: string;
+        };
         /** SiteFileIn */
         SiteFileIn: {
             /** Base Sha256 */
@@ -3301,6 +3334,7 @@ export interface components {
         SiteHostOut: {
             /** App Id */
             app_id: number;
+            config: components["schemas"]["SiteConfigOut"] | null;
             /** Max Sites */
             max_sites: number;
             /** Name */
@@ -5191,6 +5225,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SiteChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reapply_site_config_api_v1_apps__app_id__sites_config_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
                 };
             };
             /** @description Validation Error */

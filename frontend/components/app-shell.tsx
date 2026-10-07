@@ -33,10 +33,11 @@ export function useSession(): Session {
   return ctx;
 }
 
-const NAV: { href: string; label: MessageKey; icon: typeof LayoutGrid; role: Role }[] = [
+// `also`: another path under that entry (a site's page belongs to Sites).
+const NAV: { href: string; label: MessageKey; icon: typeof LayoutGrid; role: Role; also?: string }[] = [
   { href: "/", label: "nav.dashboard", icon: LayoutGrid, role: "viewer" },
   { href: "/catalog/", label: "nav.catalog", icon: Boxes, role: "viewer" },
-  { href: "/sites/", label: "nav.sites", icon: Globe, role: "viewer" },
+  { href: "/sites/", label: "nav.sites", icon: Globe, role: "viewer", also: "/app/site/" },
   { href: "/zones/", label: "nav.zones", icon: Network, role: "viewer" },
   { href: "/topology/", label: "nav.topology", icon: Share2, role: "viewer" },
   { href: "/activity/", label: "nav.activity", icon: Activity, role: "viewer" },
@@ -99,7 +100,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
             <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
               {NAV.filter((n) => session.can(n.role)).map((n) => {
-                const active = n.href === "/" ? pathname === "/" : pathname.startsWith(n.href);
+                const active =
+                  n.href === "/" ? pathname === "/" : pathname.startsWith(n.href) || (!!n.also && pathname.startsWith(n.also));
                 return (
                   <Link
                     key={n.href}

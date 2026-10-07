@@ -51,6 +51,9 @@ class VolumeKind(StrEnum):
     BIND = "bind"
 
 
+HOSTING_KIND = "static-site"  # application.kind of an nginx that hosts sites
+
+
 class Application(Base):
     __tablename__ = "application"
 
@@ -70,7 +73,7 @@ class Application(Base):
     )
     icon: Mapped[str | None] = mapped_column(String(200))
     notes: Mapped[str] = mapped_column(Text, default="")
-    kind: Mapped[str | None] = mapped_column(String(32))  # "static-site"; NULL otherwise
+    kind: Mapped[str | None] = mapped_column(String(32))  # HOSTING_KIND; NULL otherwise
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
     services: Mapped[list["Service"]] = relationship(

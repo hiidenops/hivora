@@ -143,7 +143,8 @@ class Runtime:
         site_config.register()
         apps.planner.site_ports = site_ports  # the hosts publish their sites' ports
         site_hosting = SiteHosting(sessions=sessions, revisions=apps.revisions, jobs=jobs,
-                                   bus=bus, clock=clock, settings=settings)  # fmt: skip
+                                   bus=bus, clock=clock, settings=settings,
+                                   state=state.store)  # fmt: skip
         auth = AuthService(settings=settings, sessions=sessions, box=box, bus=bus, clock=clock)
         audit = AuditRecorder(sessions, bus)
         icons = IconCache(settings.data_dir / "icons")
@@ -161,6 +162,7 @@ class Runtime:
         await self.public_address.start()
         await self.app_metrics.start()
         await self.backups.start()
+        await self.site_config.start()
         await self.auth.ensure_initial_admin()
         await self.apps.load_custom_templates()
         await self.apps.load_adopted()
@@ -200,6 +202,7 @@ class Runtime:
         await self.public_address.stop()
         await self.app_metrics.stop()
         await self.backups.stop()
+        await self.site_config.stop()
         await self.state.stop()
         await self.audit.stop()
         await self.gateway.close()

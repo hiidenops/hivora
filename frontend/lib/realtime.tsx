@@ -193,6 +193,8 @@ export function RealtimeProvider({ enabled, children }: { enabled: boolean; chil
     s.onJobFinished = () => {
       void qc.invalidateQueries({ queryKey: keys.apps });
       void qc.invalidateQueries({ queryKey: keys.jobs });
+      void qc.invalidateQueries({ queryKey: keys.siteHosts });
+      void qc.invalidateQueries({ queryKey: keys.siteFiles });
     };
     s.onAppChanged = () => void qc.invalidateQueries({ queryKey: keys.apps });
     s.connect();

@@ -11,9 +11,8 @@ import {
 } from "@/lib/api/client";
 import { keys } from "@/lib/api/hooks";
 
-// Under the apps key: the live updates that refresh the apps (job finished, state
-// changed) refresh the sites' files too.
-export const sitesKey = [...keys.apps, "sites"] as const;
+// Refreshed when a job ends (a zip, a save), not when a container's state changes.
+export const sitesKey = keys.siteFiles;
 
 /** The API base of one site's content and files: a site an nginx hosts. */
 export const siteApi = (appId: number, siteId: number) => `/apps/${appId}/sites/${siteId}`;

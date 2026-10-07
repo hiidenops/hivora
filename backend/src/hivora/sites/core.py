@@ -13,12 +13,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
-from hivora.apps.models import Application, Service
+from hivora.apps.models import HOSTING_KIND, Application, Service
 from hivora.core.errors import ConflictError, NotFoundError, PermissionDeniedError
 from hivora.sites.models import Site
 from hivora.sites.nginx import NginxSite
 
-SITE_KIND = "static-site"
+SITE_KIND = HOSTING_KIND
 SERVICE = "server"  # the nginx template's main service
 HTML_TARGET = "/usr/share/nginx/html"  # the nginx template's "html" volume
 CONF_TARGET = "/etc/nginx/hivora.d"  # its "conf" volume (template 1.1.0 and later)

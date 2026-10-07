@@ -223,6 +223,10 @@
               }
             ]
           },
+          "hosting": {
+            "title": "Hosting",
+            "type": "boolean"
+          },
           "icon_url": {
             "anyOf": [
               {
@@ -340,6 +344,7 @@
           "desired_state",
           "status",
           "drift",
+          "hosting",
           "created_at",
           "revision",
           "containers",
@@ -367,6 +372,10 @@
           },
           "drift": {
             "title": "Drift",
+            "type": "boolean"
+          },
+          "hosting": {
+            "title": "Hosting",
             "type": "boolean"
           },
           "icon_url": {
@@ -433,6 +442,7 @@
           "desired_state",
           "status",
           "drift",
+          "hosting",
           "created_at"
         ],
         "title": "AppOut",
@@ -3483,6 +3493,36 @@
         "title": "SiteChangeOut",
         "type": "object"
       },
+      "SiteConfigOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "error"
+        ],
+        "title": "SiteConfigOut",
+        "type": "object"
+      },
       "SiteFileIn": {
         "properties": {
           "base_sha256": {
@@ -3567,6 +3607,16 @@
             "title": "App Id",
             "type": "integer"
           },
+          "config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SiteConfigOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "max_sites": {
             "title": "Max Sites",
             "type": "integer"
@@ -3602,7 +3652,8 @@
           "upgrade_required",
           "stopped",
           "max_sites",
-          "sites"
+          "sites",
+          "config"
         ],
         "title": "SiteHostOut",
         "type": "object"
@@ -7048,6 +7099,49 @@
           }
         },
         "summary": "Add Hosted Site",
+        "tags": [
+          "sites"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/sites/config": {
+      "post": {
+        "description": "nginx's files written again from the sites as recorded, checked, then reloaded.",
+        "operationId": "reapply_site_config_api_v1_apps__app_id__sites_config_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reapply Site Config",
         "tags": [
           "sites"
         ]

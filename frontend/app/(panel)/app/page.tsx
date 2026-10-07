@@ -115,7 +115,7 @@ function AppDetail() {
         )}
         <StatusHero app={app} status={status} />
         {can("operator") && app.template && <UpgradeBanner appId={app.id} onJob={setActiveJob} />}
-        {app.template === "nginx" && <HostedSitesCard appId={app.id} onJob={setActiveJob} />}
+        {app.template === "nginx" && <HostedSitesCard appId={app.id} hosting={app.hosting} onJob={setActiveJob} />}
         {["healthy", "starting", "degraded"].includes(status) && <AppUsage slug={app.slug} />}
         {app.game && (
           <GamePanel

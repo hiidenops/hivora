@@ -33,7 +33,7 @@ def test_a_host_and_its_sites(client: Any) -> None:
     host = client.get(f"{API}/apps/{app_id}/sites").json()
     assert {k: v for k, v in host.items() if k != "sites"} == {
         "app_id": app_id, "slug": "vitrine", "name": "Vitrine", "upgrade_required": False,
-        "stopped": False, "max_sites": 30,
+        "stopped": False, "max_sites": 30, "config": None,
     }  # fmt: skip
     [main] = host["sites"]
     assert {k: v for k, v in main.items() if k != "id"} == {
@@ -172,7 +172,8 @@ def test_viewers_read_operators_write(client: Any) -> None:
         viewer.post(f"{API}/auth/password", json={"current": "temporary-pass-1", "new": STRONG})
         assert viewer.get(f"{API}/apps/{app_id}/sites").status_code == 200
         writes = [
-            ("post", "sites/hosting", None), ("post", "sites/plan", {"name": "b", "port": 8096}),
+            ("post", "sites/hosting", None), ("post", "sites/config", None),
+            ("post", "sites/plan", {"name": "b", "port": 8096}),
             ("post", "sites", {"name": "b", "port": 8096}),
             ("put", f"sites/{main_id}/enabled", {"enabled": False}),
             ("put", f"sites/{main_id}/server-name", {"server_name": None}),

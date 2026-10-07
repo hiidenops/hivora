@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { useSession } from "@/components/app-shell";
@@ -14,10 +15,12 @@ import { useAddSite, usePlanSite } from "./hooks";
 import { PortError } from "./port-dialog";
 import { RestartNotice } from "./restart-notice";
 
-/** A new site on its own port: checked first (conflicts, restart notice), then added. */
-export function AddSiteDialog({ appId, disabled, onJob }: { appId: number; disabled: boolean; onJob: (jobId: number) => void }) {
+/** A new site on its own port: checked first (conflicts, restart notice), then added; its
+ *  page opens next (it is empty). */
+export function AddSiteDialog({ appId, disabled }: { appId: number; disabled: boolean }) {
   const { t } = useI18n();
   const { advanced } = useSession();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [port, setPort] = useState("");
@@ -56,7 +59,8 @@ export function AddSiteDialog({ appId, disabled, onJob }: { appId: number; disab
       onSuccess: (change) => {
         setOpen(false);
         reset();
-        onJob(change.config_job.id);
+        // Straight to the new site's page: it is empty, its content goes in from there.
+        router.push(`/app/site/?app=${appId}&site=${change.site!.id}&job=${change.config_job.id}`);
       },
     });
   };
