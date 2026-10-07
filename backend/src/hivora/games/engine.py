@@ -16,14 +16,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from hivora.apps.service import AppService
+from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, HivoraError, NotFoundError, ValidationError
+from hivora.core.events import EventBus
 from hivora.core.fs import confined
-from hivora.docker_gateway import ContainerInfo
+from hivora.docker_gateway import ContainerInfo, DockerGateway
 from hivora.games import worlds as w
 from hivora.games.a2s import A2SError, query_async
 from hivora.games.minecraft import clean, parse_list
-from hivora.jobs import Job, JobKind
-from hivora.runtime import Runtime
+from hivora.jobs import Job, JobKind, JobQueue
 from hivora.templates.schema import Game, GameList, GameSaves
 
 _FAILURES = ("does not exist", "could not", "unknown", "error", "incorrect")
@@ -110,12 +114,20 @@ def edit_lines(path: Path, name: str, *, add: bool) -> None:
 
 
 class GameTools:
-    def __init__(self, rt: Runtime) -> None:
-        self.rt = rt
+    def __init__(
+        self, *, sessions: async_sessionmaker[AsyncSession], apps: AppService, settings: Settings,
+        gateway: DockerGateway, bus: EventBus, jobs: JobQueue,
+    ) -> None:  # fmt: skip
+        self.sessions = sessions
+        self.apps = apps
+        self.settings = settings
+        self.gateway = gateway
+        self.bus = bus
+        self.jobs = jobs
 
     async def _server(self, app_id: int) -> _Server:
-        async with self.rt.sessions() as session:
-            app, entry, container = await self.rt.apps.main_container(session, app_id)
+        async with self.sessions() as session:
+            app, entry, container = await self.apps.main_container(session, app_id)
             game = entry.template.game if entry else None
             if entry is None or game is None:
                 raise NotAGameServerError("not a game server", slug=app.slug)
@@ -127,16 +139,16 @@ class GameTools:
         return _Server(app_id, app.slug, game, container, volumes, ports)
 
     async def _values(self, app_id: int) -> dict[str, Any]:
-        async with self.rt.sessions() as session:
-            return (await self.rt.apps.planner.current_settings(session, app_id)).values
+        async with self.sessions() as session:
+            return (await self.apps.planner.current_settings(session, app_id)).values
 
     async def _run(self, srv: _Server, cmd: list[str]) -> str:
         if srv.container is None:
             raise ServerNotRunningError("the server must be running")
         async with asyncio.timeout(COMMAND_TIMEOUT_S):
-            s = self.rt.settings
+            s = self.settings
             user = f"{s.puid}:{s.pgid}" if srv.game.run_as == "app" else None
-            code, out = await self.rt.gateway.exec_run(srv.container.id, cmd, user)
+            code, out = await self.gateway.exec_run(srv.container.id, cmd, user)
         text = clean(out)
         if code != 0 or any(f in text.lower() for f in _FAILURES):
             raise GameCommandError(text or f"{cmd[0]} exited with {code}")
@@ -178,7 +190,7 @@ class GameTools:
         if port is None:
             raise GameFeatureMissingError("the A2S query port is not published")
         try:
-            online, maximum, names = await query_async(self.rt.settings.host_lan_ip or "127.0.0.1",
+            online, maximum, names = await query_async(self.settings.host_lan_ip or "127.0.0.1",
                                                        port)  # fmt: skip
         except A2SError as exc:  # still starting, or query disabled
             raise GameCommandError(str(exc)) from exc
@@ -219,7 +231,7 @@ class GameTools:
         else:
             await asyncio.to_thread(edit_lines, path, name, add=add)
             out = ""
-        self.rt.bus.publish("game.list_added" if add else "game.list_removed",
+        self.bus.publish("game.list_added" if add else "game.list_removed",
                             app=srv.slug, target=name, list=list_id)  # fmt: skip
         return out
 
@@ -229,7 +241,7 @@ class GameTools:
         if not gl.enabled_field:
             raise GameFeatureMissingError(f"list {list_id!r} cannot be turned off")
         values = await self._values(app_id)
-        return await self.rt.apps.revisions.update(app_id, {**values, gl.enabled_field: enabled})
+        return await self.apps.revisions.update(app_id, {**values, gl.enabled_field: enabled})
 
     # --- worlds -----------------------------------------------------------
     async def _saves(self, app_id: int) -> tuple[_Server, GameSaves, Path, str]:
@@ -248,9 +260,9 @@ class GameTools:
         return active, await asyncio.to_thread(w.list_worlds, data, active, saves)
 
     async def _enqueue(self, app_id: int, slug: str, kind: JobKind, **params: Any) -> Job:
-        async with self.rt.sessions() as session, session.begin():
-            job = self.rt.jobs.add(session, kind, app_id=app_id, app_slug=slug, params=params)
-        self.rt.jobs.wake()
+        async with self.sessions() as session, session.begin():
+            job = self.jobs.add(session, kind, app_id=app_id, app_slug=slug, params=params)
+        self.jobs.wake()
         return job
 
     async def import_world(
@@ -262,7 +274,7 @@ class GameTools:
         if (data / w.valid_world_name(name)).exists():
             raise w.WorldExistsError(f"a world named {name!r} already exists", name=name)
         # Next to the data volume (same filesystem, not visible to the server).
-        upload = self.rt.apps.volumes_dir(srv.slug) / f".hivora-upload-{secrets.token_hex(8)}.zip"
+        upload = self.apps.volumes_dir(srv.slug) / f".hivora-upload-{secrets.token_hex(8)}.zip"
         await w.receive_upload(body, upload)
         return await self._enqueue(
             app_id, srv.slug, JobKind.WORLD_IMPORT, name=name, data=str(data),
@@ -277,7 +289,7 @@ class GameTools:
         if name == active:
             raise w.ActiveWorldError("this world is already active", name=name)
         values = await self._values(app_id)
-        return await self.rt.apps.revisions.update(app_id, {**values, saves.active_field: name})
+        return await self.apps.revisions.update(app_id, {**values, saves.active_field: name})
 
     async def delete_world(self, app_id: int, name: str) -> Job:
         srv, saves, data, active = await self._saves(app_id)
@@ -292,5 +304,5 @@ class GameTools:
         w.existing_world(data, name, saves)
         if srv.container is not None and name == active and saves.flush:
             await self._run(srv, saves.flush)  # consistent files on disk
-        self.rt.bus.publish("game.world_downloaded", app=srv.slug, target=name)
+        self.bus.publish("game.world_downloaded", app=srv.slug, target=name)
         return w.zip_stream(w.world_paths(data, name, saves), data)

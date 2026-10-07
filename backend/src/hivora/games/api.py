@@ -118,18 +118,23 @@ class WorldIn(BaseModel):
     name: str = Field(max_length=48)
 
 
+def game_tools(rt: RuntimeDep) -> GameTools:
+    return GameTools(sessions=rt.sessions, apps=rt.apps, settings=rt.settings,
+                     gateway=rt.gateway, bus=rt.bus, jobs=rt.jobs)  # fmt: skip
+
+
 def _job(job: Job) -> JobRefOut:
     return JobRefOut(id=job.id, kind=job.kind.value, status=job.status.value)
 
 
 @game_router.get("/{app_id}/game/players")
 async def players(app_id: int, _: Viewer, rt: RuntimeDep) -> PlayersOut:
-    return PlayersOut(**asdict(await GameTools(rt).players(app_id)))
+    return PlayersOut(**asdict(await game_tools(rt).players(app_id)))
 
 
 @game_router.get("/{app_id}/game/lists")
 async def lists(app_id: int, _: Viewer, rt: RuntimeDep) -> ListsOut:
-    running, found = await GameTools(rt).lists(app_id)
+    running, found = await game_tools(rt).lists(app_id)
     return ListsOut(running=running, lists=[PlayerListOut(**asdict(x)) for x in found])
 
 
@@ -137,14 +142,14 @@ async def lists(app_id: int, _: Viewer, rt: RuntimeDep) -> ListsOut:
 async def list_add(
     app_id: int, list_id: str, body: PlayerIn, _: Operator, rt: RuntimeDep
 ) -> CommandOut:
-    return CommandOut(output=await GameTools(rt).change_list(app_id, list_id, body.name, add=True))
+    return CommandOut(output=await game_tools(rt).change_list(app_id, list_id, body.name, add=True))
 
 
 @game_router.delete("/{app_id}/game/lists/{list_id}/{name}")
 async def list_remove(
     app_id: int, list_id: str, name: str, _: Operator, rt: RuntimeDep
 ) -> CommandOut:
-    return CommandOut(output=await GameTools(rt).change_list(app_id, list_id, name, add=False))
+    return CommandOut(output=await game_tools(rt).change_list(app_id, list_id, name, add=False))
 
 
 @game_router.put("/{app_id}/game/lists/{list_id}/enabled", status_code=202)
@@ -152,12 +157,12 @@ async def list_enabled(
     app_id: int, list_id: str, body: EnabledIn, _: Operator, rt: RuntimeDep
 ) -> JobRefOut:
     """Intent change: new revision, the server restarts."""
-    return _job(await GameTools(rt).set_list_enabled(app_id, list_id, body.enabled))
+    return _job(await game_tools(rt).set_list_enabled(app_id, list_id, body.enabled))
 
 
 @game_router.get("/{app_id}/game/worlds")
 async def worlds(app_id: int, _: Viewer, rt: RuntimeDep) -> WorldsOut:
-    active, found = await GameTools(rt).worlds(app_id)
+    active, found = await game_tools(rt).worlds(app_id)
     return WorldsOut(active=active, worlds=[WorldOut(**asdict(x)) for x in found])
 
 
@@ -167,23 +172,23 @@ async def world_import(
     name: str = Query(max_length=48), filename: str = Query("", max_length=200),
 ) -> JobRefOut:  # fmt: skip
     """Raw .zip body (streamed to disk, 10 GB max); extraction runs as a job."""
-    return _job(await GameTools(rt).import_world(app_id, name, filename, request.stream()))
+    return _job(await game_tools(rt).import_world(app_id, name, filename, request.stream()))
 
 
 @game_router.put("/{app_id}/game/worlds/active", status_code=202)
 async def world_activate(app_id: int, body: WorldIn, _: Operator, rt: RuntimeDep) -> JobRefOut:
     """Intent change: new revision, the server restarts on that world."""
-    return _job(await GameTools(rt).activate_world(app_id, body.name))
+    return _job(await game_tools(rt).activate_world(app_id, body.name))
 
 
 @game_router.delete("/{app_id}/game/worlds/{name}", status_code=202)
 async def world_delete(app_id: int, name: str, _: Operator, rt: RuntimeDep) -> JobRefOut:
-    return _job(await GameTools(rt).delete_world(app_id, name))
+    return _job(await game_tools(rt).delete_world(app_id, name))
 
 
 @game_router.get("/{app_id}/game/worlds/{name}/download")
 async def world_download(app_id: int, name: str, _: Operator, rt: RuntimeDep) -> StreamingResponse:
-    stream = await GameTools(rt).download_world(app_id, name)
+    stream = await game_tools(rt).download_world(app_id, name)
     return StreamingResponse(stream, media_type="application/zip", headers={
         "Content-Disposition": f'attachment; filename="{name}.zip"',
         "Cache-Control": "no-store",
