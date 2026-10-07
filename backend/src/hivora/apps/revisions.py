@@ -11,19 +11,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.compose_edit import ComposeEdit
 from hivora.apps.core import (
-    AppPlanner,
-    DeployPlan,
     PortConflictError,
     conflict_dict,
     decrypt_secrets,
     get_app,
     latest_revision,
     queue_revision,
-    services_from,
     store_secrets,
 )
 from hivora.apps.custom_images import CustomImages
 from hivora.apps.models import Application, AppRevision, AppSecret, RevisionStatus
+from hivora.apps.planner import AppPlanner, DeployPlan, services_from
 from hivora.core.clock import Clock
 from hivora.core.errors import ConflictError, NotFoundError
 from hivora.core.events import EventBus

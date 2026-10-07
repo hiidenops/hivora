@@ -235,7 +235,7 @@ Situation au 07/10/2026 (lot M8-a ; mesures de `wc -l`, classes par `ast`) :
 | `vpn/service.py` | 491 lignes | alerte (inchangé) |
 | `auth/service.py` | 424 lignes | alerte (inchangé) |
 | `features/firewall/firewall-panel.tsx` | 372 lignes | alerte (inchangé) |
-| `apps/core.py` | 358 lignes | alerte (socle > 300 ; 340 au 29/09) |
+| `apps/core.py` | 116 lignes | **résolu** en M9-a (358 avant) : `AppPlanner`, `DeployPlan`, `AppSettings`, `SitePorts` et `services_from` dans `apps/planner.py` (260 lignes, sous les seuils) |
 | `features/deploy/generated-form.tsx` | 343 lignes | alerte (inchangé) |
 | `features/activity/host-charts.tsx` | 321 lignes | alerte (inchangé) |
 | `sites/files.py` | 301 lignes | sous le seuil ; fonctions pures et service `SiteFiles` (75 lignes) à séparer s'il grossit |
@@ -259,7 +259,7 @@ Priorités techniques (bilan du 29/09) :
 Second rang :
 
 1. `topology-view.tsx` (seuil bloquant) : extraire le panneau d'inspection, le gestionnaire de liens et l'export.
-2. `AppPlanner` dans `apps/planner.py` : `core.py` repasse sous 300 lignes.
+2. ~~`AppPlanner` dans `apps/planner.py` : `core.py` repasse sous 300 lignes.~~ fait le 07/10 (lot M9-a) : `core.py` 116 lignes, `planner.py` 260.
 3. Étape 7 de `AppService` : brancher les appelants sur les sous-services, puis supprimer les relais ; c'est ce qui fera baisser ses liens dans Graphify (§13).
 4. ~~`core/fs` pour `confined`, `tree_size`, `remove_tree` et `receive_upload` (§4.5)~~ fait le 01/10 (lot S0) ; reste `_Zip` à rendre public (§9.11).
 5. Topologie branchée sur l'état du pare-feu en cache (§4.6).

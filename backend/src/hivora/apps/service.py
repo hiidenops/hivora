@@ -12,17 +12,12 @@ from hivora.apps.adoption import Adoption, Candidate
 from hivora.apps.compose_edit import ComposeEdit, ComposePlan
 from hivora.apps.core import (
     LABEL_COMPOSE_SERVICE,
-    AppPlanner,
-    AppSettings,
     decrypt_secrets,
     get_app,
     latest_revision,
 )
 from hivora.apps.core import (  # re-exported: imported from here by other modules
     AppNotFoundError as AppNotFoundError,
-)
-from hivora.apps.core import (  # re-exported: imported from here by other modules
-    DeployPlan as DeployPlan,
 )
 from hivora.apps.core import (  # re-exported: imported from here by other modules
     DeployRequest as DeployRequest,
@@ -44,6 +39,10 @@ from hivora.apps.lifecycle import (  # re-exported: imported from here by other 
 from hivora.apps.models import (
     Application,
     AppRevision,
+)
+from hivora.apps.planner import AppPlanner, AppSettings
+from hivora.apps.planner import (  # re-exported: imported from here by other modules
+    DeployPlan as DeployPlan,
 )
 from hivora.apps.revisions import Revisions, UpgradeStatus
 from hivora.apps.revisions import (  # re-exported: imported from here by other modules

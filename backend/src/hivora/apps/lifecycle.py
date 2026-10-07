@@ -7,18 +7,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.core import (
-    AppPlanner,
-    DeployPlan,
     DeployRequest,
     PortConflictError,
     UnsupportedArchitectureError,
     conflict_dict,
     get_app,
-    services_from,
     slugify,
     store_secrets,
 )
 from hivora.apps.models import Application, AppRevision, DesiredState, Origin, RevisionStatus
+from hivora.apps.planner import AppPlanner, DeployPlan, services_from
 from hivora.compose_runner import ComposeRunner
 from hivora.core.clock import Clock
 from hivora.core.config import Settings
