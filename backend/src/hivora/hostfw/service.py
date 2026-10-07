@@ -15,9 +15,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from hivora.core.errors import ConflictError, ValidationError
+from hivora.core.events import EventBus
 from hivora.db.models import Setting
-from hivora.runtime import Runtime
+from hivora.docker_gateway import DockerGateway
+from hivora.state import StateStore
 
 AGENT = "hivora-host-agent"
 AGENT_IMAGE = "alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8"
@@ -129,32 +133,38 @@ def valid_ip(value: str) -> str:
 
 
 class HostFirewall:
-    def __init__(self, rt: Runtime) -> None:
-        self.rt = rt
+    def __init__(
+        self, *, sessions: async_sessionmaker[AsyncSession], gateway: DockerGateway,
+        bus: EventBus, store: StateStore,
+    ) -> None:  # fmt: skip
+        self.sessions = sessions
+        self.gateway = gateway
+        self.bus = bus
+        self.store = store  # the published ports, next to what listens on the host
         self._cache: tuple[float, FirewallState] | None = None
 
     # --- the agent ---------------------------------------------------------------
     async def agent_enabled(self) -> bool:
-        async with self.rt.sessions() as session:
+        async with self.sessions() as session:
             row = await session.get(Setting, SETTING)
         return bool(row and row.value is True)
 
     async def set_agent(self, on: bool) -> None:
         if on:
-            await self.rt.gateway.ensure_agent(AGENT, AGENT_IMAGE, LABELS)
+            await self.gateway.ensure_agent(AGENT, AGENT_IMAGE, LABELS)
         else:
-            await self.rt.gateway.remove_agent(AGENT)
-        async with self.rt.sessions() as session, session.begin():
+            await self.gateway.remove_agent(AGENT)
+        async with self.sessions() as session, session.begin():
             await session.merge(Setting(key=SETTING, value=on))
         self._cache = None
-        self.rt.bus.publish("hostfw.agent_enabled" if on else "hostfw.agent_disabled")
+        self.bus.publish("hostfw.agent_enabled" if on else "hostfw.agent_disabled")
 
     async def _run(self, argv: list[str], *, check: bool = True) -> tuple[int, str]:
         if not await self.agent_enabled():
             raise AgentOffError("the host agent is off (Settings → host firewall)")
-        agent = await self.rt.gateway.ensure_agent(AGENT, AGENT_IMAGE, LABELS)
+        agent = await self.gateway.ensure_agent(AGENT, AGENT_IMAGE, LABELS)
         async with asyncio.timeout(TIMEOUT_S):
-            code, out = await self.rt.gateway.exec_run(agent, [*HOST, *argv])
+            code, out = await self.gateway.exec_run(agent, [*HOST, *argv])
         if check and code != 0:
             raise HostCommandError(f"{argv[0]} failed", output=out[-500:])
         return code, out
@@ -196,7 +206,7 @@ class HostFirewall:
     async def _change(self, event: str, argv: list[str], **details: Any) -> str:
         _, out = await self._run(argv)
         self._cache = None
-        self.rt.bus.publish(event, **details)
+        self.bus.publish(event, **details)
         return out.strip()[-500:]
 
     async def ufw_rule(self, action: Literal["allow", "deny", "limit"], port: int,
@@ -301,7 +311,7 @@ async def listening(fw: "HostFirewall") -> list[dict[str, Any]]:
     _, out = await fw._run(["ss", "-H", "-tulpn"], check=False)
     state = await fw.state()
     published: dict[tuple[int, str], str] = {}
-    for c in fw.rt.state.store.containers():
+    for c in fw.store.containers():
         for p in c.ports:
             if p.host_port:
                 published[(p.host_port, p.protocol)] = c.labels.get("io.hivora.app") or c.name

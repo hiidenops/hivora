@@ -22,6 +22,7 @@ from hivora.db.migrate import upgrade_to_head
 from hivora.docker_gateway import DockerGateway
 from hivora.games.modpacks import ModpackCatalog
 from hivora.games.worlds import WorldJobs
+from hivora.hostfw.service import HostFirewall
 from hivora.jobs import JobQueue
 from hivora.metrics.apps import AppMetrics
 from hivora.metrics.host import HostMetrics
@@ -40,7 +41,6 @@ from hivora.templates.icons import IconCache
 from hivora.vpn.service import VpnTools, expire_clients, follow_deploys
 
 if TYPE_CHECKING:
-    from hivora.hostfw.service import HostFirewall
     from hivora.realtime.console import ConsoleManager
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ class Runtime:
     site_hosting: SiteHosting
     tasks: TaskTools
     vpn: VpnTools
-    hostfw: "HostFirewall" = field(init=False)
+    hostfw: HostFirewall
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
     consoles: "ConsoleManager" = field(init=False)
@@ -84,9 +84,6 @@ class Runtime:
         from hivora.realtime.console import ConsoleManager  # needs Runtime itself
 
         self.consoles = ConsoleManager(self)
-        from hivora.hostfw.service import HostFirewall
-
-        self.hostfw = HostFirewall(self)
 
     @classmethod
     def build(
@@ -157,11 +154,12 @@ class Runtime:
                           backups=backups, box=box, store=state.store, gateway=gateway)  # fmt: skip
         vpn = VpnTools(sessions=sessions, apps=apps, box=box, bus=bus, clock=clock,
                        gateway=gateway)  # fmt: skip
+        hostfw = HostFirewall(sessions=sessions, gateway=gateway, bus=bus, store=state.store)
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
                    public_address, AppMetrics(gateway, state.store, bus), backups,
-                   sites, site_files, site_config, site_hosting, tasks, vpn)  # fmt: skip
+                   sites, site_files, site_config, site_hosting, tasks, vpn, hostfw)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
