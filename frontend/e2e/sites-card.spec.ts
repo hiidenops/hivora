@@ -51,6 +51,12 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
   const blog = sites.getByRole("listitem", { name: "Blog" });
   await expect(blog.getByText("Port 8301")).toBeVisible({ timeout: 20_000 });
 
+  // Its page through its Configure button (the name links there too).
+  await blog.getByRole("link", { name: "Configurer le site « Blog »" }).click();
+  await expect(page.getByRole("heading", { name: "Blog", level: 1 })).toBeVisible();
+  await page.goBack();
+  await expect(blog.getByText("Port 8301")).toBeVisible();
+
   // Its own switch: no restart notice, only this site.
   const toggle = blog.getByRole("switch", { name: "Site « Blog » actif" });
   await expect(toggle).toBeChecked();
@@ -104,6 +110,8 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
   await expect(viewer.getByRole("button", { name: "Ajouter un site" })).toHaveCount(0);
   await expect(viewer.getByRole("switch", { name: "Site « Blog » actif" })).toBeDisabled();
   await expect(viewer.getByRole("button", { name: /^Actions du site/ })).toHaveCount(0); // no port, name or removal
+  await expect(viewer.getByRole("link", { name: "Voir la configuration du site « Blog »" })).toBeVisible(); // not "Configure"
+  await expect(viewer.getByRole("link", { name: /^Configurer le site/ })).toHaveCount(0);
   await viewer.close();
 });
 

@@ -1,16 +1,18 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { Eye, ExternalLink, Settings2 } from "lucide-react";
 import Link from "next/link";
 
 import { useSession } from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { HostedSite } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
 import { SiteActions, SiteSwitch } from "./site-controls";
 
-/** One site of the host: name (a link to its page), port, address, its switch and its menu. */
+/** One site of the host: name, port, address; a button to its page (Configure, or View for a
+ *  viewer), its switch and its menu. The name links to its page too. */
 export function HostedSiteRow({ appId, site, locked, stopped, onJob }: {
   appId: number;
   site: HostedSite;
@@ -19,12 +21,14 @@ export function HostedSiteRow({ appId, site, locked, stopped, onJob }: {
   onJob: (jobId: number) => void;
 }) {
   const { t } = useI18n();
-  const { advanced } = useSession();
+  const { advanced, can } = useSession();
+  const page = `/app/site/?app=${appId}&site=${site.id}`;
+  const edit = can("operator");
 
   return (
     <li aria-label={site.name} className="flex flex-wrap items-center justify-between gap-3 py-3">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <Link href={`/app/site/?app=${appId}&site=${site.id}`} className="font-medium hover:underline">
+        <Link href={page} className="font-medium hover:underline">
           {site.name}
         </Link>
         {site.main && <Badge>{t("hosting.main")}</Badge>}
@@ -37,8 +41,14 @@ export function HostedSiteRow({ appId, site, locked, stopped, onJob }: {
         )}
       </div>
       <div className="flex items-center gap-2">
+        <Button asChild size="sm" variant="outline">
+          <Link href={page} aria-label={t(edit ? "hosting.configureSite" : "hosting.viewSite", { name: site.name })}>
+            {edit ? <Settings2 /> : <Eye />} {t(edit ? "hosting.configure" : "hosting.view")}
+          </Link>
+        </Button>
         <SiteSwitch appId={appId} site={site} locked={locked} onJob={onJob} />
         <SiteActions appId={appId} site={site} locked={locked} stopped={stopped} onJob={onJob} />
+        {edit && site.main && <span aria-hidden className="size-9" />} {/* the menu's place: buttons aligned row to row */}
       </div>
     </li>
   );
