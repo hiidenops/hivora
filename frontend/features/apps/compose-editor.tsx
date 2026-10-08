@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { CodeEditor } from "@/components/code-editor";
 import { DiffView } from "@/components/diff-view";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -36,15 +37,15 @@ export function ComposeEditor({ appId, initial, onJob, onClose }: { appId: numbe
   return (
     <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">{t("compose.help")}</p>
-      <textarea
-        aria-label={t("compose.edit")}
-        spellCheck={false}
-        className="h-96 w-full resize-y rounded-md border bg-[#1c1917] p-3 font-mono text-xs leading-5 text-stone-200"
+      <CodeEditor
+        language="yaml"
+        label={t("compose.edit")}
         value={text}
-        onChange={(e) => {
-          setText(e.target.value);
+        onChange={(next) => {
+          setText(next);
           setPlan(null);
         }}
+        onSave={() => !check.isPending && check.mutate()} // Ctrl+S checks; applying stays a click
       />
       {plan && plan.problems.length > 0 && (
         <Alert tone="danger">

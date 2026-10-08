@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { useSession } from "@/components/app-shell";
+import { CodeEditor } from "@/components/code-editor";
 import { api } from "@/lib/api/client";
 import { Switch, Input, Label, Select } from "@/components/ui/input";
 import { useI18n, type Localized, type MessageKey } from "@/lib/i18n";
@@ -141,15 +142,16 @@ export function GeneratedForm({
       );
     } else if (f.type === "text") {
       control = (
-        <textarea
+        <CodeEditor
+          language="properties" // key=value lines (server.properties and the like)
           id={id}
-          rows={5}
-          className="w-full rounded-md border border-input bg-card px-3 py-2 font-mono text-xs shadow-xs outline-none focus-visible:border-ring aria-invalid:border-danger"
+          labelledBy={`${id}-label`}
+          height="10rem"
           value={values[f.id] === undefined ? "" : String(values[f.id])}
           placeholder={hint}
-          onChange={(e) => onChange(f.id, e.target.value === "" ? undefined : e.target.value)}
-          aria-invalid={!!error}
-          aria-describedby={describe}
+          onChange={(v) => onChange(f.id, v === "" ? undefined : v)}
+          invalid={!!error}
+          describedBy={describe}
         />
       );
     } else {
@@ -183,7 +185,7 @@ export function GeneratedForm({
     return (
       <div key={f.id} className="grid gap-1.5">
         {f.type !== "boolean" && (
-          <Label htmlFor={id}>
+          <Label htmlFor={id} id={`${id}-label`}>
             {l(f.label)}
             {f.required && !(f.type === "secret" && secretsSet.includes(f.id)) && (
               <span className="text-danger"> *</span>

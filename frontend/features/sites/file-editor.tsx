@@ -1,7 +1,8 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+
+import { CodeEditor, languageOfPath } from "@/components/code-editor";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,12 +11,6 @@ import { ApiError } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
 import { useSaveSiteFile, useSiteFile } from "./hooks";
-
-// CodeMirror is loaded only once a file is opened.
-const CodeEditor = dynamic(() => import("./code-editor").then((m) => m.CodeEditor), {
-  ssr: false,
-  loading: () => <Skeleton className="h-[28rem]" />,
-});
 
 type Loaded = { base: string | null; original: string; draft: string };
 
@@ -77,7 +72,7 @@ export function FileEditor({ base, path, exists, canEdit, onJob, onDirty }: {
         <Skeleton className="h-[28rem]" />
       ) : (
         <CodeEditor
-          path={path}
+          language={languageOfPath(path)}
           label={t("sites.editorLabel", { path })}
           value={state.draft}
           readOnly={!canEdit}
