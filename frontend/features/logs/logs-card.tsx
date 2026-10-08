@@ -75,7 +75,7 @@ export function LogsCard({ appId }: { appId: number }) {
         </>
       }
     >
-      <div className="grid gap-3">
+      <div className="flex h-full min-h-0 flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <select aria-label={t("logs.service")} className="h-9 rounded-md border bg-card px-2 text-sm" value={service} onChange={(e) => setService(e.target.value)}>
             <option value="">{t("logs.allServices")}</option>
@@ -85,7 +85,7 @@ export function LogsCard({ appId }: { appId: number }) {
               </option>
             ))}
           </select>
-          <Input type="search" aria-label={t("logs.search")} placeholder={t("logs.search")} className="h-9 w-56" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input type="search" aria-label={t("logs.search")} placeholder={t("logs.search")} className="h-9 w-48" value={search} onChange={(e) => setSearch(e.target.value)} />
           <label className="flex items-center gap-2 text-sm">
             <Switch checked={follow} onChange={(e) => setFollow(e.target.checked)} /> {t("logs.follow")}
           </label>
@@ -107,7 +107,7 @@ export function LogsCard({ appId }: { appId: number }) {
           role="log"
           aria-live="off"
           onWheel={() => follow && box.current && box.current.scrollTop + box.current.clientHeight < box.current.scrollHeight - 40 && setFollow(false)}
-          className="h-96 overflow-auto rounded-md bg-[#1c1917] p-3 font-mono text-xs leading-5 text-stone-200"
+          className="min-h-64 flex-1 overflow-auto rounded-md bg-[#1c1917] p-3 font-mono text-xs leading-5 text-stone-200"
         >
           {shown.length === 0 ? (
             <p className="text-stone-400">{lines.length ? t("logs.noMatch") : t("logs.empty")}</p>

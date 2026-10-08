@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, RotateCw, SquareTerminal } from "lucide-react";
+import { BookOpen, CornerDownLeft, RotateCw, SquareTerminal } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -40,6 +40,10 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
   const [phase, setPhase] = useState<Phase>("connecting");
   const [error, setError] = useState<string | null>(null);
   const [guideOpen, setGuideOpen] = useState(true);
+  const [command, setCommand] = useState("");
+  const history = useRef<string[]>([]);
+  const back = useRef(0); // steps back in the history (arrow up), 0: the line being typed
+  const line = useRef<HTMLInputElement>(null);
   const [session, setSession] = useState(0); // a new terminal (and console) per session
   const ctrl = useRef<Controller | null>(null);
   const term = useRef<TerminalHandle | null>(null);
@@ -105,6 +109,20 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
   };
 
   const showGuide = guideOpen && kind === "server" && commands.length > 0;
+  // A command line under the terminal: Enter sends it, arrows walk the history.
+  const send = (e: FormEvent) => {
+    e.preventDefault();
+    if (!command.trim() || phase !== "open") return;
+    ctrl.current?.input(`${command}\r`);
+    history.current = [...history.current.filter((c) => c !== command), command].slice(-50);
+    back.current = 0;
+    setCommand("");
+  };
+  const walk = (step: 1 | -1) => {
+    const h = history.current;
+    back.current = Math.min(h.length, Math.max(0, back.current + step));
+    setCommand(back.current ? h[h.length - back.current] : "");
+  };
 
   return (
     <CollapsibleCard
@@ -119,7 +137,7 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
         </>
       }
     >
-      <div className="grid gap-3">
+      <div className="flex h-full min-h-0 flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <div role="tablist" className="inline-flex rounded-md border p-0.5">
             {(hasServer ? (["server", "shell"] as Kind[]) : (["shell"] as Kind[])).map((k) => (
@@ -162,50 +180,72 @@ export function ConsolePanel({ app, running }: { app: AppDetail; running: boolea
           </form>
         )}
         {error && <Alert tone="danger">{error}</Alert>}
-        <div className="flex flex-col gap-3 md:h-96 md:flex-row">
+        <div className="min-h-64 flex-1">
           {running && session > 0 && (
-            <div className="h-80 min-w-0 flex-1 md:h-full">
-              <XTerm
-                key={session}
-                onInput={(d) => ctrl.current?.input(d)}
-                onResize={(rows, cols) => {
-                  size.current = { rows, cols };
-                  ctrl.current?.resize(rows, cols);
-                }}
-                onReady={(handle, initial) => {
-                  term.current = handle;
-                  size.current = initial;
-                  connect(kind);
-                }}
-              />
-            </div>
-          )}
-          {showGuide && (
-            <aside
-              className="animate-enter max-h-72 shrink-0 overflow-y-auto rounded-md border md:max-h-none md:w-64"
-              aria-label={t("console.guide")}
-            >
-              <p className="border-b px-3 py-2 text-xs text-muted-foreground">{t("console.guideHint")}</p>
-              <ul>
-                {commands.map((c) => (
-                  <li key={c.command}>
-                    <button
-                      className="w-full px-3 py-2 text-left transition-colors hover:bg-muted disabled:opacity-50"
-                      disabled={phase !== "open"}
-                      onClick={() => {
-                        ctrl.current?.input(c.command);
-                        term.current?.focus();
-                      }}
-                    >
-                      <code className="block font-mono text-xs">{c.command}</code>
-                      <span className="text-xs text-muted-foreground">{l(c.description)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </aside>
+            <XTerm
+              key={session}
+              onInput={(d) => ctrl.current?.input(d)}
+              onResize={(rows, cols) => {
+                size.current = { rows, cols };
+                ctrl.current?.resize(rows, cols);
+              }}
+              onReady={(handle, initial) => {
+                term.current = handle;
+                size.current = initial;
+                connect(kind);
+              }}
+            />
           )}
         </div>
+        {running && (
+          <form onSubmit={send} className="flex gap-2">
+            <Input
+              ref={line}
+              aria-label={t("console.command")}
+              placeholder={t("console.commandPlaceholder")}
+              className="font-mono"
+              value={command}
+              disabled={phase !== "open"}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(e) => {
+                setCommand(e.target.value);
+                back.current = 0;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                  e.preventDefault();
+                  walk(e.key === "ArrowUp" ? 1 : -1);
+                }
+              }}
+            />
+            <Button type="submit" disabled={phase !== "open" || !command.trim()}>
+              <CornerDownLeft /> {t("console.send")}
+            </Button>
+          </form>
+        )}
+        {showGuide && running && (
+          <div className="animate-enter grid gap-1.5" role="group" aria-label={t("console.guide")}>
+            <p className="text-xs text-muted-foreground">{t("console.guideHint")}</p>
+            <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
+              {commands.map((c) => (
+                <button
+                  key={c.command}
+                  type="button"
+                  title={l(c.description)}
+                  disabled={phase !== "open"}
+                  onClick={() => {
+                    setCommand(c.command);
+                    line.current?.focus();
+                  }}
+                  className="rounded-full border bg-card px-2.5 py-1 font-mono text-xs transition-[background-color,translate] duration-200 ease-(--ease-spring) hover:-translate-y-0.5 hover:bg-muted disabled:opacity-50"
+                >
+                  {c.command}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </CollapsibleCard>
   );

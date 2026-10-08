@@ -7,7 +7,6 @@ import {
   Menu,
   Network,
   Pencil,
-  ScrollText,
   SlidersHorizontal,
   SquareTerminal,
   Trash2,
@@ -23,7 +22,6 @@ import { Unfolded } from "@/components/collapsible-card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { ConsolePanel } from "@/features/console/console-panel";
 import { ZoneSelect } from "@/features/zones/zone-select";
 import type { AppDetail } from "@/lib/api/client";
 import { useI18n, type MessageKey } from "@/lib/i18n";
@@ -34,15 +32,16 @@ import { RemoveDialog } from "./remove-dialog";
 // Loaded when their panel opens: the app's page stays light.
 const BackupsCard = dynamic(() => import("@/features/backups/backups-card").then((m) => m.BackupsCard));
 const TasksCard = dynamic(() => import("@/features/tasks/tasks-card").then((m) => m.TasksCard));
-const LogsCard = dynamic(() => import("@/features/logs/logs-card").then((m) => m.LogsCard));
+const LogsAndConsole = dynamic(() => import("@/features/console/logs-console").then((m) => m.LogsAndConsole));
 const PythonCodeCard = dynamic(() => import("@/features/apps/python-code-card").then((m) => m.PythonCodeCard));
 const AdvancedCards = dynamic(() => import("@/features/apps/advanced-cards").then((m) => m.AdvancedCards));
 
-type Section = "zone" | "backups" | "tasks" | "logs" | "console" | "code" | "advanced";
+type Section = "zone" | "backups" | "tasks" | "logsConsole" | "code" | "advanced";
 type Entry = { key: Section | "edit" | "remove"; icon: LucideIcon; label: MessageKey };
 
 /** The app's secondary actions behind one round button (top right of its page): simple
- *  buttons, each opening its section in a side panel (or the settings page, or the removal). */
+ *  buttons, each opening its section in a side panel (or the settings page, or the removal).
+ *  Logs and console also have their own button next to it. */
 export function AppMenu({ app, running, onJob, onRemoving }: {
   app: AppDetail;
   running: boolean;
@@ -61,8 +60,7 @@ export function AppMenu({ app, running, onJob, onRemoving }: {
     ...(operator && app.template ? [{ key: "edit", icon: Pencil, label: "edit.button" } as const] : []),
     ...(operator ? [{ key: "backups", icon: Archive, label: "backups.title" } as const] : []),
     ...(operator ? [{ key: "tasks", icon: CalendarClock, label: "tasks.title" } as const] : []),
-    ...(operator ? [{ key: "logs", icon: ScrollText, label: "logs.title" } as const] : []),
-    ...(operator ? [{ key: "console", icon: SquareTerminal, label: "console.title" } as const] : []),
+    ...(operator ? [{ key: "logsConsole", icon: SquareTerminal, label: "app.logsConsole" } as const] : []),
     ...(operator && app.python ? [{ key: "code", icon: FileArchive, label: "py.code" } as const] : []),
     ...(advanced ? [{ key: "advanced", icon: SlidersHorizontal, label: "app.menuAdvanced" } as const] : []),
   ];
@@ -77,8 +75,7 @@ export function AppMenu({ app, running, onJob, onRemoving }: {
     ),
     backups: <BackupsCard appId={app.id} onJob={onJob} />,
     tasks: <TasksCard appId={app.id} />,
-    logs: <LogsCard appId={app.id} />,
-    console: <ConsolePanel app={app} running={running} />,
+    logsConsole: <LogsAndConsole app={app} running={running} />,
     code: <PythonCodeCard appId={app.id} onJob={onJob} />,
     advanced: (
       <div className="grid gap-4">
@@ -96,6 +93,12 @@ export function AppMenu({ app, running, onJob, onRemoving }: {
 
   return (
     <>
+      {operator && (
+        // The most used section, also one click away on the page itself.
+        <Button variant="outline" size="sm" onClick={() => setSection("logsConsole")}>
+          <SquareTerminal /> {t("app.logsConsole")}
+        </Button>
+      )}
       <DropdownMenu>
         <MenuButton label={t("app.menu")} />
         <DropdownMenuContent className="animate-burger stagger mt-2 grid w-64 gap-0.5 rounded-xl p-2 shadow-xl">
@@ -121,7 +124,12 @@ export function AppMenu({ app, running, onJob, onRemoving }: {
 
       <Sheet open={section !== null} onOpenChange={(o) => !o && setSection(null)}>
         {current && section && (
-          <SheetContent title={t(current.label)} icon={<current.icon className="size-5" />} closeLabel={t("common.close")}>
+          <SheetContent
+            title={t(current.label)}
+            icon={<current.icon className="size-5" />}
+            closeLabel={t("common.close")}
+            className={section === "logsConsole" ? "sm:max-w-[min(110rem,96vw)]" : undefined} // side by side: wide
+          >
             <Unfolded.Provider value>{body[section]}</Unfolded.Provider>
           </SheetContent>
         )}

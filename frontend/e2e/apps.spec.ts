@@ -51,14 +51,23 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   expect(await page.evaluate(() => isSecureContext)).toBe(false); // the realistic case
   // Live usage: sampled every 5 s only while the page is open.
   await expect(page.getByRole("region", { name: "Consommation" })).toContainText("25,0 %", { timeout: 12_000 });
-  await openAppMenu(page, "Console"); // the app's menu: its console in a side panel
-  await expect(page.getByRole("dialog", { name: "Console" })).toBeVisible();
+  await page.getByRole("button", { name: "Logs et console" }).click(); // its button: both side by side, wide panel
+  const panel = page.getByRole("dialog", { name: "Logs et console" });
+  await expect(panel.getByRole("region", { name: "Logs", exact: true })).toBeVisible();
+  await expect(panel.getByRole("region", { name: "Console", exact: true })).toBeVisible();
   await expect(page.locator(".xterm")).toBeVisible(); // auto-connected on a running app
   await page.locator(".xterm").scrollIntoViewIfNeeded(); // xterm only paints on screen
   await expectPointerCursors(page);
   await expect(page.locator(".xterm-rows")).toContainText("$ sh -c"); // fake exec echoes its command
+  // The command line under the terminal: Enter sends it, the arrow brings it back.
+  const line = panel.getByRole("textbox", { name: "Commande" });
+  await line.fill("ls");
+  await line.press("Enter");
+  await expect(line).toHaveValue("");
+  await line.press("ArrowUp");
+  await expect(line).toHaveValue("ls");
   await page.keyboard.press("Escape"); // the panel closes
-  await expect(page.getByRole("dialog", { name: "Console" })).toBeHidden();
+  await expect(panel).toBeHidden();
   await openAppMenu(page, "Supprimer");
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("switch", { name: "Aussi supprimer les données" })).not.toBeChecked();

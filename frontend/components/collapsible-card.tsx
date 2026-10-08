@@ -44,8 +44,8 @@ export function CollapsibleCard({
   };
   if (unfolded) {
     return (
-      <div className="grid gap-4">
-        {aside && <div className="justify-self-end">{aside}</div>}
+      <div className="flex h-full min-h-0 flex-col gap-4">
+        {aside && <div className="self-end">{aside}</div>}
         {children}
       </div>
     );
