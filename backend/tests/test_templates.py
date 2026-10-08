@@ -226,13 +226,15 @@ def test_service_image_follows_the_host_architecture() -> None:
 def test_docker_reported_arch_wins() -> None:
     from hivora.templates import catalog as cat
 
-    try:
-        cat.set_host_arch("aarch64")
-        assert cat.host_arch() == "arm64"
-        cat.set_host_arch("x86_64")
-        assert cat.host_arch() == "amd64"
-    finally:
-        cat.set_host_arch("")
+    catalog = cat.Catalog()  # each catalog knows what its Docker reports, no global
+    assert catalog.host_arch() == cat.host_arch()  # nothing reported yet: this machine's
+    catalog.set_host_arch("aarch64")
+    assert catalog.host_arch() == "arm64"
+    catalog.set_host_arch("x86_64")
+    assert catalog.host_arch() == "amd64"
+    assert cat.Catalog().host_arch() == cat.host_arch()  # another catalog: unaffected
+    catalog.set_host_arch("")
+    assert catalog.host_arch() == cat.host_arch()
 
 
 def test_every_repo_template_compiles_on_its_architectures(catalog: Catalog) -> None:

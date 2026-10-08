@@ -36,7 +36,6 @@ from hivora.system.public_address import PublicAddress
 from hivora.system.secrets import SecretSettings
 from hivora.tasks.service import TaskTools, run_scheduler
 from hivora.templates import Catalog
-from hivora.templates.catalog import set_host_arch
 from hivora.templates.icons import IconCache
 from hivora.vpn.service import VpnTools, expire_clients, follow_deploys
 
@@ -174,7 +173,7 @@ class Runtime:
         await self.apps.custom.load_templates()
         await self.apps.adoption.load()
         try:
-            set_host_arch(await self.gateway.architecture())
+            self.catalog.set_host_arch(await self.gateway.architecture())
         except Exception:
             logger.warning("Docker did not report its architecture; using the local one")
         await self.state.start()

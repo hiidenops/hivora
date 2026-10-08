@@ -20,7 +20,6 @@ from hivora.apps.planner import AppPlanner
 from hivora.hostfw.service import HostFirewall, listening
 from hivora.state import StateStore
 from hivora.templates import Catalog
-from hivora.templates.catalog import host_arch
 from hivora.templates.icons import IconCache
 from hivora.templates.models import TemplateVersion
 from hivora.topology.models import TopologyEdge, TopologyLayout, TopologyNode
@@ -61,8 +60,8 @@ class GraphBuilder:
         self.adoption = adoption
 
     async def build(self) -> Graph:
-        host = {"name": socket.gethostname(), "arch": host_arch(), "lan_ip": self.lan_ip,
-                "public_ip": self.public_ip()}  # fmt: skip
+        host = {"name": socket.gethostname(), "arch": self.catalog.host_arch(),
+                "lan_ip": self.lan_ip, "public_ip": self.public_ip()}  # fmt: skip
         graph = Graph(host=host)
         async with self.sessions() as session:
             zones = list(await session.scalars(select(Zone).order_by(Zone.sort_order, Zone.name)))

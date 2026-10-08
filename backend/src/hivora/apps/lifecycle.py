@@ -25,7 +25,7 @@ from hivora.core.events import EventBus
 from hivora.crypto.cipher import SecretBox
 from hivora.jobs import Job, JobKind, JobQueue
 from hivora.state import StateStore
-from hivora.templates import Catalog, host_arch
+from hivora.templates import Catalog
 from hivora.zones import get_zone
 
 
@@ -54,8 +54,8 @@ class Deployer:
 
     async def plan_deploy(self, session: AsyncSession, req: DeployRequest) -> DeployPlan:
         entry = self.catalog.get(req.template)
-        if not entry.supports(host_arch()):
-            raise UnsupportedArchitectureError(entry.slug, arch=host_arch())
+        if not entry.supports(self.catalog.host_arch()):
+            raise UnsupportedArchitectureError(entry.slug, arch=self.catalog.host_arch())
         name = req.name.strip() or entry.template.metadata.name
         slug = req.slug or await self._free_slug(session, slugify(name))
         if req.slug and await session.scalar(

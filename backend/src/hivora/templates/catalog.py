@@ -31,21 +31,14 @@ class TemplateInvalidError(ValidationError):
     code = "template_invalid"
 
 
-_detected_arch: str | None = None
-
-
-def set_host_arch(machine: str) -> None:
-    """Architecture reported by Docker (the source of truth), set at startup."""
-    global _detected_arch
-    _detected_arch = normalize_arch(machine) if machine else None
-
-
 def normalize_arch(machine: str) -> str:
     return _ARCH.get(machine.lower(), machine.lower())
 
 
 def host_arch() -> str:
-    return _detected_arch or normalize_arch(platform.machine())
+    """This machine's own architecture. The running panel asks its catalog instead
+    (``Catalog.host_arch``), which knows what Docker reports."""
+    return normalize_arch(platform.machine())
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +70,15 @@ class Catalog:
     def __init__(self) -> None:
         self._entries: dict[str, CatalogEntry] = {}
         self._custom: dict[str, CatalogEntry] = {}  # free images: resolvable, never listed
+        self._docker_arch: str | None = None  # what Docker reports, set at startup
+
+    def set_host_arch(self, machine: str) -> None:
+        """Architecture reported by Docker (the source of truth), set at startup."""
+        self._docker_arch = normalize_arch(machine) if machine else None
+
+    def host_arch(self) -> str:
+        """The host's architecture: Docker's, else this machine's own."""
+        return self._docker_arch or host_arch()
 
     def add_custom(self, manifest: str) -> CatalogEntry:
         """Register a template generated for a free image (pinned by digest)."""

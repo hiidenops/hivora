@@ -11,7 +11,6 @@ from hivora.apps.service import AppService, UnsupportedArchitectureError
 from hivora.compose_runner import ComposeError, ProgressEvent, ProgressStatus
 from hivora.core.fs import empty_dir, ensure_dir, remove_tree
 from hivora.jobs import JobContext, JobKind
-from hivora.templates.catalog import host_arch
 from hivora.templates.expressions import secret_env_name
 
 
@@ -171,7 +170,7 @@ class AppJobHandlers:
         """Refuse early and clearly an image with no build for this machine."""
         if self.s.gateway is None:
             return
-        arch = host_arch()
+        arch = self.s.catalog.host_arch()
         for image in images:
             platforms = await self.s.gateway.image_platforms(image)
             if platforms is not None and arch not in platforms:

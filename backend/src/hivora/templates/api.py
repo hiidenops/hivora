@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from hivora.core.errors import NotFoundError
 from hivora.runtime import Runtime
-from hivora.templates.catalog import CatalogEntry, host_arch
+from hivora.templates.catalog import CatalogEntry
 from hivora.templates.compiler import AppContext, build_context
 from hivora.templates.expressions import render
 from hivora.templates.forms import FormValues
@@ -55,7 +55,7 @@ def summary(rt: Runtime, entry: CatalogEntry) -> TemplateSummary:
         tags=m.tags,
         icon_url=icon_url(rt, m.slug),
         description=m.description,
-        compatible=entry.supports(host_arch()),
+        compatible=entry.supports(rt.catalog.host_arch()),
         arch=list(entry.template.requirements.arch),
     )
 

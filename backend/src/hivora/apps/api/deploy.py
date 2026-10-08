@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 
 from hivora.apps.api.common import DeployOut, PlanOut, app_out, job_ref, plan_out
 from hivora.apps.service import DeployRequest
-from hivora.templates.catalog import host_arch
 from hivora.templates.custom import CustomEnv, CustomPort
 from hivora.web.deps import Operator, RuntimeDep
 
@@ -80,7 +79,7 @@ class ImageOut(BaseModel):
 @router.get("/images/inspect")
 async def inspect_image(_: Operator, rt: RuntimeDep, ref: str = Query(max_length=300)) -> ImageOut:
     """What the registry says about an image: pre-fills the free image form."""
-    arch = host_arch()
+    arch = rt.catalog.host_arch()
     info = await rt.apps.registry.inspect(ref, arch)
     return ImageOut(
         name=info.ref.name, tag=info.ref.tag, digest=info.digest, platforms=info.platforms,

@@ -35,7 +35,6 @@ from hivora.templates import (
     HostInfo,
     build_context,
     compile_template,
-    host_arch,
     validate_inputs,
 )
 from hivora.templates.models import TemplateVersion
@@ -121,7 +120,7 @@ class AppPlanner:
             timezone=s.timezone,
             puid=s.puid,
             pgid=s.pgid,
-            arch=host_arch(),
+            arch=self.catalog.host_arch(),
         )
 
     async def plan(

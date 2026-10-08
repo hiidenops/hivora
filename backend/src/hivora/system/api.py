@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 
 from hivora import __version__
 from hivora.system.secrets import SecretSetting
-from hivora.templates.catalog import host_arch
 from hivora.web.deps import Admin, RuntimeDep, Viewer
 
 router = APIRouter(tags=["system"])
@@ -41,7 +40,7 @@ async def info(_: Viewer, rt: RuntimeDep) -> SystemInfo:
     return SystemInfo(
         version=__version__,
         docker_version=docker,
-        arch=host_arch(),
+        arch=rt.catalog.host_arch(),
         python=platform.python_version(),
     )
 

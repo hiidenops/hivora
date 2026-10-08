@@ -12,7 +12,7 @@ from hivora.apps.core import DeployRequest, UnsupportedArchitectureError, slugif
 from hivora.core.clock import Clock
 from hivora.core.errors import ValidationError
 from hivora.images.registry import ImageInfo, Registry
-from hivora.templates import Catalog, CatalogEntry, host_arch
+from hivora.templates import Catalog, CatalogEntry
 from hivora.templates.catalog import CUSTOM_SOURCE, TemplateInvalidError, parse_template
 from hivora.templates.custom import CustomApp, CustomEnv, CustomPort
 from hivora.templates.custom import manifest as custom_manifest
@@ -33,7 +33,7 @@ class CustomImages:
         volumes: list[str], env: list[CustomEnv],
     ) -> DeployRequest:  # fmt: skip
         """Read the image from its registry, pin it, generate its template."""
-        arch = host_arch()
+        arch = self.catalog.host_arch()
         info = await self.registry.inspect(image, arch)
         if arch not in info.platforms:
             raise UnsupportedArchitectureError(
@@ -70,7 +70,7 @@ class CustomImages:
         hit = self.inspected.get(ref)
         if hit and now - hit[0] < 600:
             return hit[1]
-        info = await self.registry.inspect(ref, host_arch())
+        info = await self.registry.inspect(ref, self.catalog.host_arch())
         self.inspected[ref] = (now, info)
         return info
 
