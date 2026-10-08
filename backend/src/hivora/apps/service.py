@@ -38,7 +38,7 @@ from hivora.apps.lifecycle import (  # re-exported: imported from here by other 
 from hivora.apps.models import (
     Application,
 )
-from hivora.apps.planner import AppPlanner, AppSettings
+from hivora.apps.planner import AppPlanner
 from hivora.apps.planner import (  # re-exported: imported from here by other modules
     DeployPlan as DeployPlan,
 )
@@ -53,8 +53,8 @@ from hivora.core.errors import ConflictError, NotFoundError
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import SecretBox
 from hivora.docker_gateway import ContainerInfo, ContainerState, DockerGateway
-from hivora.images.registry import ImageInfo, Registry
-from hivora.jobs import Job, JobQueue
+from hivora.images.registry import Registry
+from hivora.jobs import JobQueue
 from hivora.state import StateStore
 from hivora.templates import (
     AppContext,
@@ -112,18 +112,10 @@ class AppService:
                                    jobs=jobs, box=box, bus=bus, clock=self.clock,
                                    custom=self.custom, compose=self.compose)  # fmt: skip
 
-    # Free images live in CustomImages; kept here for the API and the tests.
+    # Free images live in CustomImages; kept here for the image inspection route.
     @property
     def registry(self) -> Registry:
         return self.custom.registry
-
-    @registry.setter
-    def registry(self, value: Registry) -> None:
-        self.custom.registry = value
-
-    @property
-    def _inspected(self) -> dict[str, tuple[float, ImageInfo]]:
-        return self.custom.inspected
 
     def volumes_dir(self, slug: str) -> Path:
         return self.settings.volumes_root / slug
@@ -198,48 +190,9 @@ class AppService:
 
     # --- deploy, lifecycle, removal -------------------------------------------
 
-    # --- kept for the tests only: the code calls the sub-services (planner, deployer,
-    # lifecycle, revisions, custom) and apps.core directly; to remove with the tests' calls.
+    # --- used by the job handlers and backups (they hold the AppService, not apps.core)
     async def get(self, session: AsyncSession, app_id: int) -> Application:
         return await get_app(session, app_id)
 
     async def decrypt_secrets(self, session: AsyncSession, app_id: int) -> dict[str, str]:
         return await decrypt_secrets(session, self.box, app_id)
-
-    async def current_settings(self, session: AsyncSession, app_id: int) -> AppSettings:
-        return await self.planner.current_settings(session, app_id)
-
-    async def plan_update(
-        self, session: AsyncSession, app_id: int, inputs: dict[str, Any],
-        entry: CatalogEntry | None = None, overrides: Overrides | None = None,
-    ) -> UpdatePlan:  # fmt: skip
-        return await self.revisions.plan_update(session, app_id, inputs, entry, overrides)
-
-    async def update(
-        self, app_id: int, inputs: dict[str, Any], *, reset_data: bool = False,
-        entry: CatalogEntry | None = None, event: str = "app.updated",
-        overrides: Overrides | None = None,
-    ) -> Job:  # fmt: skip
-        return await self.revisions.update(app_id, inputs, reset_data=reset_data, entry=entry,
-                                           event=event, overrides=overrides)  # fmt: skip
-
-    async def load_custom_templates(self) -> None:
-        await self.custom.load_templates()
-
-    async def plan_deploy(self, session: AsyncSession, req: DeployRequest) -> DeployPlan:
-        return await self.deployer.plan_deploy(session, req)
-
-    async def deploy(self, req: DeployRequest) -> tuple[Application, Job]:
-        return await self.deployer.deploy(req)
-
-    async def start(self, app_id: int) -> Job:
-        return await self.lifecycle.start(app_id)
-
-    async def stop(self, app_id: int) -> Job:
-        return await self.lifecycle.stop(app_id)
-
-    async def removal_plan(self, app_id: int) -> RemovalPlan:
-        return await self.lifecycle.removal_plan(app_id)
-
-    async def remove(self, app_id: int, *, remove_data: bool = False) -> Job:
-        return await self.lifecycle.remove(app_id, remove_data=remove_data)

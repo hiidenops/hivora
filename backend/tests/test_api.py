@@ -480,7 +480,7 @@ def test_free_image_deploys_like_a_template_app(client: TestClient) -> None:
 
     admin(client)
     rt = client.app.state.runtime  # type: ignore[attr-defined]
-    rt.apps.registry = FakeRegistry()
+    rt.apps.custom.registry = FakeRegistry()
     seen = client.get(f"{API}/apps/images/inspect", params={"ref": "grafana/grafana:12.2.0"}).json()
     assert seen["name"] == "grafana/grafana" and seen["compatible"] is True
     assert seen["ports"][0]["container"] == 3000 and seen["volumes"] == ["/var/lib/grafana"]
@@ -510,7 +510,7 @@ def test_free_image_deploys_like_a_template_app(client: TestClient) -> None:
     rt.catalog._custom.clear()
     import asyncio
 
-    asyncio.run(rt.apps.load_custom_templates())
+    asyncio.run(rt.apps.custom.load_templates())
     assert client.get(f"{API}/apps/{app_id}/settings").status_code == 200
 
     odd = client.post(f"{API}/apps/custom", json={**body, "name": "Odd", "image": "odd/image"})

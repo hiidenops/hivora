@@ -83,7 +83,7 @@ async def status_becomes(state: StateService, slug: str, status: AppStatus) -> N
 async def test_vaultwarden_end_to_end(stack: tuple[AppService, StateService]) -> None:
     service, state = stack
     port = free_port()
-    app, job = await service.deploy(
+    app, job = await service.deployer.deploy(
         DeployRequest("vaultwarden", "Coffre IT", {"web_port": port,
                                                    "domain": f"http://localhost:{port}"})
     )  # fmt: skip
@@ -97,11 +97,11 @@ async def test_vaultwarden_end_to_end(stack: tuple[AppService, StateService]) ->
         )
         assert body  # Vaultwarden answers with a timestamp
 
-        await finished(service, await service.stop(app.id), within=60)
+        await finished(service, await service.lifecycle.stop(app.id), within=60)
         await status_becomes(state, app.slug, AppStatus.STOPPED)
-        await finished(service, await service.start(app.id), within=120)
+        await finished(service, await service.lifecycle.start(app.id), within=120)
         await status_becomes(state, app.slug, AppStatus.HEALTHY)
     finally:
-        await finished(service, await service.remove(app.id, remove_data=True), within=60)
+        await finished(service, await service.lifecycle.remove(app.id, remove_data=True), within=60)
     await status_becomes(state, app.slug, AppStatus.MISSING)
     assert not service.volumes_dir(app.slug).exists()

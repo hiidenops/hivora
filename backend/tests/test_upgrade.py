@@ -59,7 +59,7 @@ def test_free_image_upgrade_follows_the_registry(client: Any) -> None:
 
     admin(client)
     rt = client.app.state.runtime
-    rt.apps.registry = FakeRegistry()
+    rt.apps.custom.registry = FakeRegistry()
     body = {"name": "Web", "image": "nginx:1.29", "ports": [{"container": 80, "host": 8088}]}
     deployed = client.post(f"{API}/apps/custom", json=body).json()
     assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
@@ -70,7 +70,7 @@ def test_free_image_upgrade_follows_the_registry(client: Any) -> None:
     }  # fmt: skip
 
     digests.append("sha256:" + "b" * 64)  # the tag moved
-    rt.apps._inspected.clear()
+    rt.apps.custom.inspected.clear()
     assert client.get(f"{API}/apps/{app_id}/upgrade").json()["available"] is True
     job = client.post(f"{API}/apps/{app_id}/upgrade", json={}).json()
     assert wait_job(client, job["id"])["status"] == "succeeded"

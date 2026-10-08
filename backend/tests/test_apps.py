@@ -89,7 +89,7 @@ def test_slugify() -> None:
 
 
 async def test_deploy_vaultwarden(env: Env) -> None:
-    app, job = await env.service.deploy(DeployRequest("vaultwarden", "Coffre fort"))
+    app, job = await env.service.deployer.deploy(DeployRequest("vaultwarden", "Coffre fort"))
     assert app.slug == "coffre-fort"
     done = await run(env, job)
     assert done.status is JobStatus.SUCCEEDED, done.error
@@ -121,7 +121,7 @@ async def test_deploy_vaultwarden(env: Env) -> None:
 
 async def test_invalid_form_creates_nothing(env: Env) -> None:
     with pytest.raises(FormValidationError):
-        await env.service.deploy(DeployRequest("minecraft", "Cube", {"eula": False}))
+        await env.service.deployer.deploy(DeployRequest("minecraft", "Cube", {"eula": False}))
     async with env.sessions() as session:
         assert (await session.scalars(select(Application))).all() == []
 
@@ -132,14 +132,14 @@ async def test_port_conflicts_with_containers_and_other_apps(env: Env) -> None:
         ports=(PublishedPort(80, "tcp", "0.0.0.0", 8080),),
     ))  # fmt: skip
     with pytest.raises(PortConflictError) as err:
-        await env.service.deploy(DeployRequest("vaultwarden", "vw"))
+        await env.service.deployer.deploy(DeployRequest("vaultwarden", "vw"))
     assert err.value.details["conflicts"] == [
         {"port": 8080, "protocol": "tcp", "used_by": "legacy-nginx", "suggestion": 8081}
     ]
 
-    await env.service.deploy(DeployRequest("vaultwarden", "vw", {"web_port": 8081}))
+    await env.service.deployer.deploy(DeployRequest("vaultwarden", "vw", {"web_port": 8081}))
     async with env.sessions() as session:
-        plan = await env.service.plan_deploy(
+        plan = await env.service.deployer.plan_deploy(
             session, DeployRequest("vaultwarden", "vw", {"web_port": 8081})
         )
     assert plan.slug == "vw-2"
@@ -147,36 +147,36 @@ async def test_port_conflicts_with_containers_and_other_apps(env: Env) -> None:
 
 
 async def test_explicit_slug_must_be_free(env: Env) -> None:
-    await env.service.deploy(DeployRequest("vaultwarden", "vw", slug="vault"))
+    await env.service.deployer.deploy(DeployRequest("vaultwarden", "vw", slug="vault"))
     with pytest.raises(ConflictError):
-        await env.service.deploy(
+        await env.service.deployer.deploy(
             DeployRequest("vaultwarden", "vw", {"web_port": 9000}, slug="vault")
         )
 
 
 async def test_stop_start_record_intent(env: Env) -> None:
-    app, job = await env.service.deploy(DeployRequest("vaultwarden", "vw"))
+    app, job = await env.service.deployer.deploy(DeployRequest("vaultwarden", "vw"))
     await run(env, job)
-    assert (await run(env, await env.service.stop(app.id))).status is JobStatus.SUCCEEDED
+    assert (await run(env, await env.service.lifecycle.stop(app.id))).status is JobStatus.SUCCEEDED
     async with env.sessions() as session:
         assert (await session.get_one(Application, app.id)).desired_state is DesiredState.STOPPED
-    assert (await run(env, await env.service.start(app.id))).status is JobStatus.SUCCEEDED
+    assert (await run(env, await env.service.lifecycle.start(app.id))).status is JobStatus.SUCCEEDED
     async with env.sessions() as session:
         assert (await session.get_one(Application, app.id)).desired_state is DesiredState.RUNNING
 
 
 @pytest.mark.parametrize("remove_data", [False, True])
 async def test_remove(env: Env, remove_data: bool) -> None:
-    app, job = await env.service.deploy(DeployRequest("vaultwarden", "vw"))
+    app, job = await env.service.deployer.deploy(DeployRequest("vaultwarden", "vw"))
     await run(env, job)
     data = env.settings.volumes_root / "vw"
     (data / "data" / "db.sqlite3").write_text("precious")
 
-    plan = await env.service.removal_plan(app.id)
+    plan = await env.service.lifecycle.removal_plan(app.id)
     assert plan.files == [str(env.settings.apps_dir / "vw" / f) for f in (".env", "compose.yaml")]
     assert plan.data == [str(data)]
 
-    done = await run(env, await env.service.remove(app.id, remove_data=remove_data))
+    done = await run(env, await env.service.lifecycle.remove(app.id, remove_data=remove_data))
     assert done.status is JobStatus.SUCCEEDED, done.error
     assert done.app_id is None and done.app_slug == "vw"  # job history survives
     assert not (env.settings.apps_dir / "vw").exists()
@@ -213,7 +213,7 @@ async def test_failed_start_attaches_container_logs(
     AppJobHandlers(service).register()
     await jobs.start()
     try:
-        _, job = await service.deploy(DeployRequest("vaultwarden", "vw"))
+        _, job = await service.deployer.deploy(DeployRequest("vaultwarden", "vw"))
         done = await run(Env(service, settings, StateStore(), sessions), job)
     finally:
         await jobs.stop()
@@ -224,17 +224,21 @@ async def test_failed_start_attaches_container_logs(
 
 
 async def test_update_creates_revision_and_keeps_secrets(env: Env) -> None:
-    app, job = await env.service.deploy(DeployRequest("vaultwarden", "vw"))
+    app, job = await env.service.deployer.deploy(DeployRequest("vaultwarden", "vw"))
     await run(env, job)
     async with env.sessions() as session:
         before = (await env.service.decrypt_secrets(session, app.id))["admin_token"]
-        settings = await env.service.current_settings(session, app.id)
+        settings = await env.service.planner.current_settings(session, app.id)
         assert settings.values["web_port"] == 8080 and settings.secrets_set == ["admin_token"]
-        upd = await env.service.plan_update(session, app.id, {**settings.values, "web_port": 8095})
+        upd = await env.service.revisions.plan_update(
+            session, app.id, {**settings.values, "web_port": 8095}
+        )
     assert upd.number == 2
     assert "-      published: '8080'" in upd.diff and "+      published: '8095'" in upd.diff
 
-    done = await run(env, await env.service.update(app.id, {**settings.values, "web_port": 8095}))
+    done = await run(
+        env, await env.service.revisions.update(app.id, {**settings.values, "web_port": 8095})
+    )
     assert done.status is JobStatus.SUCCEEDED, done.error
     async with env.sessions() as session:
         revs = {r.number: r for r in (await session.scalars(select(AppRevision))).all()}
@@ -258,11 +262,11 @@ async def test_ports_from_other_modules_are_published_not_stored(env: Env) -> No
         return [ExtraPort(container=9443, host=9443)]
 
     env.service.planner.site_ports = extra
-    app, job = await env.service.deploy(DeployRequest("vaultwarden", "vw"))
+    app, job = await env.service.deployer.deploy(DeployRequest("vaultwarden", "vw"))
     assert (await run(env, job)).status is JobStatus.SUCCEEDED
     async with env.sessions() as session:
-        settings = await env.service.current_settings(session, app.id)
-        upd = await env.service.plan_update(session, app.id, settings.values)
+        settings = await env.service.planner.current_settings(session, app.id)
+        upd = await env.service.revisions.plan_update(session, app.id, settings.values)
     assert "published: '9443'" in upd.plan.compiled.compose_yaml
     published = [p.host_port or 0 for s in upd.plan.compiled.services for p in s.ports]
     assert sorted(published) == [8080, 9443]
@@ -279,22 +283,24 @@ async def test_ports_from_other_modules_are_published_not_stored(env: Env) -> No
     env.state.upsert(ContainerInfo(id="x", name="other", image="x", state=ContainerState.RUNNING,
                                    ports=taken))  # fmt: skip
     async with env.sessions() as session:
-        upd = await env.service.plan_update(session, app.id, settings.values)
+        upd = await env.service.revisions.plan_update(session, app.id, settings.values)
     assert [(c.port, c.used_by) for c in upd.plan.conflicts] == [(9443, "other")]
     assert upd.plan.conflicts[0].suggestion not in (None, 9443)
 
 
 async def test_version_change_requires_confirmation_and_wipes_data(env: Env) -> None:
-    app, job = await env.service.deploy(DeployRequest("minecraft", "mc", {"eula": True}))
+    app, job = await env.service.deployer.deploy(DeployRequest("minecraft", "mc", {"eula": True}))
     assert (await run(env, job)).status is JobStatus.SUCCEEDED
     data = env.settings.volumes_root / "mc" / "data"
     (data / "world").mkdir()
     (data / "world" / "level.dat").write_bytes(b"x" * 10)
     (data / "whitelist.json").write_text("[]")
     async with env.sessions() as session:
-        values = (await env.service.current_settings(session, app.id)).values
-        same = await env.service.plan_update(session, app.id, {**values, "motd": "hello"})
-        changed = await env.service.plan_update(session, app.id, {**values, "version": "1.20.1"})
+        values = (await env.service.planner.current_settings(session, app.id)).values
+        same = await env.service.revisions.plan_update(session, app.id, {**values, "motd": "hello"})
+        changed = await env.service.revisions.plan_update(
+            session, app.id, {**values, "version": "1.20.1"}
+        )
     assert not same.reset_fields
     assert changed.reset_fields == ["version"] and changed.reset_size == 12
     assert changed.reset_volumes == {
@@ -303,16 +309,18 @@ async def test_version_change_requires_confirmation_and_wipes_data(env: Env) -> 
 
     # A harmless change never touches the data.
     assert (
-        await run(env, await env.service.update(app.id, {**values, "motd": "hello"}))
+        await run(env, await env.service.revisions.update(app.id, {**values, "motd": "hello"}))
     ).status is JobStatus.SUCCEEDED
     assert (data / "world" / "level.dat").exists()
 
     with pytest.raises(ConflictError) as exc:
-        await env.service.update(app.id, {**values, "version": "1.20.1"})
+        await env.service.revisions.update(app.id, {**values, "version": "1.20.1"})
     assert exc.value.code == "data_reset_required"
     assert (data / "world").exists()
 
-    job = await env.service.update(app.id, {**values, "version": "1.20.1"}, reset_data=True)
+    job = await env.service.revisions.update(
+        app.id, {**values, "version": "1.20.1"}, reset_data=True
+    )
     done = await run(env, job)
     assert done.status is JobStatus.SUCCEEDED, done.error
     assert sorted(p.name for p in data.iterdir()) == ["whitelist.json"]
@@ -328,13 +336,15 @@ async def test_deploy_refuses_an_image_without_a_build_for_this_machine(env: Env
     other = "arm64" if host_arch() == "amd64" else "amd64"
     image = env.service.catalog.get("vaultwarden").template.services["server"].image_ref
     gw.platforms[image] = [other]
-    _, job = await env.service.deploy(DeployRequest("vaultwarden", "vw"))
+    _, job = await env.service.deployer.deploy(DeployRequest("vaultwarden", "vw"))
     done = await run(env, job)
     assert done.status is JobStatus.FAILED
     assert done.error and f"has no {host_arch()} build" in done.error
 
     gw.platforms[image] = [other, host_arch()]
-    _, job = await env.service.deploy(DeployRequest("vaultwarden", "vw2", {"web_port": 8096}))
+    _, job = await env.service.deployer.deploy(
+        DeployRequest("vaultwarden", "vw2", {"web_port": 8096})
+    )
     done = await run(env, job)
     assert done.status is JobStatus.SUCCEEDED, done.error
     assert f"{host_arch()} build available" in done.log
