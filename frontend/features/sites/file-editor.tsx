@@ -1,17 +1,25 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
 import { useSaveSiteFile, useSiteFile } from "./hooks";
 
+// CodeMirror is loaded only once a file is opened.
+const CodeEditor = dynamic(() => import("./code-editor").then((m) => m.CodeEditor), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[28rem]" />,
+});
+
 type Loaded = { base: string | null; original: string; draft: string };
 
-/** One text file in a textarea. Saved by a job, if the file is still the one read. */
+/** One text file in a code editor. Saved by a job, if the file is still the one read. */
 export function FileEditor({ base, path, exists, canEdit, onJob, onDirty }: {
   base: string; // siteApi(…)
   path: string;
@@ -49,6 +57,7 @@ export function FileEditor({ base, path, exists, canEdit, onJob, onDirty }: {
     if (data) setState({ base: data.sha256, original: data.content, draft: data.content });
     save.reset();
   };
+  const canSave = canEdit && !(exists && !dirty) && !save.isPending;
   const submit = () =>
     save.mutate(
       { path, content: state.draft, base_sha256: exists ? state.base : null },
@@ -64,17 +73,18 @@ export function FileEditor({ base, path, exists, canEdit, onJob, onDirty }: {
           {!canEdit ? t("sites.readOnly") : !exists ? t("sites.newFileHint") : dirty ? t("sites.unsaved") : ""}
         </span>
       </div>
-      <textarea
-        aria-label={t("sites.editorLabel", { path })}
-        className="field min-h-96 w-full resize-y rounded-md border border-input p-3 font-mono text-sm leading-relaxed outline-none focus-visible:border-ring"
-        value={state.draft}
-        readOnly={!canEdit}
-        spellCheck={false}
-        autoCapitalize="off"
-        autoCorrect="off"
-        disabled={exists && !file.data}
-        onChange={(e) => setState({ ...state, draft: e.target.value })}
-      />
+      {exists && !file.data ? (
+        <Skeleton className="h-[28rem]" />
+      ) : (
+        <CodeEditor
+          path={path}
+          label={t("sites.editorLabel", { path })}
+          value={state.draft}
+          readOnly={!canEdit}
+          onChange={(draft) => setState((s) => ({ ...s, draft }))}
+          onSave={() => canSave && submit()}
+        />
+      )}
       {conflict && (
         <Alert tone="danger">
           {t("sites.conflict")}{" "}
@@ -89,7 +99,7 @@ export function FileEditor({ base, path, exists, canEdit, onJob, onDirty }: {
           <Button variant="ghost" disabled={!dirty || save.isPending} onClick={() => setState({ ...state, draft: state.original })}>
             {t("sites.revert")}
           </Button>
-          <Button disabled={(exists && !dirty) || save.isPending} onClick={submit}>
+          <Button disabled={!canSave} onClick={submit}>
             {t("common.save")}
           </Button>
         </div>

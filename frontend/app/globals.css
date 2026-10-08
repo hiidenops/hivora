@@ -32,6 +32,15 @@
   --sidebar: oklch(0.955 0.01 80);
   --chart-1: #df911a;
   --chart-2: #1a89c5;
+  /* Code editor syntax (sites' .html, .css, .js) */
+  --code-keyword: oklch(0.48 0.17 305);
+  --code-tag: oklch(0.5 0.17 25);
+  --code-attr: oklch(0.52 0.13 65);
+  --code-string: oklch(0.48 0.13 150);
+  --code-number: oklch(0.55 0.15 45);
+  --code-property: oklch(0.48 0.13 245);
+  --code-function: oklch(0.47 0.14 265);
+  --code-comment: oklch(0.55 0.02 70);
 }
 
 .dark {
@@ -57,6 +66,14 @@
   --field: oklch(0.19 0.01 60);
   --chart-1: #c98212;
   --chart-2: #1a89c5;
+  --code-keyword: oklch(0.76 0.13 305);
+  --code-tag: oklch(0.74 0.14 25);
+  --code-attr: oklch(0.82 0.12 80);
+  --code-string: oklch(0.78 0.13 145);
+  --code-number: oklch(0.78 0.13 50);
+  --code-property: oklch(0.76 0.11 235);
+  --code-function: oklch(0.78 0.11 265);
+  --code-comment: oklch(0.6 0.02 70);
   color-scheme: dark;
 }
 

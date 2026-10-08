@@ -69,8 +69,8 @@ test("hosted site page: zip, read, create, edit, conflict, viewer, back to the n
 
   // Read, then edit and save.
   await list.getByRole("button", { name: /index\.html/ }).click();
-  const editor = page.getByLabel("Contenu de index.html");
-  await expect(editor).toHaveValue(/Depuis le ZIP/);
+  const editor = page.getByRole("textbox", { name: "Contenu de index.html" }); // CodeMirror
+  await expect(editor).toHaveText(/Depuis le ZIP/);
   const save = page.getByRole("button", { name: "Enregistrer" });
   await expect(save).toBeDisabled();
   await editor.fill("<h1>Docs</h1>\n");
@@ -89,15 +89,19 @@ test("hosted site page: zip, read, create, edit, conflict, viewer, back to the n
   await save.click();
   await expect(page.getByText("Le fichier a changé depuis son ouverture.", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Recharger" }).click();
-  await expect(editor).toHaveValue("<h1>Leur version</h1>\n");
+  await expect(editor).toHaveText("<h1>Leur version</h1>");
 
   // A new file in a new folder.
   await page.getByLabel("Nouveau fichier").fill("js/app.js");
   await page.getByRole("button", { name: "Créer" }).click();
-  await page.getByLabel("Contenu de js/app.js").fill("console.log('docs');\n");
-  await page.getByRole("button", { name: "Enregistrer" }).click();
+  const appEditor = page.getByRole("textbox", { name: "Contenu de js/app.js" });
+  await appEditor.fill("console.log('docs');\n");
+  await appEditor.press("Control+Home");
+  await appEditor.press("Tab"); // indents (two spaces), the focus stays in the editor
+  await expect(appEditor).toBeFocused();
+  await appEditor.press("Control+s"); // saves, like the button
   await expect(list.getByRole("button")).toHaveText([/^css$/, /^site\.css/, /^js$/, /^app\.js/, /^index\.html/], { timeout: 20_000 });
-  expect(existsSync(`${disk}/sites/docs/js/app.js`)).toBe(true);
+  await expect.poll(() => existsSync(`${disk}/sites/docs/js/app.js`) && readFileSync(`${disk}/sites/docs/js/app.js`, "utf8")).toBe("  console.log('docs');\n");
   expect(mainTree()).toEqual(mainBefore);
   await expectPointerCursors(page);
 
@@ -114,9 +118,10 @@ test("hosted site page: zip, read, create, edit, conflict, viewer, back to the n
   const viewer = await signInViewer(page, browser, "vera");
   await viewer.goto(`/app/site/?app=${app}&site=${site}`);
   await viewer.getByRole("list", { name: "Fichiers" }).getByRole("button", { name: /^app\.js/ }).click();
-  const readOnly = viewer.getByLabel("Contenu de js/app.js");
-  await expect(readOnly).toHaveValue("console.log('docs');\n");
-  await expect(readOnly).toHaveAttribute("readonly", "");
+  const readOnly = viewer.getByRole("textbox", { name: "Contenu de js/app.js" });
+  await expect(readOnly).toHaveText(/console\.log\('docs'\);/);
+  await expect(readOnly).toHaveAttribute("aria-readonly", "true");
+  await expect(readOnly).toHaveAttribute("contenteditable", "false");
   await expect(viewer.getByRole("button", { name: "Enregistrer" })).toHaveCount(0);
   await expect(viewer.getByLabel("Nouveau fichier")).toHaveCount(0);
   await expect(viewer.getByRole("button", { name: "Remplacer le contenu" })).toHaveCount(0);
