@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 import { expect, test } from "@playwright/test";
 
-import { deployNginx, signIn } from "./helpers";
+import { deployNginx, openAppMenu, signIn } from "./helpers";
 
 // The app's backups card: a manual backup taken, then restored (the volume's file is back
 // as it was when archived).
@@ -14,7 +14,7 @@ test("backups: back up now, then restore the data", async ({ page }) => {
   writeFileSync(`${html}/index.html`, "version 1");
 
   await page.goto(`/app/?id=${id}`);
-  await page.getByRole("button", { name: "Sauvegardes" }).click();
+  await openAppMenu(page, "Sauvegardes"); // the app's menu: a side panel
   await page.getByRole("button", { name: "Sauvegarder maintenant" }).click();
   const row = page.getByRole("listitem").filter({ hasText: "manuelle" });
   await expect(row).toHaveCount(1);

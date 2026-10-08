@@ -577,6 +577,8 @@ export const fr = {
   "app.volumes": "Volumes",
   "app.jobs": "Tâches récentes",
   "app.compose": "Compose",
+  "app.menu": "Menu de l'application",
+  "app.menuAdvanced": "Détails avancés",
   "app.revisions": "Révisions",
   "app.notFound": "Application introuvable.",
   "app.running": "En marche",

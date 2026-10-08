@@ -78,3 +78,9 @@ export async function expectPointerCursors(page: Page) {
   );
   expect(arrows).toEqual([]);
 }
+
+/** An entry of the app page's round menu (zone, edit, backups, tasks, logs, console, removal…). */
+export async function openAppMenu(page: Page, item: string) {
+  await page.getByRole("button", { name: "Menu de l'application" }).click();
+  await page.getByRole("menuitem", { name: item, exact: true }).click();
+}

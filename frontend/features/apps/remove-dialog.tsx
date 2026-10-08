@@ -11,9 +11,18 @@ import { useRemovalPlan, useRemoveApp } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 
 /** Lists what will be deleted; data removal is opt-in (unchecked by default). */
-export function RemoveDialog({ id, name, onJob }: { id: number; name: string; onJob: (jobId: number) => void }) {
+export function RemoveDialog({ id, name, onJob, open: shown, onOpenChange }: {
+  id: number;
+  name: string;
+  onJob: (jobId: number) => void;
+  open?: boolean; // opened from outside (the app menu): no button of its own
+  onOpenChange?: (open: boolean) => void;
+}) {
   const { t, errorMessage } = useI18n();
-  const [open, setOpen] = useState(false);
+  const [own, setOwn] = useState(false);
+  const controlled = shown !== undefined;
+  const open = controlled ? shown : own;
+  const setOpen = (o: boolean) => (controlled ? onOpenChange?.(o) : setOwn(o));
   const [removeData, setRemoveData] = useState(false);
   const { data: plan } = useRemovalPlan(id, open);
   const remove = useRemoveApp();
@@ -26,11 +35,13 @@ export function RemoveDialog({ id, name, onJob }: { id: number; name: string; on
         setRemoveData(false);
       }}
     >
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Trash2 /> {t("action.remove")}
-        </Button>
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Trash2 /> {t("action.remove")}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent title={t("remove.title", { name })} closeLabel={t("common.close")}>
         {!plan ? (
           <p className="text-muted-foreground">{t("common.loading")}</p>

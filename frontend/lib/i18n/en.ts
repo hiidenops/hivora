@@ -578,6 +578,8 @@ export const en: Record<MessageKey, string> = {
   "app.volumes": "Volumes",
   "app.jobs": "Recent tasks",
   "app.compose": "Compose",
+  "app.menu": "App menu",
+  "app.menuAdvanced": "Advanced details",
   "app.revisions": "Revisions",
   "app.notFound": "Application not found.",
   "app.running": "Running",

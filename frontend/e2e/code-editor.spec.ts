@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { adminApi, deployNginx, signIn } from "./helpers";
+import { adminApi, deployNginx, openAppMenu, signIn } from "./helpers";
 
 // The code editor (CodeMirror) where text is written by hand, besides the site files
 // (sites-page.spec.ts): the hand-written compose and a long text field of a form.
@@ -12,6 +12,7 @@ test("code editor: the compose, YAML colored, Tab indents, Ctrl+S checks, then a
 
   await page.goto(`/app/?id=${id}`);
   await page.getByText("Mode avancé", { exact: true }).click();
+  await openAppMenu(page, "Détails avancés");
   await page.getByRole("button", { name: "Modifier le compose" }).click();
   const editor = page.getByRole("textbox", { name: "Modifier le compose" });
   await expect(editor).toHaveText(/services:/);

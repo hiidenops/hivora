@@ -1,11 +1,15 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useState, type ReactNode } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { readPref, writePref } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
+
+/** Inside it (a side panel shows one section), a CollapsibleCard is its body only, always
+ *  open: the panel already has the title and the frame. */
+export const Unfolded = createContext(false);
 
 /** Card whose body folds away (folded unless `defaultOpen`); the choice is remembered per `storageKey`. */
 export function CollapsibleCard({
@@ -25,7 +29,9 @@ export function CollapsibleCard({
   defaultOpen?: boolean; // until the user folds or unfolds it once
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const unfolded = useContext(Unfolded);
+  const [folded, setOpen] = useState(false);
+  const open = unfolded || folded;
   const bodyId = useId();
   useEffect(() => {
     const saved = readPref(`fold.${storageKey}`);
@@ -36,6 +42,14 @@ export function CollapsibleCard({
     writePref(`fold.${storageKey}`, open ? "0" : "1");
     setOpen(!open);
   };
+  if (unfolded) {
+    return (
+      <div className="grid gap-4">
+        {aside && <div className="justify-self-end">{aside}</div>}
+        {children}
+      </div>
+    );
+  }
   return (
     <Card className={className}>
       <button

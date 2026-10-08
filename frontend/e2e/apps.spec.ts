@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { PASSWORD, deployNginx, expectPointerCursors, signIn } from "./helpers";
+import { PASSWORD, deployNginx, expectPointerCursors, openAppMenu, signIn } from "./helpers";
 
 // The panel's first start and an app's removal.
 
@@ -49,14 +49,17 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await page.getByRole("link", { name: "Voir l'application" }).click();
   await expect(page.getByRole("heading", { name: /Vaultwarden/ })).toBeVisible();
   expect(await page.evaluate(() => isSecureContext)).toBe(false); // the realistic case
-  await expect(page.getByRole("button", { name: "Console", expanded: true })).toBeVisible();
   // Live usage: sampled every 5 s only while the page is open.
   await expect(page.getByRole("region", { name: "Consommation" })).toContainText("25,0 %", { timeout: 12_000 });
+  await openAppMenu(page, "Console"); // the app's menu: its console in a side panel
+  await expect(page.getByRole("dialog", { name: "Console" })).toBeVisible();
   await expect(page.locator(".xterm")).toBeVisible(); // auto-connected on a running app
   await page.locator(".xterm").scrollIntoViewIfNeeded(); // xterm only paints on screen
   await expectPointerCursors(page);
   await expect(page.locator(".xterm-rows")).toContainText("$ sh -c"); // fake exec echoes its command
-  await page.getByRole("button", { name: "Supprimer" }).click();
+  await page.keyboard.press("Escape"); // the panel closes
+  await expect(page.getByRole("dialog", { name: "Console" })).toBeHidden();
+  await openAppMenu(page, "Supprimer");
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("switch", { name: "Aussi supprimer les données" })).not.toBeChecked();
   await dialog.getByRole("button", { name: "Supprimer" }).click();
@@ -76,7 +79,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await page.getByRole("button", { name: "Déployer", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Application en ligne" })).toBeVisible({ timeout: 20_000 });
   await page.getByRole("link", { name: "Voir l'application" }).click();
-  await page.getByRole("link", { name: "Modifier" }).click();
+  await openAppMenu(page, "Modifier");
   await page.getByLabel("Type de serveur", { exact: true }).selectOption("PAPER");
   await expectPointerCursors(page);
   await page.getByRole("button", { name: "Vérifier les changements" }).click();
@@ -136,7 +139,7 @@ test("removal goes back to the dashboard even if the app is gone before its job 
   const deployed = await deployNginx(page, "Témoin", 8090);
 
   await page.goto(`/app/?id=${deployed.app.id}`);
-  await page.getByRole("button", { name: "Supprimer" }).click();
+  await openAppMenu(page, "Supprimer");
   await page.getByRole("dialog").getByRole("button", { name: "Supprimer" }).click();
   await expect(page).toHaveURL(/\/$/, { timeout: 20_000 });
   await expect(page.getByText("Application introuvable.")).toBeHidden();

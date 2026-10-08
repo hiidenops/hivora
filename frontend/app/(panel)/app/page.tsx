@@ -1,32 +1,22 @@
 "use client";
 
-import { Pencil } from "lucide-react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { PageHeader, useSession } from "@/components/app-shell";
 import { useTrackJob } from "@/components/job-toasts";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppActions } from "@/features/apps/app-actions";
+import { AppMenu } from "@/features/apps/app-menu";
 import { AppUsage } from "@/features/apps/app-usage";
 import { StatusHero } from "@/features/apps/status-hero";
-import { ConsolePanel } from "@/features/console/console-panel";
 import { GamePanel } from "@/features/games/game-panel";
-import { RemoveDialog } from "@/features/apps/remove-dialog";
-import { ZoneSelect } from "@/features/zones/zone-select";
 
 // Only VPN apps need it: loaded on demand (page budget).
 const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.VpnCard));
-const LogsCard = dynamic(() => import("@/features/logs/logs-card").then((m) => m.LogsCard));
-const PythonCodeCard = dynamic(() => import("@/features/apps/python-code-card").then((m) => m.PythonCodeCard));
-const TasksCard = dynamic(() => import("@/features/tasks/tasks-card").then((m) => m.TasksCard));
-const BackupsCard = dynamic(() => import("@/features/backups/backups-card").then((m) => m.BackupsCard));
 const UpgradeBanner = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.UpgradeBanner));
-const AdvancedCards = dynamic(() => import("@/features/apps/advanced-cards").then((m) => m.AdvancedCards));
 const HostedSitesCard = dynamic(() => import("@/features/hosting/hosted-sites-card").then((m) => m.HostedSitesCard));
 import { ApiError } from "@/lib/api/client";
 import { useApp } from "@/lib/api/hooks";
@@ -36,12 +26,13 @@ import { useLiveStatus } from "@/lib/realtime";
 function AppDetail() {
   const { t, errorMessage } = useI18n();
   const router = useRouter();
-  const { advanced, can } = useSession();
+  const { can } = useSession();
   const id = Number(useSearchParams().get("id") ?? 0);
   const { data: app, error } = useApp(id);
   const setActiveJob = useTrackJob(); // followed in a pop-up
   const [removing, setRemoving] = useState(false);
   const status = useLiveStatus(app?.slug ?? "", app?.status ?? "missing");
+  const running = ["healthy", "starting", "degraded"].includes(status);
   // Removal deletes the app before its job ends: a 404 then means "removed", not an error
   // (the job card, which redirects when the job ends, would be gone with the page).
   const removed = removing && error instanceof ApiError && error.status === 404;
@@ -75,25 +66,16 @@ function AppDetail() {
         }
         actions={
           <>
-            {can("operator") && app.template && <ZoneSelect appId={app.id} zoneId={app.zone_id} onJob={setActiveJob} />}
             <AppActions id={app.id} status={status} onJob={setActiveJob} />
-            {can("operator") && app.template && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/edit/?id=${app.id}`}>
-                  <Pencil /> {t("edit.button")}
-                </Link>
-              </Button>
-            )}
-            {can("operator") && (
-              <RemoveDialog
-                id={app.id}
-                name={app.name}
-                onJob={(jobId) => {
-                  setRemoving(true);
-                  setActiveJob(jobId, (s) => s === "succeeded" && router.replace("/"));
-                }}
-              />
-            )}
+            <AppMenu
+              app={app}
+              running={running}
+              onJob={setActiveJob}
+              onRemoving={(jobId) => {
+                setRemoving(true);
+                setActiveJob(jobId, (s) => s === "succeeded" && router.replace("/"));
+              }}
+            />
           </>
         }
       />
@@ -106,19 +88,11 @@ function AppDetail() {
           <GamePanel
             appId={app.id}
             caps={app.game}
-            running={["healthy", "starting", "degraded"].includes(status)}
+            running={running}
             onJob={setActiveJob}
           />
         )}
         {app.vpn && can("operator") && <VpnCard appId={app.id} onJob={setActiveJob} />}
-        {can("operator") && app.python && <PythonCodeCard appId={app.id} onJob={setActiveJob} />}
-        {can("operator") && <BackupsCard appId={app.id} onJob={setActiveJob} />}
-        {can("operator") && <TasksCard appId={app.id} />}
-        {can("operator") && <LogsCard appId={app.id} />}
-        {can("operator") && (
-          <ConsolePanel app={app} running={["healthy", "starting", "degraded"].includes(status)} />
-        )}
-        {advanced && <AdvancedCards app={app} onJob={setActiveJob} />}
       </div>
     </>
   );
