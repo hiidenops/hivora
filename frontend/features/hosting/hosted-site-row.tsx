@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import type { HostedSite } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
-import { SiteActions, SiteSwitch } from "./site-controls";
+import { SiteActions, SitePort, SiteSwitch } from "./site-controls";
 
 /** One site of the host: name, port, address; a button to its page (Configure, or View for a
  *  viewer), its switch and its menu. The name links to its page too. */
@@ -32,7 +32,7 @@ export function HostedSiteRow({ appId, site, locked, stopped, onJob }: {
           {site.name}
         </Link>
         {site.main && <Badge>{t("hosting.main")}</Badge>}
-        {site.port !== null && <span className="font-mono text-sm text-muted-foreground">{t("sites.portValue", { port: site.port })}</span>}
+        <SitePort appId={appId} site={site} locked={locked} stopped={stopped} onJob={onJob} />
         {advanced && site.server_name && <span className="font-mono text-xs text-muted-foreground">{site.server_name}</span>}
         {site.url && (
           <a href={site.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
@@ -48,7 +48,6 @@ export function HostedSiteRow({ appId, site, locked, stopped, onJob }: {
         </Button>
         <SiteSwitch appId={appId} site={site} locked={locked} onJob={onJob} />
         <SiteActions appId={appId} site={site} locked={locked} stopped={stopped} onJob={onJob} />
-        {edit && site.main && <span aria-hidden className="size-9" />} {/* the menu's place: buttons aligned row to row */}
       </div>
     </li>
   );

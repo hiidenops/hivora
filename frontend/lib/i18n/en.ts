@@ -88,6 +88,7 @@ export const en: Record<MessageKey, string> = {
   "hosting.full": "{n} sites at most per nginx.",
   "hosting.actions": "Actions of the site “{name}”",
   "hosting.changePort": "Change the port",
+  "hosting.changePortOf": "Port {port} of the site “{name}”: change",
   "hosting.portTitle": "Port of the site “{name}”",
   "hosting.newPort": "New port",
   "hosting.portConfirm": "Change the port",

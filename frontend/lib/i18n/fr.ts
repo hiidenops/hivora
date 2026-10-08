@@ -87,6 +87,7 @@ export const fr = {
   "hosting.full": "{n} sites au plus par nginx.",
   "hosting.actions": "Actions du site « {name} »",
   "hosting.changePort": "Changer le port",
+  "hosting.changePortOf": "Port {port} du site « {name} » : changer",
   "hosting.portTitle": "Port du site « {name} »",
   "hosting.newPort": "Nouveau port",
   "hosting.portConfirm": "Changer le port",

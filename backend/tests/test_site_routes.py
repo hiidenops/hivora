@@ -80,7 +80,7 @@ def test_errors_and_their_status(client: Any) -> None:
         ("post", "sites/plan", {"name": "x", "port": 8190}, 409, "port_conflict"),
         ("post", "sites", {"name": "Blog", "port": 8098}, 409, "site_exists"),
         ("post", "sites", {"name": "x", "port": 0}, 422, "request_invalid"),
-        ("put", f"sites/{main_id}/port", {"port": 8099}, 409, "main_site_fixed"),
+        ("put", f"sites/{main_id}/port", {"port": 8096}, 409, "port_conflict"),  # the blog's
         ("put", f"sites/{main_id}/server-name", {"server_name": "a.com"}, 409, "main_site_fixed"),
         ("put", f"sites/{blog['site']['id']}/server-name", {"server_name": "a;b"}, 422,
          "invalid_site_config"),

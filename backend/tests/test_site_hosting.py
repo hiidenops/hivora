@@ -181,7 +181,17 @@ def test_change_port_moves_the_published_port(client: Any) -> None:
     assert update.id < config.id and wait_job(client, config.id)["status"] == "succeeded"
     assert _published(client, app_id) == [8190, 8099]
     assert "listen 8099;" in (app_dir / "conf" / "site-blog.conf").read_text()
-    _refused(client, "main_site_fixed", "change_port", app_id, main, 8100)
+
+    # The main site's port is the app's web port: moved the same way, by a new revision.
+    same = _call(client, "plan_port", app_id, main, 8190)
+    assert (same.recreate, same.revision) == (False, None)
+    _refused(client, "port_conflict", "change_port", app_id, main, 8099)  # the blog's
+    plan = _call(client, "plan_port", app_id, main, 8100)
+    assert plan.recreate and plan.revision is not None and "8100" in plan.diff
+    update, config = _call(client, "change_port", app_id, main, 8100)
+    assert update.id < config.id and wait_job(client, config.id)["status"] == "succeeded"
+    assert _published(client, app_id) == [8100, 8099]
+    assert client.get(f"{API}/apps/{app_id}/settings").json()["values"]["web_port"] == 8100
 
 
 def test_remove_unconfigures_first_and_keeps_files_unless_asked(client: Any) -> None:

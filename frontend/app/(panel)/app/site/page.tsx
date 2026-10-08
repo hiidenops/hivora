@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfigStatus } from "@/features/hosting/config-status";
 import { useHostedSites } from "@/features/hosting/hooks";
-import { SiteActions, SiteSwitch } from "@/features/hosting/site-controls";
+import { SiteActions, SitePort, SiteSwitch } from "@/features/hosting/site-controls";
 import { ContentCard } from "@/features/sites/content-card";
 import { FilesCard } from "@/features/sites/files-card";
 import { siteApi, useSaveSiteFile, useSiteFiles } from "@/features/sites/hooks";
@@ -85,7 +85,7 @@ function HostedSiteDetail() {
       />
       <div className="mb-6 flex flex-wrap items-center gap-4 text-sm">
         {site.main && <Badge>{t("hosting.main")}</Badge>}
-        {site.port !== null && <span className="font-mono text-muted-foreground">{t("sites.portValue", { port: site.port })}</span>}
+        <SitePort appId={appId} site={site} locked={host.upgrade_required} stopped={host.stopped} onJob={follow} />
         {host.stopped && <span className="text-muted-foreground">{t("hosting.hostStopped")}</span>}
       </div>
       <div className="mb-6 grid gap-3 empty:hidden">

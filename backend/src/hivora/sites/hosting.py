@@ -52,6 +52,9 @@ class NotNginxError(ConflictError):
 
 
 Change = Callable[[AsyncSession, int], Awaitable[Site]]  # one change to a host's sites
+# Inputs of the app a change also sets, filled while it runs (the main site's port is the
+# app's web port: moving it changes that input).
+Patch = dict[str, Any]
 
 
 class SiteHosting:
@@ -107,9 +110,10 @@ class SiteHosting:
         return await self._preview(app_id, self._removing(site_id))
 
     async def plan_port(self, app_id: int, site_id: int, port: int) -> SitePlan:
-        return await self._preview(app_id, self._moving(site_id, port))
+        patch: Patch = {}
+        return await self._preview(app_id, self._moving(site_id, port, patch), patch)
 
-    async def _preview(self, app_id: int, change: Change) -> SitePlan:
+    async def _preview(self, app_id: int, change: Change, patch: Patch | None = None) -> SitePlan:
         """The change made, then dropped: the session is never committed (closing it
         rolls everything back), so nothing is written."""
         async with self.sessions() as session:
@@ -118,9 +122,9 @@ class SiteHosting:
             await change(session, app_id)
             await session.flush()
             after = await core.added_ports(session, app_id)
-            if before == after:
+            if before == after and not patch:
                 return SitePlan(False, None, "", before, after)
-            inputs = await core.current_inputs(session, app_id)
+            inputs = {**await core.current_inputs(session, app_id), **(patch or {})}
             upd = await self.revisions.plan_update(session, app_id, inputs)
             if conflicts := [conflict_dict(c) for c in upd.plan.conflicts]:
                 raise await self.ports.conflict(session, app_id, conflicts, before)
@@ -140,8 +144,10 @@ class SiteHosting:
         return site.id, update, config
 
     async def change_port(self, app_id: int, site_id: int, port: int) -> tuple[Job, Job]:
+        """Any site's, the main one's included (the app's web port: a new revision too)."""
+        patch: Patch = {}
         app, site, update, config, number = await self._republish(
-            app_id, self._moving(site_id, port)
+            app_id, self._moving(site_id, port, patch), patch=patch
         )
         self.bus.publish("site.port_changed", app=app.slug, site=site.slug, port=port,
                          revision=number, job=update.id)  # fmt: skip
@@ -185,8 +191,9 @@ class SiteHosting:
     # --- the two sequences every change goes through -----------------------------------
 
     async def _republish(
-        self, app_id: int, change: Change, *, removal: bool = False, remove_data: bool = False
-    ) -> tuple[Application, Site, Job, Job, int]:
+        self, app_id: int, change: Change, *, removal: bool = False, remove_data: bool = False,
+        patch: Patch | None = None,
+    ) -> tuple[Application, Site, Job, Job, int]:  # fmt: skip
         """A change that moves a port, in one transaction: the change, the revision that
         publishes the ports as they now are (its job recreates the container), and nginx's
         files (site_config). The files go after the revision, except for a removal: nginx
@@ -201,9 +208,8 @@ class SiteHosting:
                 folders = [site.root] if remove_data else []
                 first = self._config(session, app.id, app.slug, remove_folders=folders)
             try:
-                update, number = await self.revisions.queue_update(
-                    session, app_id, await core.current_inputs(session, app_id)
-                )
+                inputs = {**await core.current_inputs(session, app_id), **(patch or {})}
+                update, number = await self.revisions.queue_update(session, app_id, inputs)
             except PortConflictError as err:
                 conflicts = cast(list[dict[str, Any]], err.details["conflicts"])
                 raise await self.ports.conflict(session, app_id, conflicts, before) from None
@@ -248,11 +254,14 @@ class SiteHosting:
 
         return change
 
-    def _moving(self, site_id: int, port: int) -> Change:
+    def _moving(self, site_id: int, port: int, patch: Patch) -> Change:
         async def change(session: AsyncSession, app_id: int) -> Site:
             site = await self._site(session, app_id, site_id)
-            if site.root == "":
-                raise MainSiteError("the main site uses the app's web port", site=site.id)
+            if site.root == "":  # the main site: its port is the app's web port (an input)
+                if port != (await core.current_inputs(session, app_id)).get("web_port"):
+                    await self.ports.free(session, app_id, port)
+                    patch["web_port"] = port
+                return site
             nginx.check(_nginx_site(site.slug, port, site.server_name))
             if port != site.port:
                 await self.ports.free(session, app_id, port)

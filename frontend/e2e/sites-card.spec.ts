@@ -142,15 +142,17 @@ test("nginx sites card: change a port, a domain name, remove a site", async ({ p
   const sites = page.getByRole("list", { name: "Sites" });
   const blog = sites.getByRole("listitem", { name: "Blog" });
   await expect(blog.getByText("Port 8311")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Actions du site « Pages »" })).toHaveCount(0); // the main site
   const menu = async (site: string, item: string) => {
     await page.getByRole("button", { name: `Actions du site « ${site} »` }).click();
     await page.getByRole("menuitem", { name: item }).click();
   };
 
-  // Simple mode: no domain name in the menu.
+  // Simple mode: no domain name in the menu; the main site's has its port only.
   await page.getByRole("button", { name: "Actions du site « Blog »" }).click();
   await expect(page.getByRole("menuitem")).toHaveText(["Changer le port", "Supprimer"]);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Actions du site « Pages »" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText(["Changer le port"]);
   await page.keyboard.press("Escape");
 
   // Port: Wiki's port is taken, and so is the neighbour nginx's: each time a really free one
@@ -175,6 +177,18 @@ test("nginx sites card: change a port, a domain name, remove a site", async ({ p
   await dialog.getByRole("button", { name: "Changer le port" }).click();
   await expect(dialog).toBeHidden();
   await expect(blog.getByText(`Port ${port}`)).toBeVisible({ timeout: 20_000 });
+
+  // The main site's port (the nginx's web port), from its port button this time.
+  const main = sites.getByRole("listitem", { name: "Pages" });
+  await main.getByRole("button", { name: "Port 8310 du site « Pages » : changer" }).click();
+  await expect(newPort).toHaveValue("8310");
+  await newPort.fill("8318");
+  await dialog.getByRole("button", { name: "Vérifier" }).click();
+  await expect(dialog.getByText("tous ses sites seront indisponibles", { exact: false })).toBeVisible();
+  await dialog.getByRole("button", { name: "Changer le port" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(main.getByText("Port 8318")).toBeVisible({ timeout: 20_000 });
+  expect((await (await page.request.get(`/api/v1/apps/${app}/settings`)).json()).values.web_port).toBe(8318);
 
   // Advanced mode: the compose diff before a port change, the domain name.
   await page.getByText("Mode avancé", { exact: true }).click();

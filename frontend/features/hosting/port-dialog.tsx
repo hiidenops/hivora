@@ -32,7 +32,8 @@ export function PortError({ error, onUse }: { error: Error | null; onUse: (port:
   ));
 }
 
-/** An added site moves to another port: checked first (conflicts, restart notice), then moved. */
+/** A site moves to another port (the main site: its app's web port): checked first (conflicts,
+ *  restart notice), then moved. */
 export function PortDialog({ appId, site, open, onOpenChange, onJob }: {
   appId: number;
   site: HostedSite;
