@@ -42,6 +42,8 @@ export const fr = {
   "sites.filesHelp": "Les fichiers .html, .css et .js du site. Les images et les autres fichiers se changent avec une archive .zip.",
   "sites.noFiles": "Aucun fichier .html, .css ou .js.",
   "sites.size": "{size} octets",
+  "sites.folderExpand": "Déplier {name}",
+  "sites.folderCollapse": "Replier {name}",
   "sites.truncated": "Seuls les {n} premiers fichiers sont listés.",
   "sites.newFile": "Nouveau fichier",
   "sites.newFilePlaceholder": "dossier/page.html",

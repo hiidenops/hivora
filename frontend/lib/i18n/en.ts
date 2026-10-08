@@ -43,6 +43,8 @@ export const en: Record<MessageKey, string> = {
   "sites.filesHelp": "The site's .html, .css and .js files. Images and other files are changed with a .zip archive.",
   "sites.noFiles": "No .html, .css or .js file.",
   "sites.size": "{size} bytes",
+  "sites.folderExpand": "Expand {name}",
+  "sites.folderCollapse": "Collapse {name}",
   "sites.truncated": "Only the first {n} files are listed.",
   "sites.newFile": "New file",
   "sites.newFilePlaceholder": "folder/page.html",

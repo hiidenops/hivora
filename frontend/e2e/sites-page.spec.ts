@@ -55,7 +55,15 @@ test("hosted site page: zip, read, create, edit, conflict, viewer, back to the n
   await page.getByRole("button", { name: "Remplacer le contenu" }).click();
   await expect(page.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
   const list = page.getByRole("list", { name: "Fichiers" });
-  await expect(list.getByRole("button")).toHaveText([/css\/site\.css/, /index\.html/], { timeout: 20_000 });
+  // As folders and files: the folder first, its file inside, then the root's.
+  await expect(list.getByRole("button")).toHaveText([/^css$/, /^site\.css/, /^index\.html/], { timeout: 20_000 });
+  const folder = list.getByRole("button", { name: "css", exact: true });
+  await expect(folder).toHaveAttribute("aria-expanded", "true");
+  await folder.click(); // folded: its file hidden
+  await expect(folder).toHaveAttribute("aria-expanded", "false");
+  await expect(list.getByRole("button", { name: /site\.css/ })).toBeHidden();
+  await folder.click();
+  await expect(list.getByRole("button", { name: /site\.css/ })).toBeVisible();
   expect(readFileSync(`${disk}/sites/docs/index.html`, "utf8")).toContain("Depuis le ZIP");
   expect(mainTree()).toEqual(mainBefore);
 
@@ -88,7 +96,7 @@ test("hosted site page: zip, read, create, edit, conflict, viewer, back to the n
   await page.getByRole("button", { name: "Créer" }).click();
   await page.getByLabel("Contenu de js/app.js").fill("console.log('docs');\n");
   await page.getByRole("button", { name: "Enregistrer" }).click();
-  await expect(list.getByRole("button")).toHaveText([/css\/site\.css/, /index\.html/, /js\/app\.js/], { timeout: 20_000 });
+  await expect(list.getByRole("button")).toHaveText([/^css$/, /^site\.css/, /^js$/, /^app\.js/, /^index\.html/], { timeout: 20_000 });
   expect(existsSync(`${disk}/sites/docs/js/app.js`)).toBe(true);
   expect(mainTree()).toEqual(mainBefore);
   await expectPointerCursors(page);
@@ -105,7 +113,7 @@ test("hosted site page: zip, read, create, edit, conflict, viewer, back to the n
   // A viewer reads, writes nothing.
   const viewer = await signInViewer(page, browser, "vera");
   await viewer.goto(`/app/site/?app=${app}&site=${site}`);
-  await viewer.getByRole("list", { name: "Fichiers" }).getByRole("button", { name: /js\/app\.js/ }).click();
+  await viewer.getByRole("list", { name: "Fichiers" }).getByRole("button", { name: /^app\.js/ }).click();
   const readOnly = viewer.getByLabel("Contenu de js/app.js");
   await expect(readOnly).toHaveValue("console.log('docs');\n");
   await expect(readOnly).toHaveAttribute("readonly", "");

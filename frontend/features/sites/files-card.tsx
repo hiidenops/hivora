@@ -8,14 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 
 import { FileEditor } from "./file-editor";
+import { FileTree } from "./file-tree";
 import { useSiteFiles } from "./hooks";
 
 /** The site's .html, .css and .js files: pick one to read or edit, or start a new one. `base`: siteApi(…). */
 export function FilesCard({ base, canEdit, onJob }: { base: string; canEdit: boolean; onJob: (jobId: number) => void }) {
-  const { t, lang, errorMessage } = useI18n();
+  const { t, errorMessage } = useI18n();
   const { data, error } = useSiteFiles(base);
   const [path, setPath] = useState<string | null>(null);
   const [newPath, setNewPath] = useState("");
@@ -46,21 +46,7 @@ export function FilesCard({ base, canEdit, onJob }: { base: string; canEdit: boo
           <p className="text-sm text-muted-foreground">{t("sites.filesHelp")}</p>
           {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
           {data && files.length === 0 && <p className="text-sm text-muted-foreground">{t("sites.noFiles")}</p>}
-          <ul className="grid gap-1" aria-label={t("sites.files")}>
-            {files.map((f) => (
-              <li key={f.path}>
-                <button
-                  type="button"
-                  aria-current={f.path === path || undefined}
-                  onClick={() => open(f.path)}
-                  className={cn("flex w-full items-baseline justify-between gap-2 rounded-md px-2 py-1 text-left hover:bg-muted", f.path === path && "bg-muted")}
-                >
-                  <span className="truncate font-mono text-sm">{f.path}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{t("sites.size", { size: f.size.toLocaleString(lang) })}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <FileTree files={files} current={path} onOpen={open} label={t("sites.files")} />
           {data?.truncated && <p className="text-xs text-muted-foreground">{t("sites.truncated", { n: files.length })}</p>}
           {canEdit && (
             <form className="flex gap-2" onSubmit={create}>
