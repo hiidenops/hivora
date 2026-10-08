@@ -15,13 +15,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.adoption import Adoption
-from hivora.apps.models import Application, AppRevision, Exposure, Origin
+from hivora.apps.core import latest_revision
+from hivora.apps.models import Exposure, Origin
 from hivora.apps.planner import AppPlanner
+from hivora.apps.queries import apps_with_template
 from hivora.hostfw.service import HostFirewall, listening
 from hivora.state import StateStore
 from hivora.templates import Catalog
 from hivora.templates.icons import IconCache
-from hivora.templates.models import TemplateVersion
 from hivora.topology.models import TopologyEdge, TopologyLayout, TopologyNode
 from hivora.zones import NetworkMode, Zone
 
@@ -65,12 +66,9 @@ class GraphBuilder:
         graph = Graph(host=host)
         async with self.sessions() as session:
             zones = list(await session.scalars(select(Zone).order_by(Zone.sort_order, Zone.name)))
-            apps = list(await session.scalars(select(Application).order_by(Application.name)))
-            templates = dict(
-                (await session.execute(select(TemplateVersion.id, TemplateVersion.slug)))
-                .tuples()
-                .all()
-            )
+            with_template = await apps_with_template(session)  # by name
+            apps = [app for app, _ in with_template]
+            templates = {app.id: slug for app, slug in with_template}  # None: no template
             declared = list(await session.scalars(select(TopologyNode).order_by(TopologyNode.id)))
             links = list(await session.scalars(select(TopologyEdge).order_by(TopologyEdge.id)))
             graph.positions = {
@@ -81,7 +79,7 @@ class GraphBuilder:
             overridden: dict[int, dict[tuple[str, str], str]] = {}
             template_ports: dict[int, dict[tuple[str, int, str], str]] = {}
             for app in apps:
-                template = templates.get(app.template_version_id or -1)
+                template = templates.get(app.id)
                 try:
                     spec = self.catalog.get(template).template if template else None
                 except Exception:  # template gone from the catalog
@@ -91,10 +89,7 @@ class GraphBuilder:
                     template_ports[app.id] = {(name, p.container, p.protocol): p.exposure
                                               for name, svc in spec.services.items()
                                               for p in svc.ports}  # fmt: skip
-                latest = await session.scalar(
-                    select(AppRevision).where(AppRevision.app_id == app.id)
-                    .order_by(AppRevision.number.desc()).limit(1)
-                )  # fmt: skip
+                latest = await latest_revision(session, app.id)
                 if latest and latest.overrides:
                     overridden[app.id] = {
                         (name, key): value
@@ -146,7 +141,7 @@ class GraphBuilder:
         }
         for app in apps:
             key = f"app:{app.id}"
-            template = templates.get(app.template_version_id or -1)
+            template = templates.get(app.id)
             status = self.store.app(app.slug).status.value
             overrides, defaults = overridden.get(app.id, {}), template_ports.get(app.id, {})
             ports = [  # unpublished ones too (port: the container's): they can be opened again

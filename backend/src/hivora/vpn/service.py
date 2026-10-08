@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from hivora.apps.models import Application
+from hivora.apps.queries import app_id_by_slug
 from hivora.apps.service import AppService
 from hivora.core.clock import Clock
 from hivora.core.errors import NotFoundError
@@ -325,9 +325,7 @@ async def follow_deploys(vpn: VpnTools) -> None:
             await asyncio.sleep(3)
             try:
                 async with vpn.sessions() as session:
-                    app_id = await session.scalar(
-                        select(Application.id).where(Application.slug == event.payload["app"])
-                    )
+                    app_id = await app_id_by_slug(session, event.payload["app"])
                 if app_id is not None:
                     await vpn.sync(app_id)
             except NotAVpnError:

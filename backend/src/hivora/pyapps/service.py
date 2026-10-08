@@ -22,10 +22,9 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from hivora.apps.models import Application
+from hivora.apps.queries import app_id_by_slug
 from hivora.apps.service import AppService, DeployRequest, slugify
 from hivora.core.config import Settings
 from hivora.core.errors import ConflictError, NotFoundError, ValidationError
@@ -277,7 +276,7 @@ class PythonProjects:
         apps = self.apps
         slug = slugify(spec.name)
         async with self.sessions() as session:
-            if await session.scalar(select(Application.id).where(Application.slug == slug)):
+            if await app_id_by_slug(session, slug):
                 raise ConflictError("an app already uses this name", slug=slug)
         text = manifest(slug, spec, version=f"1.0.{int(time.time())}")
         try:

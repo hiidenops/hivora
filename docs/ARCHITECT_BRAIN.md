@@ -245,6 +245,8 @@ Situation au 07/10/2026 (lot M8-a ; mesures de `wc -l`, classes par `ast`) :
 
 Accès inter-modules du module `sites` (§9.9) : **résolu** en M8-a. `sites` lit les apps par `apps.queries` (`hosting_app`, `hosting_app_id`, `volume_source`) et `apps.core.latest_revision`, marque un hôte par `Application.mark_hosting()`, lit les jobs par `jobs.queries` (`get_job`, `last_job`) ; il ne fait plus de requête sur les tables `application`, `service` ni `job`.
 
+Accès inter-modules aux tables d'`apps` (§9.9) : **résolu** en M11-c1. `topology` lit les apps et leur modèle par `apps.queries.apps_with_template` et leur dernière révision par `apps.core.latest_revision` ; `vpn` (`follow_deploys`) et `pyapps` trouvent une app par `apps.queries.app_id_by_slug` ; `backups` ne fait qu'importer le type `Application`. Restent hors d'`apps` : `topology` lit la table `zone` (comme `apps.revisions`), et `apps` joint `template_version` (6 requêtes, lien qu'il porte lui-même) ; `setting` (`db`) est une table d'infrastructure partagée.
+
 Priorités techniques (bilan du 29/09) :
 
 - **PRIORITÉ 1 : routes fines.**

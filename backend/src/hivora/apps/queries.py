@@ -65,6 +65,14 @@ async def hosting_app(session: AsyncSession, app_id: int) -> Application | None:
     return app if app is not None and app.kind == HOSTING_KIND else None
 
 
+async def app_id_by_slug(session: AsyncSession, slug: str) -> int | None:
+    """The id of the app with this slug, if any."""
+    app_id: int | None = await session.scalar(
+        select(Application.id).where(Application.slug == slug)
+    )
+    return app_id
+
+
 async def hosting_app_id(session: AsyncSession, slug: str) -> int | None:
     """The id of the app with this slug if it hosts sites, else None."""
     app_id: int | None = await session.scalar(
