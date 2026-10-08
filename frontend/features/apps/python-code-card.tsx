@@ -5,8 +5,8 @@ import { useState } from "react";
 
 import { CollapsibleCard } from "@/components/collapsible-card";
 import { Alert } from "@/components/ui/alert";
+import { FileDrop } from "@/components/file-drop";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { upload, type JobRef } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
@@ -41,12 +41,10 @@ export function PythonCodeCard({ appId, onJob }: { appId: number; onJob: (id: nu
     >
       <div className="grid gap-3">
         <p className="text-sm text-muted-foreground">{t("py.codeHelp")}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input type="file" accept=".zip,application/zip" aria-label={t("py.zip")} className="max-w-md" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          <Button disabled={!file || progress !== null} onClick={() => void send()}>
-            {progress !== null ? t("worlds.uploading", { percent: Math.round(progress * 100) }) : t("py.sendCode")}
-          </Button>
-        </div>
+        <FileDrop label={t("py.zip")} accept=".zip,application/zip" file={file} disabled={progress !== null} onFile={setFile} />
+        <Button className="justify-self-center" disabled={!file || progress !== null} onClick={() => void send()}>
+          {progress !== null ? t("worlds.uploading", { percent: Math.round(progress * 100) }) : t("py.sendCode")}
+        </Button>
         {!!error && <Alert tone="danger">{errorMessage(error)}</Alert>}
       </div>
     </CollapsibleCard>

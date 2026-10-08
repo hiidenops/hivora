@@ -75,7 +75,12 @@ export function FilesCard({ base, canEdit, onJob }: { base: string; canEdit: boo
             onDirty={onDirty}
           />
         ) : (
-          <p className="self-center text-sm text-muted-foreground">{t("sites.pickFile")}</p>
+          <div className="grid h-[28rem] place-items-center rounded-lg border-2 border-dashed border-input p-6 text-center">
+            <span className="grid justify-items-center gap-2 text-sm text-muted-foreground">
+              <FileCode aria-hidden className="size-8" />
+              {t("sites.pickFile")}
+            </span>
+          </div>
         )}
       </CardContent>
     </Card>

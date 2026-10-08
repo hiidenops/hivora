@@ -7,6 +7,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/app-shell";
 import { JobProgress } from "@/components/job-progress";
 import { Alert } from "@/components/ui/alert";
+import { FileDrop } from "@/components/file-drop";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Switch } from "@/components/ui/input";
 import { api, upload } from "@/lib/api/client";
@@ -110,12 +111,10 @@ export default function PythonProjectPage() {
       <div className="grid max-w-4xl gap-4">
         <div className={section}>
           <p className="text-sm text-muted-foreground">{t("py.help")}</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input type="file" accept=".zip,application/zip" aria-label={t("py.zip")} className="max-w-md" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-            <Button disabled={!file || busy} onClick={() => void analyze()}>
-              <FileArchive /> {progress !== null ? t("worlds.uploading", { percent: Math.round(progress * 100) }) : t("py.analyze")}
-            </Button>
-          </div>
+          <FileDrop label={t("py.zip")} accept=".zip,application/zip" file={file} disabled={busy} onFile={setFile} />
+          <Button className="justify-self-center" disabled={!file || busy} onClick={() => void analyze()}>
+            <FileArchive /> {progress !== null ? t("worlds.uploading", { percent: Math.round(progress * 100) }) : t("py.analyze")}
+          </Button>
         </div>
         {!!error && <Alert tone="danger">{errorMessage(error)}</Alert>}
 

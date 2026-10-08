@@ -4,9 +4,9 @@ import { FileArchive } from "lucide-react";
 import { useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
+import { FileDrop } from "@/components/file-drop";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { ApiError, upload, type JobRef } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
@@ -48,21 +48,19 @@ export function ContentCard({ base, onJob }: { base: string; onJob: (jobId: numb
       <CardContent className="grid gap-3">
         <p className="text-sm text-muted-foreground">{t("sites.contentHelp")}</p>
         <Alert tone="warn">{t("sites.replaceWarning")}</Alert>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            type="file"
-            accept=".zip,application/zip"
-            aria-label={t("sites.zip")}
-            className="max-w-md"
-            onChange={(e) => {
-              setFile(e.target.files?.[0] ?? null);
-              setError(null);
-            }}
-          />
-          <Button disabled={!file || progress !== null} onClick={() => void send()}>
-            {progress !== null ? t("worlds.uploading", { percent: Math.round(progress * 100) }) : t("sites.replace")}
-          </Button>
-        </div>
+        <FileDrop
+          label={t("sites.zip")}
+          accept=".zip,application/zip"
+          file={file}
+          disabled={progress !== null}
+          onFile={(f) => {
+            setFile(f);
+            setError(null);
+          }}
+        />
+        <Button className="justify-self-center" disabled={!file || progress !== null} onClick={() => void send()}>
+          {progress !== null ? t("worlds.uploading", { percent: Math.round(progress * 100) }) : t("sites.replace")}
+        </Button>
         {!!error && <Alert tone="danger">{errorMessage(error)}</Alert>}
       </CardContent>
     </Card>

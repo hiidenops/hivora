@@ -1,11 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Globe, Play, Trash2, Upload } from "lucide-react";
-import { useRef, useState, type FormEvent } from "react";
+import { Download, Globe, Play, Trash2 } from "lucide-react";
+import { useState, type FormEvent } from "react";
 
 import { useSession } from "@/components/app-shell";
 import { CollapsibleCard } from "@/components/collapsible-card";
+import { FileDrop } from "@/components/file-drop";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,6 @@ function nameFromFile(file: string): string {
 
 function ImportForm({ appId, onJob }: { appId: number; onJob: (id: number) => void }) {
   const { t, errorMessage } = useI18n();
-  const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState("");
   const [progress, setProgress] = useState<number | null>(null);
@@ -46,8 +46,7 @@ function ImportForm({ appId, onJob }: { appId: number; onJob: (id: number) => vo
     onSettled: () => setProgress(null),
     onSuccess: (job) => {
       onJob(job.id);
-      setFile(null);
-      if (input.current) input.current.value = "";
+      setFile(null); // the picker clears itself
     },
   });
   const submit = (e: FormEvent) => {
@@ -56,28 +55,22 @@ function ImportForm({ appId, onJob }: { appId: number; onJob: (id: number) => vo
   };
 
   return (
-    <form onSubmit={submit} className="grid gap-2 rounded-lg border border-dashed p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          ref={input}
-          type="file"
-          accept=".zip,application/zip"
-          className="sr-only"
-          id={`world-file-${appId}`}
-          onChange={(e) => {
-            const f = e.target.files?.[0] ?? null;
-            setFile(f);
-            if (f) setName(nameFromFile(f.name));
-            send.reset();
-          }}
-        />
-        <Button type="button" variant="outline" size="sm" onClick={() => input.current?.click()} disabled={send.isPending}>
-          <Upload /> {t("worlds.choose")}
-        </Button>
-        <span className="min-w-0 truncate text-sm text-muted-foreground">{file ? file.name : t("worlds.importHelp")}</span>
-      </div>
+    <form onSubmit={submit} className="grid gap-2">
+      <FileDrop
+        label={t("worlds.choose")}
+        title={t("worlds.choose")}
+        hint={t("worlds.importHelp")}
+        accept=".zip,application/zip"
+        file={file}
+        disabled={send.isPending}
+        onFile={(f) => {
+          setFile(f);
+          if (f) setName(nameFromFile(f.name));
+          send.reset();
+        }}
+      />
       {file && (
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-wrap items-end justify-center gap-2">
           <div className="grid gap-1">
             <Label htmlFor={`world-name-${appId}`}>{t("worlds.name")}</Label>
             <Input
