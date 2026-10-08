@@ -53,32 +53,33 @@ def user_out(u: User) -> UserOut:
 
 @router.get("")
 async def list_users(_: Admin, rt: RuntimeDep) -> list[UserOut]:
-    return [user_out(u) for u in await rt.auth.list_users()]
+    return [user_out(u) for u in await rt.auth.users.list_users()]
 
 
 @router.post("", status_code=201)
 async def create_user(body: UserCreateIn, _: Admin, rt: RuntimeDep) -> UserOut:
-    return user_out(await rt.auth.create_user(body.username, body.role, body.password))
+    return user_out(await rt.auth.users.create_user(body.username, body.role, body.password))
 
 
 @router.patch("/{user_id}")
 async def update_user(user_id: int, body: UserUpdateIn, _: Admin, rt: RuntimeDep) -> UserOut:
-    return user_out(await rt.auth.update_user(user_id, role=body.role, disabled=body.disabled))
+    user = await rt.auth.users.update_user(user_id, role=body.role, disabled=body.disabled)
+    return user_out(user)
 
 
 @router.delete("/{user_id}", status_code=204)
 async def delete_user(user_id: int, admin: Admin, rt: RuntimeDep) -> None:
-    await rt.auth.delete_user(user_id, acting_user_id=admin.user_id)
+    await rt.auth.users.delete_user(user_id, acting_user_id=admin.user_id)
 
 
 @router.post("/{user_id}/password", status_code=204)
 async def reset_password(user_id: int, body: TemporaryPasswordIn, _: Admin, rt: RuntimeDep) -> None:
-    await rt.auth.reset_password(user_id, body.temporary)
+    await rt.auth.users.reset_password(user_id, body.temporary)
 
 
 @router.post("/{user_id}/totp/reset", status_code=204)
 async def reset_totp(user_id: int, _: Admin, rt: RuntimeDep) -> None:
-    await rt.auth.reset_totp(user_id)
+    await rt.auth.users.reset_totp(user_id)
 
 
 @router.get("/{user_id}/sessions")
@@ -93,4 +94,4 @@ async def user_sessions(user_id: int, _: Admin, rt: RuntimeDep) -> list[SessionO
 @router.delete("/{user_id}/sessions", status_code=204)
 async def revoke_user_sessions(user_id: int, admin: Admin, rt: RuntimeDep) -> None:
     keep = admin.session_id if user_id == admin.user_id else None
-    await rt.auth.revoke_sessions(user_id, keep=keep)
+    await rt.auth.users.revoke_sessions(user_id, keep=keep)

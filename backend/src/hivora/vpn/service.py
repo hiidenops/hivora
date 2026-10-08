@@ -7,11 +7,7 @@ app's volume and applies it live by exec (`wg syncconf`): no API, no web UI.
 import asyncio
 import ipaddress
 import logging
-import os
 from contextlib import suppress
-from dataclasses import dataclass
-from datetime import UTC
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import select
@@ -20,19 +16,20 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from hivora.apps.models import Application
 from hivora.apps.service import AppService
 from hivora.core.clock import Clock
-from hivora.core.errors import ConflictError, NotFoundError, ValidationError
+from hivora.core.errors import NotFoundError
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import Purpose, Sealed, SecretBox
-from hivora.docker_gateway import ContainerInfo, DockerGateway
+from hivora.docker_gateway import DockerGateway
 from hivora.jobs import Job
-from hivora.templates.schema import Vpn
 from hivora.vpn import wireguard as wg
+from hivora.vpn.acl import access_of, apply_changes, client_out, is_active
+from hivora.vpn.addressing import VpnApp, VpnFullError, allowed_ips, check_address
+from hivora.vpn.apply import VpnApplyError, bring_up, write_files, zone_subnets
 from hivora.vpn.models import VpnPeer
 
 logger = logging.getLogger(__name__)
 
 ACL = "hivora-acl.sh"
-ROUTINGS = ("default", "all", "access", "custom")
 
 # ponytail: one lock for every VPN (peer changes are rare); per-app locks if that ever matters
 
@@ -43,56 +40,6 @@ class NotAVpnError(NotFoundError):
 
 class VpnClientNotFoundError(NotFoundError):
     code = "vpn_client_not_found"
-
-
-class VpnFullError(ConflictError):
-    code = "vpn_full"
-
-
-class VpnApplyError(ConflictError):
-    code = "vpn_apply_failed"
-
-
-class VpnNetworkError(ValidationError):
-    code = "vpn_bad_network"
-
-
-class VpnAddressError(ValidationError):
-    code = "vpn_bad_address"
-
-
-@dataclass(frozen=True, slots=True)
-class _Vpn:
-    app_id: int
-    slug: str
-    spec: Vpn
-    container: ContainerInfo | None
-    values: dict[str, Any]
-    host_config: Path  # the server config on the host
-    config: str  # the same file inside the container
-    host_acl: Path  # the access-rights script on the host
-    acl: str  # the same file inside the container
-
-    @property
-    def zones(self) -> list[str]:
-        return [z for z in str(self.values.get(self.spec.zones_field or "") or "").split(",") if z]
-
-    def value(self, field: str | None, default: str = "") -> str:
-        return str(self.values.get(field or "") or default)
-
-    def network(self) -> tuple[str, str]:
-        """(subnet, server address) from the advanced settings, validated."""
-        s = self.spec
-        try:
-            net, server = wg.network(self.value(s.subnet_field, s.subnet),
-                                     self.value(s.server_ip_field))  # fmt: skip
-        except ValueError as exc:
-            raise VpnNetworkError(f"invalid VPN addressing: {exc}") from None
-        return str(net), server
-
-    @property
-    def endpoint_port(self) -> str:
-        return self.value(self.spec.port_field, str(self.spec.port))
 
 
 def _context(app_id: int, public_key: str) -> str:
@@ -115,7 +62,7 @@ class VpnTools:
         self.gateway = gateway
         self._lock = asyncio.Lock()
 
-    async def _vpn(self, app_id: int) -> _Vpn:
+    async def _vpn(self, app_id: int) -> VpnApp:
         async with self.sessions() as session:
             app, entry, container = await self.apps.main_container(session, app_id)
             spec = entry.template.vpn if entry else None
@@ -126,7 +73,7 @@ class VpnTools:
         target = next(v.target for v in main.volumes if v.name == spec.volume)
         volume = self.apps.volumes_dir(app.slug) / spec.volume
         root = target.rstrip("/")
-        return _Vpn(app.id, app.slug, spec, container, values, volume / spec.config,
+        return VpnApp(app.id, app.slug, spec, container, values, volume / spec.config,
                     f"{root}/{spec.config}", volume / ACL, f"{root}/{ACL}")  # fmt: skip
 
     def _seal(self, app_id: int, private: str, public: str) -> Sealed:
@@ -148,7 +95,7 @@ class VpnTools:
         sealed = Sealed(peer.private_nonce, peer.private_key)
         return self.box.open(Purpose.VPN, sealed, _context(peer.app_id, peer.public_key))
 
-    async def _peers(self, session: AsyncSession, vpn: _Vpn) -> tuple[VpnPeer, list[VpnPeer]]:
+    async def _peers(self, session: AsyncSession, vpn: VpnApp) -> tuple[VpnPeer, list[VpnPeer]]:
         """The server's key pair (created on first use) and the clients.
 
         Follows the addressing settings: the server takes its configured address,
@@ -191,35 +138,10 @@ class VpnTools:
         await session.flush()
         return server, clients
 
-    def _check_address(self, vpn: _Vpn, address: str, taken: set[str]) -> None:
-        subnet, _ = vpn.network()
-        try:
-            ok = ipaddress.ip_address(address) in set(ipaddress.ip_network(subnet).hosts())
-        except ValueError:
-            ok = False
-        if not ok or address in taken:
-            raise VpnAddressError("address outside the VPN network or already used",
-                                  field="address", address=address[:45])  # fmt: skip
-
-    async def _zone_subnets(self, vpn: _Vpn) -> dict[str, tuple[str, ...]]:
-        """Subnets of the networks this VPN reaches, by zone slug or "@<app>"."""
-        if not vpn.zones:
-            return {}
-        names = {(f"{z[1:]}_default" if z.startswith("@") else f"hivora-zone-{z}"): z
-                 for z in vpn.zones}  # fmt: skip
-        return {names[n.name]: n.subnets for n in await self.gateway.list_networks()
-                if n.name in names}  # fmt: skip
-
-    def _access(self, peer: VpnPeer, vpn: _Vpn, subnets: dict[str, tuple[str, ...]]) -> wg.Access:
-        a = peer.access or {"internet": True, "lan": True, "zones": vpn.zones}
-        zones = [z for z in a.get("zones") or [] if z in vpn.zones]
-        return wg.Access(peer.address, bool(a.get("internet")), bool(a.get("lan")),
-                         tuple(n for z in zones for n in subnets.get(z, ())))  # fmt: skip
-
     def _active(self, peer: VpnPeer) -> bool:
-        return peer.enabled and (peer.expires_at is None or peer.expires_at > self.clock.now())
+        return is_active(peer, self.clock.now())
 
-    async def _sync(self, vpn: _Vpn, *, if_changed: bool = False) -> None:
+    async def _sync(self, vpn: VpnApp, *, if_changed: bool = False) -> None:
         """Rewrite the server config and access rights, then apply them if the VPN runs.
 
         Caller holds ``self._lock``, outside any transaction: the exec into the container
@@ -229,9 +151,9 @@ class VpnTools:
         async with self.sessions() as session, session.begin():
             address = await self._write(session, vpn, if_changed=if_changed)
         if address is not None:
-            await self._up(vpn, address)
+            await bring_up(self.gateway, vpn, address)
 
-    async def _write(self, session: AsyncSession, vpn: _Vpn, *, if_changed: bool) -> str | None:
+    async def _write(self, session: AsyncSession, vpn: VpnApp, *, if_changed: bool) -> str | None:
         """Write wg0.conf and the access script; the server address to apply, if running."""
         server, clients = await self._peers(session, vpn)
         s = vpn.spec
@@ -241,48 +163,20 @@ class VpnTools:
                               [wg.Peer(c.name, c.address, c.public_key, self._psk(c))
                                for c in active],
                               vpn.acl)  # fmt: skip
-        subnets = await self._zone_subnets(vpn)
-        acl = wg.acl_script(s.interface, [self._access(c, vpn, subnets) for c in active],
+        subnets = await zone_subnets(self.gateway, vpn)
+        acl = wg.acl_script(s.interface, [access_of(c, vpn, subnets) for c in active],
                             sorted({n for nets in subnets.values() for n in nets}))  # fmt: skip
-        with suppress(OSError):
-            if if_changed and vpn.host_config.read_text() == text \
-                    and vpn.host_acl.read_text() == acl:  # fmt: skip
-                return None
-        vpn.host_config.parent.mkdir(parents=True, exist_ok=True)
-        for path, content in ((vpn.host_acl, acl), (vpn.host_config, text)):
-            tmp = path.with_suffix(".tmp")
-            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)  # private key inside
-            with os.fdopen(fd, "w") as f:
-                f.write(content)
-            tmp.replace(path)
+        if not write_files(vpn, text, acl, if_changed=if_changed):
+            return None
         # Not running: the image brings it up on start (PostUp runs the access rights).
         return server.address if vpn.container is not None else None
-
-    async def _up(self, vpn: _Vpn, address: str) -> None:
-        assert vpn.container is not None
-        s = vpn.spec
-        subnet, _ = vpn.network()
-        # Same address: peers and rights applied live. New addressing: interface rebuilt.
-        # ponytail: the old network's NAT rule stays until the container restarts (harmless)
-        i, c = s.interface, vpn.config
-        inet = f"inet {address}/{ipaddress.ip_network(subnet).prefixlen} "
-        code, out = await self.gateway.exec_run(vpn.container.id, ["sh", "-c", (
-            f"if wg show {i} >/dev/null 2>&1; then"
-            f" if ip -4 -o addr show {i} | grep -qF '{inet}'; then"
-            f" wg-quick strip {c} > /tmp/{i}.conf && wg syncconf {i} /tmp/{i}.conf"
-            f" && sh {vpn.acl};"
-            f" else ip link del {i} && wg-quick up {c}; fi;"
-            f" else wg-quick up {c}; fi"
-        )])  # fmt: skip
-        if code != 0:
-            raise VpnApplyError("WireGuard refused the configuration", output=out[-500:])
 
     async def sync(self, app_id: int) -> None:
         vpn = await self._vpn(app_id)
         async with self._lock:
             await self._sync(vpn)
 
-    async def _client(self, session: AsyncSession, vpn: _Vpn, cid: int) -> VpnPeer:
+    async def _client(self, session: AsyncSession, vpn: VpnApp, cid: int) -> VpnPeer:
         peer = await session.get(VpnPeer, cid)
         if peer is None or peer.app_id != vpn.app_id or peer.server:
             raise VpnClientNotFoundError("unknown VPN client", id=cid)
@@ -308,21 +202,9 @@ class VpnTools:
         subnet, server_ip = vpn.network()
         return {"running": vpn.container is not None, "zones": vpn.zones, "subnet": subnet,
                 "server_address": server_ip,
-                "default_allowed_ips": vpn.value(vpn.spec.allowed_ips_field, "0.0.0.0/0"),
-                "clients": [self._client_out(c, vpn, stats.get(c.public_key, none))
+                "default_allowed_ips": vpn.default_allowed_ips,
+                "clients": [client_out(c, vpn, stats.get(c.public_key, none), self.clock.now())
                             for c in clients]}  # fmt: skip
-
-    def _client_out(self, c: VpnPeer, vpn: _Vpn, st: wg.PeerStats) -> dict[str, Any]:
-        a = self._access(c, vpn, {})
-        zones = [z for z in (c.access or {"zones": vpn.zones}).get("zones") or [] if z in vpn.zones]
-        return {
-            "id": c.id, "name": c.name, "address": c.address, "enabled": c.enabled,
-            "active": self._active(c), "expires_at": c.expires_at,
-            "access": {"internet": a.internet, "lan": a.lan, "zones": zones},
-            "routing": c.routing, "allowed_ips": c.allowed_ips, "public_key": c.public_key,
-            "latest_handshake": st.latest_handshake, "online": st.online,
-            "endpoint": st.endpoint, "rx": st.rx, "tx": st.tx,
-        }  # fmt: skip
 
     async def create(self, app_id: int, name: str, allowed_ips: list[str] | None,
                      address: str | None = None, **changes: Any) -> int:  # fmt: skip
@@ -332,7 +214,7 @@ class VpnTools:
                 server, clients = await self._peers(session, vpn)
                 used = {server.address, *(c.address for c in clients)}
                 if address:
-                    self._check_address(vpn, address, used)
+                    check_address(vpn, address, used)
                 address = address or wg.free_address(vpn.network()[0], used)
                 if address is None:
                     raise VpnFullError("no address left in the VPN network")
@@ -344,7 +226,7 @@ class VpnTools:
                                private_nonce=sealed.nonce,
                                private_key=sealed.ciphertext)  # fmt: skip
                 self._set_psk(peer)
-                self._apply(peer, changes)
+                apply_changes(peer, changes, self.clock.now())
                 session.add(peer)
                 await session.flush()
             try:
@@ -358,26 +240,6 @@ class VpnTools:
         self.bus.publish("vpn.client_created", app=vpn.slug, target=name)
         return peer.id
 
-    def _apply(self, peer: VpnPeer, changes: dict[str, Any]) -> None:
-        """Fields sent by the API (only those present change)."""
-        if "name" in changes:
-            peer.name = changes["name"]
-        if "access" in changes:
-            peer.access = changes["access"]
-        if "expires_at" in changes:
-            at = changes["expires_at"]
-            peer.expires_at = at.replace(tzinfo=UTC) if at and at.tzinfo is None else at
-        if "routing" in changes:
-            peer.routing = changes["routing"]
-        if changes.get("allowed_ips"):
-            peer.allowed_ips, peer.routing = changes["allowed_ips"], "custom"
-        if changes.get("clear_allowed_ips"):
-            peer.allowed_ips, peer.routing = None, "default"
-        if changes.get("enabled") is not None:
-            peer.enabled = changes["enabled"]
-            if peer.enabled and not self._active(peer):
-                peer.expires_at = None  # re-enabled by hand after expiring
-
     async def update(self, app_id: int, cid: int, **changes: Any) -> None:
         vpn = await self._vpn(app_id)
         async with self._lock:
@@ -387,9 +249,9 @@ class VpnTools:
                 address = changes.pop("address", None)
                 if address and address != peer.address:
                     taken = {server.address, *(c.address for c in clients if c is not peer)}
-                    self._check_address(vpn, address, taken)
+                    check_address(vpn, address, taken)
                     peer.address = address
-                self._apply(peer, changes)
+                apply_changes(peer, changes, self.clock.now())
                 await session.flush()
             await self._sync(vpn)
         self.bus.publish("vpn.client_updated", app=vpn.slug, target=peer.name)
@@ -425,23 +287,12 @@ class VpnTools:
         async with self._lock, self.sessions() as session, session.begin():
             server, _ = await self._peers(session, vpn)
             peer = await self._client(session, vpn, cid)
-            s = vpn.spec
-            host = vpn.value(s.endpoint_field)
-            port = vpn.endpoint_port
-            endpoint = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
-            default = vpn.value(s.allowed_ips_field, "0.0.0.0/0")
-            if peer.routing == "all":
-                allowed = "0.0.0.0/0"
-            elif peer.routing == "access":
-                access = self._access(peer, vpn, await self._zone_subnets(vpn))
-                allowed = ", ".join(wg.routes(vpn.network()[0], access))
-            elif peer.routing == "custom":
-                allowed = ", ".join(peer.allowed_ips or []) or default
-            else:
-                allowed = default
+            access = (access_of(peer, vpn, await zone_subnets(self.gateway, vpn))
+                      if peer.routing == "access" else None)  # fmt: skip
+            allowed = allowed_ips(vpn, peer.routing, peer.allowed_ips, access)
             text = wg.client_conf(
-                self._private(peer), peer.address, vpn.value(s.dns_field),
-                server.public_key, endpoint, allowed, self._psk(peer),
+                self._private(peer), peer.address, vpn.value(vpn.spec.dns_field),
+                server.public_key, vpn.endpoint, allowed, self._psk(peer),
             )  # fmt: skip
         self.bus.publish("vpn.config_downloaded", app=vpn.slug, target=peer.name)
         return text

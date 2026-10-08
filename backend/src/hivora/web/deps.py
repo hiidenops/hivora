@@ -7,7 +7,8 @@ from typing import Annotated
 from fastapi import Depends, Request
 
 from hivora.auth.models import Role
-from hivora.auth.service import AuthError, csrf_matches
+from hivora.auth.service import AuthError
+from hivora.auth.sessions import csrf_matches
 from hivora.core.context import Actor, current_actor
 from hivora.core.errors import PermissionDeniedError
 from hivora.runtime import Runtime

@@ -232,8 +232,8 @@ Situation au 07/10/2026 (lot M8-a ; mesures de `wc -l`, classes par `ast`) :
 |---|---|---|
 | `features/topology/topology-view.tsx` | 236 lignes | **résolu** en M9-b2 (541 avant) : `inspector.tsx` 181, `toolbar.tsx` 128, `pending-panel.tsx` 34, `connect.ts` 39 (règles de connexion, fonction pure), `export.ts` 29 ; couvert par `e2e/topology.spec.ts` (M9-b1) |
 | `templates/schema.py` | 496 lignes | alerte (inchangé) |
-| `vpn/service.py` | 491 lignes | alerte (inchangé) |
-| `auth/service.py` | 424 lignes | alerte (inchangé) |
+| `vpn/service.py` | 355 lignes, classe `VpnTools` 269, 9 méthodes publiques | **résolu** en M11-b (504 avant, classe 365) : `vpn/addressing.py` 100 (`VpnApp`, adresses, routes du client, pur), `vpn/acl.py` 58 (droits, activité, vue d'un client, champs reçus, pur), `vpn/apply.py` 62 (sous-réseaux lus dans Docker, fichiers écrits, application par exec) ; couvert par `e2e/vpn.spec.ts` |
+| `auth/service.py` | 236 lignes, classe `AuthService` 181, 13 méthodes publiques | **résolu** en M11-b (424 avant, classe 313, 20 méthodes publiques) : `auth/users.py` 122 (`UserAdmin`, administration des comptes, 7 méthodes, `rt.auth.users`), `auth/totp.py` 67 (`TotpGuard` : codes acceptés une fois, codes de secours), `auth/passwords.py` 36 (règles, pur), `auth/sessions.py` 41 (jeton, CSRF, révocation) ; `ratelimit.py` inchangé |
 | `features/firewall/firewall-panel.tsx` | 372 lignes | alerte (inchangé) |
 | `apps/core.py` | 116 lignes | **résolu** en M9-a (358 avant) : `AppPlanner`, `DeployPlan`, `AppSettings`, `SitePorts` et `services_from` dans `apps/planner.py` (260 lignes, sous les seuils) |
 | `features/deploy/generated-form.tsx` | 343 lignes | alerte (inchangé) |
@@ -255,7 +255,7 @@ Priorités techniques (bilan du 29/09) :
   - Dépendances explicites à la place de `Runtime`. *`vpn` : fait le 07/10 (lot M10-b5) ; `hostfw` : fait le 07/10 (lot M10-b6).*
   - Plus de lecture directe de `apps.models`.
   - Verrou d'instance à la place de `_LOCK`. *`vpn` : fait le 07/10 (lot M10-b5) : `VpnTools._lock`, une seule instance par Hivora.*
-  - Découpage de `vpn/service.py` (491 lignes) : socle `addressing` / `acl` purs, application par exec à part.
+  - ~~Découpage de `vpn/service.py` (491 lignes) : socle `addressing` / `acl` purs, application par exec à part.~~ fait le 07/10 (lot M11-b).
 - **PRIORITÉ 3 : sortir `Runtime` des services métier restants** (~~`topology`~~ fait le 07/10, lot M10-b1 ; ~~`tasks`~~ fait le 07/10, lot M10-b2 ; ~~`pyapps`~~ fait le 07/10, lot M10-b3 ; ~~`games.engine`~~ fait le 07/10, lot M10-b4). Cela supprime les 4 cycles masqués de `runtime.py` (§8.2).
 
 Second rang :

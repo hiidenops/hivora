@@ -1,47 +1,38 @@
-"""Authentication, sessions, TOTP and user management."""
+"""Authentication, sessions and the second factor; user administration in `auth.users`.
 
-import hashlib
-import hmac
+Rules and pieces it relies on: `passwords` (policy, Argon2id), `sessions` (cookie token,
+CSRF, revocation), `totp` (codes accepted once, recovery codes), `ratelimit` (attempts).
+"""
+
 import logging
-import re
-import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from functools import cache
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.auth.models import Role, Session, User
+from hivora.auth.passwords import DEFAULT_ADMIN, check_password_policy, dummy_hash
 from hivora.auth.ratelimit import LoginRateLimiter
+from hivora.auth.sessions import (
+    LAST_SEEN_RESOLUTION,
+    hash_token,
+    new_session,
+    revoke_sessions,
+)
+from hivora.auth.totp import TotpEnrollment, TotpGuard, clear_totp
+from hivora.auth.users import UserAdmin, get_user
 from hivora.core.clock import Clock, SystemClock
 from hivora.core.config import Settings
-from hivora.core.errors import ConflictError, HivoraError, NotFoundError, ValidationError
+from hivora.core.errors import ConflictError, HivoraError
 from hivora.core.events import EventBus
-from hivora.crypto.cipher import Purpose, Sealed, SecretBox
+from hivora.crypto.cipher import SecretBox
 from hivora.crypto.passwords import hash_password, needs_rehash, verify_password
-from hivora.crypto.totp import (
-    generate_recovery_codes,
-    generate_totp_secret,
-    hash_recovery_code,
-    match_recovery_code,
-    provisioning_uri,
-    totp_step,
-)
+from hivora.crypto.totp import generate_recovery_codes, hash_recovery_code
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ADMIN = "admin"
-MIN_PASSWORD_LENGTH = 10
-_USERNAME = re.compile(r"^[a-z0-9][a-z0-9._-]{1,63}$")
-_LAST_SEEN_RESOLUTION = timedelta(minutes=1)
 CONSOLE_CONFIRMATION = timedelta(minutes=15)
-
-
-@cache
-def _dummy_hash() -> str:
-    """Verified when the user does not exist, so timing does not reveal usernames."""
-    return hash_password(secrets.token_hex(16))
 
 
 class AuthError(HivoraError):
@@ -56,47 +47,11 @@ class TotpRequiredError(AuthError):
     code = "totp_required"
 
 
-class UserNotFoundError(NotFoundError):
-    code = "user_not_found"
-
-
-class LastAdminError(ConflictError):
-    code = "last_admin"
-
-
-class WeakPasswordError(ValidationError):
-    code = "weak_password"
-
-
 @dataclass(frozen=True, slots=True)
 class LoginResult:
     user: User
     session: Session
     token: str  # raw cookie value, never stored
-
-
-@dataclass(frozen=True, slots=True)
-class TotpEnrollment:
-    secret: str
-    uri: str
-
-
-def hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
-
-
-def check_password_policy(password: str, username: str) -> None:
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise WeakPasswordError("password too short", min_length=MIN_PASSWORD_LENGTH)
-    if password.lower() in (username.lower(), DEFAULT_ADMIN):
-        raise WeakPasswordError("password too easy to guess")
-
-
-def validate_username(username: str) -> str:
-    username = username.strip().lower()
-    if not _USERNAME.match(username):
-        raise ValidationError("invalid username", field="username")
-    return username
 
 
 class AuthService:
@@ -113,11 +68,10 @@ class AuthService:
         self.sessions = sessions
         self.box = box
         self.bus = bus
-        # ponytail: last TOTP step accepted per user, in memory (a restart reopens at
-        # most the 90 s window); a column if that ever matters.
-        self._totp_used: dict[int, int] = {}
         self.clock = clock or SystemClock()
+        self.totp = TotpGuard(box, self.clock)
         self.limiter = LoginRateLimiter(self.clock)
+        self.users = UserAdmin(sessions=sessions, bus=bus, clock=self.clock)
         # session id -> until when consoles are allowed without a new TOTP code
         self._console_ok: dict[int, datetime] = {}
 
@@ -162,7 +116,7 @@ class AuthService:
         self.limiter.check(*keys)
         async with self.sessions() as session, session.begin():
             user = await session.scalar(select(User).where(User.username == username))
-            valid = verify_password(user.password_hash if user else _dummy_hash(), password)
+            valid = verify_password(user.password_hash if user else dummy_hash(), password)
             if not user or not valid or user.disabled:
                 self.limiter.failure(*keys)
                 self.bus.publish("auth.login_failed", username=username, ip=ip)
@@ -170,7 +124,7 @@ class AuthService:
             if user.totp_enabled:
                 if not totp_code:
                     raise TotpRequiredError("TOTP code required")
-                if not self._check_second_factor(user, totp_code):
+                if not self.totp.check(user, totp_code):
                     self.limiter.failure(*keys)
                     self.bus.publish("auth.login_failed", username=username, ip=ip, step="totp")
                     raise InvalidCredentialsError("invalid TOTP code")
@@ -179,33 +133,11 @@ class AuthService:
                 user.password_hash = hash_password(password)
             now = self.clock.now()
             user.last_login_at = now
-            token = secrets.token_urlsafe(32)
-            record = Session(
-                user_id=user.id, token_hash=hash_token(token),
-                csrf_token=secrets.token_urlsafe(24), ip=ip,
-                user_agent=(user_agent or "")[:300] or None, created_at=now, last_seen_at=now,
-                expires_at=now + timedelta(days=self.settings.session_max_days),
-            )  # fmt: skip
+            record, token = new_session(user, ip=ip, user_agent=user_agent, now=now,
+                                        max_days=self.settings.session_max_days)  # fmt: skip
             session.add(record)
         self.bus.publish("auth.login", user_id=user.id, username=user.username, ip=ip)
         return LoginResult(user, record, token)
-
-    def _accept_totp(self, user: User, code: str) -> bool:
-        """A valid code not used before (replay of an observed code refused)."""
-        step = totp_step(self._totp_secret(user), code, self.clock.now())
-        if step is None or step <= self._totp_used.get(user.id, -1):
-            return False
-        self._totp_used[user.id] = step
-        return True
-
-    def _check_second_factor(self, user: User, code: str) -> bool:
-        if self._accept_totp(user, code):
-            return True
-        index = match_recovery_code(code, user.recovery_codes)
-        if index is None:
-            return False
-        user.recovery_codes = [h for i, h in enumerate(user.recovery_codes) if i != index]
-        return True
 
     async def authenticate(self, token: str) -> tuple[User, Session] | None:
         now = self.clock.now()
@@ -224,7 +156,7 @@ class AuthService:
             ):
                 await session.delete(record)
                 return None
-            if now - record.last_seen_at >= _LAST_SEEN_RESOLUTION:
+            if now - record.last_seen_at >= LAST_SEEN_RESOLUTION:
                 record.last_seen_at = now
             return user, record
 
@@ -232,6 +164,13 @@ class AuthService:
         async with self.sessions() as session, session.begin():
             await session.execute(delete(Session).where(Session.id == session_id))
         self.bus.publish("auth.logout")
+
+    async def list_sessions(self, user_id: int) -> list[Session]:
+        async with self.sessions() as session:
+            rows = await session.scalars(
+                select(Session).where(Session.user_id == user_id).order_by(Session.id.desc())
+            )
+            return list(rows)
 
     # --- console re-confirmation ---------------------------------------------
     def recently_confirmed(self, session_id: int, totp_enabled: bool) -> bool:
@@ -249,8 +188,8 @@ class AuthService:
 
     async def confirm_console(self, user_id: int, session_id: int, code: str) -> None:
         async with self.sessions() as session, session.begin():
-            user = await self._user(session, user_id)
-            if user.totp_enabled and not self._check_second_factor(user, code):
+            user = await get_user(session, user_id)
+            if user.totp_enabled and not self.totp.check(user, code):
                 raise InvalidCredentialsError("invalid TOTP code")
         self._console_ok[session_id] = self.clock.now() + CONSOLE_CONFIRMATION
 
@@ -259,32 +198,29 @@ class AuthService:
         self, user_id: int, current: str, new: str, *, keep_session: int | None = None
     ) -> None:
         async with self.sessions() as session, session.begin():
-            user = await self._user(session, user_id)
+            user = await get_user(session, user_id)
             if not verify_password(user.password_hash, current):
                 raise InvalidCredentialsError("current password is wrong")
             check_password_policy(new, user.username)
             user.password_hash = hash_password(new)
             user.must_change_password = False
-            await self._revoke_sessions(session, user.id, keep=keep_session)
+            await revoke_sessions(session, user.id, keep=keep_session)
         self.bus.publish("auth.password_changed", user_id=user_id)
 
     async def totp_enroll(self, user_id: int) -> TotpEnrollment:
-        secret = generate_totp_secret()
         async with self.sessions() as session, session.begin():
-            user = await self._user(session, user_id)
+            user = await get_user(session, user_id)
             if user.totp_enabled:
                 raise ConflictError("TOTP already enabled")
-            sealed = self.box.seal(Purpose.TOTP, secret, f"user:{user.id}")
-            user.totp_ciphertext, user.totp_nonce = sealed.ciphertext, sealed.nonce
-            return TotpEnrollment(secret, provisioning_uri(secret, user.username))
+            return self.totp.enroll(user)
 
     async def totp_confirm(self, user_id: int, code: str) -> list[str]:
         """Enable TOTP after a first valid code; returns the recovery codes (shown once)."""
         async with self.sessions() as session, session.begin():
-            user = await self._user(session, user_id)
+            user = await get_user(session, user_id)
             if user.totp_enabled or user.totp_ciphertext is None:
                 raise ConflictError("no TOTP enrollment in progress")
-            if not self._accept_totp(user, code):
+            if not self.totp.accept(user, code):
                 raise InvalidCredentialsError("invalid TOTP code")
             codes = generate_recovery_codes()
             user.recovery_codes = [hash_recovery_code(c) for c in codes]
@@ -294,131 +230,8 @@ class AuthService:
 
     async def totp_disable(self, user_id: int, password: str) -> None:
         async with self.sessions() as session, session.begin():
-            user = await self._user(session, user_id)
+            user = await get_user(session, user_id)
             if not verify_password(user.password_hash, password):
                 raise InvalidCredentialsError("password is wrong")
-            _clear_totp(user)
+            clear_totp(user)
         self.bus.publish("auth.totp_disabled", user_id=user_id)
-
-    # --- administration -----------------------------------------------------
-    async def list_users(self) -> list[User]:
-        async with self.sessions() as session:
-            return list(await session.scalars(select(User).order_by(User.username)))
-
-    async def create_user(self, username: str, role: Role, password: str) -> User:
-        username = validate_username(username)
-        check_password_policy(password, username)
-        async with self.sessions() as session, session.begin():
-            if await session.scalar(select(User.id).where(User.username == username)):
-                raise ConflictError("username already taken", field="username")
-            user = User(
-                username=username,
-                password_hash=hash_password(password),
-                role=role,
-                must_change_password=True,
-                created_at=self.clock.now(),
-            )
-            session.add(user)
-        self.bus.publish("user.created", target=username, role=role.value)
-        return user
-
-    async def update_user(
-        self, user_id: int, *, role: Role | None = None, disabled: bool | None = None
-    ) -> User:
-        async with self.sessions() as session, session.begin():
-            user = await self._user(session, user_id)
-            new_role = role if role is not None else user.role
-            new_disabled = disabled if disabled is not None else user.disabled
-            if (
-                user.role is Role.ADMIN
-                and not user.disabled
-                and (new_role is not Role.ADMIN or new_disabled)
-            ):
-                await self._ensure_other_admin(session, user.id)
-            user.role, user.disabled = new_role, new_disabled
-            if new_disabled:
-                await self._revoke_sessions(session, user.id)
-        self.bus.publish(
-            "user.updated", target=user.username, role=user.role.value, disabled=user.disabled
-        )
-        return user
-
-    async def reset_password(self, user_id: int, temporary: str) -> None:
-        async with self.sessions() as session, session.begin():
-            user = await self._user(session, user_id)
-            check_password_policy(temporary, user.username)
-            user.password_hash = hash_password(temporary)
-            user.must_change_password = True
-            await self._revoke_sessions(session, user.id)
-        self.bus.publish("user.password_reset", target=user.username)
-
-    async def reset_totp(self, user_id: int) -> None:
-        async with self.sessions() as session, session.begin():
-            user = await self._user(session, user_id)
-            _clear_totp(user)
-        self.bus.publish("user.totp_reset", target=user.username)
-
-    async def delete_user(self, user_id: int, *, acting_user_id: int) -> None:
-        if user_id == acting_user_id:
-            raise ConflictError("you cannot delete your own account")
-        async with self.sessions() as session, session.begin():
-            user = await self._user(session, user_id)
-            if user.role is Role.ADMIN and not user.disabled:
-                await self._ensure_other_admin(session, user.id)
-            await session.delete(user)
-        self.bus.publish("user.deleted", target=user.username)
-
-    async def list_sessions(self, user_id: int) -> list[Session]:
-        async with self.sessions() as session:
-            rows = await session.scalars(
-                select(Session).where(Session.user_id == user_id).order_by(Session.id.desc())
-            )
-            return list(rows)
-
-    async def revoke_sessions(self, user_id: int, *, keep: int | None = None) -> None:
-        async with self.sessions() as session, session.begin():
-            user = await self._user(session, user_id)
-            await self._revoke_sessions(session, user.id, keep=keep)
-        self.bus.publish("user.sessions_revoked", target=user.username)
-
-    # --- helpers --------------------------------------------------------------
-    async def _user(self, session: AsyncSession, user_id: int) -> User:
-        user = await session.get(User, user_id)
-        if user is None:
-            raise UserNotFoundError(str(user_id))
-        return user
-
-    async def _ensure_other_admin(self, session: AsyncSession, user_id: int) -> None:
-        others = await session.scalar(
-            select(func.count(User.id)).where(
-                User.role == Role.ADMIN, User.disabled.is_(False), User.id != user_id
-            )
-        )
-        if not others:
-            raise LastAdminError("at least one active admin is required")
-
-    @staticmethod
-    async def _revoke_sessions(
-        session: AsyncSession, user_id: int, keep: int | None = None
-    ) -> None:
-        query = delete(Session).where(Session.user_id == user_id)
-        if keep is not None:
-            query = query.where(Session.id != keep)
-        await session.execute(query)
-
-    def _totp_secret(self, user: User) -> str:
-        if user.totp_ciphertext is None or user.totp_nonce is None:
-            raise HivoraError("TOTP not configured")
-        return self.box.open(
-            Purpose.TOTP, Sealed(user.totp_nonce, user.totp_ciphertext), f"user:{user.id}"
-        )
-
-
-def _clear_totp(user: User) -> None:
-    user.totp_enabled = False
-    user.totp_ciphertext = user.totp_nonce = None
-    user.recovery_codes = []
-
-
-def csrf_matches(expected: str, provided: str | None) -> bool:
-    return provided is not None and hmac.compare_digest(expected, provided)
