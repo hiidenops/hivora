@@ -12,6 +12,7 @@ import { CollapsibleCard } from "@/components/collapsible-card";
 import { Input, Label, Switch } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type GameCaps, type GameLists, type JobRef, type Players } from "@/lib/api/client";
+import { keys } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 
 import { WorldsCard } from "./worlds-card";
@@ -19,7 +20,7 @@ import { WorldsCard } from "./worlds-card";
 /** Players online, polled every 15 s while the server runs (shared cache key). */
 export function usePlayers(appId: number, enabled: boolean) {
   return useQuery({
-    queryKey: ["apps", appId, "game", "players"],
+    queryKey: [...keys.game(appId), "players"],
     queryFn: () => api<Players>(`/apps/${appId}/game/players`),
     refetchInterval: enabled ? 15_000 : false,
     enabled,
@@ -145,7 +146,7 @@ function ListsCard({ appId, onJob }: { appId: number; onJob: (id: number) => voi
   const { t, l, errorMessage } = useI18n();
   const { can } = useSession();
   const qc = useQueryClient();
-  const key = ["apps", appId, "game", "lists"];
+  const key = [...keys.game(appId), "lists"];
   const { data } = useQuery({ queryKey: key, queryFn: () => api<GameLists>(`/apps/${appId}/game/lists`) });
   const refresh = () => qc.invalidateQueries({ queryKey: key });
   // Shows the requested on/off state right away; the server applies it on restart.

@@ -35,6 +35,11 @@ export const keys = {
   // container state change.
   siteHosts: ["site-hosts"] as const,
   siteFiles: ["site-files"] as const,
+  // Topology, VPN and game panels: not under "apps" (refreshed by invalidateAppViews when
+  // an app changes state or a job of it ends, not on every apps list refresh).
+  topology: ["topology"] as const,
+  vpn: (id: number) => ["vpn", id] as const,
+  game: (id: number) => ["game", id] as const,
   templates: ["templates"] as const,
   template: (slug: string) => ["templates", slug] as const,
   jobs: ["jobs"] as const,
@@ -43,6 +48,36 @@ export const keys = {
   zones: ["zones"] as const,
   audit: ["audit"] as const,
 };
+
+/** Ids of the app `slug` among the apps in cache (the list, a detail page). */
+function cachedAppIds(qc: QueryClient, slug: string): number[] {
+  const ids = new Set<number>();
+  for (const [, data] of qc.getQueriesData<unknown>({ queryKey: keys.apps })) {
+    for (const row of Array.isArray(data) ? data : [data]) {
+      const app = row as { id?: unknown; slug?: unknown } | null;
+      if (app?.slug === slug && typeof app.id === "number") ids.add(app.id);
+    }
+  }
+  return [...ids];
+}
+
+/** One app's VPN and game panels read again. */
+export function invalidateAppPanels(qc: QueryClient, id: number) {
+  void qc.invalidateQueries({ queryKey: keys.vpn(id) });
+  void qc.invalidateQueries({ queryKey: keys.game(id) });
+}
+
+/** The app `slug` changed state or a job of it ended: the topology and that app's panels
+ *  read again (every app's when the slug is unknown, e.g. the state snapshot on reconnect). */
+export function invalidateAppViews(qc: QueryClient, slug: string | undefined) {
+  void qc.invalidateQueries({ queryKey: keys.topology });
+  if (slug === undefined) {
+    void qc.invalidateQueries({ queryKey: ["vpn"] });
+    void qc.invalidateQueries({ queryKey: ["game"] });
+    return;
+  }
+  for (const id of cachedAppIds(qc, slug)) invalidateAppPanels(qc, id);
+}
 
 /** A job of the app `slug` ended: its hosted sites and their files read again, no other
  *  host's (the hosts in cache tell which app ids that slug is). */
@@ -167,6 +202,7 @@ export function useMoveZone(appId: number) {
     mutationFn: (zone: string | null) => api<JobRef>(`/apps/${appId}/zone`, { method: "PUT", body: { zone } }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.app(appId) });
+      invalidateAppPanels(qc, appId);
       void qc.invalidateQueries({ queryKey: keys.zones });
     },
   });
@@ -248,6 +284,9 @@ export function useUpdateSettings(id: number) {
   return useMutation({
     mutationFn: ({ inputs, resetData, overrides }: { inputs: Record<string, unknown>; resetData: boolean; overrides?: unknown }) =>
       api<JobRef>(`/apps/${id}/settings`, { method: "PUT", body: { inputs, reset_data: resetData, overrides } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.app(id) }),
+    onSuccess: () => {
+      invalidateAppPanels(qc, id);
+      return qc.invalidateQueries({ queryKey: keys.app(id) }); // awaited, as before
+    },
   });
 }

@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 
-import { invalidateSitesOf, keys } from "@/lib/api/hooks";
+import { invalidateAppViews, invalidateSitesOf, keys } from "@/lib/api/hooks";
 import type { AppStatus, HostSample } from "@/lib/api/client";
 
 export interface LiveJob {
@@ -38,7 +38,7 @@ class RealtimeStore {
   private retry = 0;
   private closed = false;
   onJobFinished: ((msg: Message) => void) | null = null;
-  onAppChanged: (() => void) | null = null;
+  onAppChanged: ((msg: Message) => void) | null = null;
   connected = false;
   statuses: Record<string, AppStatus> = {};
   jobs: Record<number, LiveJob> = {};
@@ -164,7 +164,7 @@ class RealtimeStore {
     } else if (msg.channel === "state") {
       if (msg.type === "snapshot") this.statuses = msg.apps as Record<string, AppStatus>;
       else this.statuses = { ...this.statuses, [msg.app as string]: msg.status as AppStatus };
-      this.onAppChanged?.();
+      this.onAppChanged?.(msg);
     } else if (msg.channel === "jobs" && typeof msg.id === "number" && this.watchedJobs.has(msg.id)) {
       if (msg.type === "started") this.updateJob(msg.id, { status: "running" });
       if (msg.type === "progress")
@@ -194,8 +194,12 @@ export function RealtimeProvider({ enabled, children }: { enabled: boolean; chil
       void qc.invalidateQueries({ queryKey: keys.apps });
       void qc.invalidateQueries({ queryKey: keys.jobs });
       invalidateSitesOf(qc, msg.app as string | undefined);
+      invalidateAppViews(qc, msg.app as string | undefined);
     };
-    s.onAppChanged = () => void qc.invalidateQueries({ queryKey: keys.apps });
+    s.onAppChanged = (msg) => {
+      void qc.invalidateQueries({ queryKey: keys.apps });
+      invalidateAppViews(qc, msg.type === "app" ? (msg.app as string) : undefined); // else: snapshot
+    };
     s.connect();
     return () => s.disconnect();
   }, [enabled, qc]);

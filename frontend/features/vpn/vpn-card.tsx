@@ -12,7 +12,7 @@ import { Input, Switch } from "@/components/ui/input";
 import { units } from "@/features/activity/host-charts";
 import { api, type JobRef } from "@/lib/api/client";
 import type { components } from "@/lib/api/schema";
-import { useZones } from "@/lib/api/hooks";
+import { keys, useZones } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 
 type Vpn = components["schemas"]["VpnOut"];
@@ -123,7 +123,7 @@ function ClientSettings({ appId, client, vpn, zones, onSaved }: { appId: number;
 export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) => void }) {
   const { t, lang, errorMessage } = useI18n();
   const qc = useQueryClient();
-  const key = ["apps", appId, "vpn"];
+  const key = keys.vpn(appId);
   const { data, error } = useQuery({ queryKey: key, queryFn: () => api<Vpn>(`/apps/${appId}/vpn`), refetchInterval: 15_000 });
   const { data: zones } = useZones();
   const refresh = () => qc.invalidateQueries({ queryKey: key });

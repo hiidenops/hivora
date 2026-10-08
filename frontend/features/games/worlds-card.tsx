@@ -13,6 +13,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { units } from "@/features/activity/host-charts";
 import { ApiError, api, upload, type JobRef, type Worlds } from "@/lib/api/client";
+import { keys } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 
 const MAX_UPLOAD = 10 * 1024 ** 3; // same cap as the backend
@@ -124,7 +125,7 @@ export function WorldsCard({
   const { t, lang, errorMessage } = useI18n();
   const { can } = useSession();
   const qc = useQueryClient();
-  const key = ["apps", appId, "game", "worlds"];
+  const key = [...keys.game(appId), "worlds"];
   const { data, error } = useQuery({ queryKey: key, queryFn: () => api<Worlds>(`/apps/${appId}/game/worlds`) });
   const u = units(lang);
   const act = useMutation({

@@ -7,7 +7,7 @@ import { DiffView } from "@/components/diff-view";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { api, type JobRef } from "@/lib/api/client";
-import { keys } from "@/lib/api/hooks";
+import { invalidateAppPanels, keys } from "@/lib/api/hooks";
 import type { components } from "@/lib/api/schema";
 import { useI18n } from "@/lib/i18n";
 
@@ -28,6 +28,7 @@ export function ComposeEditor({ appId, initial, onJob, onClose }: { appId: numbe
     onSuccess: (job) => {
       onJob(job.id);
       void qc.invalidateQueries({ queryKey: keys.app(appId) });
+      invalidateAppPanels(qc, appId);
       onClose();
     },
   });

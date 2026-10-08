@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/components/app-shell";
 import { Alert } from "@/components/ui/alert";
 import { api } from "@/lib/api/client";
+import { keys } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 
 import { applyChanges, changeKey, upsert, type Change } from "./changes";
@@ -32,7 +33,6 @@ import { nodeTypes } from "./nodes";
 import { PendingPanel } from "./pending-panel";
 import { Toolbar } from "./toolbar";
 
-const KEY = ["apps", "topology"]; // under "apps": refreshed whenever an app changes
 const MAX_DETAILED = 150;
 const PENDING = "hivora.topology.pending"; // prepared changes survive refreshes
 
@@ -41,7 +41,7 @@ function Canvas() {
   const { can } = useSession();
   const canEdit = can("operator");
   const qc = useQueryClient();
-  const { data: graph, error } = useQuery({ queryKey: KEY, queryFn: () => api<Graph>("/topology"), refetchInterval: 60_000 });
+  const { data: graph, error } = useQuery({ queryKey: keys.topology, queryFn: () => api<Graph>("/topology"), refetchInterval: 60_000 });
   const [level, setLevel] = useState<Level>("apps");
   const [selected, setSelected] = useState<string | null>(null);
   const [changes, setChangesState] = useState<Change[]>(() => {
@@ -68,7 +68,7 @@ function Canvas() {
   const [showPending, setShowPending] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const refresh = () => qc.invalidateQueries({ queryKey: KEY });
+  const refresh = () => qc.invalidateQueries({ queryKey: keys.topology });
 
   const tooBig = (graph?.nodes.length ?? 0) > MAX_DETAILED;
   const effective: Level = tooBig ? "zones" : level;
