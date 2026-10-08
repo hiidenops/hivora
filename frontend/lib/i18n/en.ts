@@ -613,6 +613,7 @@ export const en: Record<MessageKey, string> = {
   "job.status.cancelled": "Cancelled",
   "job.status.interrupted": "Interrupted",
   "job.log": "Log",
+  "job.toasts": "Jobs in progress",
   "job.cancel": "Cancel task",
 
   "activity.title": "Activity",

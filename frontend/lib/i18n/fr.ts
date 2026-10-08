@@ -612,6 +612,7 @@ export const fr = {
   "job.status.cancelled": "Annulé",
   "job.status.interrupted": "Interrompu",
   "job.log": "Journal",
+  "job.toasts": "Suivi des tâches",
   "job.cancel": "Annuler la tâche",
 
   "activity.title": "Activité",

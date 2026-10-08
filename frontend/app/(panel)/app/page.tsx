@@ -7,10 +7,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
 import { PageHeader, useSession } from "@/components/app-shell";
-import { JobProgress } from "@/components/job-progress";
+import { useTrackJob } from "@/components/job-toasts";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppActions } from "@/features/apps/app-actions";
 import { AppUsage } from "@/features/apps/app-usage";
@@ -30,8 +29,8 @@ const UpgradeBanner = dynamic(() => import("@/features/apps/change-dialog").then
 const AdvancedCards = dynamic(() => import("@/features/apps/advanced-cards").then((m) => m.AdvancedCards));
 const HostedSitesCard = dynamic(() => import("@/features/hosting/hosted-sites-card").then((m) => m.HostedSitesCard));
 import { ApiError } from "@/lib/api/client";
-import { useApp, useJob } from "@/lib/api/hooks";
-import { useI18n, type MessageKey } from "@/lib/i18n";
+import { useApp } from "@/lib/api/hooks";
+import { useI18n } from "@/lib/i18n";
 import { useLiveStatus } from "@/lib/realtime";
 
 function AppDetail() {
@@ -40,9 +39,8 @@ function AppDetail() {
   const { advanced, can } = useSession();
   const id = Number(useSearchParams().get("id") ?? 0);
   const { data: app, error } = useApp(id);
-  const [activeJob, setActiveJob] = useState<number | null>(null);
+  const setActiveJob = useTrackJob(); // followed in a pop-up
   const [removing, setRemoving] = useState(false);
-  const { data: active } = useJob(activeJob);
   const status = useLiveStatus(app?.slug ?? "", app?.status ?? "missing");
   // Removal deletes the app before its job ends: a 404 then means "removed", not an error
   // (the job card, which redirects when the job ends, would be gone with the page).
@@ -92,7 +90,7 @@ function AppDetail() {
                 name={app.name}
                 onJob={(jobId) => {
                   setRemoving(true);
-                  setActiveJob(jobId);
+                  setActiveJob(jobId, (s) => s === "succeeded" && router.replace("/"));
                 }}
               />
             )}
@@ -100,19 +98,6 @@ function AppDetail() {
         }
       />
       <div className="stagger grid items-start gap-4 lg:grid-cols-2">
-        {activeJob && (
-          <Card className="animate-enter lg:col-span-2">
-            <CardHeader>
-              <CardTitle>{active ? t(`job.kind.${active.kind}` as MessageKey) : t("common.loading")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <JobProgress
-                jobId={activeJob}
-                onFinished={(s) => removing && s === "succeeded" && router.replace("/")}
-              />
-            </CardContent>
-          </Card>
-        )}
         <StatusHero app={app} status={status} />
         {can("operator") && app.template && <UpgradeBanner appId={app.id} onJob={setActiveJob} />}
         {app.template === "nginx" && <HostedSitesCard appId={app.id} hosting={app.hosting} onJob={setActiveJob} />}

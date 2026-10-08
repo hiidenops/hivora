@@ -148,6 +148,36 @@ label:has(> span > input:not(:disabled)) {
 }
 
 /* ---- Motion: short, purposeful, and off when the user asks for less. ---- */
+@keyframes hv-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+/* Job pop-ups: a springy rise in, a little wind-up then a slide out; status icon pop. */
+@keyframes hv-toast-in {
+  0% { opacity: 0; transform: translate3d(0, 32px, 0) scale(0.9); }
+  55% { opacity: 1; transform: translate3d(0, -7px, 0) scale(1.02); }
+  78% { transform: translate3d(0, 2px, 0) scale(0.995); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes hv-toast-out {
+  0% { opacity: 1; transform: none; }
+  28% { opacity: 1; transform: translate3d(-8px, 0, 0) scale(1.015); }
+  100% { opacity: 0; transform: translate3d(115%, 0, 0) scale(0.92); }
+}
+@keyframes hv-pop {
+  0% { opacity: 0; transform: scale(0) rotate(-30deg); }
+  55% { opacity: 1; transform: scale(1.3) rotate(8deg); }
+  75% { transform: scale(0.9) rotate(-3deg); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes hv-shake {
+  0%, 100% { transform: none; }
+  18% { transform: translateX(-6px) rotate(-0.6deg); }
+  36% { transform: translateX(5px) rotate(0.5deg); }
+  54% { transform: translateX(-3px); }
+  72% { transform: translateX(2px); }
+}
+
 @keyframes hv-enter {
   from { opacity: 0; transform: translateY(10px) scale(0.99); }
   to { opacity: 1; transform: none; }
@@ -176,6 +206,10 @@ label:has(> span > input:not(:disabled)) {
 }
 
 @utility animate-enter { animation: hv-enter 420ms var(--ease-out) both; }
+@utility animate-toast-in { animation: hv-toast-in 620ms var(--ease-out) both; }
+@utility animate-toast-out { animation: hv-toast-out 420ms cubic-bezier(0.55, 0, 0.75, 0.2) forwards; }
+@utility animate-pop { animation: hv-pop 560ms var(--ease-out) both; }
+@utility animate-shake { animation: hv-shake 460ms var(--ease-out) both; }
 /* Children appear one after another (cards of a page, form sections). */
 @utility stagger {
   & > * { animation: hv-enter 460ms var(--ease-out) both; }

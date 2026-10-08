@@ -14,6 +14,7 @@ import { RealtimeProvider, useConnected } from "@/lib/realtime";
 import { cn } from "@/lib/utils";
 
 import { Brand } from "./brand";
+import { JobToasts } from "./job-toasts";
 import { ShelfCat } from "./shelf-cat";
 
 const LEVEL: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
@@ -93,55 +94,58 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <SessionContext.Provider value={session}>
       <RealtimeProvider enabled>
-        <div className="flex min-h-screen flex-col md:flex-row">
-          <aside className="relative z-10 flex shrink-0 flex-col gap-1 border-b bg-sidebar p-3 shadow-md md:sticky md:top-0 md:h-screen md:w-56 md:overflow-x-hidden md:overflow-y-auto md:border-b-0 md:border-r">
-            <Link href="/" aria-label={t("app.name")} className="mb-4 rounded-md px-2 py-3">
-              <Brand />
-            </Link>
-            <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
-              {NAV.filter((n) => session.can(n.role)).map((n) => {
-                const active =
-                  n.href === "/" ? pathname === "/" : pathname.startsWith(n.href) || (!!n.also && pathname.startsWith(n.also));
-                return (
-                  <Link
-                    key={n.href}
-                    href={n.href}
-                    className={cn(
-                      "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-[background-color,color,box-shadow,translate] duration-200 ease-(--ease-out)",
-                      active
-                        ? "surface font-medium before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary"
-                        : "text-muted-foreground hover:translate-x-0.5 hover:bg-muted hover:text-foreground",
-                    )}
+        {/* Above <main>, keyed by page: a job's pop-up stays when the page changes. */}
+        <JobToasts>
+          <div className="flex min-h-screen flex-col md:flex-row">
+            <aside className="relative z-10 flex shrink-0 flex-col gap-1 border-b bg-sidebar p-3 shadow-md md:sticky md:top-0 md:h-screen md:w-56 md:overflow-x-hidden md:overflow-y-auto md:border-b-0 md:border-r">
+              <Link href="/" aria-label={t("app.name")} className="mb-4 rounded-md px-2 py-3">
+                <Brand />
+              </Link>
+              <nav className="flex gap-1 overflow-x-auto md:flex-col md:overflow-visible">
+                {NAV.filter((n) => session.can(n.role)).map((n) => {
+                  const active =
+                    n.href === "/" ? pathname === "/" : pathname.startsWith(n.href) || (!!n.also && pathname.startsWith(n.also));
+                  return (
+                    <Link
+                      key={n.href}
+                      href={n.href}
+                      className={cn(
+                        "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-[background-color,color,box-shadow,translate] duration-200 ease-(--ease-out)",
+                        active
+                          ? "surface font-medium before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary"
+                          : "text-muted-foreground hover:translate-x-0.5 hover:bg-muted hover:text-foreground",
+                      )}
+                    >
+                      <n.icon className="size-4 shrink-0" /> {t(n.label)}
+                    </Link>
+                  );
+                })}
+              </nav>
+              <div className="mt-auto hidden flex-col gap-3 px-2 pt-6 md:flex">
+                <ShelfCat />
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={advanced} onChange={(e) => session.setAdvanced(e.target.checked)} />
+                  {t("nav.advanced")}
+                </label>
+                <ConnectionDot />
+                <div className="flex items-center justify-between text-sm">
+                  <span className="truncate font-medium">{me.username}</span>
+                  <button
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label={t("nav.logout")}
+                    title={t("nav.logout")}
+                    onClick={() => logout.mutate(undefined, { onSettled: () => router.replace("/login/") })}
                   >
-                    <n.icon className="size-4 shrink-0" /> {t(n.label)}
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="mt-auto hidden flex-col gap-3 px-2 pt-6 md:flex">
-              <ShelfCat />
-              <label className="flex items-center gap-2 text-sm">
-                <Switch checked={advanced} onChange={(e) => session.setAdvanced(e.target.checked)} />
-                {t("nav.advanced")}
-              </label>
-              <ConnectionDot />
-              <div className="flex items-center justify-between text-sm">
-                <span className="truncate font-medium">{me.username}</span>
-                <button
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label={t("nav.logout")}
-                  title={t("nav.logout")}
-                  onClick={() => logout.mutate(undefined, { onSettled: () => router.replace("/login/") })}
-                >
-                  <LogOut className="size-4" />
-                </button>
+                    <LogOut className="size-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-          </aside>
-          <main key={pathname} className="animate-enter min-w-0 flex-1 p-4 md:p-8">
-            {children}
-          </main>
-        </div>
+            </aside>
+            <main key={pathname} className="animate-enter min-w-0 flex-1 p-4 md:p-8">
+              {children}
+            </main>
+          </div>
+        </JobToasts>
       </RealtimeProvider>
     </SessionContext.Provider>
   );

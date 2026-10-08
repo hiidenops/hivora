@@ -2,13 +2,12 @@
 
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 
 import { PageHeader, useSession } from "@/components/app-shell";
+import { useTrackJob } from "@/components/job-toasts";
 import { Button } from "@/components/ui/button";
 import { TileSkeletons } from "@/components/ui/skeleton";
 import { HostedSitesCard } from "@/features/hosting/hosted-sites-card";
-import { JobsCard } from "@/features/sites/jobs-card";
 import { useApps } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 
@@ -17,7 +16,7 @@ export default function SitesPage() {
   const { t } = useI18n();
   const { can } = useSession();
   const { data: apps, isPending } = useApps();
-  const [jobs, setJobs] = useState<number[]>([]);
+  const follow = useTrackJob(); // in a pop-up
   const hosts = apps?.filter((a) => a.template === "nginx") ?? [];
   // One request per nginx that hosts sites (GET /apps/{id}/sites); none for the others.
   const deploy = (
@@ -32,7 +31,6 @@ export default function SitesPage() {
     <>
       <PageHeader title={t("sites.title")} actions={can("operator") && deploy} />
       <p className="mb-6 max-w-2xl text-sm text-muted-foreground">{t("sites.intro")}</p>
-      <JobsCard jobs={jobs} className="animate-enter mb-6" />
       {isPending && <TileSkeletons label={t("common.loading")} count={2} />}
       {apps && hosts.length === 0 && (
         <div className="surface grid justify-items-start gap-3 rounded-xl border p-6">
@@ -42,7 +40,7 @@ export default function SitesPage() {
       )}
       <div className="stagger grid gap-4">
         {hosts.map((a) => (
-          <HostedSitesCard key={a.id} appId={a.id} hosting={a.hosting} title={a.name} onJob={(id) => setJobs([id])} />
+          <HostedSitesCard key={a.id} appId={a.id} hosting={a.hosting} title={a.name} onJob={(id) => follow(id)} />
         ))}
       </div>
     </>

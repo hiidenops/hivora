@@ -10,7 +10,11 @@ import { useLiveJob } from "@/lib/realtime";
 const TERMINAL = new Set(["succeeded", "failed", "cancelled", "interrupted"]);
 
 /** Live progress of a job: WebSocket first, with the REST record as the source of truth. */
-export function JobProgress({ jobId, onFinished }: { jobId: number; onFinished?: (status: string) => void }) {
+export function JobProgress({ jobId, onFinished, compact = false }: {
+  jobId: number;
+  onFinished?: (status: string) => void;
+  compact?: boolean; // a shorter log (in a pop-up)
+}) {
   const { t } = useI18n();
   const live = useLiveJob(jobId);
   const liveDone = !!live && TERMINAL.has(live.status);
@@ -59,8 +63,8 @@ export function JobProgress({ jobId, onFinished }: { jobId: number; onFinished?:
             status === "failed"
               ? "h-full bg-danger"
               : done
-                ? "h-full bg-ok transition-all duration-500"
-                : "progress-active h-full bg-primary transition-all duration-500"
+                ? "h-full bg-ok transition-[width,background-color] duration-700 ease-(--ease-out)"
+                : "progress-active h-full bg-primary transition-[width,background-color] duration-700 ease-(--ease-out)"
           }
           style={{ width: `${progress}%` }}
         />
@@ -71,7 +75,7 @@ export function JobProgress({ jobId, onFinished }: { jobId: number; onFinished?:
         <summary className="cursor-pointer text-sm text-muted-foreground">{t("job.log")}</summary>
         <pre
           ref={logRef}
-          className="mt-2 h-72 overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-muted p-3 font-mono text-xs"
+          className={`mt-2 overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-muted p-3 font-mono text-xs ${compact ? "h-40" : "h-72"}`}
         >
           {lines.join("\n")}
         </pre>

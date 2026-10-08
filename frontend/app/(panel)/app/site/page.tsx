@@ -3,9 +3,10 @@
 import { ChevronRight, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect } from "react";
 
 import { PageHeader, useSession } from "@/components/app-shell";
+import { useTrackJob } from "@/components/job-toasts";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,6 @@ import { SiteActions, SitePort, SiteSwitch } from "@/features/hosting/site-contr
 import { ContentCard } from "@/features/sites/content-card";
 import { FilesCard } from "@/features/sites/files-card";
 import { siteApi, useSaveSiteFile, useSiteFiles } from "@/features/sites/hooks";
-import { JobsCard } from "@/features/sites/jobs-card";
 import { useI18n } from "@/lib/i18n";
 
 /** One site an nginx hosts (app -> sites): its switch and actions, its content and files, on
@@ -33,7 +33,11 @@ function HostedSiteDetail() {
   const base = siteApi(appId, siteId);
   const { data: files } = useSiteFiles(base);
   const create = useSaveSiteFile(base);
-  const [jobs, setJobs] = useState<number[]>(() => (params.get("job") ? [Number(params.get("job"))] : []));
+  const follow = useTrackJob(); // in a pop-up
+  const startedJob = Number(params.get("job") ?? 0); // the site was just added: its configuration
+  useEffect(() => {
+    if (startedJob) follow(startedJob);
+  }, [startedJob, follow]);
 
   if (error) return <Alert tone="danger">{errorMessage(error)}</Alert>;
   if (isPending) {
@@ -45,7 +49,6 @@ function HostedSiteDetail() {
     );
   }
   if (!host || !site) return <Alert tone="danger">{t("error.site_not_found")}</Alert>;
-  const follow = (jobId: number) => setJobs([jobId]);
 
   return (
     <>
@@ -108,7 +111,6 @@ function HostedSiteDetail() {
         )}
       </div>
       <div className="stagger grid items-start gap-4 lg:grid-cols-2">
-        <JobsCard jobs={jobs} className="animate-enter lg:col-span-2" />
         {can("operator") && <ContentCard base={base} onJob={follow} />}
         <FilesCard base={base} canEdit={can("operator")} onJob={follow} />
       </div>
