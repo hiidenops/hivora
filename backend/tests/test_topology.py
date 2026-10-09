@@ -1,6 +1,6 @@
 from typing import Any
 
-from helpers import API, admin, wait_job
+from helpers import API, admin, nginx_host, wait_job
 
 
 def by_key(graph: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -176,3 +176,26 @@ def test_put_an_app_behind_the_vpn(client: Any) -> None:
     ).items()
     assert any(a["code"] == "unreachable" and a["app"] == "cube" for a in graph["alerts"])
     assert client.delete(f"{API}/apps/{mc_id}").status_code == 202
+
+
+def test_each_hosted_site_is_a_node_linked_from_its_nginx(client: Any) -> None:
+    admin(client)
+    plain = client.post(f"{API}/apps", json={"template": "nginx", "name": "Simple",
+                                             "inputs": {"web_port": 8191}}).json()  # fmt: skip
+    assert wait_job(client, plain["job"]["id"])["status"] == "succeeded"
+    host = nginx_host(client, "Vitrine", 8190)
+    docs = client.post(f"{API}/apps/{host}/sites", json={"name": "Docs", "port": 8096}).json()
+    assert wait_job(client, docs["config_job"]["id"])["status"] == "succeeded"
+
+    graph = client.get(f"{API}/topology").json()
+    sites = [n for n in graph["nodes"] if n["type"] == "site"]
+    assert [(n["label"], n["main"], n["port"], n["enabled"]) for n in sites] == [
+        ("Vitrine", True, 8190, True),
+        ("Docs", False, 8096, True),
+    ]  # the main one first
+    app_key = f"app:{host}"
+    nodes = by_key(graph)
+    assert all(n["host"] == app_key and n["parent"] == nodes[app_key]["parent"] for n in sites)
+    links = [(e["source"], e["target"], e["label"]) for e in graph["edges"] if e["kind"] == "site"]
+    assert links == [(app_key, n["key"], f":{n['port']}") for n in sites]
+    assert not any(n["host"] == f"app:{plain['app']['id']}" for n in sites)  # hosts no sites

@@ -208,6 +208,7 @@ function Canvas() {
         <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1"><span className="inline-block w-6 border-t-2 border-dashed" style={{ borderColor: "var(--danger)" }} /> {t("topology.legend.exposed")}</span>
           <span className="flex items-center gap-1"><span className="inline-block w-6 border-t-2" style={{ borderColor: "var(--ok)" }} /> {t("topology.legend.vpn")}</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-6 border-t-2" style={{ borderColor: "var(--primary)" }} /> {t("topology.legend.site")}</span>
           <span className="flex items-center gap-1"><span className="inline-block w-6 border-t-2 border-dashed" style={{ borderColor: "var(--muted-foreground)" }} /> {t("topology.legend.declared")}</span>
         </div>
         {graph && graph.alerts.length > 0 && (

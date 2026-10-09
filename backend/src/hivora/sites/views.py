@@ -87,6 +87,16 @@ async def site_view(
     return _hosted(row, await _web_port(session, app_id), lan)
 
 
+async def sites_by_host(session: AsyncSession, lan: str | None) -> dict[int, list[HostedSite]]:
+    """Every host's sites (the main one first), by app id: what the topology shows."""
+    rows = list(await session.scalars(select(Site).order_by(Site.app_id, Site.root != "", Site.id)))
+    out: dict[int, list[HostedSite]] = {}
+    for app_id in dict.fromkeys(r.app_id for r in rows):
+        main_port = await _web_port(session, app_id)
+        out[app_id] = [_hosted(r, main_port, lan) for r in rows if r.app_id == app_id]
+    return out
+
+
 async def _web_port(session: AsyncSession, app_id: int) -> int | None:
     """The app's web port: the main site's."""
     web_port = (await core.current_inputs(session, app_id)).get("web_port")

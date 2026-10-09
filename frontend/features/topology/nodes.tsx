@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
-import { Globe, Router, Shield, ShieldCheck, StickyNote, Monitor } from "lucide-react";
+import { Globe, House, Router, Shield, ShieldCheck, StickyNote, Monitor } from "lucide-react";
 
 import { AppIcon } from "@/components/app-icon";
 import type { AppStatus } from "@/lib/api/client";
@@ -45,13 +45,16 @@ const DOT: Record<AppStatus, string> = { healthy: "bg-ok", starting: "bg-info an
 
 export function AppNode({ data, selected }: NodeProps) {
   const { t } = useI18n();
-  const d = data as { label: string; slug: string; status: AppStatus; icon_url: string | null; ports: Port[]; level: string; vpn: boolean; zoneColor?: string | null };
+  const d = data as { label: string; slug: string; status: AppStatus; icon_url: string | null; ports: Port[]; level: string; vpn: boolean; zoneColor?: string | null; sitePorts?: (number | null)[]; hosts?: boolean };
   const status = useLiveStatus(d.slug, d.status);
-  // Published ports always show (how the app is reached); internal ones only at "all".
-  const ports = d.level === "all" ? d.ports : d.ports.filter((p) => p.exposure !== "internal");
+  // Published ports always show (how the app is reached); internal ones only at "all"; the
+  // ports of the sites it hosts show on their own cards.
+  const ports = (d.level === "all" ? d.ports : d.ports.filter((p) => p.exposure !== "internal")).filter((p) => !d.sitePorts?.includes(p.port));
   return (
     <div className={cn("rounded-md border border-l-4 bg-card px-2 py-1.5 shadow-sm", selected && "ring-2 ring-ring", status === "error" && "border-danger")} style={{ borderLeftColor: d.zoneColor ?? "var(--muted-foreground)" }}>
       {handles}
+      {/* Its hosted sites hang from its bottom left, in the gutter beside them. */}
+      {d.hosts && <Handle id="sites" type="source" position={Position.Bottom} style={{ left: 8 }} className="!size-1.5 !bg-primary" />}
       <div className="flex items-center gap-1.5" title={t(`status.${status}`)}>
         <AppIcon src={d.icon_url} name={d.label} className="size-5 rounded" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium">{d.label}</span>
@@ -99,6 +102,30 @@ export function FirewallNode({ data, selected }: NodeProps) {
   );
 }
 
+/** A site an nginx hosts, under it: what a reverse proxy will point at. Dimmed when off. */
+export function SiteNode({ data, selected }: NodeProps) {
+  const { t } = useI18n();
+  const d = data as { label: string; port: number | null; main: boolean; enabled: boolean; server_name: string | null; zoneColor?: string | null };
+  return (
+    <div
+      className={cn(
+        "flex size-full items-center gap-1.5 rounded-md border bg-card px-2 text-xs shadow-sm",
+        !d.enabled && "border-dashed opacity-60",
+        selected && "ring-2 ring-ring",
+      )}
+      title={d.server_name ?? undefined}
+    >
+      <Handle type="target" position={Position.Left} className="!size-1.5 !bg-primary" />
+      <Handle type="source" position={Position.Right} className="!size-1.5 !bg-muted-foreground" />
+      <Globe className="size-3.5 shrink-0 text-primary" />
+      <span className="min-w-0 flex-1 truncate font-medium">{d.label}</span>
+      {d.main && <House aria-label={t("topology.siteMain")} className="size-3 shrink-0 text-muted-foreground"><title>{t("topology.siteMain")}</title></House>}
+      {!d.enabled && <span className="text-[9px] text-muted-foreground">{t("hosting.off")}</span>}
+      {d.port !== null && <span className="font-mono text-[10px] text-muted-foreground">:{d.port}</span>}
+    </div>
+  );
+}
+
 const ICONS = { firewall: Shield, router: Router, vpn: ShieldCheck, device: Monitor, note: StickyNote } as const;
 
 export function DeclaredNode({ data, selected }: NodeProps) {
@@ -117,4 +144,4 @@ export function DeclaredNode({ data, selected }: NodeProps) {
   );
 }
 
-export const nodeTypes = { zone: ZoneNode, app: AppNode, internet: InternetNode, declared: DeclaredNode, firewall: FirewallNode };
+export const nodeTypes = { zone: ZoneNode, app: AppNode, site: SiteNode, internet: InternetNode, declared: DeclaredNode, firewall: FirewallNode };

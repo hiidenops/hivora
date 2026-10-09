@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { deployNginx, signIn } from "./helpers";
+import { adminApi, deployNginx, signIn } from "./helpers";
 
-type Graph = { nodes: { type: string; label?: string; kind?: string }[] };
+type Graph = { nodes: { type: string; label?: string; kind?: string; host?: string }[] };
 
 /** The topology as the API returns it. */
 async function graph(page: Page): Promise<Graph> {
@@ -85,4 +85,19 @@ test("topology: graph, inspector, declared element, prepared change, JSON export
   const exported = JSON.parse(readFileSync((await file.path())!, "utf8")) as Graph;
   expect(exported.nodes.map((n) => n.label)).toContain("Carto");
   expect(exported.nodes.some((n) => n.type === "internet")).toBe(true);
+
+  // Each site an nginx hosts is a node under it, its inspector leading to the site's page.
+  const { headers, done } = await adminApi(page);
+  await page.request.post(`/api/v1/apps/${carto}/sites/hosting`, { headers });
+  const atlas = await (await page.request.post(`/api/v1/apps/${carto}/sites`, { headers, data: { name: "Atlas", port: 8342 } })).json();
+  await done(atlas.config_job.id);
+  await page.reload();
+  await expect(node("Atlas")).toContainText(":8342");
+  await expect(node("Carto").filter({ hasText: ":8340" })).toHaveCount(1); // its main site, port on its card
+  await node("Atlas").click();
+  const site = page.locator("aside").filter({ has: page.getByRole("heading", { name: "Atlas" }) });
+  await expect(site.getByText("Site hébergé par Carto", { exact: false })).toBeVisible();
+  await expect(site.getByRole("link", { name: "Configurer" })).toHaveAttribute("href", `/app/site/?app=${carto}&site=${atlas.site.id}`);
+  const graphSites = (await graph(page)).nodes.filter((n) => n.type === "site" && n.host === `app:${carto}`).map((n) => n.label);
+  expect(graphSites).toEqual(["Carto", "Atlas"]);
 });

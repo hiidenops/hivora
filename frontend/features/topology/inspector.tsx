@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { Trash2, X } from "lucide-react";
+import { ExternalLink, Eye, Settings2, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -123,6 +123,39 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
           <Button size="sm" asChild>
             <Link href={`/app/?id=${node.id}`}>{t("topology.openApp")}</Link>
           </Button>
+        </>
+      )}
+      {node.type === "site" && (
+        <>
+          <p className="text-muted-foreground">
+            {t(node.main ? "topology.siteMainHelp" : "topology.siteHelp", { host: String(nodes.find((n) => n.key === node.host)?.label ?? "") })}
+          </p>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+            <dt className="text-muted-foreground">{t("topology.sitePort")}</dt>
+            <dd className="font-mono">{node.port === null ? "—" : String(node.port)}</dd>
+            {node.server_name ? (
+              <>
+                <dt className="text-muted-foreground">{t("hosting.serverName")}</dt>
+                <dd className="truncate font-mono">{String(node.server_name)}</dd>
+              </>
+            ) : null}
+            <dt className="text-muted-foreground">{t("topology.siteState")}</dt>
+            <dd>{t(node.enabled ? "hosting.on" : "hosting.off")}</dd>
+          </dl>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" asChild>
+              <Link href={`/app/site/?app=${node.app_id}&site=${node.id}`}>
+                {can("operator") ? <Settings2 /> : <Eye />} {t(can("operator") ? "hosting.configure" : "hosting.view")}
+              </Link>
+            </Button>
+            {node.url ? (
+              <Button size="sm" variant="outline" asChild>
+                <a href={String(node.url)} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink /> {t("hosting.open")}
+                </a>
+              </Button>
+            ) : null}
+          </div>
         </>
       )}
       {node.type === "zone" && (

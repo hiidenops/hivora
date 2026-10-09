@@ -20,6 +20,7 @@ from hivora.apps.models import Exposure, Origin
 from hivora.apps.planner import AppPlanner
 from hivora.apps.queries import apps_with_template
 from hivora.hostfw.service import HostFirewall, listening
+from hivora.sites.views import sites_by_host
 from hivora.state import StateStore
 from hivora.templates import Catalog
 from hivora.templates.icons import IconCache
@@ -71,6 +72,7 @@ class GraphBuilder:
             templates = {app.id: slug for app, slug in with_template}  # None: no template
             declared = list(await session.scalars(select(TopologyNode).order_by(TopologyNode.id)))
             links = list(await session.scalars(select(TopologyEdge).order_by(TopologyEdge.id)))
+            hosted = await sites_by_host(session, self.lan_ip)  # nginx app id -> its sites
             graph.positions = {
                 row.key: {"x": row.x, "y": row.y, "w": row.w, "h": row.h}
                 for row in await session.scalars(select(TopologyLayout))
@@ -167,6 +169,18 @@ class GraphBuilder:
                 "vpn_address": _address_on(self.store, app.slug, f"{app.slug}_default")
                 if app.slug in behind else None,
             })  # fmt: skip
+            # The sites this nginx hosts: a node each, next to it (what a reverse proxy will
+            # point at later), linked from the nginx.
+            for site in hosted.get(app.id, []):
+                site_key = f"site:{site.id}"
+                graph.nodes.append({
+                    "key": site_key, "type": "site", "parent": parent, "host": key, "id": site.id,
+                    "app_id": app.id, "label": site.name, "slug": site.slug, "main": site.main,
+                    "port": site.port, "server_name": site.server_name, "enabled": site.enabled,
+                    "url": site.url,
+                })  # fmt: skip
+                graph.edges.append({"source": key, "target": site_key, "kind": "site",
+                                    "label": f":{site.port}" if site.port else ""})  # fmt: skip
             public = [p for p in ports if p["exposure"] == Exposure.PUBLIC.value]
             for p in public:
                 graph.edges.append({"source": INTERNET, "target": key, "kind": "exposed",
