@@ -1,9 +1,9 @@
 "use client";
 
-import { Activity, Boxes, BrickWall, Globe, LayoutGrid, LogOut, Network, Settings, Share2, Users } from "lucide-react";
+import { Activity, Ban, Boxes, BrickWall, Cable, Globe, LayoutDashboard, LayoutGrid, LogOut, Network, Route, Settings, Share2, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { Fragment, createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 import { Switch } from "@/components/ui/input";
 import { ApiError, type Me, type Role } from "@/lib/api/client";
@@ -34,15 +34,27 @@ export function useSession(): Session {
   return ctx;
 }
 
-// `also`: another path under that entry (a site's page belongs to Sites).
-const NAV: { href: string; label: MessageKey; icon: typeof LayoutGrid; role: Role; also?: string }[] = [
+type Entry = { href: string; label: MessageKey; icon: typeof LayoutGrid };
+
+/** The firewall's pages: its tabs, and its entries in the side menu while it is open. */
+export const FIREWALL_TABS: Entry[] = [
+  { href: "/firewall/", label: "fw.tab.overview", icon: LayoutDashboard },
+  { href: "/firewall/ports/", label: "fw.tab.ports", icon: ShieldCheck },
+  { href: "/firewall/connections/", label: "fw.tab.connections", icon: Cable },
+  { href: "/firewall/fail2ban/", label: "fw.tab.fail2ban", icon: Ban },
+  { href: "/firewall/routes/", label: "fw.tab.routes", icon: Route },
+];
+
+// `also`: another path under that entry (a site's page belongs to Sites); `sub`: its pages,
+// listed under it while one is open (wide screens).
+const NAV: (Entry & { role: Role; also?: string; sub?: Entry[] })[] = [
   { href: "/", label: "nav.dashboard", icon: LayoutGrid, role: "viewer" },
   { href: "/catalog/", label: "nav.catalog", icon: Boxes, role: "viewer" },
   { href: "/sites/", label: "nav.sites", icon: Globe, role: "viewer", also: "/app/site/" },
   { href: "/zones/", label: "nav.zones", icon: Network, role: "viewer" },
   { href: "/topology/", label: "nav.topology", icon: Share2, role: "viewer" },
   { href: "/activity/", label: "nav.activity", icon: Activity, role: "viewer" },
-  { href: "/firewall/", label: "nav.firewall", icon: BrickWall, role: "admin" },
+  { href: "/firewall/", label: "nav.firewall", icon: BrickWall, role: "admin", sub: FIREWALL_TABS },
   { href: "/users/", label: "nav.users", icon: Users, role: "admin" },
   { href: "/settings/", label: "nav.settings", icon: Settings, role: "viewer" },
 ];
@@ -106,18 +118,36 @@ export function AppShell({ children }: { children: ReactNode }) {
                   const active =
                     n.href === "/" ? pathname === "/" : pathname.startsWith(n.href) || (!!n.also && pathname.startsWith(n.also));
                   return (
-                    <Link
-                      key={n.href}
-                      href={n.href}
-                      className={cn(
-                        "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-[background-color,color,box-shadow,translate] duration-200 ease-(--ease-out)",
-                        active
-                          ? "surface font-medium before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary"
-                          : "text-muted-foreground hover:translate-x-0.5 hover:bg-muted hover:text-foreground",
+                    <Fragment key={n.href}>
+                      <Link
+                        href={n.href}
+                        className={cn(
+                          "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-[background-color,color,box-shadow,translate] duration-200 ease-(--ease-out)",
+                          active
+                            ? "surface font-medium before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary"
+                            : "text-muted-foreground hover:translate-x-0.5 hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        <n.icon className="size-4 shrink-0" /> {t(n.label)}
+                      </Link>
+                      {active && n.sub && (
+                        <div className="ml-4 hidden flex-col gap-0.5 border-l pl-2 md:flex">
+                          {n.sub.map((e) => (
+                            <Link
+                              key={e.href}
+                              href={e.href}
+                              aria-current={pathname === e.href ? "page" : undefined}
+                              className={cn(
+                                "flex items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors",
+                                pathname === e.href ? "font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                              )}
+                            >
+                              <e.icon className="size-3.5 shrink-0" /> {t(e.label)}
+                            </Link>
+                          ))}
+                        </div>
                       )}
-                    >
-                      <n.icon className="size-4 shrink-0" /> {t(n.label)}
-                    </Link>
+                    </Fragment>
                   );
                 })}
               </nav>

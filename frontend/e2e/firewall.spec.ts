@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 
 import { signIn } from "./helpers";
 
-// The host firewall page: the host agent turned on (after its warning), its UFW section shown
-// (inactive, no rule on the fake host), then turned off again. The API agrees each time.
-test("firewall: host agent turned on, then off", async ({ page }) => {
+// The host firewall pages: the host agent turned on from the overview (after its warning), its
+// tiles, then each section through the tabs; turned off again. The API agrees each time.
+test("firewall: host agent turned on, sections, then off", async ({ page }) => {
   await signIn(page);
   const agent = async () => (await (await page.request.get("/api/v1/host-firewall")).json()).agent;
 
@@ -18,11 +18,45 @@ test("firewall: host agent turned on, then off", async ({ page }) => {
     expect(d.message()).toContain("Activer l'agent hôte ?");
     void d.accept();
   });
+  // What listens, as a host would answer: a Docker app (UFW bypassed) and a local service.
+  await page.route("**/api/v1/host-firewall/listening", (route) =>
+    route.fulfill({ json: [
+      { protocol: "tcp", address: "0.0.0.0", port: 25565, process: "docker-proxy", app: "survie", ufw: "bypassed" },
+      { protocol: "tcp", address: "127.0.0.1", port: 5432, process: "postgres", app: null, ufw: "local" },
+    ] }),
+  ); // prettier-ignore
   await toggle.click(); // controlled: it follows the API, not the click
-  await expect(page.getByRole("heading", { name: "UFW", level: 3 })).toBeVisible();
-  await expect(page.getByRole("switch", { name: "UFW actif" })).not.toBeChecked();
-  await expect(page.getByText("Aucune règle.")).toBeVisible();
+  // The overview: each section at a glance, a link to its page.
+  await expect(page.getByRole("link", { name: "UFW", exact: true })).toContainText("inactif");
+  await expect(page.getByRole("link", { name: "UFW", exact: true })).toContainText("0 règle(s)");
+  const exposed = page.getByRole("link", { name: "Ports exposés" });
+  await expect(exposed).toContainText("1 joignable(s) de l'extérieur");
+  await expect(exposed).toContainText("1 publié(s) par Docker, UFW sans effet");
   expect(await agent()).toBe(true);
+
+  // Ports: what listens now (a badge each, filterable), the UFW rules, a new rule's dialog.
+  const tabs = page.getByRole("navigation", { name: "Sections du pare-feu" });
+  await tabs.getByRole("link", { name: "Ports (UFW)" }).click();
+  await expect(page).toHaveURL(/\/firewall\/ports\/$/);
+  const listening = page.getByRole("region", { name: "En écoute maintenant (en direct)" });
+  await expect(listening.getByRole("row").filter({ hasText: "25565/tcp" })).toContainText("Oui, Docker contourne UFW");
+  await expect(listening.getByRole("row").filter({ hasText: "5432/tcp" })).toContainText("Non, local seulement");
+  await listening.getByRole("button", { name: "Joignables seulement" }).click();
+  await expect(listening.getByText("5432/tcp")).toBeHidden();
+  const rules = page.getByRole("region", { name: "Règles UFW" });
+  await expect(rules.getByRole("switch", { name: "UFW actif" })).not.toBeChecked();
+  await expect(rules.getByText("Aucune règle.")).toBeVisible();
+  await rules.getByRole("button", { name: "Nouvelle règle" }).click();
+  await expect(page.getByRole("dialog", { name: "Nouvelle règle" }).getByRole("button", { name: "Ajouter la règle" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.unroute("**/api/v1/host-firewall/listening");
+
+  // fail2ban and routes, each on its page; the side menu lists them too.
+  await tabs.getByRole("link", { name: "fail2ban" }).click();
+  await expect(page.getByRole("heading", { name: "fail2ban", level: 3 })).toBeVisible();
+  await page.locator("aside").getByRole("link", { name: "Routes" }).click();
+  await expect(page.getByRole("heading", { name: "Routes de l'hôte (lecture seule)", level: 3 })).toBeVisible();
+  await tabs.getByRole("link", { name: "Connexions" }).click();
 
   // Who is connected now, read every 3 s: none on the fake host, then an answer replaced.
   const live = page.getByRole("region", { name: "Connexions en cours" });
@@ -47,7 +81,8 @@ test("firewall: host agent turned on, then off", async ({ page }) => {
   await expect(job.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
   await page.unroute("**/api/v1/host-firewall/connections");
 
+  await tabs.getByRole("link", { name: "Vue d'ensemble" }).click();
   await toggle.click(); // no warning to turn it off
-  await expect(page.getByRole("heading", { name: "UFW", level: 3 })).toBeHidden();
+  await expect(page.getByRole("link", { name: "Ports exposés" })).toBeHidden();
   await expect.poll(agent).toBe(false);
 });

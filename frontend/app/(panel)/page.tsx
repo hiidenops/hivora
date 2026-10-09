@@ -27,9 +27,7 @@ function AppTile({ app }: { app: App }) {
         <AppIcon src={app.icon_url} name={app.name} />
         <span className="min-w-0">
           <span className="block truncate font-medium">{app.name}</span>
-          <span className="block truncate font-mono text-xs text-muted-foreground">
-            {app.slug}
-          </span>
+          <span className="block truncate font-mono text-xs text-muted-foreground">{app.slug}</span>
         </span>
       </Link>
       <div className="flex items-center justify-between">
@@ -38,10 +36,7 @@ function AppTile({ app }: { app: App }) {
           {app.update && (
             <Link
               href={`/app/?id=${app.id}`}
-              title={t("dashboard.updateTip", {
-                latest: app.update.latest,
-                current: app.update.current,
-              })}
+              title={t("dashboard.updateTip", { latest: app.update.latest, current: app.update.current })}
               className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
             >
               <ArrowUpCircle className="size-3.5" />
@@ -55,9 +50,7 @@ function AppTile({ app }: { app: App }) {
   );
 }
 
-const AdoptBanner = dynamic(() =>
-  import("@/features/apps/adopt-banner").then((m) => m.AdoptBanner),
-);
+const AdoptBanner = dynamic(() => import("@/features/apps/adopt-banner").then((m) => m.AdoptBanner));
 
 export default function DashboardPage() {
   const { t } = useI18n();
@@ -69,19 +62,12 @@ export default function DashboardPage() {
 
   const sections = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const visible = (apps ?? []).filter(
-      (a) => !q || a.name.toLowerCase().includes(q) || a.slug.includes(q),
-    );
-    const groups: { zone: Zone | null; apps: App[] }[] = (zones ?? []).map(
-      (zone) => ({
-        zone,
-        apps: visible.filter((a) => a.zone_id === zone.id),
-      }),
-    );
-    groups.push({
-      zone: null,
-      apps: visible.filter((a) => !zones?.some((z) => z.id === a.zone_id)),
-    });
+    const visible = (apps ?? []).filter((a) => !q || a.name.toLowerCase().includes(q) || a.slug.includes(q));
+    const groups: { zone: Zone | null; apps: App[] }[] = (zones ?? []).map((zone) => ({
+      zone,
+      apps: visible.filter((a) => a.zone_id === zone.id),
+    }));
+    groups.push({ zone: null, apps: visible.filter((a) => !zones?.some((z) => z.id === a.zone_id)) });
     return groups.filter((g) => g.apps.length > 0);
   }, [apps, zones, query]);
 
@@ -121,19 +107,12 @@ export default function DashboardPage() {
         {sections.map(({ zone, apps: list }) => (
           <section key={zone?.id ?? "none"}>
             <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              <span
-                className="size-2.5 rounded-full"
-                style={{ background: zone?.color ?? "var(--idle)" }}
-              />
+              <span className="size-2.5 rounded-full" style={{ background: zone?.color ?? "var(--idle)" }} />
               {zone?.name ?? t("dashboard.unclassified")}
             </h2>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">
               {list.map((app, i) => (
-                <div
-                  key={app.id}
-                  className="animate-enter"
-                  style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
-                >
+                <div key={app.id} className="animate-enter" style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}>
                   <AppTile app={app} />
                 </div>
               ))}

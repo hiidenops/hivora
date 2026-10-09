@@ -20,6 +20,9 @@ type Connection = {
 };
 type Connections = { conntrack: boolean; connections: Connection[] };
 
+export const useConnections = () =>
+  useQuery({ queryKey: ["host-firewall", "connections"], queryFn: () => api<Connections>("/host-firewall/connections"), refetchInterval: 3000 });
+
 /** Who is connected to the host right now, one row per remote address, read every 3 s
  *  (the Internet first). Read only: blocking an app's visitors is not UFW's job (Docker
  *  bypasses it). Without conntrack on the host, a button installs it (a job); `act` runs
@@ -30,11 +33,7 @@ export function LiveConnections({ act }: { act?: (f: () => Promise<unknown>) => 
   const install = () =>
     window.confirm(t("fw.conntrackConfirm")) &&
     act?.(async () => track((await api<JobRef>("/host-firewall/connections/conntrack", { method: "POST" })).id));
-  const { data, error } = useQuery({
-    queryKey: ["host-firewall", "connections"],
-    queryFn: () => api<Connections>("/host-firewall/connections"),
-    refetchInterval: 3000,
-  });
+  const { data, error } = useConnections();
   const since = (at: number) => {
     const s = Math.max(0, Math.round(Date.now() / 1000 - at));
     const rtf = new Intl.RelativeTimeFormat(lang, { numeric: "auto", style: "short" });
