@@ -531,6 +531,9 @@ export const en: Record<MessageKey, string> = {
   "dashboard.emptyCta": "Browse the catalog",
   "dashboard.unclassified": "Unclassified",
   "dashboard.search": "Search applications",
+  "dashboard.update": "Update",
+  "dashboard.updateTip": "Version {latest} available (current {current})",
+  "dashboard.updates": "{n} update(s) available",
 
   "action.start": "Start",
   "action.stop": "Stop",

@@ -48,6 +48,11 @@ class JobRef(BaseModel):
     status: str
 
 
+class AppUpdateOut(BaseModel):
+    current: str  # template version, or tag@digest for a free image
+    latest: str
+
+
 class AppOut(BaseModel):
     id: int
     slug: str
@@ -59,8 +64,9 @@ class AppOut(BaseModel):
     desired_state: DesiredState
     status: AppStatus
     drift: bool  # intent and reality disagree
-    hosting: bool  # an nginx that hosts sites (/apps/{id}/sites)
+    hosting: bool  # a web server that hosts sites (/apps/{id}/sites)
     created_at: datetime
+    update: AppUpdateOut | None = None  # a newer version known (the list only); None: none
 
 
 class DeployOut(BaseModel):
@@ -78,7 +84,8 @@ def has_drift(desired: DesiredState, status: AppStatus) -> bool:
     return status in _RUNNING
 
 
-def app_out(rt: RuntimeDep, app: Application, template: str | None) -> AppOut:
+def app_out(rt: RuntimeDep, app: Application, template: str | None,
+            update: tuple[str, str] | None = None) -> AppOut:  # fmt: skip
     status = rt.state.store.app(app.slug).status
     icon = f"/api/v1/templates/{template}/icon" if template and rt.icons.path(template) else None
     return AppOut(
@@ -94,6 +101,7 @@ def app_out(rt: RuntimeDep, app: Application, template: str | None) -> AppOut:
         drift=has_drift(app.desired_state, status),
         hosting=app.kind == HOSTING_KIND,
         created_at=app.created_at,
+        update=AppUpdateOut(current=update[0], latest=update[1]) if update else None,
     )
 
 

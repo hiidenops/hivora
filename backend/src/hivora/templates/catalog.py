@@ -116,3 +116,7 @@ class Catalog:
 
     def entries(self) -> list[CatalogEntry]:
         return sorted(self._entries.values(), key=lambda e: e.template.metadata.name.lower())
+
+    def custom_entries(self) -> list[CatalogEntry]:
+        """The templates generated for free images (not listed by entries())."""
+        return list(self._custom.values())

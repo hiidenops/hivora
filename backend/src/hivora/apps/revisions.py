@@ -29,7 +29,12 @@ from hivora.core.fs import tree_size
 from hivora.crypto.cipher import SecretBox
 from hivora.jobs import Job, JobQueue
 from hivora.templates import Catalog, CatalogEntry
-from hivora.templates.catalog import CUSTOM_SOURCE, TemplateInvalidError, parse_template
+from hivora.templates.catalog import (
+    CUSTOM_SOURCE,
+    TemplateInvalidError,
+    TemplateNotFoundError,
+    parse_template,
+)
 from hivora.templates.models import TemplateVersion
 from hivora.templates.overrides import Overrides
 from hivora.zones import Zone, get_zone
@@ -181,6 +186,27 @@ class Revisions:
             {"reset_volumes": upd.reset_volumes} if upd.reset_fields else None,
         )  # fmt: skip
         return job, upd.number
+
+    async def updates(self, session: AsyncSession) -> dict[int, tuple[str, str]]:
+        """App id -> (current, latest) for every app with a newer version known: a newer
+        catalog template, or, for a free image, what its registry last said. No request:
+        the dashboard reads this for every app."""
+        rows = await session.execute(
+            select(Application.id, TemplateVersion.slug, TemplateVersion.version)
+            .join(TemplateVersion, Application.template_version_id == TemplateVersion.id)
+        )  # fmt: skip
+        found: dict[int, tuple[str, str]] = {}
+        for app_id, slug, version in rows:
+            try:
+                entry = self.catalog.get(slug)
+            except TemplateNotFoundError:  # gone from the catalog: nothing to offer
+                continue
+            if entry.source != CUSTOM_SOURCE:
+                if (latest := entry.template.metadata.version) != version:
+                    found[app_id] = (version, latest)
+            elif (known := self.custom.known_status(entry)) and known[2]:
+                found[app_id] = (known[0], known[1])
+        return found
 
     async def upgrade_status(self, session: AsyncSession, app_id: int) -> UpgradeStatus:
         """Is a newer template version (or, for a free image, a newer image) available?"""

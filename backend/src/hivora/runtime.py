@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from hivora.apps import AppJobHandlers, AppService
+from hivora.apps.custom_images import check_images
 from hivora.audit import AuditRecorder
 from hivora.auth.service import AuthService
 from hivora.backups.service import BackupService
@@ -183,6 +184,7 @@ class Runtime:
             asyncio.create_task(follow_deploys(self.vpn), name="vpn-follow"),
             asyncio.create_task(expire_clients(self.vpn), name="vpn-expiry"),
             asyncio.create_task(run_scheduler(self.tasks), name="task-scheduler"),
+            asyncio.create_task(check_images(self.apps.custom), name="free-image-updates"),
         ]
         await self.jobs.start()
 

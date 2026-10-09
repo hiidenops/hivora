@@ -310,6 +310,16 @@
             ],
             "title": "Template"
           },
+          "update": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppUpdateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "volumes": {
             "items": {
               "type": "string"
@@ -419,6 +429,16 @@
             ],
             "title": "Template"
           },
+          "update": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppUpdateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "zone_id": {
             "anyOf": [
               {
@@ -459,6 +479,24 @@
         ],
         "title": "AppStatus",
         "type": "string"
+      },
+      "AppUpdateOut": {
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "string"
+          },
+          "latest": {
+            "title": "Latest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current",
+          "latest"
+        ],
+        "title": "AppUpdateOut",
+        "type": "object"
       },
       "ApplyIn": {
         "properties": {

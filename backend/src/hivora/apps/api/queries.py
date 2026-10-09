@@ -150,7 +150,8 @@ def game_caps(rt: RuntimeDep, template: str | None) -> GameCapsOut | None:
 async def list_apps(_: Viewer, rt: RuntimeDep) -> list[AppOut]:
     async with rt.sessions() as session:
         rows = await apps_with_template(session)
-        return [app_out(rt, app, template) for app, template in rows]
+        updates = await rt.apps.revisions.updates(session)
+        return [app_out(rt, app, template, updates.get(app.id)) for app, template in rows]
 
 
 @router.get("/{app_id}")

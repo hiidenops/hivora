@@ -2217,6 +2217,7 @@ export interface components {
             summary: components["schemas"]["SummaryItemOut"][];
             /** Template */
             template: string | null;
+            update?: components["schemas"]["AppUpdateOut"] | null;
             /** Volumes */
             volumes: string[];
             /** Vpn */
@@ -2249,6 +2250,7 @@ export interface components {
             status: components["schemas"]["AppStatus"];
             /** Template */
             template: string | null;
+            update?: components["schemas"]["AppUpdateOut"] | null;
             /** Zone Id */
             zone_id: number | null;
         };
@@ -2257,6 +2259,13 @@ export interface components {
          * @enum {string}
          */
         AppStatus: "healthy" | "starting" | "degraded" | "stopped" | "error" | "missing";
+        /** AppUpdateOut */
+        AppUpdateOut: {
+            /** Current */
+            current: string;
+            /** Latest */
+            latest: string;
+        };
         /** ApplyIn */
         ApplyIn: {
             /**

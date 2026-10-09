@@ -1,7 +1,10 @@
 """Free images: any registry image, read from its registry, pinned by digest and turned
 into a generated template, so it lives like any other app."""
 
+import asyncio
 import hashlib
+import logging
+from contextlib import suppress
 from typing import Any
 
 import yaml
@@ -74,6 +77,22 @@ class CustomImages:
         self.inspected[ref] = (now, info)
         return info
 
+    def known_status(self, entry: CatalogEntry) -> tuple[str, str, bool] | None:
+        """What the registry last said for this free image (no request); None: never asked."""
+        svc = entry.template.services[entry.template.main_service]
+        tag, _, digest = svc.tag.partition("@")
+        hit = self.inspected.get(f"{svc.image}:{tag}")
+        if hit is None:
+            return None
+        return f"{tag}@{digest[:19]}", f"{tag}@{hit[1].digest[:19]}", hit[1].digest != digest
+
+    async def check_all(self) -> None:
+        """Ask the registry about every free image, one after the other (the dashboard's
+        update marks read the answers: known_status)."""
+        for entry in self.catalog.custom_entries():
+            with suppress(Exception):  # a registry down: the next round asks again
+                await self.image_status(entry)
+
     async def image_status(self, entry: CatalogEntry) -> tuple[str, str, bool]:
         """(current, latest, newer available) for the main service's pinned tag."""
         svc = entry.template.services[entry.template.main_service]
@@ -95,3 +114,19 @@ class CustomImages:
         text = yaml.safe_dump(doc, sort_keys=False, allow_unicode=True)
         return CatalogEntry(parse_template(text, require_pinned=True), text,
                             hashlib.sha256(text.encode()).hexdigest(), CUSTOM_SOURCE)  # fmt: skip
+
+
+CHECK_EVERY_S = 6 * 3600
+
+
+async def check_images(custom: CustomImages, *, first_after: float = 60,
+                       every: float = CHECK_EVERY_S) -> None:  # fmt: skip
+    """In the background: the free images' registries asked every 6 h (the first time a
+    minute after startup), so the dashboard can mark their updates without asking."""
+    await asyncio.sleep(first_after)
+    while True:
+        try:
+            await custom.check_all()
+        except Exception:
+            logging.getLogger(__name__).exception("free image update check failed")
+        await asyncio.sleep(every)

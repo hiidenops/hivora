@@ -530,6 +530,9 @@ export const fr = {
   "dashboard.emptyCta": "Parcourir le catalogue",
   "dashboard.unclassified": "Non classé",
   "dashboard.search": "Rechercher une application",
+  "dashboard.update": "Mise à jour",
+  "dashboard.updateTip": "Version {latest} disponible (actuelle {current})",
+  "dashboard.updates": "{n} mise(s) à jour disponible(s)",
 
   "action.start": "Démarrer",
   "action.stop": "Arrêter",
