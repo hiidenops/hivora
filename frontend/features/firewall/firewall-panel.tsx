@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Switch } from "@/components/ui/input";
+import { TBody, TEmpty, THead, Table, Td, Th, Tr } from "@/components/ui/table";
 import { ApiError, api } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -157,20 +158,33 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
                         </label>
                       )}
                     </div>
-                    <ul className="divide-y rounded border">
-                      {data.ufw_rules.map((r) => (
-                        <li key={r.number} className="flex items-center gap-3 px-2 py-1 font-mono text-xs">
-                          <span className="w-6 text-muted-foreground">{r.number}</span>
-                          <span className="flex-1">{r.to}</span>
-                          <span>{r.action}</span>
-                          <span className="flex-1">{r.source}</span>
-                          <Button size="sm" variant="ghost" aria-label={t("fw.deleteRule", { n: r.number })} onClick={() => window.confirm(t("fw.deleteRule", { n: r.number })) && act.mutate(() => api(`/host-firewall/ufw/rules/${r.number}`, { method: "DELETE" }))}>
-                            <Trash2 className="text-danger" />
-                          </Button>
-                        </li>
-                      ))}
-                      {data.ufw_rules.length === 0 && <li className="px-2 py-1 text-xs text-muted-foreground">{t("fw.noRule")}</li>}
-                    </ul>
+                    <Table>
+                      <THead>
+                        <tr>
+                          <Th numeric>#</Th>
+                          <Th>{t("fw.to")}</Th>
+                          <Th>{t("fw.action")}</Th>
+                          <Th>{t("fw.from")}</Th>
+                          <Th />
+                        </tr>
+                      </THead>
+                      <TBody>
+                        {data.ufw_rules.length === 0 && <TEmpty colSpan={5}>{t("fw.noRule")}</TEmpty>}
+                        {data.ufw_rules.map((r) => (
+                          <Tr key={r.number}>
+                            <Td numeric className="text-muted-foreground">{r.number}</Td>
+                            <Td mono>{r.to}</Td>
+                            <Td mono>{r.action}</Td>
+                            <Td mono>{r.source}</Td>
+                            <Td className="py-1 text-right">
+                              <Button size="sm" variant="ghost" aria-label={t("fw.deleteRule", { n: r.number })} onClick={() => window.confirm(t("fw.deleteRule", { n: r.number })) && act.mutate(() => api(`/host-firewall/ufw/rules/${r.number}`, { method: "DELETE" }))}>
+                                <Trash2 className="text-danger" />
+                              </Button>
+                            </Td>
+                          </Tr>
+                        ))}
+                      </TBody>
+                    </Table>
                     <form className="flex flex-wrap items-end gap-2" onSubmit={addRule}>
                       <select className={select} value={rule.action} onChange={(e) => setRule({ ...rule, action: e.target.value })} aria-label={t("fw.action")}>
                         <option value="allow">{t("fw.allow")}</option>
@@ -249,7 +263,6 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
 type Listening = { protocol: string; address: string; port: number; process: string; app: string | null; ufw: "bypassed" | "off" | "local" | "allowed" | "blocked" };
 const UFW_TONE: Record<Listening["ufw"], string> = { bypassed: "text-danger", off: "text-warn", allowed: "text-warn", local: "text-muted-foreground", blocked: "text-ok" };
 const box = "surface grid gap-2 rounded-lg border p-3";
-const th = "px-2 py-1 text-left font-medium text-muted-foreground";
 
 /** What listens on the host right now, and whether it is reachable from outside. */
 function OpenPorts({ onPick }: { onPick?: (action: string, port: number, protocol: string) => void }) {
@@ -260,45 +273,44 @@ function OpenPorts({ onPick }: { onPick?: (action: string, port: number, protoco
       <h3 className="font-semibold">{t("fw.openPorts")}</h3>
       <p className="text-xs text-muted-foreground">{t("fw.openPortsHelp")}</p>
       {error && <Alert tone="danger">{String(error)}</Alert>}
-      <div className="overflow-x-auto">
-        <table className="w-full font-mono text-xs">
-          <thead>
-            <tr>
-              <th className={th}>{t("fw.port")}</th>
-              <th className={th}>{t("fw.address")}</th>
-              <th className={th}>{t("fw.process")}</th>
-              <th className={th}>{t("fw.reach")}</th>
-              {onPick && <th className={th} />}
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {data?.map((p) => (
-              <tr key={`${p.protocol}${p.address}${p.port}`}>
-                <td className="px-2 py-1">
-                  {p.port}/{p.protocol}
-                </td>
-                <td className="px-2 py-1">{p.address}</td>
-                <td className="px-2 py-1">{p.app ? t("fw.dockerApp", { app: p.app }) : p.process || "—"}</td>
-                <td className={`px-2 py-1 font-sans ${UFW_TONE[p.ufw]}`}>{t(`fw.reach.${p.ufw}`)}</td>
-                {onPick && (
-                  <td className="whitespace-nowrap px-2 py-1 text-right font-sans">
-                    {p.ufw !== "local" && (
-                      <>
-                        <Button size="sm" variant="ghost" disabled={p.ufw === "bypassed"} title={p.ufw === "bypassed" ? t("fw.pickBypassed") : undefined} onClick={() => onPick("allow", p.port, p.protocol)}>
-                          {t("fw.allow")}
-                        </Button>
-                        <Button size="sm" variant="ghost" disabled={p.ufw === "bypassed"} title={p.ufw === "bypassed" ? t("fw.pickBypassed") : undefined} onClick={() => onPick("deny", p.port, p.protocol)}>
-                          {t("fw.deny")}
-                        </Button>
-                      </>
-                    )}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table>
+        <THead>
+          <tr>
+            <Th>{t("fw.port")}</Th>
+            <Th>{t("fw.address")}</Th>
+            <Th>{t("fw.process")}</Th>
+            <Th>{t("fw.reach")}</Th>
+            {onPick && <Th />}
+          </tr>
+        </THead>
+        <TBody>
+          {data?.length === 0 && <TEmpty colSpan={onPick ? 5 : 4}>{t("fw.noOpenPort")}</TEmpty>}
+          {data?.map((p) => (
+            <Tr key={`${p.protocol}${p.address}${p.port}`}>
+              <Td mono>
+                {p.port}/{p.protocol}
+              </Td>
+              <Td mono>{p.address}</Td>
+              <Td>{p.app ? t("fw.dockerApp", { app: p.app }) : p.process || "—"}</Td>
+              <Td className={UFW_TONE[p.ufw]}>{t(`fw.reach.${p.ufw}`)}</Td>
+              {onPick && (
+                <Td className="whitespace-nowrap py-1 text-right">
+                  {p.ufw !== "local" && (
+                    <>
+                      <Button size="sm" variant="ghost" disabled={p.ufw === "bypassed"} title={p.ufw === "bypassed" ? t("fw.pickBypassed") : undefined} onClick={() => onPick("allow", p.port, p.protocol)}>
+                        {t("fw.allow")}
+                      </Button>
+                      <Button size="sm" variant="ghost" disabled={p.ufw === "bypassed"} title={p.ufw === "bypassed" ? t("fw.pickBypassed") : undefined} onClick={() => onPick("deny", p.port, p.protocol)}>
+                        {t("fw.deny")}
+                      </Button>
+                    </>
+                  )}
+                </Td>
+              )}
+            </Tr>
+          ))}
+        </TBody>
+      </Table>
     </section>
   );
 }
@@ -361,25 +373,50 @@ function Routes() {
   return (
     <section className={box}>
       <h3 className="font-semibold">{t("fw.routes")}</h3>
-      <ul className="divide-y rounded border font-mono text-xs">
-        {data?.routes.map((r, i) => (
-          <li key={i} className="px-2 py-1">
-            {r.dst}
-            {r.gateway && ` via ${r.gateway}`} dev {r.dev}
-            {r.prefsrc && ` src ${r.prefsrc}`}
-            {r.metric != null && ` metric ${r.metric}`}
-          </li>
-        ))}
-      </ul>
+      <Table>
+        <THead>
+          <tr>
+            <Th>{t("fw.route.dst")}</Th>
+            <Th>{t("fw.route.gateway")}</Th>
+            <Th>{t("fw.route.dev")}</Th>
+            <Th>{t("fw.route.src")}</Th>
+            <Th numeric>{t("fw.route.metric")}</Th>
+          </tr>
+        </THead>
+        <TBody>
+          {data?.routes.map((r, i) => (
+            <Tr key={i}>
+              <Td mono>{r.dst}</Td>
+              <Td mono>{r.gateway ?? "—"}</Td>
+              <Td mono>{r.dev}</Td>
+              <Td mono>{r.prefsrc ?? "—"}</Td>
+              <Td numeric mono>{r.metric ?? "—"}</Td>
+            </Tr>
+          ))}
+        </TBody>
+      </Table>
       <h3 className="mt-2 font-semibold">{t("fw.forwards")}</h3>
-      <ul className="divide-y rounded border font-mono text-xs">
-        {data?.forwards.map((f) => (
-          <li key={`${f.address}${f.port}${f.protocol}`} className="px-2 py-1">
-            {f.address}:{f.port}/{f.protocol} → {f.app}:{f.container_port}
-          </li>
-        ))}
-        {data?.forwards.length === 0 && <li className="px-2 py-1 font-sans text-muted-foreground">{t("fw.noForward")}</li>}
-      </ul>
+      <Table>
+        <THead>
+          <tr>
+            <Th>{t("fw.forward.host")}</Th>
+            <Th>{t("fw.forward.app")}</Th>
+            <Th numeric>{t("fw.forward.container")}</Th>
+          </tr>
+        </THead>
+        <TBody>
+          {data?.forwards.length === 0 && <TEmpty colSpan={3}>{t("fw.noForward")}</TEmpty>}
+          {data?.forwards.map((f) => (
+            <Tr key={`${f.address}${f.port}${f.protocol}`}>
+              <Td mono>
+                {f.address}:{f.port}/{f.protocol}
+              </Td>
+              <Td>{f.app}</Td>
+              <Td numeric mono>{f.container_port}</Td>
+            </Tr>
+          ))}
+        </TBody>
+      </Table>
     </section>
   );
 }

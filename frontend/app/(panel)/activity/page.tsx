@@ -8,6 +8,7 @@ import { PageHeader, useSession } from "@/components/app-shell";
 import { JobProgress } from "@/components/job-progress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TBody, THead, Table, Td, Th, Tr } from "@/components/ui/table";
 import { HostCharts } from "@/features/activity/host-charts";
 import { JobList } from "@/features/apps/job-list";
 import { api } from "@/lib/api/client";
@@ -39,37 +40,31 @@ function AuditTable() {
   const { t, lang } = useI18n();
   const { data: entries } = useAudit();
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="text-xs uppercase text-muted-foreground">
-          <tr>
-            <th className="py-2 pr-4 font-medium">{t("activity.when")}</th>
-            <th className="py-2 pr-4 font-medium">{t("activity.who")}</th>
-            <th className="py-2 pr-4 font-medium">{t("activity.action")}</th>
-            <th className="py-2 pr-4 font-medium">{t("activity.target")}</th>
-            <th className="py-2 font-medium">{t("activity.result")}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {entries?.map((a) => (
-            <tr key={a.id}>
-              <td className="whitespace-nowrap py-2 pr-4 text-xs text-muted-foreground">
-                {new Date(a.ts).toLocaleString(lang)}
-              </td>
-              <td className="py-2 pr-4">
-                {a.username ?? "—"}
-                {a.ip && <span className="ml-1 font-mono text-xs text-muted-foreground">{a.ip}</span>}
-              </td>
-              <td className="py-2 pr-4 font-mono text-xs">{a.action}</td>
-              <td className="py-2 pr-4 font-mono text-xs">{a.target ?? ""}</td>
-              <td className={cn("py-2 text-xs", a.result === "ok" || a.result === "succeeded" ? "text-ok" : "text-danger")}>
-                {a.result}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table>
+      <THead>
+        <tr>
+          <Th>{t("activity.when")}</Th>
+          <Th>{t("activity.who")}</Th>
+          <Th>{t("activity.action")}</Th>
+          <Th>{t("activity.target")}</Th>
+          <Th>{t("activity.result")}</Th>
+        </tr>
+      </THead>
+      <TBody>
+        {entries?.map((a) => (
+          <Tr key={a.id}>
+            <Td className="whitespace-nowrap text-xs text-muted-foreground">{new Date(a.ts).toLocaleString(lang)}</Td>
+            <Td>
+              {a.username ?? "—"}
+              {a.ip && <span className="ml-1 font-mono text-xs text-muted-foreground">{a.ip}</span>}
+            </Td>
+            <Td mono>{a.action}</Td>
+            <Td mono>{a.target ?? ""}</Td>
+            <Td className={cn("text-xs", a.result === "ok" || a.result === "succeeded" ? "text-ok" : "text-danger")}>{a.result}</Td>
+          </Tr>
+        ))}
+      </TBody>
+    </Table>
   );
 }
 

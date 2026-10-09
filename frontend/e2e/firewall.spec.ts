@@ -34,8 +34,8 @@ test("firewall: host agent turned on, then off", async ({ page }) => {
   ); // prettier-ignore
   const row = live.getByRole("row").filter({ hasText: "203.0.113.24" });
   await expect(row).toContainText("Internet", { timeout: 10_000 }); // the next refresh
-  await expect(row).toContainText("survie (25565)");
-  await expect(row).toContainText("il y a 3 minutes");
+  await expect(row).toContainText("survie :25565");
+  await expect(row).toContainText("il y a 3 min");
   await expect(live.getByText("conntrack n'est pas installé", { exact: false })).toBeVisible(); // apps unseen
   // Installed on request: confirmed, then a job followed in a pop-up.
   page.once("dialog", (d) => {

@@ -7,7 +7,6 @@ import { PageHeader, useSession } from "@/components/app-shell";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -17,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input, Label, Select } from "@/components/ui/input";
+import { TBody, THead, Table, Td, Th, Tr } from "@/components/ui/table";
 import type { Role, User } from "@/lib/api/client";
 import { userApi, useUserMutation, useUsers } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
@@ -130,70 +130,68 @@ export default function UsersPage() {
         }
       />
       {error && <Alert tone="danger" className="mb-4">{errorMessage(error)}</Alert>}
-      <Card className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3 font-medium">{t("users.username")}</th>
-              <th className="px-4 py-3 font-medium">{t("users.role")}</th>
-              <th className="px-4 py-3 font-medium">{t("users.lastLogin")}</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {users?.map((u) => (
-              <tr key={u.id} className={u.disabled ? "opacity-60" : undefined}>
-                <td className="px-4 py-3">
-                  <span className="font-medium">{u.username}</span>
-                  {u.id === me.id && <span className="ml-2 text-xs text-muted-foreground">({t("users.you")})</span>}
-                  <span className="ml-2 inline-flex gap-1">
-                    {u.disabled && <Badge>{t("users.disabled")}</Badge>}
-                    {u.totp_enabled && <Badge>TOTP</Badge>}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <RoleSelect value={u.role} onChange={(role) => update.mutate({ id: u.id, role })} />
-                </td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">
-                  {u.last_login_at ? new Date(u.last_login_at).toLocaleString(lang) : t("users.never")}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label={t("users.actions", { name: u.username })}>
-                        <MoreHorizontal />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onSelect={() => setResetting(u)}>{t("users.resetPassword")}</DropdownMenuItem>
-                      <DropdownMenuItem disabled={!u.totp_enabled} onSelect={() => resetTotp.mutate(u.id)}>
-                        {t("users.resetTotp")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => revoke.mutate(u.id)}>{t("users.revokeSessions")}</DropdownMenuItem>
-                      <DropdownMenuItem
-                        disabled={u.id === me.id}
-                        onSelect={() => update.mutate({ id: u.id, disabled: !u.disabled })}
-                      >
-                        {u.disabled ? t("users.enable") : t("users.disable")}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        disabled={u.id === me.id}
-                        className="text-danger"
-                        onSelect={() => {
-                          if (window.confirm(t("users.deleteConfirm", { name: u.username }))) remove.mutate(u.id);
-                        }}
-                      >
-                        {t("common.delete")}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      <Table>
+        <THead>
+          <tr>
+            <Th>{t("users.username")}</Th>
+            <Th>{t("users.role")}</Th>
+            <Th>{t("users.lastLogin")}</Th>
+            <Th />
+          </tr>
+        </THead>
+        <TBody>
+          {users?.map((u) => (
+            <Tr key={u.id} className={u.disabled ? "opacity-60" : undefined}>
+              <Td>
+                <span className="font-medium">{u.username}</span>
+                {u.id === me.id && <span className="ml-2 text-xs text-muted-foreground">({t("users.you")})</span>}
+                <span className="ml-2 inline-flex gap-1">
+                  {u.disabled && <Badge>{t("users.disabled")}</Badge>}
+                  {u.totp_enabled && <Badge>TOTP</Badge>}
+                </span>
+              </Td>
+              <Td>
+                <RoleSelect value={u.role} onChange={(role) => update.mutate({ id: u.id, role })} />
+              </Td>
+              <Td className="text-xs text-muted-foreground">
+                {u.last_login_at ? new Date(u.last_login_at).toLocaleString(lang) : t("users.never")}
+              </Td>
+              <Td className="py-1 text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" aria-label={t("users.actions", { name: u.username })}>
+                      <MoreHorizontal />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => setResetting(u)}>{t("users.resetPassword")}</DropdownMenuItem>
+                    <DropdownMenuItem disabled={!u.totp_enabled} onSelect={() => resetTotp.mutate(u.id)}>
+                      {t("users.resetTotp")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => revoke.mutate(u.id)}>{t("users.revokeSessions")}</DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={u.id === me.id}
+                      onSelect={() => update.mutate({ id: u.id, disabled: !u.disabled })}
+                    >
+                      {u.disabled ? t("users.enable") : t("users.disable")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled={u.id === me.id}
+                      className="text-danger"
+                      onSelect={() => {
+                        if (window.confirm(t("users.deleteConfirm", { name: u.username }))) remove.mutate(u.id);
+                      }}
+                    >
+                      {t("common.delete")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </Td>
+            </Tr>
+          ))}
+        </TBody>
+      </Table>
       <CreateUserDialog open={creating} onOpenChange={setCreating} />
       <ResetPasswordDialog user={resetting} onClose={() => setResetting(null)} />
     </>
