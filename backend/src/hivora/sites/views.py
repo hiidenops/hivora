@@ -45,6 +45,7 @@ class SiteHost:
     max_sites: int
     sites: list[HostedSite]
     config: ConfigState | None  # None: no configuration applied yet
+    server: str  # its web server, as messages name it ("nginx", "Apache")
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,8 +61,9 @@ async def host_view(session: AsyncSession, app_id: int, lan: str | None) -> Site
     """A host and its sites, the main one first (404 for an app that hosts none).
     ``lan``: the host's LAN address, for the sites' URLs."""
     app = await core.get_site(session, app_id)
+    dirs = await core.host_dirs(session, app.id)
     try:
-        await core.conf_dir(session, app.id)
+        dirs.conf()
         upgrade_required = False
     except core.HostUpgradeRequiredError:
         upgrade_required = True
@@ -74,7 +76,7 @@ async def host_view(session: AsyncSession, app_id: int, lan: str | None) -> Site
     config = ConfigState(last.id, last.status.value, last.error) if last else None
     return SiteHost(app.id, app.slug, app.name, upgrade_required,
                     app.desired_state is DesiredState.STOPPED, core.MAX_SITES, sites,
-                    config)  # fmt: skip
+                    config, dirs.server().label)  # fmt: skip
 
 
 async def site_view(

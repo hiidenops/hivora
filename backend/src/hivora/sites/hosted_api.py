@@ -38,11 +38,12 @@ class SiteHostOut(BaseModel):
     app_id: int
     slug: str
     name: str
-    upgrade_required: bool  # nginx on template 1.0.0: update the app to add sites
+    upgrade_required: bool  # a template version without sites (nginx, httpd 1.0.0): update it
     stopped: bool  # port changes refused until the app is started
     max_sites: int
     sites: list[HostedSiteOut]
     config: SiteConfigOut | None  # None: no configuration applied yet
+    server: str  # its web server, as messages name it ("nginx", "Apache")
 
 
 class HostedSiteIn(BaseModel):

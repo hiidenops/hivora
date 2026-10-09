@@ -20,13 +20,11 @@ from hivora.apps.queries import hosting_app, volume_sources
 from hivora.core.errors import ConflictError, NotFoundError, PermissionDeniedError
 from hivora.sites.models import Site
 from hivora.sites.nginx import NginxSite
+from hivora.sites.servers import WebServer, of_targets
 
 SITE_KIND = HOSTING_KIND
-SERVICE = "server"  # the nginx template's main service
+SERVICE = "server"  # the web server templates' main service (nginx, httpd)
 MAX_SITES = 30  # added sites per host (the main site aside)
-HTML_TARGET = "/usr/share/nginx/html"  # the nginx template's "html" volume
-CONF_TARGET = "/etc/nginx/hivora.d"  # its "conf" volume (template 1.1.0 and later)
-SITES_TARGET = "/usr/share/nginx/sites"  # its "sites" volume: one folder per added site
 UPLOAD_TTL_S = 24 * 3600  # an upload left by an interrupted job is swept after this
 _STAGED = (".hivora-upload-", ".hivora-edit-")  # files a queued job may still be waiting for
 _WORK_DIRS = (".hivora-staging-", ".hivora-conf-")  # folders of one running job only
@@ -62,26 +60,31 @@ async def added_ports(session: AsyncSession, app_id: int) -> list[int]:
 
 @dataclass(frozen=True, slots=True)
 class HostDirs:
-    """A host's bind-mounted folders, read at once (one query)."""
+    """A host's bind-mounted folders, read at once (one query); its web server is told by
+    them (servers.of_targets)."""
 
     app_id: int
     found: dict[str, Path]  # by target in the container
 
-    def html(self) -> Path:
-        if (path := self.found.get(HTML_TARGET)) is None:
+    def server(self) -> WebServer:
+        if (server := of_targets(self.found)) is None:
             raise ConflictError("site has no html volume", app=self.app_id)
-        return path
+        return server
+
+    def html(self) -> Path:
+        return self.found[self.server().html]
 
     def conf(self) -> Path:
-        """The folder of the nginx files Hivora writes; only nginx 1.1.0 and later has it."""
-        return self._hosting(CONF_TARGET)
+        """The folder of the files Hivora writes; only the template versions that host
+        sites have it (nginx 1.1.0, httpd 1.1.0 and later)."""
+        return self._hosting(self.server().conf)
 
     def sites(self) -> Path:
-        return self._hosting(SITES_TARGET)
+        return self._hosting(self.server().sites)
 
     def _hosting(self, target: str) -> Path:
         if (path := self.found.get(target)) is None:
-            raise HostUpgradeRequiredError("update this nginx to host several sites",
+            raise HostUpgradeRequiredError("update this web server to host several sites",
                                            app=self.app_id)  # fmt: skip
         return path
 

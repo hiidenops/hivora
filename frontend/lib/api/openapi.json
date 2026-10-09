@@ -3626,6 +3626,10 @@
             "title": "Name",
             "type": "string"
           },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
           "sites": {
             "items": {
               "$ref": "#/components/schemas/HostedSiteOut"
@@ -3654,7 +3658,8 @@
           "stopped",
           "max_sites",
           "sites",
-          "config"
+          "config",
+          "server"
         ],
         "title": "SiteHostOut",
         "type": "object"

@@ -32,6 +32,7 @@ from hivora.jobs import Job, JobContext, JobKind, JobQueue, JobStatus
 from hivora.jobs.queries import get_job
 from hivora.sites import core
 from hivora.sites.nginx import MANAGED, NginxSite, desired_files
+from hivora.sites.servers import WebServer
 from hivora.state import StateStore
 
 logger = logging.getLogger(__name__)
@@ -40,9 +41,9 @@ logger = logging.getLogger(__name__)
 # its volumes restored (the "conf" volume is not backed up), or the app deployed again.
 AFTER = (JobKind.START, JobKind.RESTART, JobKind.BACKUP_RESTORE, JobKind.DEPLOY)
 
-CHECK = ["nginx", "-t"]
+CHECK = ["nginx", "-t"]  # nginx's (servers.NGINX); each host's server has its own
 RELOAD = ["nginx", "-s", "reload"]
-_OUTPUT = 2000  # characters of nginx's output kept in a job error
+_OUTPUT = 2000  # characters of the server's output kept in a job error
 
 
 class NginxConfigRejectedError(ConflictError):
@@ -171,20 +172,23 @@ class SiteConfig:
         """The site_config job."""
         async with self.sessions() as session:  # closed before any file or exec
             app = await core.get_site(session, ctx.app_id or 0)
-            conf_path = await core.conf_dir(session, app.id)
+            dirs = await core.host_dirs(session, app.id)
+            server, conf_path = dirs.server(), dirs.conf()
             sites = await core.sites_of(session, app.id)
             folders = ctx.params.get("remove_folders") or []
             sites_path = await core.sites_dir(session, app.id) if folders else None
         try:
-            await self._apply(ctx, app, conf_path, sites)
+            await self._apply(ctx, app, server, conf_path, sites)
         finally:
             # A removed site's files, asked with remove_data: gone even if nginx refused
             # the configuration (the site's row and port are gone already).
             await self._remove_folders(ctx, sites_path, folders)
 
-    async def _apply(self, ctx: JobContext, app: Application, conf_path: Path,
+    async def _apply(self, ctx: JobContext, app: Application, server: WebServer, conf_path: Path,
                      sites: list[NginxSite]) -> None:  # fmt: skip
-        want = desired_files(sites)  # refuses any value that is not whitelisted
+        # Refuses any value that is not whitelisted; the files of this host's server.
+        want = desired_files(sites, server.render, server.main_off)
+        check, reload = list(server.check), list(server.reload)
         root, s = self.settings.volumes_root, self.settings
         conf = confined(conf_path, root)
         work = confined(conf.parent / f".hivora-conf-{secrets.token_hex(8)}", root)
@@ -216,24 +220,25 @@ class SiteConfig:
         if container is None and ctx.params.get("after_start"):
             container = await self._wait_container(app.slug)
         if container is None:
-            await ctx.log("nginx is not running: it reads these files when it starts")
+            await ctx.log(f"{server.label} is not running: it reads these files when it starts")
         else:
             # Reload only a configuration nginx has checked; on any refusal, the files
             # go back, and nginx checks (and reloads) the previous ones again.
-            code, out = await self._exec(ctx, container, CHECK)
+            code, out = await self._exec(ctx, container, check)
             if code != 0:
                 await rollback()
-                await self._exec(ctx, container, CHECK)
+                await self._exec(ctx, container, check)
                 raise NginxConfigRejectedError(
-                    f"nginx refused the configuration: {out.strip()[-_OUTPUT:]}", app=app.slug
+                    f"{server.label} refused the configuration: {out.strip()[-_OUTPUT:]}",
+                    app=app.slug,
                 )
-            code, out = await self._exec(ctx, container, RELOAD)
+            code, out = await self._exec(ctx, container, reload)
             if code != 0:
                 await rollback()
-                await self._exec(ctx, container, CHECK)
-                await self._exec(ctx, container, RELOAD)
+                await self._exec(ctx, container, check)
+                await self._exec(ctx, container, reload)
                 raise NginxConfigRejectedError(
-                    f"nginx could not reload: {out.strip()[-_OUTPUT:]}", app=app.slug
+                    f"{server.label} could not reload: {out.strip()[-_OUTPUT:]}", app=app.slug
                 )
         self.bus.publish("site.config_applied", app=app.slug, files=changed, removed=removed)
 

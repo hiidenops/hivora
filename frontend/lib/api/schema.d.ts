@@ -3381,6 +3381,8 @@ export interface components {
             max_sites: number;
             /** Name */
             name: string;
+            /** Server */
+            server: string;
             /** Sites */
             sites: components["schemas"]["HostedSiteOut"][];
             /** Slug */

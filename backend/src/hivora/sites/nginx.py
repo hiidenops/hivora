@@ -9,7 +9,7 @@ from a site can add an nginx directive.
 """
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 from hivora.core.errors import ValidationError
@@ -83,11 +83,16 @@ def render_site(site: NginxSite) -> str:
     )
 
 
-def desired_files(sites: Iterable[NginxSite]) -> dict[str, str]:
-    """Every file Hivora's part of the conf volume must hold, by name (sorted).
+def desired_files(
+    sites: Iterable[NginxSite], render: Callable[[NginxSite], str] | None = None,
+    main_off: str = MAIN_OFF,
+) -> dict[str, str]:  # fmt: skip
+    """Every file Hivora's part of the conf volume must hold, by name (sorted). ``render``
+    and ``main_off``: another web server's (sites.servers), nginx's by default.
 
-    No main site row (an nginx whose sites Hivora does not manage): it stays on.
+    No main site row (a server whose sites Hivora does not manage): it stays on.
     """
+    render = render or render_site
     sites = list(sites)
     for site in sites:
         check(site)
@@ -101,7 +106,7 @@ def desired_files(sites: Iterable[NginxSite]) -> dict[str, str]:
     for site in sites:
         if site.enabled:
             if not site.main:
-                files[f"site-{site.slug}.conf"] = render_site(site)
+                files[f"site-{site.slug}.conf"] = render(site)
         elif site.main:
-            files["main-off.conf"] = MAIN_OFF
+            files["main-off.conf"] = main_off
     return dict(sorted(files.items()))

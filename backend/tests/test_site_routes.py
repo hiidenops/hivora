@@ -33,7 +33,7 @@ def test_a_host_and_its_sites(client: Any) -> None:
     host = client.get(f"{API}/apps/{app_id}/sites").json()
     assert {k: v for k, v in host.items() if k != "sites"} == {
         "app_id": app_id, "slug": "vitrine", "name": "Vitrine", "upgrade_required": False,
-        "stopped": False, "max_sites": 30, "config": None,
+        "stopped": False, "max_sites": 30, "config": None, "server": "nginx",
     }  # fmt: skip
     [main] = host["sites"]
     assert {k: v for k, v in main.items() if k != "id"} == {

@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: httpd
   name: Apache HTTP Server
-  version: 1.0.0
+  version: 1.1.0
   category: services
   tags: [web, server, static, apache]
   icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/apache.svg" }
@@ -40,12 +40,55 @@ services:
       TZ: "{{ host.timezone }}"
     ports:
       - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    # Replaces the image's httpd.conf (read only): the modules a static site needs, the
+    # main site fixed here (an Apache whose sites Hivora does not manage behaves as before),
+    # and the files Hivora writes in the "conf" volume included (e.g. main-off.conf).
+    files:
+      - target: /usr/local/apache2/conf/httpd.conf
+        content: |
+          # Managed by Hivora (httpd template 1.1.0): do not edit.
+          ServerRoot "/usr/local/apache2"
+          Listen 80
+          LoadModule mpm_event_module modules/mod_mpm_event.so
+          LoadModule authz_core_module modules/mod_authz_core.so
+          LoadModule mime_module modules/mod_mime.so
+          LoadModule log_config_module modules/mod_log_config.so
+          LoadModule unixd_module modules/mod_unixd.so
+          LoadModule dir_module modules/mod_dir.so
+          LoadModule autoindex_module modules/mod_autoindex.so
+          LoadModule alias_module modules/mod_alias.so
+          User daemon
+          Group daemon
+          ServerName localhost
+          DirectoryIndex index.html
+          TypesConfig conf/mime.types
+          ErrorLog /proc/self/fd/2
+          LogFormat "%h %l %u %t \"%r\" %>s %b" common
+          CustomLog /proc/self/fd/1 common
+          <Directory />
+              AllowOverride None
+              Require all denied
+          </Directory>
+          # The main site: the "htdocs" volume, on the web port.
+          <VirtualHost *:80>
+              DocumentRoot "/usr/local/apache2/htdocs"
+              <Directory "/usr/local/apache2/htdocs">
+                  Options Indexes FollowSymLinks
+                  AllowOverride None
+                  Require all granted
+              </Directory>
+              IncludeOptional conf/hivora.d/main-*.conf
+          </VirtualHost>
+          # The other sites: one file each, written by Hivora.
+          IncludeOptional conf/hivora.d/site-*.conf
     volumes:
       - { name: htdocs, target: /usr/local/apache2/htdocs, backup: true }
+      - { name: sites, target: /usr/local/apache2/sites, backup: true }
+      - { name: conf, target: /usr/local/apache2/conf/hivora.d }
 access:
   web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
 backup:
-  volumes: [htdocs]
+  volumes: [htdocs, sites]
 update:
   strategy: manual
 defaults:

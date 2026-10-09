@@ -61,11 +61,12 @@ def wait_job(c: TestClient, job_id: int, within: float = 10) -> dict[str, Any]:
 
 
 def nginx_host(c: TestClient, name: str = "Vitrine", port: int = 8190, *,
-               running: bool = False) -> int:  # fmt: skip
-    """An nginx from the catalog that hosts sites (POST /apps, then .../sites/hosting): its
-    app id. ``running``: its container reported running by the fake Docker (it reports
-    none until told), as the routes that reload nginx need."""
-    deployed = c.post(f"{API}/apps", json={"template": "nginx", "name": name,
+               running: bool = False, template: str = "nginx") -> int:  # fmt: skip
+    """An nginx (or another web server: ``template``, e.g. "httpd") from the catalog that
+    hosts sites (POST /apps, then .../sites/hosting): its app id. ``running``: its container
+    reported running by the fake Docker (it reports none until told), as the routes that
+    reload the server need."""
+    deployed = c.post(f"{API}/apps", json={"template": template, "name": name,
                                            "inputs": {"web_port": port}})  # fmt: skip
     assert deployed.status_code == 202, deployed.text
     app: dict[str, Any] = deployed.json()["app"]
@@ -77,7 +78,7 @@ def nginx_host(c: TestClient, name: str = "Vitrine", port: int = 8190, *,
 
         rt = cast(Any, c.app).state.runtime
         rt.gateway.put(ContainerInfo(
-            id=f"ctr-{app['slug']}", name=f"{app['slug']}-server-1", image="nginx",
+            id=f"ctr-{app['slug']}", name=f"{app['slug']}-server-1", image=template,
             state=ContainerState.RUNNING,
             labels={"io.hivora.app": app["slug"], "com.docker.compose.service": "server"},
         ), "start")  # fmt: skip

@@ -24,7 +24,7 @@ from hivora.core.config import Settings
 from hivora.core.errors import ConflictError
 from hivora.core.events import EventBus
 from hivora.jobs import Job, JobKind, JobQueue
-from hivora.sites import core, nginx
+from hivora.sites import core, nginx, servers
 from hivora.sites.models import Site
 from hivora.sites.port_check import PortCheck
 from hivora.sites.views import HostedSite, SiteHost, SitePlan, host_view, site_view
@@ -87,8 +87,8 @@ class SiteHosting:
         site. Nothing is redeployed; a host already is one (no change)."""
         async with self.sessions() as session, session.begin():
             app = await get_app(session, app_id)
-            if await template_slug(session, app) != "nginx":
-                raise NotNginxError("only an nginx app can host sites", app=app.slug)
+            if await template_slug(session, app) not in servers.TEMPLATES:
+                raise NotNginxError("only an nginx or Apache app can host sites", app=app.slug)
             app.mark_hosting()
             if not await session.scalar(select(Site.id).where(Site.app_id == app.id,
                                                               Site.root == "")):  # fmt: skip
