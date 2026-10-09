@@ -8,6 +8,7 @@
     "lint": "tsc --noEmit",
     "gen:api": "cd ../backend && uv run python scripts/export_openapi.py ../frontend/lib/api/openapi.json && cd ../frontend && npx --yes -p typescript@5 -p openapi-typescript@7 openapi-typescript lib/api/openapi.json -o lib/api/schema.d.ts",
     "check:bundle": "node scripts/check-bundle.mjs",
+    "test": "node --test \"features/**/*.test.mjs\"",
     "e2e": "playwright test"
   },
   "dependencies": {

@@ -149,3 +149,57 @@ test("topology: group selection and group move, an nginx with its sites", async 
   expect(Math.round(p1!.y - p0!.y)).toBe(Math.round(g1!.y - g0!.y)); // its site with it
   await expect(bar).toContainText("2 éléments sélectionnés"); // still selected after the refresh
 });
+
+// Magnetic alignment: a card dragged near another's line snaps onto it (a guide shows
+// meanwhile); with Alt held it is placed freely.
+test("topology: cards snap into alignment, Alt places freely", async ({ page }) => {
+  await signIn(page);
+  // Alone in their own zone: no other card to snap to.
+  const { headers, done } = await adminApi(page);
+  await page.request.post("/api/v1/zones", { headers, data: { name: "Aimants", color: "#0ea5e9", network_mode: "none" } });
+  for (const [name, port] of [["Aimant", 8346], ["Repère", 8347]] as const) {
+    const created = await (await page.request.post("/api/v1/apps", {
+      headers, data: { template: "nginx", name, zone: "aimants", inputs: { web_port: port } },
+    })).json(); // prettier-ignore
+    await done(created.job.id);
+  }
+  await page.goto("/topology/");
+  const app = (name: string) => page.locator(".react-flow__node-app").filter({ hasText: name });
+  await expect(app("Repère")).toBeVisible();
+  const guide = page.locator(".react-flow__viewport-portal div[aria-hidden]");
+  const mouse = { x: 0, y: 0 }; // where the pointer is (the card lags behind it a little)
+  const drag = async (dy: number, alt: boolean) => {
+    const b = (await app("Aimant").boundingBox())!;
+    if (alt) await page.keyboard.down("Alt");
+    [mouse.x, mouse.y] = [b.x + 40, b.y + 10];
+    await page.mouse.move(mouse.x, mouse.y);
+    await page.mouse.down();
+    mouse.y += dy;
+    await page.mouse.move(mouse.x, mouse.y, { steps: 12 });
+    return async () => {
+      // Dropped: its position saved, then the graph read again (before any next drag).
+      const saved = page.waitForResponse((r) => r.url().endsWith("/topology/layout"));
+      const reloaded = page.waitForResponse((r) => r.url().endsWith("/api/v1/topology") && r.request().method() === "GET");
+      await page.mouse.up();
+      if (alt) await page.keyboard.up("Alt");
+      await Promise.all([saved, reloaded]);
+    };
+  };
+  const top = async (name: string) => (await app(name).boundingBox())!.y;
+
+  let release = await drag(60, true); // Alt: free, no guide
+  await expect(guide).toHaveCount(0);
+  await release();
+  const offset = (await top("Aimant")) - (await top("Repère"));
+  expect(Math.abs(offset)).toBeGreaterThan(20);
+
+  // Back up near the other's top (React Flow starts a drag a few pixels late: the gap left
+  // is measured, then closed to 1 screen px, under the threshold at any zoom): it snaps.
+  release = await drag(-offset, false);
+  const gap = (await top("Aimant")) - (await top("Repère"));
+  if (Math.abs(gap) > 0.5) await page.mouse.move(mouse.x, mouse.y - gap + Math.sign(gap), { steps: 4 });
+  await expect(guide).not.toHaveCount(0); // 1 px dashed lines: present while dragging
+  await release();
+  expect(Math.abs((await top("Aimant")) - (await top("Repère")))).toBeLessThan(0.5);
+  await expect(guide).toHaveCount(0); // gone once dropped
+});

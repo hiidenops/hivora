@@ -9,14 +9,17 @@ import {
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
+  ViewportPortal,
   useEdgesState,
   useNodesState,
   useReactFlow,
   type Connection,
   type Edge,
   type Node,
+  type NodeChange,
+  type NodePositionChange,
 } from "@xyflow/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useSession } from "@/components/app-shell";
 import { Alert } from "@/components/ui/alert";
@@ -29,6 +32,7 @@ import { connectNodes } from "./connect";
 import { exportJson, exportPng } from "./export";
 import { FirewallDialog } from "@/features/firewall/firewall-panel";
 import { Inspector } from "./inspector";
+import { snap, type Guide } from "./snap";
 import { toFlow, type GNode, type Graph, type Level, type Port } from "./layout";
 import { nodeTypes } from "./nodes";
 import { PendingPanel } from "./pending-panel";
@@ -66,10 +70,41 @@ function Canvas() {
   const [firewallOpen, setFirewallOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<{ jobs: number[]; errors: string[] } | null>(null);
-  const { getIntersectingNodes, getNodesBounds } = useReactFlow();
+  const { getIntersectingNodes, getNodesBounds, getInternalNode } = useReactFlow();
   const [showPending, setShowPending] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  // Magnetic alignment while dragging: the card under the cursor snaps to its neighbours
+  // (same parent), the rest of the group follows; Alt held: free placement.
+  const [guides, setGuides] = useState<Guide[]>([]);
+  const dragged = useRef<{ id: string | null; free: boolean; dx: number; dy: number }>({ id: null, free: false, dx: 0, dy: 0 });
+  const nodesChange = (changes: NodeChange<Node>[]) => {
+    // The drop: React Flow sends its own (unsnapped) position, the last nudge is applied again.
+    for (const c of changes)
+      if (c.type === "position" && !c.dragging && c.position) c.position = { x: c.position.x + dragged.current.dx, y: c.position.y + dragged.current.dy };
+    const moves = changes.filter((c): c is NodePositionChange => c.type === "position" && !!c.dragging && !!c.position);
+    const lead = moves.find((c) => c.id === dragged.current.id) ?? moves[0];
+    const inner = lead && getInternalNode(lead.id);
+    if (lead && inner && !dragged.current.free) {
+      const size = (n: Node) => ({ w: n.measured?.width ?? n.width ?? 0, h: n.measured?.height ?? n.height ?? 0 });
+      const movingIds = new Set(moves.map((m) => m.id));
+      const others = nodes
+        .filter((n) => n.parentId === inner.parentId && !movingIds.has(n.id) && size(n).w > 0)
+        .map((n) => ({ x: n.position.x, y: n.position.y, ...size(n) }));
+      const r = snap({ x: lead.position!.x, y: lead.position!.y, ...size(inner) }, others);
+      for (const m of moves) m.position = { x: m.position!.x + r.dx, y: m.position!.y + r.dy };
+      dragged.current.dx = r.dx;
+      dragged.current.dy = r.dy;
+      // Guides in the drawing's coordinates: the parent's offset added.
+      const at = inner.parentId ? getInternalNode(inner.parentId)?.internals.positionAbsolute : undefined;
+      const [ox, oy] = [at?.x ?? 0, at?.y ?? 0];
+      setGuides(r.guides.map((g) => (g.axis === "x" ? { ...g, at: g.at + ox, from: g.from + oy, to: g.to + oy } : { ...g, at: g.at + oy, from: g.from + ox, to: g.to + ox })));
+    } else if (moves.length) {
+      setGuides([]);
+      dragged.current.dx = dragged.current.dy = 0;
+    }
+    onNodesChange(changes);
+  };
   const refresh = () => qc.invalidateQueries({ queryKey: keys.topology });
 
   const tooBig = (graph?.nodes.length ?? 0) > MAX_DETAILED;
@@ -105,7 +140,11 @@ function Canvas() {
   // One item or a whole selection dropped: each app landing in another zone gets a move
   // prepared (applied later, all at once); otherwise every moved item's position is saved.
   const dragStop = (node: Node, moved: Node[]) => {
-    const group = moved.length ? moved : [node];
+    setGuides([]);
+    // What is saved: the positions shown (snapped), not React Flow's own.
+    const shift = { x: dragged.current.dx, y: dragged.current.dy };
+    dragged.current = { id: null, free: false, dx: 0, dy: 0 };
+    const group = (moved.length ? moved : [node]).map((n) => ({ ...n, position: { x: n.position.x + shift.x, y: n.position.y + shift.y } }));
     if (canEdit) {
       const moves = group.flatMap((n) => {
         const zone = n.type === "app" ? getIntersectingNodes({ id: n.id }).find((z) => z.type === "zone" && z.id !== n.parentId) : undefined;
@@ -188,7 +227,9 @@ function Canvas() {
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
+          onNodesChange={nodesChange}
+          onNodeDragStart={(e, n) => (dragged.current = { id: n.id, free: e.altKey, dx: 0, dy: 0 })}
+          onNodeDrag={(e) => (dragged.current.free = e.altKey)}
           onEdgesChange={onEdgesChange}
           onNodeDragStop={(_, n, moved) => dragStop(n, moved)}
           onNodeClick={(e, n) => setSelected(e.ctrlKey || e.metaKey ? null : n.id)} // adding to a group: no inspector
@@ -230,6 +271,20 @@ function Canvas() {
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={24} />
+          <ViewportPortal>
+            {guides.map((g, i) => (
+              <div
+                key={i}
+                aria-hidden
+                className="pointer-events-none absolute"
+                style={
+                  g.axis === "x"
+                    ? { left: g.at, top: g.from, height: g.to - g.from, borderLeft: "1px dashed var(--primary)" }
+                    : { top: g.at, left: g.from, width: g.to - g.from, borderTop: "1px dashed var(--primary)" }
+                }
+              />
+            ))}
+          </ViewportPortal>
           <Controls showInteractive={false} />
         </ReactFlow>
         {picked.length > 1 && (
