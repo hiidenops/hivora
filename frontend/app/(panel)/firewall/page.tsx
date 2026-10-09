@@ -9,8 +9,8 @@ export default function FirewallPage() {
   return (
     <>
       <PageHeader title={t("nav.firewall")} />
-      <div className="grid max-w-4xl gap-4">
-        <p className="text-sm text-muted-foreground">{t("fw.help")}</p>
+      <div className="grid gap-4">
+        <p className="max-w-4xl text-sm text-muted-foreground">{t("fw.help")}</p>
         <FirewallPanel full />
       </div>
     </>

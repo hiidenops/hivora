@@ -10,6 +10,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input, Switch } from "@/components/ui/input";
 import { ApiError, api } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 import { LiveConnections } from "./connections";
 
@@ -96,7 +97,20 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
 
   return (
         <div className="grid gap-4 text-sm">
-          <Alert tone="warn">{t("fw.dockerBypass")}</Alert>
+          {/* The page's top: the agent's switch on the left, the Docker warning beside it. */}
+          <div className="flex flex-wrap items-stretch gap-4">
+            <div className={cn("surface grid content-center gap-1 rounded-lg border p-3", full && "max-w-md")}>
+              <label className="flex items-center gap-2 font-medium">
+                <Switch checked={!!data?.agent} disabled={!data || act.isPending} onChange={(e) => {
+                  const enabled = e.target.checked;
+                  if (!enabled || window.confirm(t("fw.agentConfirm"))) act.mutate(() => api("/host-firewall/agent", { method: "PUT", body: { enabled } }));
+                }} />
+                {t("fw.agent")}
+              </label>
+              <p className="text-xs text-muted-foreground">{t("fw.agentHelp")}</p>
+            </div>
+            <Alert tone="warn" className="flex min-w-72 flex-1 items-center">{t("fw.dockerBypass")}</Alert>
+          </div>
           {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
           {(act.error ?? confirm.error) && <Alert tone="danger">{errorMessage(act.error ?? confirm.error)}</Alert>}
           {totp && (
@@ -114,20 +128,11 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
               </Button>
             </form>
           )}
-
-          <div className="surface grid gap-1 rounded-lg border p-3">
-            <label className="flex items-center gap-2 font-medium">
-            <Switch checked={!!data?.agent} disabled={!data || act.isPending} onChange={(e) => {
-              const enabled = e.target.checked;
-              if (!enabled || window.confirm(t("fw.agentConfirm"))) act.mutate(() => api("/host-firewall/agent", { method: "PUT", body: { enabled } }));
-            }} />
-            {t("fw.agent")}
-          </label>
-            <p className="text-xs text-muted-foreground">{t("fw.agentHelp")}</p>
-          </div>
+          {/* Who is connected first, then the rest in two columns on a wide screen. */}
+          {full && on && <LiveConnections act={(f) => act.mutate(f)} />}
 
           {data?.agent && (
-            <>
+            <div className={cn("grid items-start gap-4", full && "lg:grid-cols-2")}>
               <section className="surface grid gap-2 rounded-lg border p-3">
                 <h3 className="font-semibold">UFW</h3>
                 {!data.ufw_installed ? (
@@ -187,50 +192,55 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
                 )}
               </section>
 
-              <section className="surface grid gap-2 rounded-lg border p-3">
-                <h3 className="font-semibold">fail2ban</h3>
-                {!data.fail2ban_installed ? (
-                  <p className="text-muted-foreground">{t("fw.f2bMissing")}</p>
-                ) : !data.fail2ban_running ? (
-                  <p className="text-muted-foreground">{t("fw.f2bStopped")}</p>
-                ) : (
-                  data.jails.map((j) => (
-                    <div key={j.name} className="grid gap-1 rounded border p-2">
-                      <p className="font-medium">
-                        {j.name} <span className="text-xs font-normal text-muted-foreground">{t("fw.jailStats", { banned: j.banned.length, total: j.total_banned, failed: j.failed })}</span>
-                      </p>
-                      <ul className="flex flex-wrap gap-1">
-                        {j.banned.map((ip) => (
-                          <li key={ip} className="flex items-center gap-1 rounded bg-danger/10 px-2 py-0.5 font-mono text-xs">
-                            {ip}
-                            <button className="text-muted-foreground hover:text-foreground" aria-label={t("fw.unban", { ip })} title={t("fw.unban", { ip })} onClick={() => act.mutate(() => api(`/host-firewall/fail2ban/${j.name}`, { method: "POST", body: { ip, ban: false } }))}>
-                              ×
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                      <form
-                        className="flex gap-2"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          act.mutate(() => api(`/host-firewall/fail2ban/${j.name}`, { method: "POST", body: { ip: ban[j.name], ban: true } }));
-                        }}
-                      >
-                        <Input className="h-8 w-44 font-mono text-xs" required placeholder="203.0.113.5" value={ban[j.name] ?? ""} onChange={(e) => setBan({ ...ban, [j.name]: e.target.value })} aria-label={t("fw.banIp")} />
-                        <Button size="sm" variant="outline" type="submit">
-                          {t("fw.ban")}
-                        </Button>
-                      </form>
-                    </div>
-                  ))
-                )}
-              </section>
-            </>
+              <div className="grid gap-4">
+                <section className="surface grid gap-2 rounded-lg border p-3">
+                  <h3 className="font-semibold">fail2ban</h3>
+                  {!data.fail2ban_installed ? (
+                    <p className="text-muted-foreground">{t("fw.f2bMissing")}</p>
+                  ) : !data.fail2ban_running ? (
+                    <p className="text-muted-foreground">{t("fw.f2bStopped")}</p>
+                  ) : (
+                    data.jails.map((j) => (
+                      <div key={j.name} className="grid gap-1 rounded border p-2">
+                        <p className="font-medium">
+                          {j.name} <span className="text-xs font-normal text-muted-foreground">{t("fw.jailStats", { banned: j.banned.length, total: j.total_banned, failed: j.failed })}</span>
+                        </p>
+                        <ul className="flex flex-wrap gap-1">
+                          {j.banned.map((ip) => (
+                            <li key={ip} className="flex items-center gap-1 rounded bg-danger/10 px-2 py-0.5 font-mono text-xs">
+                              {ip}
+                              <button className="text-muted-foreground hover:text-foreground" aria-label={t("fw.unban", { ip })} title={t("fw.unban", { ip })} onClick={() => act.mutate(() => api(`/host-firewall/fail2ban/${j.name}`, { method: "POST", body: { ip, ban: false } }))}>
+                                ×
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        <form
+                          className="flex gap-2"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            act.mutate(() => api(`/host-firewall/fail2ban/${j.name}`, { method: "POST", body: { ip: ban[j.name], ban: true } }));
+                          }}
+                        >
+                          <Input className="h-8 w-44 font-mono text-xs" required placeholder="203.0.113.5" value={ban[j.name] ?? ""} onChange={(e) => setBan({ ...ban, [j.name]: e.target.value })} aria-label={t("fw.banIp")} />
+                          <Button size="sm" variant="outline" type="submit">
+                            {t("fw.ban")}
+                          </Button>
+                        </form>
+                      </div>
+                    ))
+                  )}
+                </section>
+                {full && data.fail2ban_running && <JailSettings act={(f) => act.mutate(f)} />}
+              </div>
+            </div>
           )}
-          {full && on && <OpenPorts onPick={data.ufw_installed ? pick : undefined} />}
-          {full && on && <LiveConnections act={(f) => act.mutate(f)} />}
-          {full && on && data.fail2ban_running && <JailSettings act={(f) => act.mutate(f)} />}
-          {full && on && <Routes />}
+          {full && on && (
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+              <OpenPorts onPick={data.ufw_installed ? pick : undefined} />
+              <Routes />
+            </div>
+          )}
           {isFetching && <p className="text-xs text-muted-foreground">{t("common.loading")}</p>}
         </div>
   );
