@@ -101,3 +101,51 @@ test("topology: graph, inspector, declared element, prepared change, JSON export
   const graphSites = (await graph(page)).nodes.filter((n) => n.type === "site" && n.host === `app:${carto}`).map((n) => n.label);
   expect(graphSites).toEqual(["Carto", "Atlas"]);
 });
+
+// Moving several items at once: a selection box (select mode), Ctrl + click to add, the
+// whole group dragged together (every position saved); an nginx carries its sites.
+test("topology: group selection and group move, an nginx with its sites", async ({ page }) => {
+  await signIn(page);
+  const { headers, done } = await adminApi(page);
+  const groupe = (await deployNginx(page, "Groupe", 8343)).app.id;
+  const satellite = (await deployNginx(page, "Satellite", 8345)).app.id;
+  await page.request.post(`/api/v1/apps/${groupe}/sites/hosting`, { headers });
+  const plan = await (await page.request.post(`/api/v1/apps/${groupe}/sites`, { headers, data: { name: "Plan", port: 8344 } })).json();
+  await done(plan.config_job.id);
+
+  await page.goto("/topology/");
+  const flow = page.locator(".react-flow");
+  const node = (text: string) => flow.locator(".react-flow__node").filter({ hasText: text });
+  await expect(node("Plan")).toBeVisible();
+  const bar = page.getByRole("status").filter({ hasText: "éléments sélectionnés" });
+
+  // Select mode: a box drawn on the background selects what it touches.
+  await page.getByRole("tab", { name: "Sélectionner" }).click();
+  const [net, fw] = [await node("Internet").boundingBox(), await node("Pare-feu").boundingBox()];
+  await page.mouse.move(Math.min(net!.x, fw!.x) - 40, net!.y - 30);
+  await page.mouse.down();
+  await page.mouse.move(Math.max(net!.x + net!.width, fw!.x + fw!.width) + 40, fw!.y + fw!.height + 10, { steps: 8 });
+  await page.mouse.up();
+  await expect(bar).toContainText("2 éléments sélectionnés");
+  await page.keyboard.press("Escape");
+  await expect(bar).toBeHidden();
+
+  // Ctrl + click two apps, then drag one: both move, both positions saved; the site follows.
+  const app = (name: string) => flow.locator(`.react-flow__node-app`).filter({ hasText: name });
+  await app("Groupe").click({ modifiers: ["Control"] });
+  await app("Satellite").click({ modifiers: ["Control"] });
+  await expect(bar).toContainText("2 éléments sélectionnés");
+  const [g0, s0, p0] = [await app("Groupe").boundingBox(), await app("Satellite").boundingBox(), await node("Plan").boundingBox()];
+  const saved = page.waitForResponse((r) => r.url().endsWith("/topology/layout") && r.request().method() === "PUT");
+  await page.mouse.move(g0!.x + 30, g0!.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(g0!.x + 30, g0!.y + 90, { steps: 10 });
+  await page.mouse.up();
+  const body = (await saved).request().postDataJSON() as { positions: Record<string, unknown> };
+  expect(Object.keys(body.positions).sort()).toEqual([`app:${groupe}`, `app:${satellite}`].sort());
+  const [g1, s1, p1] = [await app("Groupe").boundingBox(), await app("Satellite").boundingBox(), await node("Plan").boundingBox()];
+  expect(Math.round(g1!.y - g0!.y)).toBeGreaterThan(40);
+  expect(Math.round(s1!.y - s0!.y)).toBe(Math.round(g1!.y - g0!.y)); // moved together
+  expect(Math.round(p1!.y - p0!.y)).toBe(Math.round(g1!.y - g0!.y)); // its site with it
+  await expect(bar).toContainText("2 éléments sélectionnés"); // still selected after the refresh
+});

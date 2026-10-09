@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { Check, Download, FileJson, LayoutTemplate, ListChecks, Plus, Undo2 } from "lucide-react";
+import { Check, Download, FileJson, Hand, LayoutTemplate, ListChecks, Plus, SquareDashedMousePointer, Undo2 } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -30,10 +30,12 @@ export function KindSelect({ value, onChange }: { value: string; onChange: (kind
 
 /** Above the drawing: the detail level, adding a declared item, the prepared changes
  *  (list, apply, discard), the automatic layout, the exports. */
-export function Toolbar({ level, tooBig, onLevel, canEdit, pending, showPending, onTogglePending, applying, onApply, onDiscard, onPng, onJson, onRefresh }: {
+export function Toolbar({ level, tooBig, onLevel, mode, onMode, canEdit, pending, showPending, onTogglePending, applying, onApply, onDiscard, onPng, onJson, onRefresh }: {
   level: Level; // the one shown (zones only when the graph is too big)
   tooBig: boolean;
   onLevel: (level: Level) => void;
+  mode: "pan" | "select"; // what dragging on the background does
+  onMode: (mode: "pan" | "select") => void;
   canEdit: boolean;
   pending: number; // prepared changes
   showPending: boolean;
@@ -72,6 +74,21 @@ export function Toolbar({ level, tooBig, onLevel, canEdit, pending, showPending,
               className={cn("rounded px-3 py-1 text-sm transition-colors disabled:opacity-40", level === l ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
             >
               {t(`topology.level.${l}` as "topology.level.zones")}
+            </button>
+          ))}
+        </div>
+        <div role="tablist" aria-label={t("topology.drag")} className="inline-flex rounded-md border p-0.5">
+          {(["pan", "select"] as const).map((m) => (
+            <button
+              key={m}
+              role="tab"
+              aria-selected={mode === m}
+              title={t(`topology.drag.${m}Help` as "topology.drag.panHelp")}
+              onClick={() => onMode(m)}
+              className={cn("flex items-center gap-1.5 rounded px-3 py-1 text-sm transition-colors", mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+            >
+              {m === "pan" ? <Hand className="size-4" /> : <SquareDashedMousePointer className="size-4" />}
+              {t(`topology.drag.${m}` as "topology.drag.pan")}
             </button>
           ))}
         </div>

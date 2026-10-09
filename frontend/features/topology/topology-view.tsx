@@ -8,6 +8,7 @@ import {
   Controls,
   ReactFlow,
   ReactFlowProvider,
+  SelectionMode,
   useEdgesState,
   useNodesState,
   useReactFlow,
@@ -44,6 +45,7 @@ function Canvas() {
   const { data: graph, error } = useQuery({ queryKey: keys.topology, queryFn: () => api<Graph>("/topology"), refetchInterval: 60_000 });
   const [level, setLevel] = useState<Level>("apps");
   const [selected, setSelected] = useState<string | null>(null);
+  const [mode, setMode] = useState<"pan" | "select">("pan"); // what dragging the background does
   const [changes, setChangesState] = useState<Change[]>(() => {
     try {
       return JSON.parse(sessionStorage.getItem(PENDING) ?? "[]") as Change[];
@@ -90,25 +92,50 @@ function Canvas() {
   }, [graph, effective, canEdit]);
   useEffect(() => {
     if (!flow) return;
-    setNodes(flow.nodes);
+    // A refresh (after a move, every minute) keeps what is selected.
+    setNodes((prev) => {
+      const kept = new Set(prev.filter((n) => n.selected).map((n) => n.id));
+      return kept.size ? flow.nodes.map((n) => (kept.has(n.id) ? { ...n, selected: true } : n)) : flow.nodes;
+    });
     setEdges(flow.edges);
   }, [flow, setNodes, setEdges]);
 
   const gnode = (id: string) => (graph?.nodes as GNode[] | undefined)?.find((n) => n.key === id);
   const onChange = (c: Change) => setChanges((list) => upsert(list, c));
+  // One item or a whole selection dropped: each app landing in another zone gets a move
+  // prepared (applied later, all at once); otherwise every moved item's position is saved.
   const dragStop = (node: Node, moved: Node[]) => {
-    if (node.type === "app" && canEdit) {
-      const zone = getIntersectingNodes(node).find((n) => n.type === "zone" && n.id !== node.parentId);
-      const app = gnode(node.id);
-      if (zone && app) {
-        const z = gnode(zone.id);
-        onChange({ kind: "move", appId: Number(app.id), app: String(app.label), zone: (z?.slug as string | null) ?? null, zoneLabel: String(z?.label ?? t("topology.noZone")) });
-        if (flow) setNodes(flow.nodes); // it moves for real once applied
+    const group = moved.length ? moved : [node];
+    if (canEdit) {
+      const moves = group.flatMap((n) => {
+        const zone = n.type === "app" ? getIntersectingNodes({ id: n.id }).find((z) => z.type === "zone" && z.id !== n.parentId) : undefined;
+        const app = gnode(n.id);
+        return zone && app ? [{ app, z: gnode(zone.id) }] : [];
+      });
+      if (moves.length) {
+        for (const { app, z } of moves)
+          onChange({ kind: "move", appId: Number(app.id), app: String(app.label), zone: (z?.slug as string | null) ?? null, zoneLabel: String(z?.label ?? t("topology.noZone")) });
+        if (flow) setNodes(flow.nodes); // they move for real once applied
         return;
       }
     }
-    savePositions(moved.length ? moved : [node]);
+    savePositions(group);
   };
+  const picked = nodes.filter((n) => n.selected);
+  const selectAll = (on: boolean) => setNodes((list) => list.map((n) => ({ ...n, selected: on })));
+  // Ctrl/Cmd + A: everything; Escape: nothing (not while typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable=true]")) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        selectAll(true);
+      } else if (e.key === "Escape") selectAll(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setNodes is stable
+  }, []);
   const savePositions = (moved: Node[]) => {
     if (!canEdit || !moved.length) return;
     const size = (n: Node) => (n.type === "zone" && n.measured ? { w: Math.round(n.measured.width ?? 0) || null, h: Math.round(n.measured.height ?? 0) || null } : {});
@@ -141,6 +168,8 @@ function Canvas() {
         level={effective}
         tooBig={tooBig}
         onLevel={setLevel}
+        mode={mode}
+        onMode={setMode}
         canEdit={canEdit}
         pending={changes.length}
         showPending={showPending}
@@ -162,7 +191,7 @@ function Canvas() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeDragStop={(_, n, moved) => dragStop(n, moved)}
-          onNodeClick={(_, n) => setSelected(n.id)}
+          onNodeClick={(e, n) => setSelected(e.ctrlKey || e.metaKey ? null : n.id)} // adding to a group: no inspector
           onPaneClick={() => setSelected(null)}
           onConnect={connect}
           onEdgeClick={(_, e) => {
@@ -185,6 +214,14 @@ function Canvas() {
             if (data?.declaredId && window.confirm(t("topology.deleteLink"))) void api(`/topology/edges/${data.declaredId}`, { method: "DELETE" }).then(refresh);
           }}
           nodesDraggable={canEdit}
+          // Group selection: a box (dragging the background in "select" mode, or Shift +
+          // drag), Ctrl/Cmd + click to add; dragging one selected item moves the group.
+          selectionOnDrag={mode === "select"}
+          panOnDrag={mode === "select" ? [1, 2] : true}
+          selectionMode={SelectionMode.Partial}
+          selectionKeyCode="Shift"
+          multiSelectionKeyCode={["Meta", "Control"]}
+          deleteKeyCode={null}
           nodesConnectable={canEdit}
           fitView
           fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
@@ -195,6 +232,14 @@ function Canvas() {
           <Background gap={24} />
           <Controls showInteractive={false} />
         </ReactFlow>
+        {picked.length > 1 && (
+          <div role="status" className="animate-burger absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-full border bg-card px-4 py-1.5 text-sm shadow-lg" title={t("topology.selectedHelp")}>
+            <span className="font-medium">{t("topology.selected", { n: picked.length })}</span>
+            <button className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" onClick={() => selectAll(false)}>
+              {t("topology.unselect")}
+            </button>
+          </div>
+        )}
         {changes.length > 0 && showPending && <PendingPanel changes={changes} onRemove={(c) => setChanges((l) => l.filter((x) => changeKey(x) !== changeKey(c)))} />}
         {node && graph && <Inspector key={node.key} node={node} graph={graph} canEdit={canEdit} changes={changes} onChange={onChange} openFirewall={() => setFirewallOpen(true)} onClose={() => setSelected(null)} onChanged={() => void refresh()} />}
         {firewallOpen && <FirewallDialog open={firewallOpen} onOpenChange={setFirewallOpen} onChanged={() => void refresh()} />}

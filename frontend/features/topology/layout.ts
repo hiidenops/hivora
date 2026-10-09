@@ -22,7 +22,7 @@ const ZONES_PER_ROW = 3;
  * Automatic layout: Internet on top, zones as boxes in rows of three, their apps
  * in two columns inside (each nginx with its hosted sites under it, the shortest column
  * filled first), declared nodes in a column on the left. Positions the user saved win
- * (apps and sites are stored relative to their zone, as React Flow does).
+ * (apps are stored relative to their zone, sites to their nginx, as React Flow does).
  */
 export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): { nodes: Node[]; edges: Edge[] } {
   const nodes = graph.nodes as GNode[];
@@ -91,12 +91,13 @@ export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): {
           data: { ...a, level, zoneColor: z.color, sitePorts: own.map((s) => s.port), hosts: own.length > 0 },
           style: { width: APP_W },
         });
+        // Its sites are its children: they follow it wherever it is moved.
         own.forEach((s, k) => {
           out.push({
             id: s.key,
             type: "site",
-            parentId: z.key,
-            position: pos(s.key, left + SITE_INDENT, HEADER + top + h + SITE_GAP + k * (SITE_H + SITE_GAP)),
+            parentId: a.key,
+            position: pos(s.key, SITE_INDENT, h + SITE_GAP + k * (SITE_H + SITE_GAP)),
             data: { ...s, zoneColor: z.color },
             style: { width: APP_W - SITE_INDENT, height: SITE_H },
           });
