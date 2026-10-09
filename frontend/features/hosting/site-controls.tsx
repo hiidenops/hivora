@@ -18,6 +18,7 @@ import type { HostedSite } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
 import { useSetHostedSiteEnabled } from "./hooks";
+import { useServerName } from "./server";
 
 // Loaded when opened: a site's page stays light.
 const PortDialog = dynamic(() => import("./port-dialog").then((m) => m.PortDialog));
@@ -35,11 +36,12 @@ type Controls = {
 export function SiteSwitch({ appId, site, locked, onJob }: Controls) {
   const { t, errorMessage } = useI18n();
   const { can } = useSession();
+  const server = useServerName();
   const toggle = useSetHostedSiteEnabled(appId);
   const state = site.enabled ? t("hosting.on") : site.main ? t("hosting.offMain") : t("hosting.off");
   return (
     <span className="grid gap-1">
-      <label className="flex items-center gap-2 text-sm" title={t("hosting.switchHelp")}>
+      <label className="flex items-center gap-2 text-sm" title={t("hosting.switchHelp", { server })}>
         <Switch
           checked={site.enabled}
           disabled={!can("operator") || locked || toggle.isPending}

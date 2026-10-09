@@ -13,6 +13,7 @@ import { AppMenu } from "@/features/apps/app-menu";
 import { AppUsage } from "@/features/apps/app-usage";
 import { StatusHero } from "@/features/apps/status-hero";
 import { GamePanel } from "@/features/games/game-panel";
+import { hostsSites } from "@/features/hosting/server";
 
 // Only VPN apps need it: loaded on demand (page budget).
 const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.VpnCard));
@@ -82,7 +83,7 @@ function AppDetail() {
       <div className="stagger grid items-start gap-4 lg:grid-cols-2">
         <StatusHero app={app} status={status} />
         {can("operator") && app.template && <UpgradeBanner appId={app.id} onJob={setActiveJob} />}
-        {app.template === "nginx" && <HostedSitesCard appId={app.id} hosting={app.hosting} onJob={setActiveJob} />}
+        {hostsSites(app.template) && <HostedSitesCard appId={app.id} template={app.template!} hosting={app.hosting} onJob={setActiveJob} />}
         {["healthy", "starting", "degraded"].includes(status) && <AppUsage slug={app.slug} />}
         {app.game && (
           <GamePanel

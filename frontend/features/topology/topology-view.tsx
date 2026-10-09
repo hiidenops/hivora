@@ -70,7 +70,7 @@ function Canvas() {
   const [firewallOpen, setFirewallOpen] = useState(false);
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<{ jobs: number[]; errors: string[] } | null>(null);
-  const { getIntersectingNodes, getNodesBounds, getInternalNode } = useReactFlow();
+  const { getIntersectingNodes, getNodesBounds, getInternalNode, fitView } = useReactFlow();
   const [showPending, setShowPending] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -134,6 +134,16 @@ function Canvas() {
     });
     setEdges(flow.edges);
   }, [flow, setNodes, setEdges]);
+  // A declared element just added sits beside the drawing, maybe out of view: bring the
+  // whole drawing into view once it is there.
+  const declaredCount = useRef<number | null>(null);
+  useEffect(() => {
+    if (!flow) return;
+    const n = flow.nodes.filter((x) => x.type === "declared").length;
+    if (declaredCount.current !== null && n > declaredCount.current)
+      setTimeout(() => void fitView({ duration: 400, maxZoom: 1, padding: 0.15 }), 50);
+    declaredCount.current = n;
+  }, [flow, fitView]);
 
   const gnode = (id: string) => (graph?.nodes as GNode[] | undefined)?.find((n) => n.key === id);
   const onChange = (c: Change) => setChanges((list) => upsert(list, c));

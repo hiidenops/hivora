@@ -8,23 +8,32 @@ import { useTrackJob } from "@/components/job-toasts";
 import { Button } from "@/components/ui/button";
 import { TileSkeletons } from "@/components/ui/skeleton";
 import { HostedSitesCard } from "@/features/hosting/hosted-sites-card";
+import { hostsSites } from "@/features/hosting/server";
 import { useApps } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 
-/** Every site, grouped by the nginx that hosts it: one Sites card per nginx app. */
+/** Every site, grouped by the web server that hosts it (nginx, Apache): one Sites card per
+ *  server app. */
 export default function SitesPage() {
   const { t } = useI18n();
   const { can } = useSession();
   const { data: apps, isPending } = useApps();
   const follow = useTrackJob(); // in a pop-up
-  const hosts = apps?.filter((a) => a.template === "nginx") ?? [];
-  // One request per nginx that hosts sites (GET /apps/{id}/sites); none for the others.
+  const hosts = apps?.filter((a) => hostsSites(a.template)) ?? [];
+  // One request per server that hosts sites (GET /apps/{id}/sites); none for the others.
   const deploy = (
-    <Button asChild>
-      <Link href="/deploy/?template=nginx">
-        <Plus /> {t("sites.newHost")}
-      </Link>
-    </Button>
+    <span className="flex flex-wrap gap-2">
+      <Button asChild>
+        <Link href="/deploy/?template=nginx">
+          <Plus /> {t("sites.newHost")}
+        </Link>
+      </Button>
+      <Button asChild variant="outline">
+        <Link href="/deploy/?template=httpd">
+          <Plus /> {t("sites.newApache")}
+        </Link>
+      </Button>
+    </span>
   );
 
   return (
@@ -40,7 +49,7 @@ export default function SitesPage() {
       )}
       <div className="stagger grid gap-4">
         {hosts.map((a) => (
-          <HostedSitesCard key={a.id} appId={a.id} hosting={a.hosting} title={a.name} onJob={(id) => follow(id)} />
+          <HostedSitesCard key={a.id} appId={a.id} template={a.template!} hosting={a.hosting} title={a.name} onJob={(id) => follow(id)} />
         ))}
       </div>
     </>

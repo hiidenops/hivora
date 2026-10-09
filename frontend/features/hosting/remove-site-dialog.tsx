@@ -11,6 +11,7 @@ import { useI18n } from "@/lib/i18n";
 
 import { useRemovalPlan, useRemoveSite } from "./hooks";
 import { RestartNotice } from "./restart-notice";
+import { useServerName } from "./server";
 
 /** Lists what goes (its nginx configuration, its port) and announces the restart; its files
  *  stay unless asked (unchecked by default). */
@@ -22,6 +23,7 @@ export function RemoveSiteDialog({ appId, site, open, onOpenChange, onJob }: {
   onJob: (jobId: number) => void;
 }) {
   const { t, errorMessage } = useI18n();
+  const server = useServerName();
   const [removeData, setRemoveData] = useState(false);
   const plan = useRemovalPlan(appId, site.id, open);
   const remove = useRemoveSite(appId, site.id);
@@ -37,7 +39,7 @@ export function RemoveSiteDialog({ appId, site, open, onOpenChange, onJob }: {
         ) : (
           <div className="grid gap-4 text-sm">
             <ul className="grid list-disc gap-1 pl-5">
-              <li>{t("hosting.removeConfig")}</li>
+              <li>{t("hosting.removeConfig", { server })}</li>
               {site.port !== null && <li>{t("hosting.removePort", { port: site.port })}</li>}
             </ul>
             <div className="grid gap-2">

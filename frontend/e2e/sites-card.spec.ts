@@ -23,7 +23,7 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
   await page.getByRole("link", { name: "Voir l'application" }).click();
   await expect(page).toHaveURL(/\/app\/\?id=\d+$/);
   const appId = new URL(page.url()).searchParams.get("id");
-  await expect(page.getByText("Ce nginx sert un seul site", { exact: false })).toBeVisible();
+  await expect(page.getByText("Ce serveur nginx sert un seul site", { exact: false })).toBeVisible();
 
   // It hosts sites: its main site is listed, then a site is added after its preview.
   await page.getByRole("button", { name: "Héberger des sites" }).click();
@@ -68,7 +68,7 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
 
   // A stopped nginx: no site added (its revision would start it), each switch still works.
   await page.getByRole("button", { name: "Arrêter", exact: true }).click();
-  await expect(page.getByText("Ce nginx est arrêté", { exact: false })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Ce serveur nginx est arrêté", { exact: false })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("button", { name: "Ajouter un site" })).toBeDisabled();
   await expect(toggle).toBeEnabled();
   await page.getByRole("button", { name: "Actions du site « Blog »" }).click();
@@ -96,7 +96,7 @@ test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", asy
     await route.fulfill({ response, json: { ...host, config } });
   });
   await page.reload();
-  await expect(page.getByText("La dernière configuration de nginx a échoué", { exact: false })).toBeVisible();
+  await expect(page.getByText("La dernière configuration du serveur nginx a échoué", { exact: false })).toBeVisible();
   await expect(page.getByText("[emerg] boom", { exact: false })).toBeVisible();
   const reapplied = page.waitForResponse((r) => r.url().endsWith(`/apps/${appId}/sites/config`));
   await page.getByRole("button", { name: "Réappliquer la configuration" }).click();

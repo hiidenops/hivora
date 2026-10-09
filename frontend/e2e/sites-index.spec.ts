@@ -20,7 +20,7 @@ test("sites index: grouped by nginx, host sites, site links, older bookmarks", a
   await page.reload(); // the apps list read again (not from the dashboard's cache)
   await page.getByRole("link", { name: "Sites" }).click();
   await expect(page.getByRole("heading", { name: "Sites", level: 1 })).toBeVisible();
-  await expect(page.getByText("Aucun nginx pour l'instant", { exact: false })).toBeVisible();
+  await expect(page.getByText("Aucun serveur web pour l'instant", { exact: false })).toBeVisible();
   await expect(page.getByRole("link", { name: "Nouveau nginx" }).first()).toHaveAttribute("href", "/deploy/?template=nginx");
   await expectPointerCursors(page);
   await page.unroute("**/api/v1/apps");
@@ -40,7 +40,7 @@ test("sites index: grouped by nginx, host sites, site links, older bookmarks", a
   await expect(vitrineSites).toHaveCount(0);
   // Vitrine's own card (other nginx may host no sites either).
   const vitrineCard = page.locator("div.rounded-xl").filter({ has: page.getByRole("link", { name: "Vitrine", exact: true }) });
-  await expect(vitrineCard.getByText("Ce nginx sert un seul site", { exact: false })).toBeVisible();
+  await expect(vitrineCard.getByText("Ce serveur nginx sert un seul site", { exact: false })).toBeVisible();
 
   // Vitrine starts hosting from the index; its main site, off then on.
   await vitrineCard.getByRole("button", { name: "Héberger des sites" }).click();

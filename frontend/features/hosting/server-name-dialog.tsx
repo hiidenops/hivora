@@ -10,6 +10,7 @@ import type { HostedSite } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
 import { useSetServerName } from "./hooks";
+import { useServerName } from "./server";
 
 /** The domain name an added site answers to (advanced mode): nginx's files only, no restart. */
 export function ServerNameDialog({ appId, site, open, onOpenChange, onJob }: {
@@ -20,6 +21,7 @@ export function ServerNameDialog({ appId, site, open, onOpenChange, onJob }: {
   onJob: (jobId: number) => void;
 }) {
   const { t, errorMessage } = useI18n();
+  const server = useServerName();
   const [value, setValue] = useState(site.server_name ?? "");
   const save = useSetServerName(appId, site.id);
   const next = value.trim() || null; // empty: any name
@@ -52,7 +54,7 @@ export function ServerNameDialog({ appId, site, open, onOpenChange, onJob }: {
             />
             <p className="text-xs text-muted-foreground">{t("hosting.serverNameHelp")}</p>
           </div>
-          <p className="text-sm text-muted-foreground">{t("hosting.noRestart")}</p>
+          <p className="text-sm text-muted-foreground">{t("hosting.noRestart", { server })}</p>
           {save.error && <Alert tone="danger">{errorMessage(save.error)}</Alert>}
           <Button type="submit" className="justify-self-end" disabled={save.isPending || next === site.server_name}>
             {t("common.save")}

@@ -19,6 +19,7 @@ export function ConfigStatus({ appId, host, always, onJob }: {
   onJob: (jobId: number) => void;
 }) {
   const { t, errorMessage } = useI18n();
+  const server = host.server;
   const { can } = useSession();
   const reapply = useReapplyConfig(appId);
   const failed = host.config?.status === "failed";
@@ -33,12 +34,12 @@ export function ConfigStatus({ appId, host, always, onJob }: {
     <>
       {failed && (
         <Alert tone="danger" className="grid justify-items-start gap-2">
-          <span>{t("hosting.configFailed")}</span>
+          <span>{t("hosting.configFailed", { server })}</span>
           {host.config?.error && <span className="font-mono text-xs">{host.config.error}</span>}
           {again}
         </Alert>
       )}
-      {applying && <p className="text-xs text-muted-foreground">{t("hosting.configApplying")}</p>}
+      {applying && <p className="text-xs text-muted-foreground">{t("hosting.configApplying", { server })}</p>}
       {always && !failed && again && <div>{again}</div>}
       {reapply.error && <Alert tone="danger">{errorMessage(reapply.error)}</Alert>}
     </>

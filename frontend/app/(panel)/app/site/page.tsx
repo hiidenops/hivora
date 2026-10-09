@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfigStatus } from "@/features/hosting/config-status";
 import { useHostedSites } from "@/features/hosting/hooks";
+import { ServerName } from "@/features/hosting/server";
 import { SiteActions, SitePort, SiteSwitch } from "@/features/hosting/site-controls";
 import { ContentCard } from "@/features/sites/content-card";
 import { FilesCard } from "@/features/sites/files-card";
@@ -51,7 +52,7 @@ function HostedSiteDetail() {
   if (!host || !site) return <Alert tone="danger">{t("error.site_not_found")}</Alert>;
 
   return (
-    <>
+    <ServerName.Provider value={host.server}>
       <nav aria-label={t("hosting.breadcrumb")} className="mb-2 flex items-center gap-1 text-sm text-muted-foreground">
         <Link href="/sites/" className="hover:text-foreground">
           {t("nav.sites")}
@@ -89,7 +90,7 @@ function HostedSiteDetail() {
       <div className="mb-6 flex flex-wrap items-center gap-4 text-sm">
         {site.main && <Badge>{t("hosting.main")}</Badge>}
         <SitePort appId={appId} site={site} locked={host.upgrade_required} stopped={host.stopped} onJob={follow} />
-        {host.stopped && <span className="text-muted-foreground">{t("hosting.hostStopped")}</span>}
+        {host.stopped && <span className="text-muted-foreground">{t("hosting.hostStopped", { server: host.server })}</span>}
       </div>
       <div className="mb-6 grid gap-3 empty:hidden">
         <ConfigStatus appId={appId} host={host} always={false} onJob={follow} />
@@ -114,7 +115,7 @@ function HostedSiteDetail() {
         {can("operator") && <ContentCard base={base} onJob={follow} />}
         <FilesCard base={base} canEdit={can("operator")} onJob={follow} />
       </div>
-    </>
+    </ServerName.Provider>
   );
 }
 

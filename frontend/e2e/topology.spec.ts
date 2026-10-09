@@ -122,7 +122,8 @@ test("topology: group selection and group move, an nginx with its sites", async 
   // Select mode: a box drawn on the background selects what it touches.
   await page.getByRole("tab", { name: "Sélectionner" }).click();
   const [net, fw] = [await node("Internet").boundingBox(), await node("Pare-feu").boundingBox()];
-  await page.mouse.move(Math.min(net!.x, fw!.x) - 40, net!.y - 30);
+  const canvas = (await flow.boundingBox())!; // the box starts on the canvas, whatever the zoom
+  await page.mouse.move(Math.min(net!.x, fw!.x) - 40, Math.max(canvas.y + 4, net!.y - 30));
   await page.mouse.down();
   await page.mouse.move(Math.max(net!.x + net!.width, fw!.x + fw!.width) + 40, fw!.y + fw!.height + 10, { steps: 8 });
   await page.mouse.up();
