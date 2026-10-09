@@ -9217,6 +9217,30 @@
         ]
       }
     },
+    "/api/v1/host-firewall/connections": {
+      "get": {
+        "description": "Who is connected to the host now, per remote address (host services by ``ss``,\nDocker apps by ``conntrack`` when the host has it). Read only.",
+        "operationId": "inbound_connections_api_v1_host_firewall_connections_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Inbound Connections Api V1 Host Firewall Connections Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Inbound Connections",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
     "/api/v1/host-firewall/fail2ban/settings": {
       "get": {
         "operationId": "get_jails_api_v1_host_firewall_fail2ban_settings_get",

@@ -142,6 +142,7 @@ class HostFirewall:
         self.bus = bus
         self.store = store  # the published ports, next to what listens on the host
         self._cache: tuple[float, FirewallState] | None = None
+        self.seen: dict[str, float] = {}  # connected address -> first seen (hostfw.connections)
 
     # --- the agent ---------------------------------------------------------------
     async def agent_enabled(self) -> bool:

@@ -11,6 +11,8 @@ import { Input, Switch } from "@/components/ui/input";
 import { ApiError, api } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
+import { LiveConnections } from "./connections";
+
 type State = {
   agent: boolean;
   ufw_installed: boolean;
@@ -226,6 +228,7 @@ export function FirewallPanel({ onChanged, full = false }: { onChanged?: () => v
             </>
           )}
           {full && on && <OpenPorts onPick={data.ufw_installed ? pick : undefined} />}
+          {full && on && <LiveConnections />}
           {full && on && data.fail2ban_running && <JailSettings act={(f) => act.mutate(f)} />}
           {full && on && <Routes />}
           {isFetching && <p className="text-xs text-muted-foreground">{t("common.loading")}</p>}

@@ -1403,6 +1403,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/host-firewall/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inbound Connections
+         * @description Who is connected to the host now, per remote address (host services by ``ss``,
+         *     Docker apps by ``conntrack`` when the host has it). Read only.
+         */
+        get: operations["inbound_connections_api_v1_host_firewall_connections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/host-firewall/fail2ban/settings": {
         parameters: {
             query?: never;
@@ -6682,6 +6703,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inbound_connections_api_v1_host_firewall_connections_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

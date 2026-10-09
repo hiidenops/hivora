@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from hivora.core.errors import PermissionDeniedError
+from hivora.hostfw.connections import connections
 from hivora.hostfw.service import (
     HostFirewall,
     jail_settings,
@@ -117,6 +118,13 @@ class JailsIn(BaseModel):
 async def open_ports(_: Admin, rt: RuntimeDep) -> list[dict[str, Any]]:
     """What listens on the host, what opens it, and what UFW does about it."""
     return await listening(fw(rt))
+
+
+@router.get("/connections")
+async def inbound_connections(_: Admin, rt: RuntimeDep) -> dict[str, Any]:
+    """Who is connected to the host now, per remote address (host services by ``ss``,
+    Docker apps by ``conntrack`` when the host has it). Read only."""
+    return await connections(fw(rt))
 
 
 @router.get("/routes")
