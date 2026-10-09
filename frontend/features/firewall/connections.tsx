@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Download } from "lucide-react";
+import { Ban, Download, Undo2 } from "lucide-react";
+import { useState } from "react";
 
 import { useTrackJob } from "@/components/job-toasts";
 import { Alert } from "@/components/ui/alert";
@@ -19,6 +20,8 @@ type Connection = {
   targets: { port: number; name: string }[];
 };
 type Connections = { conntrack: boolean; connections: Connection[] };
+/** fail2ban's running jails and their banned addresses (the firewall's state). */
+type Jail = { name: string; banned: string[] };
 
 export const useConnections = () =>
   useQuery({ queryKey: ["host-firewall", "connections"], queryFn: () => api<Connections>("/host-firewall/connections"), refetchInterval: 3000 });
@@ -26,9 +29,17 @@ export const useConnections = () =>
 /** Who is connected to the host right now, one row per remote address, read every 3 s
  *  (the Internet first). Read only: blocking an app's visitors is not UFW's job (Docker
  *  bypasses it). Without conntrack on the host, a button installs it (a job); `act` runs
- *  it as the page's other host changes (a fresh TOTP asked for when needed). */
-export function LiveConnections({ act }: { act?: (f: () => Promise<unknown>) => void }) {
+ *  it as the page's other host changes (a fresh TOTP asked for when needed). Each address
+ *  can be banned in a fail2ban jail (`jails`: none when fail2ban is missing or stopped),
+ *  which cuts the host's services only, as the page says: Docker's apps stay reachable. */
+export function LiveConnections({ act, jails = [] }: { act?: (f: () => Promise<unknown>) => void; jails?: Jail[] }) {
   const { t, lang } = useI18n();
+  const [picked, setPicked] = useState<string>();
+  const jail = jails.find((j) => j.name === picked)?.name ?? jails.find((j) => j.name === "sshd")?.name ?? jails[0]?.name;
+  const setBan = (name: string, ip: string, ban: boolean) =>
+    act?.(() => api(`/host-firewall/fail2ban/${name}`, { method: "POST", body: { ip, ban } }));
+  const ban = (ip: string) => jail && window.confirm(t("fw.banConfirm", { ip, jail })) && setBan(jail, ip, true);
+  const unban = (ip: string) => jails.filter((j) => j.banned.includes(ip)).forEach((j) => setBan(j.name, ip, false));
   const track = useTrackJob();
   const install = () =>
     window.confirm(t("fw.conntrackConfirm")) &&
@@ -58,6 +69,16 @@ export function LiveConnections({ act }: { act?: (f: () => Promise<unknown>) => 
           )}
         </Alert>
       )}
+      {act && jails.length > 1 && (
+        <label className="flex items-center gap-2 text-xs">
+          {t("fw.banJail")}
+          <select className="h-8 rounded-md border bg-card px-2 text-sm" value={jail} onChange={(e) => setPicked(e.target.value)}>
+            {jails.map((j) => (
+              <option key={j.name}>{j.name}</option>
+            ))}
+          </select>
+        </label>
+      )}
       {error && <Alert tone="danger">{String(error)}</Alert>}
       <Table>
         <THead>
@@ -66,10 +87,11 @@ export function LiveConnections({ act }: { act?: (f: () => Promise<unknown>) => 
             <Th>{t("fw.reaches")}</Th>
             <Th numeric>{t("fw.connectionCount")}</Th>
             <Th>{t("fw.since")}</Th>
+            {act && <Th>{t("fw.action")}</Th>}
           </tr>
         </THead>
         <TBody>
-          {data?.connections.length === 0 && <TEmpty colSpan={4}>{t("fw.noConnections")}</TEmpty>}
+          {data?.connections.length === 0 && <TEmpty colSpan={act ? 5 : 4}>{t("fw.noConnections")}</TEmpty>}
           {data?.connections.map((c) => (
             <Tr key={c.ip}>
               <Td className="whitespace-nowrap">
@@ -95,10 +117,44 @@ export function LiveConnections({ act }: { act?: (f: () => Promise<unknown>) => 
               </Td>
               <Td numeric>{c.connections}</Td>
               <Td className="whitespace-nowrap text-xs text-muted-foreground">{since(c.first_seen)}</Td>
+              {act && (
+                <Td className="whitespace-nowrap">
+                  <BanCell ip={c.ip} jails={jails} onBan={() => ban(c.ip)} onUnban={() => unban(c.ip)} />
+                </Td>
+              )}
             </Tr>
           ))}
         </TBody>
       </Table>
+      {act && <p className="text-xs text-muted-foreground">{t("fw.banAppsNote")}</p>}
     </section>
+  );
+}
+
+/** An address's ban: "Banned (jails)" and unban when a jail holds it, else ban (off
+ *  without a running fail2ban). */
+function BanCell({ ip, jails, onBan, onUnban }: { ip: string; jails: Jail[]; onBan: () => void; onUnban: () => void }) {
+  const { t } = useI18n();
+  const holding = jails.filter((j) => j.banned.includes(ip)).map((j) => j.name);
+  if (holding.length)
+    return (
+      <span className="flex items-center gap-2">
+        <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10px] font-medium text-danger">{t("fw.bannedIn", { jails: holding.join(", ") })}</span>
+        <Button size="sm" variant="ghost" onClick={onUnban} aria-label={t("fw.unban", { ip })} title={t("fw.unban", { ip })}>
+          <Undo2 />
+        </Button>
+      </span>
+    );
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      disabled={!jails.length}
+      onClick={onBan}
+      aria-label={t("fw.banIpNamed", { ip })}
+      title={jails.length ? t("fw.banIpNamed", { ip }) : t("fw.banNoF2b")}
+    >
+      <Ban /> {t("fw.ban")}
+    </Button>
   );
 }
