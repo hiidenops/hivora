@@ -2023,7 +2023,8 @@
           "backup_restore",
           "site_content",
           "site_file",
-          "site_config"
+          "site_config",
+          "host_package"
         ],
         "title": "JobKind",
         "type": "string"
@@ -9236,6 +9237,28 @@
           }
         },
         "summary": "Inbound Connections",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/connections/conntrack": {
+      "post": {
+        "description": "Install conntrack on the host (Debian, Ubuntu: apt-get), by a job: the apps'\nconnections become visible. Like every host change: admin and a recent TOTP.",
+        "operationId": "install_conntrack_api_v1_host_firewall_connections_conntrack_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Install Conntrack",
         "tags": [
           "host-firewall"
         ]

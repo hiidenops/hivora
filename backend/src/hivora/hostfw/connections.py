@@ -5,7 +5,8 @@ own sockets (``ss``: SSH and the other host services) and the kernel's connectio
 tracking (``conntrack``: Docker publishes the apps' ports by NAT, so their connections
 never show in ``ss``). Only inbound connections count: to a port the host listens on,
 or to a port Docker publishes. ``conntrack`` comes from the host (``apt install
-conntrack``); without it only the host's own services are seen.
+conntrack``); without it only the host's own services are seen, and an admin can have
+it installed (a job: the fixed apt-get command lines below, Debian and Ubuntu only).
 """
 
 import ipaddress
@@ -15,12 +16,25 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-from hivora.hostfw.service import HostFirewall, parse_ss
+from hivora.core.errors import ConflictError
+from hivora.hostfw.service import AgentOffError, HostCommandError, HostFirewall, parse_ss
+from hivora.jobs import Job, JobContext, JobKind, JobQueue
 
 SS_ESTABLISHED = ["ss", "-H", "-tnp", "state", "established"]
 SS_LISTENING = ["ss", "-H", "-tulpn"]
 CONNTRACK = ["conntrack", "-L", "-p", "tcp", "--state", "ESTABLISHED"]
 MAX_ROWS = 500
+# The only package the agent installs, by these fixed command lines (no argument from the
+# user); the package lists are refreshed once if apt does not know it yet.
+APT = ["env", "DEBIAN_FRONTEND=noninteractive", "apt-get"]
+INSTALL = [*APT, "install", "-y", "--no-install-recommends", "conntrack"]
+APT_UPDATE = [*APT, "update"]
+INSTALL_TIMEOUT_S = 600
+
+
+class NoAptError(ConflictError):
+    code = "host_no_apt"
+
 
 _ADDR = re.compile(r"^\[?(.+?)\]?:(\d+)$")
 _PROCESS = re.compile(r'users:\(\("([^"]+)"')
@@ -148,3 +162,38 @@ async def connections(fw: HostFirewall) -> dict[str, Any]:
                  listening=listening, published=published, containers=containers,
                  seen=fw.seen, now=time.time())  # fmt: skip
     return {"conntrack": code == 0, "connections": rows}
+
+
+# --- installing conntrack on the host (a job) ---------------------------------------------
+
+
+async def request_conntrack(fw: HostFirewall, jobs: JobQueue) -> Job:
+    """Queue the conntrack install (no app: it runs beside the apps' jobs)."""
+    if not await fw.agent_enabled():
+        raise AgentOffError("the host agent is off (Settings → host firewall)")
+    async with fw.sessions() as session, session.begin():
+        job = jobs.add(session, JobKind.HOST_PACKAGE, params={"package": "conntrack"})
+    jobs.wake()
+    fw.bus.publish("hostfw.package_requested", target="conntrack", job=job.id)
+    return job
+
+
+def register_conntrack(fw: HostFirewall, jobs: JobQueue) -> None:
+    async def install(ctx: JobContext) -> None:
+        await ctx.progress(5, "apt-get")
+        code, out = await fw._run([*APT, "--version"], check=False)
+        if code != 0:
+            raise NoAptError("apt-get is not on the host: install conntrack by hand")
+        await ctx.progress(20, "conntrack")
+        code, out = await fw._run(INSTALL, check=False, limit_s=INSTALL_TIMEOUT_S)
+        if code != 0 and "Unable to locate package" in out:  # stale package lists
+            await ctx.log(out[-2000:])
+            await ctx.progress(40, "apt-get update")
+            await fw._run(APT_UPDATE, limit_s=INSTALL_TIMEOUT_S)
+            code, out = await fw._run(INSTALL, check=False, limit_s=INSTALL_TIMEOUT_S)
+        await ctx.log(out[-4000:])
+        if code != 0:
+            raise HostCommandError("apt-get failed", output=out[-500:])
+        fw.bus.publish("hostfw.package_installed", target="conntrack")
+
+    jobs.register(JobKind.HOST_PACKAGE, install)

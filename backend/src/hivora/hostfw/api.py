@@ -6,8 +6,9 @@ from typing import Any, Literal
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from hivora.apps.api.common import JobRef, job_ref
 from hivora.core.errors import PermissionDeniedError
-from hivora.hostfw.connections import connections
+from hivora.hostfw.connections import connections, request_conntrack
 from hivora.hostfw.service import (
     HostFirewall,
     jail_settings,
@@ -125,6 +126,14 @@ async def inbound_connections(_: Admin, rt: RuntimeDep) -> dict[str, Any]:
     """Who is connected to the host now, per remote address (host services by ``ss``,
     Docker apps by ``conntrack`` when the host has it). Read only."""
     return await connections(fw(rt))
+
+
+@router.post("/connections/conntrack", status_code=202)
+async def install_conntrack(principal: Admin, rt: RuntimeDep) -> JobRef:
+    """Install conntrack on the host (Debian, Ubuntu: apt-get), by a job: the apps'
+    connections become visible. Like every host change: admin and a recent TOTP."""
+    confirmed(principal, rt)
+    return job_ref(await request_conntrack(fw(rt), rt.jobs))
 
 
 @router.get("/routes")

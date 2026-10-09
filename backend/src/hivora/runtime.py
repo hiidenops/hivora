@@ -22,6 +22,7 @@ from hivora.db.migrate import upgrade_to_head
 from hivora.docker_gateway import DockerGateway
 from hivora.games.modpacks import ModpackCatalog
 from hivora.games.worlds import WorldJobs
+from hivora.hostfw.connections import register_conntrack
 from hivora.hostfw.service import HostFirewall
 from hivora.jobs import JobQueue
 from hivora.metrics.apps import AppMetrics
@@ -154,6 +155,7 @@ class Runtime:
         vpn = VpnTools(sessions=sessions, apps=apps, box=box, bus=bus, clock=clock,
                        gateway=gateway)  # fmt: skip
         hostfw = HostFirewall(sessions=sessions, gateway=gateway, bus=bus, store=state.store)
+        register_conntrack(hostfw, jobs)  # the conntrack install job
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),

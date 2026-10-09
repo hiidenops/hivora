@@ -96,3 +96,40 @@ def test_connections_route_through_the_agent(client: Any) -> None:
         ("203.0.113.24", 2, [{"port": 25565, "name": "survie"}]),
         ("192.168.1.12", 2, [{"port": 22, "name": "sshd"}]),
     ]  # fmt: skip
+
+
+def test_conntrack_installed_by_a_job_on_request(client: Any) -> None:
+    from helpers import wait_job
+
+    from hivora.hostfw.connections import APT_UPDATE, INSTALL
+
+    admin(client)
+    gw = client.app.state.runtime.gateway
+    url = f"{API}/host-firewall/connections/conntrack"
+    assert client.post(url).status_code == 409  # agent off: nothing queued
+    client.put(f"{API}/host-firewall/agent", json={"enabled": True})
+
+    # Debian or Ubuntu: the fixed install line, by a job; audited.
+    r = client.post(url)
+    assert r.status_code == 202 and r.json()["kind"] == "host_package"
+    assert wait_job(client, r.json()["id"])["status"] == "succeeded"
+    calls = [c[len(HOST) :] for c in gw.exec_calls]
+    assert INSTALL in calls and APT_UPDATE not in calls
+    deadline = time.monotonic() + 3  # the audit recorder writes in small batches
+    while True:
+        actions = [a["action"] for a in client.get(f"{API}/audit").json()]
+        if {"hostfw.package_requested", "hostfw.package_installed"} <= set(actions):
+            break
+        assert time.monotonic() < deadline, actions
+        time.sleep(0.1)
+
+    # Stale package lists: refreshed once, then tried again (still failing here: reported).
+    gw.exec_results[host(*INSTALL)] = (100, "E: Unable to locate package conntrack")
+    job = wait_job(client, client.post(url).json()["id"])
+    assert job["status"] == "failed" and APT_UPDATE in [c[len(HOST) :] for c in gw.exec_calls]
+
+    # No apt-get on the host: refused with a clear error, nothing installed.
+    gw.exec_results[host("env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "--version")] = (
+        127, "nsenter: failed to execute env: apt-get: No such file or directory")  # fmt: skip
+    job = wait_job(client, client.post(url).json()["id"])
+    assert job["status"] == "failed" and "install conntrack by hand" in job["error"]

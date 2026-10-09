@@ -333,7 +333,9 @@ export const fr = {
   "fw.connections": "Connexions en cours",
   "fw.connectionsLive": "En direct · toutes les 3 s",
   "fw.connectionsHelp": "Qui est connecté à la machine maintenant, par adresse : les services de l'hôte (SSH…) et les apps publiées par Docker. Lecture seule : bloquer un visiteur d'une app ne passe pas par UFW, que Docker contourne.",
-  "fw.conntrackMissing": "Les connexions vers les apps Docker ne sont pas visibles : installez conntrack sur la machine (apt install conntrack). Seuls les services de l'hôte (SSH…) sont listés.",
+  "fw.conntrackMissing": "Les connexions vers les apps Docker ne sont pas visibles : conntrack n'est pas installé sur la machine. Seuls les services de l'hôte (SSH…) sont listés.",
+  "fw.conntrackInstall": "Installer conntrack",
+  "fw.conntrackConfirm": "Installer le paquet conntrack sur la machine (apt-get, Debian et Ubuntu) ? Il sert à voir les connexions vers les apps Docker.",
   "fw.noConnections": "Aucune connexion entrante en ce moment.",
   "fw.reaches": "Accède à",
   "fw.connectionCount": "Connexions",
@@ -618,6 +620,7 @@ export const fr = {
 
   "job.kind.deploy": "Déploiement",
   "job.kind.start": "Démarrage",
+  "job.kind.host_package": "Installation d'un paquet sur la machine",
   "job.kind.stop": "Arrêt",
   "job.kind.restart": "Redémarrage",
   "job.kind.remove": "Suppression",

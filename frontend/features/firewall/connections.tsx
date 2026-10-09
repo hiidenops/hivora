@@ -1,9 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { Download } from "lucide-react";
 
+import { useTrackJob } from "@/components/job-toasts";
 import { Alert } from "@/components/ui/alert";
-import { api } from "@/lib/api/client";
+import { Button } from "@/components/ui/button";
+import { api, type JobRef } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -20,9 +23,14 @@ const th = "px-2 py-1 text-left font-medium text-muted-foreground";
 
 /** Who is connected to the host right now, one row per remote address, read every 3 s
  *  (the Internet first). Read only: blocking an app's visitors is not UFW's job (Docker
- *  bypasses it). */
-export function LiveConnections() {
+ *  bypasses it). Without conntrack on the host, a button installs it (a job); `act` runs
+ *  it as the page's other host changes (a fresh TOTP asked for when needed). */
+export function LiveConnections({ act }: { act?: (f: () => Promise<unknown>) => void }) {
   const { t, lang } = useI18n();
+  const track = useTrackJob();
+  const install = () =>
+    window.confirm(t("fw.conntrackConfirm")) &&
+    act?.(async () => track((await api<JobRef>("/host-firewall/connections/conntrack", { method: "POST" })).id));
   const { data, error } = useQuery({
     queryKey: ["host-firewall", "connections"],
     queryFn: () => api<Connections>("/host-firewall/connections"),
@@ -42,7 +50,16 @@ export function LiveConnections() {
         </span>
       </div>
       <p className="text-xs text-muted-foreground">{t("fw.connectionsHelp")}</p>
-      {data && !data.conntrack && <Alert tone="warn">{t("fw.conntrackMissing")}</Alert>}
+      {data && !data.conntrack && (
+        <Alert tone="warn" className="flex flex-wrap items-center justify-between gap-3">
+          <span>{t("fw.conntrackMissing")}</span>
+          {act && (
+            <Button size="sm" variant="outline" onClick={install}>
+              <Download /> {t("fw.conntrackInstall")}
+            </Button>
+          )}
+        </Alert>
+      )}
       {error && <Alert tone="danger">{String(error)}</Alert>}
       {data && data.connections.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("fw.noConnections")}</p>

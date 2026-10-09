@@ -160,11 +160,12 @@ class HostFirewall:
         self._cache = None
         self.bus.publish("hostfw.agent_enabled" if on else "hostfw.agent_disabled")
 
-    async def _run(self, argv: list[str], *, check: bool = True) -> tuple[int, str]:
+    async def _run(self, argv: list[str], *, check: bool = True,
+                   limit_s: float = TIMEOUT_S) -> tuple[int, str]:  # fmt: skip
         if not await self.agent_enabled():
             raise AgentOffError("the host agent is off (Settings → host firewall)")
         agent = await self.gateway.ensure_agent(AGENT, AGENT_IMAGE, LABELS)
-        async with asyncio.timeout(TIMEOUT_S):
+        async with asyncio.timeout(limit_s):
             code, out = await self.gateway.exec_run(agent, [*HOST, *argv])
         if check and code != 0:
             raise HostCommandError(f"{argv[0]} failed", output=out[-500:])

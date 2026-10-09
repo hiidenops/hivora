@@ -29,6 +29,7 @@ class JobKind(StrEnum):
     SITE_CONTENT = "site_content"
     SITE_FILE = "site_file"
     SITE_CONFIG = "site_config"
+    HOST_PACKAGE = "host_package"  # a package the host agent needs, installed on the host
 
 
 class JobStatus(StrEnum):

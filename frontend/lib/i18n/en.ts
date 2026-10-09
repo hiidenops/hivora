@@ -334,7 +334,9 @@ export const en: Record<MessageKey, string> = {
   "fw.connections": "Current connections",
   "fw.connectionsLive": "Live · every 3 s",
   "fw.connectionsHelp": "Who is connected to the machine now, per address: the host's services (SSH…) and the apps Docker publishes. Read only: blocking an app's visitor is not done through UFW, which Docker bypasses.",
-  "fw.conntrackMissing": "Connections to Docker apps are not visible: install conntrack on the machine (apt install conntrack). Only the host's services (SSH…) are listed.",
+  "fw.conntrackMissing": "Connections to Docker apps are not visible: conntrack is not installed on the machine. Only the host's services (SSH…) are listed.",
+  "fw.conntrackInstall": "Install conntrack",
+  "fw.conntrackConfirm": "Install the conntrack package on the machine (apt-get, Debian and Ubuntu)? It shows the connections to Docker apps.",
   "fw.noConnections": "No inbound connection right now.",
   "fw.reaches": "Reaches",
   "fw.connectionCount": "Connections",
@@ -618,6 +620,7 @@ export const en: Record<MessageKey, string> = {
   "remove.dataKept": "Data is kept in:",
 
   "job.kind.deploy": "Deployment",
+  "job.kind.host_package": "Installing a package on the machine",
   "job.kind.start": "Start",
   "job.kind.stop": "Stop",
   "job.kind.restart": "Restart",

@@ -1424,6 +1424,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/host-firewall/connections/conntrack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install Conntrack
+         * @description Install conntrack on the host (Debian, Ubuntu: apt-get), by a job: the apps'
+         *     connections become visible. Like every host change: admin and a recent TOTP.
+         */
+        post: operations["install_conntrack_api_v1_host_firewall_connections_conntrack_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/host-firewall/fail2ban/settings": {
         parameters: {
             query?: never;
@@ -2784,7 +2805,7 @@ export interface components {
          * JobKind
          * @enum {string}
          */
-        JobKind: "deploy" | "update" | "remove" | "pull" | "start" | "stop" | "restart" | "rollback" | "adopt" | "convert" | "move_zone" | "world_import" | "world_delete" | "backup" | "backup_restore" | "site_content" | "site_file" | "site_config";
+        JobKind: "deploy" | "update" | "remove" | "pull" | "start" | "stop" | "restart" | "rollback" | "adopt" | "convert" | "move_zone" | "world_import" | "world_delete" | "backup" | "backup_restore" | "site_content" | "site_file" | "site_config" | "host_package";
         /** JobOut */
         JobOut: {
             /** App Id */
@@ -6725,6 +6746,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    install_conntrack_api_v1_host_firewall_connections_conntrack_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
                 };
             };
         };

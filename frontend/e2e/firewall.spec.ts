@@ -36,7 +36,15 @@ test("firewall: host agent turned on, then off", async ({ page }) => {
   await expect(row).toContainText("Internet", { timeout: 10_000 }); // the next refresh
   await expect(row).toContainText("survie (25565)");
   await expect(row).toContainText("il y a 3 minutes");
-  await expect(live.getByText("installez conntrack", { exact: false })).toBeVisible(); // apps unseen
+  await expect(live.getByText("conntrack n'est pas installé", { exact: false })).toBeVisible(); // apps unseen
+  // Installed on request: confirmed, then a job followed in a pop-up.
+  page.once("dialog", (d) => {
+    expect(d.message()).toContain("Installer le paquet conntrack");
+    void d.accept();
+  });
+  await live.getByRole("button", { name: "Installer conntrack" }).click();
+  const job = page.getByRole("region", { name: "Suivi des tâches" }).getByRole("status", { name: "Installation d'un paquet sur la machine" });
+  await expect(job.getByText("Réussi")).toBeVisible({ timeout: 20_000 });
   await page.unroute("**/api/v1/host-firewall/connections");
 
   await toggle.click(); // no warning to turn it off
