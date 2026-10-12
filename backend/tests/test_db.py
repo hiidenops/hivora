@@ -197,3 +197,62 @@ def test_migration_0017_site_config_job_kind(tmp_path: Path) -> None:
     with engine.begin() as conn:
         add_job(conn, "site_config")
     engine.dispose()
+
+
+def test_migration_0019_blocked_addresses_and_host_firewall_job_kind(tmp_path: Path) -> None:
+    db = tmp_path / "hivora.db"
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0018")
+    engine = make_sync_engine(db)
+    now = "2026-10-12 12:00:00"
+
+    def add_job(conn: Connection, kind: str) -> None:
+        conn.execute(text("INSERT INTO job (kind, params, status, progress, log, created_at)"
+                          " VALUES (:k, '{}', 'queued', 0, '', :t)"),
+                     {"k": kind, "t": now})  # fmt: skip
+
+    def block(conn: Connection, address: str, user: int | None = None) -> None:
+        conn.execute(text("INSERT INTO blocked_address (address, created_by, created_at)"
+                          " VALUES (:a, :u, :t)"), {"a": address, "u": user, "t": now})  # fmt: skip
+
+    with engine.begin() as conn:
+        add_job(conn, "host_package")
+        conn.execute(text("INSERT INTO user (id, username, password_hash, role,"
+                          " must_change_password, disabled, totp_enabled, recovery_codes,"
+                          " created_at) VALUES (7, 'ops', 'x', 'admin', 0, 0, 0, '[]', :t)"),
+                     {"t": now})  # fmt: skip
+    with pytest.raises(IntegrityError), engine.begin() as conn:  # not a job kind yet
+        add_job(conn, "host_firewall")
+    assert "blocked_address" not in inspect(engine).get_table_names()
+
+    command.upgrade(cfg, "0019")
+    with engine.begin() as conn:
+        add_job(conn, "host_firewall")
+        block(conn, "203.0.113.24", user=7)
+        block(conn, "2001:db8::7")
+    for refused in ("203.0.113.24", ""):  # the same address twice, an empty one
+        with pytest.raises(IntegrityError), engine.begin() as conn:
+            block(conn, refused)
+    with pytest.raises(IntegrityError), engine.begin() as conn:  # an unknown user
+        block(conn, "198.51.100.3", user=99)
+    with pytest.raises(IntegrityError), engine.begin() as conn:  # the CHECK still holds
+        add_job(conn, "host_unknown")
+    with engine.begin() as conn:  # removing the user keeps the block, without its author
+        conn.execute(text("DELETE FROM user WHERE id = 7"))
+    with engine.connect() as conn:
+        rows = conn.execute(text("SELECT address, created_by FROM blocked_address ORDER BY id"))
+        assert [tuple(r) for r in rows] == [("203.0.113.24", None), ("2001:db8::7", None)]
+        assert conn.execute(text("PRAGMA integrity_check")).scalar() == "ok"
+        assert conn.execute(text("PRAGMA foreign_key_check")).all() == []
+
+    command.downgrade(cfg, "0018")
+    with engine.connect() as conn:  # host_firewall jobs and the table removed, the rest kept
+        assert conn.execute(text("SELECT kind FROM job")).scalars().all() == ["host_package"]
+        assert "blocked_address" not in inspect(engine).get_table_names()
+        assert conn.execute(text("PRAGMA integrity_check")).scalar() == "ok"
+
+    command.upgrade(cfg, "head")  # and back up again
+    with engine.begin() as conn:
+        add_job(conn, "host_firewall")
+        block(conn, "203.0.113.24")
+    engine.dispose()

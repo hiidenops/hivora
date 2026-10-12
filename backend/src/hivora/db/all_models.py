@@ -9,6 +9,7 @@ import hivora.audit.models
 import hivora.auth.models
 import hivora.backups.models
 import hivora.db.models
+import hivora.hostfw.models
 import hivora.jobs.models
 import hivora.sites.models
 import hivora.tasks.models

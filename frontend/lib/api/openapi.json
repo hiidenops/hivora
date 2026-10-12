@@ -2062,7 +2062,8 @@
           "site_content",
           "site_file",
           "site_config",
-          "host_package"
+          "host_package",
+          "host_firewall"
         ],
         "title": "JobKind",
         "type": "string"

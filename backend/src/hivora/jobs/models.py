@@ -30,6 +30,7 @@ class JobKind(StrEnum):
     SITE_FILE = "site_file"
     SITE_CONFIG = "site_config"
     HOST_PACKAGE = "host_package"  # a package the host agent needs, installed on the host
+    HOST_FIREWALL = "host_firewall"  # the blocked addresses applied to the host
 
 
 class JobStatus(StrEnum):
