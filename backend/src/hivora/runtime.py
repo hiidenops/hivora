@@ -26,6 +26,7 @@ from hivora.games.worlds import WorldJobs
 from hivora.hostfw.blocking import Blocking
 from hivora.hostfw.connections import register_conntrack
 from hivora.hostfw.service import HostFirewall
+from hivora.hostfw.static_routes import StaticRoutes
 from hivora.jobs import JobQueue
 from hivora.metrics.apps import AppMetrics
 from hivora.metrics.host import HostMetrics
@@ -79,6 +80,7 @@ class Runtime:
     vpn: VpnTools
     hostfw: HostFirewall
     blocking: Blocking
+    static_routes: StaticRoutes
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
     consoles: "ConsoleManager" = field(init=False)
@@ -169,12 +171,14 @@ class Runtime:
             host_ips=lambda: [settings.host_lan_ip, public_address.current()],
         )
         blocking.register()  # the host_firewall job
+        static_routes = StaticRoutes(fw=hostfw, sessions=sessions, jobs=jobs, bus=bus, clock=clock)
+        static_routes.register()  # the host_route job
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
                    public_address, AppMetrics(gateway, state.store, bus), backups,
                    sites, site_files, site_config, site_hosting, tasks, vpn, hostfw,
-                   blocking)  # fmt: skip
+                   blocking, static_routes)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
@@ -200,6 +204,7 @@ class Runtime:
             asyncio.create_task(check_images(self.apps.custom), name="free-image-updates"),
         ]
         await self.blocking.reapply()  # the host may have rebooted: its rules are gone
+        await self.static_routes.reapply()  # and its static routes
         await self.jobs.start()
 
     async def tasks_tick(self) -> None:

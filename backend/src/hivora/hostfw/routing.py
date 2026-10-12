@@ -150,15 +150,21 @@ def plan(
     241 on the host that are no longer wanted (``present``: ``ip -j route show proto 241``)."""
     keep = sorted(wanted, key=lambda r: ipaddress.IPv4Network(r.destination))
     names = {r.destination for r in keep}
+    return keep, [n for n in marked(present) if n not in names]
+
+
+def marked(present: Iterable[dict[str, Any]]) -> list[str]:
+    """The destinations of ``ip -j route show proto 241``, canonical and sorted (ip prints one
+    address without its /32)."""
     found: set[IPv4] = set()
-    for p in present:  # ip prints one address without its /32: made canonical first
+    for p in present:
         try:
             net = ipaddress.ip_network(str(p.get("dst")), strict=False)
         except ValueError:
             continue
         if isinstance(net, IPv4) and net.prefixlen:
             found.add(net)
-    return keep, [str(n) for n in sorted(found) if str(n) not in names]
+    return [str(n) for n in sorted(found)]
 
 
 def replace_argv(r: Route) -> list[str]:

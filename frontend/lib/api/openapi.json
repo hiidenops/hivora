@@ -3896,6 +3896,152 @@
         "title": "SiteToggleIn",
         "type": "object"
       },
+      "StaticRouteIn": {
+        "properties": {
+          "destination": {
+            "maxLength": 18,
+            "title": "Destination",
+            "type": "string"
+          },
+          "dev": {
+            "anyOf": [
+              {
+                "maxLength": 15,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev"
+          },
+          "gateway": {
+            "maxLength": 15,
+            "title": "Gateway",
+            "type": "string"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "maximum": 4294967295.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "destination",
+          "gateway"
+        ],
+        "title": "StaticRouteIn",
+        "type": "object"
+      },
+      "StaticRouteOut": {
+        "properties": {
+          "applied": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "destination": {
+            "title": "Destination",
+            "type": "string"
+          },
+          "dev": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev"
+          },
+          "gateway": {
+            "title": "Gateway",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "id",
+          "destination",
+          "gateway",
+          "dev",
+          "metric",
+          "note",
+          "created_by",
+          "created_at",
+          "applied"
+        ],
+        "title": "StaticRouteOut",
+        "type": "object"
+      },
       "SummaryItemOut": {
         "properties": {
           "label": {
@@ -9652,6 +9798,114 @@
           }
         },
         "summary": "Host Routes",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/static-routes": {
+      "get": {
+        "description": "The host's static IPv4 routes kept by Hivora (marked proto 241), each with whether\nit is set on the host now.",
+        "operationId": "static_routes_api_v1_host_firewall_static_routes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StaticRouteOut"
+                  },
+                  "title": "Response Static Routes Api V1 Host Firewall Static Routes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Static Routes",
+        "tags": [
+          "host-firewall"
+        ]
+      },
+      "post": {
+        "description": "Add a route (a job sets it). Refused when it could cut the host off: the default\nroute, a connected network, the requester's own address, a gateway out of reach.",
+        "operationId": "add_static_route_api_v1_host_firewall_static_routes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StaticRouteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Static Route",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/static-routes/{route_id}": {
+      "delete": {
+        "operationId": "remove_static_route_api_v1_host_firewall_static_routes__route_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "route_id",
+            "required": true,
+            "schema": {
+              "title": "Route Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Static Route",
         "tags": [
           "host-firewall"
         ]

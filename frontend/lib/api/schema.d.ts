@@ -1565,6 +1565,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/host-firewall/static-routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Static Routes
+         * @description The host's static IPv4 routes kept by Hivora (marked proto 241), each with whether
+         *     it is set on the host now.
+         */
+        get: operations["static_routes_api_v1_host_firewall_static_routes_get"];
+        put?: never;
+        /**
+         * Add Static Route
+         * @description Add a route (a job sets it). Refused when it could cut the host off: the default
+         *     route, a connected network, the requester's own address, a gateway out of reach.
+         */
+        post: operations["add_static_route_api_v1_host_firewall_static_routes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-firewall/static-routes/{route_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Static Route */
+        delete: operations["remove_static_route_api_v1_host_firewall_static_routes__route_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/host-firewall/ufw": {
         parameters: {
             query?: never;
@@ -3502,6 +3545,43 @@ export interface components {
         SiteToggleIn: {
             /** Enabled */
             enabled: boolean;
+        };
+        /** StaticRouteIn */
+        StaticRouteIn: {
+            /** Destination */
+            destination: string;
+            /** Dev */
+            dev?: string | null;
+            /** Gateway */
+            gateway: string;
+            /** Metric */
+            metric?: number | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** StaticRouteOut */
+        StaticRouteOut: {
+            /** Applied */
+            applied: boolean | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number | null;
+            /** Destination */
+            destination: string;
+            /** Dev */
+            dev: string | null;
+            /** Gateway */
+            gateway: string;
+            /** Id */
+            id: number;
+            /** Metric */
+            metric: number | null;
+            /** Note */
+            note: string | null;
         };
         /** SummaryItemOut */
         SummaryItemOut: {
@@ -7060,6 +7140,90 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    static_routes_api_v1_host_firewall_static_routes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaticRouteOut"][];
+                };
+            };
+        };
+    };
+    add_static_route_api_v1_host_firewall_static_routes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaticRouteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_static_route_api_v1_host_firewall_static_routes__route_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                route_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

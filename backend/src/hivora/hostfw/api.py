@@ -11,6 +11,7 @@ from hivora.apps.api.common import JobRef, job_ref
 from hivora.core.errors import PermissionDeniedError
 from hivora.hostfw.blocking import Blocked
 from hivora.hostfw.connections import connections, request_conntrack
+from hivora.hostfw.routing import MAX_METRIC
 from hivora.hostfw.service import (
     HostFirewall,
     jail_settings,
@@ -18,6 +19,7 @@ from hivora.hostfw.service import (
     routes,
     save_jails,
 )
+from hivora.hostfw.static_routes import Listed
 from hivora.web.deps import Admin, Principal, RuntimeDep, client_ip
 
 router = APIRouter(tags=["host-firewall"])
@@ -200,3 +202,55 @@ async def block(body: BlockIn, request: Request, principal: Admin, rt: RuntimeDe
 async def unblock(address: str, principal: Admin, rt: RuntimeDep) -> JobRef:
     confirmed(principal, rt)
     return job_ref(await rt.blocking.unblock(address))
+
+
+class StaticRouteIn(BaseModel):
+    destination: str = Field(max_length=18)  # an IPv4 network, e.g. 10.8.0.0/24
+    gateway: str = Field(max_length=15)
+    dev: str | None = Field(default=None, max_length=15)
+    metric: int | None = Field(default=None, ge=0, le=MAX_METRIC)
+    note: str | None = Field(default=None, max_length=200)
+
+
+class StaticRouteOut(BaseModel):
+    id: int
+    destination: str
+    gateway: str
+    dev: str | None
+    metric: int | None
+    note: str | None
+    created_by: int | None
+    created_at: datetime
+    applied: bool | None  # set on the host now; None: unknown (agent off, table unreadable)
+
+
+def static_route_out(r: Listed) -> StaticRouteOut:
+    return StaticRouteOut(id=r.id, destination=r.destination, gateway=r.gateway, dev=r.dev,
+                          metric=r.metric, note=r.note, created_by=r.created_by,
+                          created_at=r.created_at, applied=r.applied)  # fmt: skip
+
+
+@router.get("/static-routes")
+async def static_routes(_: Admin, rt: RuntimeDep) -> list[StaticRouteOut]:
+    """The host's static IPv4 routes kept by Hivora (marked proto 241), each with whether
+    it is set on the host now."""
+    return [static_route_out(r) for r in await rt.static_routes.listing()]
+
+
+@router.post("/static-routes", status_code=202)
+async def add_static_route(body: StaticRouteIn, request: Request, principal: Admin,
+                           rt: RuntimeDep) -> JobRef:  # fmt: skip
+    """Add a route (a job sets it). Refused when it could cut the host off: the default
+    route, a connected network, the requester's own address, a gateway out of reach."""
+    confirmed(principal, rt)
+    job = await rt.static_routes.add(body.destination, body.gateway, dev=body.dev,
+                                     metric=body.metric, note=body.note,
+                                     requester=client_ip(request),
+                                     user_id=principal.user_id)  # fmt: skip
+    return job_ref(job)
+
+
+@router.delete("/static-routes/{route_id}", status_code=202)
+async def remove_static_route(route_id: int, principal: Admin, rt: RuntimeDep) -> JobRef:
+    confirmed(principal, rt)
+    return job_ref(await rt.static_routes.remove(route_id))
