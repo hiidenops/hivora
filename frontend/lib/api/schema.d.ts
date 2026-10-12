@@ -1386,6 +1386,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/host-firewall/blocked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Blocked
+         * @description The addresses blocked on the host and its Docker apps (the intention).
+         */
+        get: operations["blocked_api_v1_host_firewall_blocked_get"];
+        put?: never;
+        /**
+         * Block
+         * @description Block an address for the host and its apps (HIVORA-BLOCK, by a job). Never the
+         *     address of the request itself, of the host, or of a container.
+         */
+        post: operations["block_api_v1_host_firewall_blocked_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/host-firewall/blocked/{address}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unblock */
+        delete: operations["unblock_api_v1_host_firewall_blocked__address__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/host-firewall/confirm": {
         parameters: {
             query?: never;
@@ -2329,6 +2371,27 @@ export interface components {
             timezone: string;
             /** Volumes */
             volumes: string[];
+        };
+        /** BlockIn */
+        BlockIn: {
+            /** Address */
+            address: string;
+            /** Note */
+            note?: string | null;
+        };
+        /** BlockedOut */
+        BlockedOut: {
+            /** Address */
+            address: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number | null;
+            /** Note */
+            note: string | null;
         };
         /** CandidateOut */
         CandidateOut: {
@@ -6696,6 +6759,90 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    blocked_api_v1_host_firewall_blocked_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockedOut"][];
+                };
+            };
+        };
+    };
+    block_api_v1_host_firewall_blocked_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BlockIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unblock_api_v1_host_firewall_blocked__address__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                address: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
             };
             /** @description Validation Error */
             422: {

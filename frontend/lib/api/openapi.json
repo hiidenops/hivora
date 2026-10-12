@@ -677,6 +677,75 @@
         "title": "BackupsOut",
         "type": "object"
       },
+      "BlockIn": {
+        "properties": {
+          "address": {
+            "maxLength": 45,
+            "title": "Address",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "address"
+        ],
+        "title": "BlockIn",
+        "type": "object"
+      },
+      "BlockedOut": {
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "address",
+          "note",
+          "created_by",
+          "created_at"
+        ],
+        "title": "BlockedOut",
+        "type": "object"
+      },
       "CandidateOut": {
         "properties": {
           "containers": {
@@ -9223,6 +9292,114 @@
           }
         },
         "summary": "Agent",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/blocked": {
+      "get": {
+        "description": "The addresses blocked on the host and its Docker apps (the intention).",
+        "operationId": "blocked_api_v1_host_firewall_blocked_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BlockedOut"
+                  },
+                  "title": "Response Blocked Api V1 Host Firewall Blocked Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Blocked",
+        "tags": [
+          "host-firewall"
+        ]
+      },
+      "post": {
+        "description": "Block an address for the host and its apps (HIVORA-BLOCK, by a job). Never the\naddress of the request itself, of the host, or of a container.",
+        "operationId": "block_api_v1_host_firewall_blocked_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Block",
+        "tags": [
+          "host-firewall"
+        ]
+      }
+    },
+    "/api/v1/host-firewall/blocked/{address}": {
+      "delete": {
+        "operationId": "unblock_api_v1_host_firewall_blocked__address__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address",
+            "required": true,
+            "schema": {
+              "title": "Address",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unblock",
         "tags": [
           "host-firewall"
         ]

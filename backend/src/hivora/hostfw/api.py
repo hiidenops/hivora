@@ -1,13 +1,15 @@
 """Host firewall routes (/api/v1/host-firewall): admin only, changes need a fresh TOTP."""
 
 from dataclasses import asdict
+from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from hivora.apps.api.common import JobRef, job_ref
 from hivora.core.errors import PermissionDeniedError
+from hivora.hostfw.blocking import Blocked
 from hivora.hostfw.connections import connections, request_conntrack
 from hivora.hostfw.service import (
     HostFirewall,
@@ -16,7 +18,7 @@ from hivora.hostfw.service import (
     routes,
     save_jails,
 )
-from hivora.web.deps import Admin, Principal, RuntimeDep
+from hivora.web.deps import Admin, Principal, RuntimeDep, client_ip
 
 router = APIRouter(tags=["host-firewall"])
 
@@ -160,3 +162,41 @@ async def put_jails(body: JailsIn, principal: Admin, rt: RuntimeDep) -> DoneOut:
     confirmed(principal, rt)
     jails = {name: j.model_dump(exclude_none=True) for name, j in body.jails.items()}
     return DoneOut(output=await save_jails(fw(rt), jails))
+
+
+class BlockIn(BaseModel):
+    address: str = Field(max_length=45)
+    note: str | None = Field(default=None, max_length=200)
+
+
+class BlockedOut(BaseModel):
+    address: str
+    note: str | None
+    created_by: int | None
+    created_at: datetime
+
+
+def blocked_out(b: Blocked) -> BlockedOut:
+    return BlockedOut(address=b.address, note=b.note, created_by=b.created_by,
+                      created_at=b.created_at)  # fmt: skip
+
+
+@router.get("/blocked")
+async def blocked(_: Admin, rt: RuntimeDep) -> list[BlockedOut]:
+    """The addresses blocked on the host and its Docker apps (the intention)."""
+    return [blocked_out(b) for b in await rt.blocking.listing()]
+
+
+@router.post("/blocked", status_code=202)
+async def block(body: BlockIn, request: Request, principal: Admin, rt: RuntimeDep) -> JobRef:
+    """Block an address for the host and its apps (HIVORA-BLOCK, by a job). Never the
+    address of the request itself, of the host, or of a container."""
+    confirmed(principal, rt)
+    return job_ref(await rt.blocking.block(body.address, body.note, requester=client_ip(request),
+                                           user_id=principal.user_id))  # fmt: skip
+
+
+@router.delete("/blocked/{address}", status_code=202)
+async def unblock(address: str, principal: Admin, rt: RuntimeDep) -> JobRef:
+    confirmed(principal, rt)
+    return job_ref(await rt.blocking.unblock(address))
