@@ -88,7 +88,11 @@ test("firewall: host agent turned on, sections, then off", async ({ page }) => {
   });
   await routeRow.getByRole("button", { name: "Supprimer la route vers 10.8.0.0/24" }).click();
   await expect(statics.getByText("Aucune route statique.")).toBeVisible();
-  await tabs.getByRole("link", { name: "Connexions" }).click();
+  // Who is connected: on the firewall's home, under the tiles (no tab of its own any more;
+  // an older link lands on the home).
+  await expect(tabs.getByRole("link", { name: "Connexions" })).toHaveCount(0);
+  await page.goto("/firewall/connections/");
+  await expect(page).toHaveURL(/\/firewall\/$/);
 
   // Who is connected now, read every 3 s: none on the fake host, then an answer replaced.
   const live = page.getByRole("region", { name: "Connexions en cours" });
@@ -147,8 +151,7 @@ test("firewall: host agent turned on, sections, then off", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Adresses bloquées" })).toContainText("1 adresse(s) bloquée(s)");
   await expect(page.getByLabel("Routes", { exact: true })).toContainText("0 route(s) statique(s)"); // the tile; removed above
 
-  // Unblocked from its row.
-  await tabs.getByRole("link", { name: "Connexions" }).click();
+  // Unblocked from its row (the home: the tiles above, the connections below).
   await row.getByRole("button", { name: "Débloquer 203.0.113.24" }).click();
   await expect(row.getByRole("button", { name: "Bloquer 203.0.113.24" })).toBeVisible({ timeout: 10_000 });
   expect(await blockedNow()).toEqual([]);

@@ -1,13 +1,16 @@
 "use client";
 
 import { Alert } from "@/components/ui/alert";
+import { useBlocked } from "@/features/firewall/blocked";
+import { LiveConnections } from "@/features/firewall/connections";
 import { AgentSwitch, useHost } from "@/features/firewall/host";
 import { Overview } from "@/features/firewall/overview";
 import { useI18n } from "@/lib/i18n";
 
 export default function FirewallPage() {
   const { t } = useI18n();
-  const { state } = useHost();
+  const { state, act } = useHost();
+  const { data: blocked } = useBlocked();
   return (
     <>
       {/* The agent's switch on the left, the Docker warning beside it. */}
@@ -17,7 +20,15 @@ export default function FirewallPage() {
           {t("fw.dockerBypass")}
         </Alert>
       </div>
-      {state.data?.agent ? <Overview /> : <p className="max-w-4xl text-muted-foreground">{t("fw.help")}</p>}
+      {/* The other sections at a glance (each tile opens its tab), then who is connected now. */}
+      {state.data?.agent ? (
+        <>
+          <Overview />
+          <LiveConnections act={act} blocked={blocked?.map((b) => b.address)} />
+        </>
+      ) : (
+        <p className="max-w-4xl text-muted-foreground">{t("fw.help")}</p>
+      )}
     </>
   );
 }

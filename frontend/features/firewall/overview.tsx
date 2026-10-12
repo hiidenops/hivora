@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Ban, Cable, Route as RouteIcon, ScanLine, ShieldBan, ShieldCheck } from "lucide-react";
+import { ArrowRight, Ban, Route as RouteIcon, ScanLine, ShieldBan, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -8,7 +8,6 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 import { useBlocked } from "./blocked";
-import { useConnections } from "./connections";
 import { useHost } from "./host";
 import { reachable, useListening } from "./ports";
 import { useRoutes } from "./routes";
@@ -36,12 +35,12 @@ function Tile({ href, icon, title, tone, children }: { href: string; icon: React
   );
 }
 
-/** The firewall's essentials: UFW, what is exposed, who is connected, blocks, bans, routes. */
+/** The firewall's essentials: UFW, what is exposed, blocks, bans, routes (who is connected
+ *  is shown in full below them, on the same page). */
 export function Overview() {
   const { t } = useI18n();
   const { state } = useHost();
   const { data: ports } = useListening();
-  const { data: live } = useConnections();
   const { data: routes } = useRoutes();
   const { data: blocked } = useBlocked();
   const { data: statics } = useStaticRoutes();
@@ -50,8 +49,6 @@ export function Overview() {
 
   const open = ports?.filter(reachable) ?? [];
   const bypassed = open.filter((p) => p.ufw === "bypassed").length;
-  const ips = live?.connections ?? [];
-  const internet = ips.filter((c) => c.origin === "internet").length;
   const banned = s.jails.reduce((n, j) => n + j.banned.length, 0);
   const gateway = routes?.routes.find((r) => r.dst === "default")?.gateway;
 
@@ -70,10 +67,6 @@ export function Overview() {
       >
         <span>{t("fw.tile.reachable", { n: open.length })}</span>
         {bypassed > 0 && <span className="text-danger">{t("fw.tile.bypassed", { n: bypassed })}</span>}
-      </Tile>
-      <Tile href="/firewall/connections/" icon={<Cable className="size-4" />} title={t("fw.tab.connections")} tone={internet ? "warn" : "ok"}>
-        <span>{t("fw.tile.ips", { n: ips.length })}</span>
-        {internet > 0 && <span>{t("fw.tile.internet", { n: internet })}</span>}
       </Tile>
       <Tile href="/firewall/blocked/" icon={<ShieldBan className="size-4" />} title={t("fw.blocked")} tone={blocked?.length ? "ok" : "idle"}>
         <span>{t("fw.tile.blocked", { n: blocked?.length ?? 0 })}</span>

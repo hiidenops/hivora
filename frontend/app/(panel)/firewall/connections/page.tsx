@@ -1,11 +1,11 @@
 "use client";
 
-import { useBlocked } from "@/features/firewall/blocked";
-import { LiveConnections } from "@/features/firewall/connections";
-import { useHost } from "@/features/firewall/host";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
+/** The live connections moved to the firewall's home: older links land there. */
 export default function FirewallConnectionsPage() {
-  const { act } = useHost();
-  const { data } = useBlocked();
-  return <LiveConnections act={act} blocked={data?.map((b) => b.address)} />;
+  const router = useRouter();
+  useEffect(() => router.replace("/firewall/"), [router]);
+  return null;
 }
