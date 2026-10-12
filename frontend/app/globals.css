@@ -113,8 +113,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-* {
-  border-color: var(--border);
+/* In the base layer, like Tailwind's own reset: the default border color, which any
+   border-* utility (border-primary, border-danger…) overrides. Unlayered, it beat them all. */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 /* Grid items default to min-width: auto and grow to fit long content (logs,
