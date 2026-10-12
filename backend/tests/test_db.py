@@ -256,3 +256,56 @@ def test_migration_0019_blocked_addresses_and_host_firewall_job_kind(tmp_path: P
         add_job(conn, "host_firewall")
         block(conn, "203.0.113.24")
     engine.dispose()
+
+
+def test_migration_0020_static_routes_and_host_route_job_kind(tmp_path: Path) -> None:
+    db = tmp_path / "hivora.db"
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0019")
+    engine = make_sync_engine(db)
+    now = "2026-10-12 18:00:00"
+
+    def add_job(conn: Connection, kind: str) -> None:
+        conn.execute(text("INSERT INTO job (kind, params, status, progress, log, created_at)"
+                          " VALUES (:k, '{}', 'queued', 0, '', :t)"),
+                     {"k": kind, "t": now})  # fmt: skip
+
+    def add_route(conn: Connection, dst: str, gw: str = "192.168.70.20",
+                  metric: int | None = None) -> None:  # fmt: skip
+        conn.execute(text("INSERT INTO static_route (destination, gateway, metric, created_at)"
+                          " VALUES (:d, :g, :m, :t)"),
+                     {"d": dst, "g": gw, "m": metric, "t": now})  # fmt: skip
+
+    with engine.begin() as conn:
+        add_job(conn, "host_firewall")
+    with pytest.raises(IntegrityError), engine.begin() as conn:  # not a job kind yet
+        add_job(conn, "host_route")
+    assert "static_route" not in inspect(engine).get_table_names()
+
+    command.upgrade(cfg, "0020")
+    with engine.begin() as conn:
+        add_job(conn, "host_route")
+        add_route(conn, "10.8.0.0/24", metric=4294967295)
+        add_route(conn, "10.9.0.7/32")
+    refused = [("10.8.0.0/24", "192.168.70.21", None), ("", "192.168.70.20", None),
+               ("10.7.0.0/16", "", None), ("10.6.0.0/16", "192.168.70.20", -1),
+               ("10.5.0.0/16", "192.168.70.20", 4294967296)]  # fmt: skip
+    for dst, gw, metric in refused:  # the same destination twice, empty, out of range
+        with pytest.raises(IntegrityError), engine.begin() as conn:
+            add_route(conn, dst, gw, metric)
+    with engine.connect() as conn:
+        rows = conn.execute(text("SELECT destination, metric FROM static_route ORDER BY id"))
+        assert [tuple(r) for r in rows] == [("10.8.0.0/24", 4294967295), ("10.9.0.7/32", None)]
+        assert conn.execute(text("PRAGMA integrity_check")).scalar() == "ok"
+
+    command.downgrade(cfg, "0019")
+    with engine.connect() as conn:  # host_route jobs and the table removed, the rest kept
+        assert conn.execute(text("SELECT kind FROM job")).scalars().all() == ["host_firewall"]
+        assert "static_route" not in inspect(engine).get_table_names()
+        assert conn.execute(text("PRAGMA integrity_check")).scalar() == "ok"
+
+    command.upgrade(cfg, "head")  # and back up again
+    with engine.begin() as conn:
+        add_job(conn, "host_route")
+        add_route(conn, "10.8.0.0/24")
+    engine.dispose()

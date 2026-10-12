@@ -678,6 +678,7 @@ export const en: Record<MessageKey, string> = {
   "job.kind.deploy": "Deployment",
   "job.kind.host_package": "Installing a package on the machine",
   "job.kind.host_firewall": "Host firewall",
+  "job.kind.host_route": "Host routes",
   "job.kind.start": "Start",
   "job.kind.stop": "Stop",
   "job.kind.restart": "Restart",
