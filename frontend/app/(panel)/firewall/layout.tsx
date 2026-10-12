@@ -18,14 +18,16 @@ export default function FirewallLayout({ children }: { children: ReactNode }) {
   return (
     <FirewallProvider>
       <PageHeader title={t("nav.firewall")} />
-      <nav aria-label={t("fw.sections")} className="-mt-2 mb-5 flex gap-1 overflow-x-auto border-b">
+      {/* The baseline is an inset shadow under the tabs (no border to overlap): nothing
+          overflows, so no scrollbar; narrow screens still scroll the tabs sideways. */}
+      <nav aria-label={t("fw.sections")} className="-mt-2 mb-5 flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--border)] [scrollbar-width:none]">
         {FIREWALL_TABS.map((tab) => (
           <Link
             key={tab.href}
             href={tab.href}
             aria-current={pathname === tab.href ? "page" : undefined}
             className={cn(
-              "-mb-px flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm transition-colors",
+              "flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm transition-colors",
               pathname === tab.href ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
