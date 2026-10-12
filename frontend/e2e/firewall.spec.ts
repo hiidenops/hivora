@@ -121,7 +121,7 @@ test("firewall: host agent turned on, sections, then off", async ({ page }) => {
   await tabs.getByRole("link", { name: "Bloquées" }).click();
   const list = page.getByRole("region", { name: "Adresses bloquées" });
   await expect(list.getByRole("row").filter({ hasText: "203.0.113.24" })).toContainText("survie :25565");
-  const form = list.getByRole("form", { name: "Bloquer une adresse" });
+  const form = list; // the add row: its fields under the table's columns
   const typed = form.getByLabel("Adresse IP à bloquer");
   await typed.fill("198.51.100.3");
   await form.getByLabel("Note").fill("scan de ports");

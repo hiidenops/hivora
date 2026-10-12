@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { ShieldBan, Undo2 } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { useTrackJob } from "@/components/job-toasts";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ export function BlockedAddresses() {
   const { block, unblock } = useBlockActions(act);
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
+  const formId = useId(); // the add row's fields belong to this form (a form cannot wrap a row)
   const date = new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeStyle: "short" });
   return (
     <section className={box} aria-label={t("fw.blocked")}>
@@ -75,10 +76,25 @@ export function BlockedAddresses() {
               </Td>
             </Tr>
           ))}
+          {/* The add row: each field under its column. */}
+          <Tr>
+            <Td>
+              <Input form={formId} className="h-8 w-full min-w-32 font-mono text-xs" required placeholder="203.0.113.5" value={address} onChange={(e) => setAddress(e.target.value)} aria-label={t("fw.addressToBlock")} />
+            </Td>
+            <Td>
+              <Input form={formId} className="h-8 w-full min-w-32 text-xs" maxLength={200} placeholder={t("fw.notePlaceholder")} value={note} onChange={(e) => setNote(e.target.value)} aria-label={t("fw.note")} />
+            </Td>
+            <Td />
+            <Td>
+              <Button form={formId} size="sm" variant="outline" type="submit" aria-label={t("fw.blockAddress")} title={t("fw.blockAddress")}>
+                <ShieldBan /> {t("fw.block")}
+              </Button>
+            </Td>
+          </Tr>
         </TBody>
       </Table>
       <form
-        className="flex flex-wrap items-end gap-2"
+        id={formId}
         aria-label={t("fw.blockAddress")}
         onSubmit={(e) => {
           e.preventDefault();
@@ -89,27 +105,7 @@ export function BlockedAddresses() {
             },
           });
         }}
-      >
-        <Input
-          className="h-8 w-52 font-mono text-xs"
-          required
-          placeholder="203.0.113.5"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          aria-label={t("fw.addressToBlock")}
-        />
-        <Input
-          className="h-8 w-52 text-xs"
-          maxLength={200}
-          placeholder={t("fw.notePlaceholder")}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          aria-label={t("fw.note")}
-        />
-        <Button size="sm" variant="outline" type="submit">
-          <ShieldBan /> {t("fw.blockAddress")}
-        </Button>
-      </form>
+      />
     </section>
   );
 }
