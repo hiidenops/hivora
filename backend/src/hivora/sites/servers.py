@@ -8,7 +8,10 @@ container), so no template lookup is needed where only the volumes are read.
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-from hivora.sites import httpd, nginx
+# The submodules themselves, not through the package: its __init__ imports core, which
+# imports this module (a cycle otherwise).
+import hivora.sites.httpd as httpd
+import hivora.sites.nginx as nginx
 
 
 @dataclass(frozen=True, slots=True)

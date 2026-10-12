@@ -146,7 +146,7 @@ Rapport complet : `.report/architecture-apres-decoupage-2026-09-29.md` (local, n
 ## 4. Règles de dépendance entre modules
 
 1. **Le graphe est orienté et sans cycle, y compris en tenant compte des imports différés.** Un import dans une fonction, dans `__post_init__` ou sous `TYPE_CHECKING` pour contourner un cycle **est** un cycle.
-   - *Dette constatée le 12/10* (relevé Graphify, vérifiée dans le code) : `sites/servers.py` fait `from hivora.sites import httpd, nginx`, donc importe le paquet `sites`, dont `__init__.py` importe `core`, qui importe `servers` : cycle `sites/__init__` → `core` → `servers` → `sites/__init__` (introduit le 09/10, `eabaf31`, profils de serveur web). Python le tolère (sous-modules résolus à la volée), la règle non. Correction prévue, commit séparé : importer les sous-modules directement (`import hivora.sites.httpd as httpd`), sans passer par le paquet.
+   - *Dette constatée le 12/10* (relevé Graphify, vérifiée dans le code) : `sites/servers.py` fait `from hivora.sites import httpd, nginx`, donc importe le paquet `sites`, dont `__init__.py` importe `core`, qui importe `servers` : cycle `sites/__init__` → `core` → `servers` → `sites/__init__` (introduit le 09/10, `eabaf31`, profils de serveur web). Python le tolère (sous-modules résolus à la volée), la règle non. **Réglé le 12/10** : `servers.py` importe les sous-modules eux-mêmes (`import hivora.sites.httpd as httpd`, idem `nginx`), sans passer par le paquet ; Graphify : « None detected ».
 2. **Au sein d'un module découpé** : `core` ← sous-modules ← façade.
    - `core` n'importe aucun sous-module ni la façade.
    - Un sous-module importe `core` et, si besoin, un autre sous-module, sans jamais créer de boucle (exemple : `revisions` → `custom_images`, `compose_edit`).
@@ -259,7 +259,7 @@ Situation au 12/10/2026 (après les lots K et R ; `wc -l`, classes par `ast`) :
 | `sites/hosting.py` | 310 lignes, classe `SiteHosting` 247, 11 méthodes publiques | sous les seuils |
 | `apps/revisions.py` | 305 lignes, classe `Revisions` 234 | sous les seuils |
 
-Aucun fichier au seuil bloquant. **Nouvelle dette** : le cycle d'import du module `sites` (§4.1).
+Aucun fichier au seuil bloquant. Dette constatée ce jour-là et réglée le même jour : le cycle d'import du module `sites` (§4.1).
 
 `AppService` (`apps/service.py`, 245 lignes, classe 171) : **résolu** en M10-a pour le seuil bloquant des dépendances injectées (13 → 9 : `registry`, inutilisé, retiré ; `secret_settings` et `public_address`, utilisés par le seul planificateur, et `gateway`, par les seuls gestionnaires de jobs, posés par `Runtime` comme `site_ports`) et 34 → 17 méthodes publiques (alerte à 15 : 12 sont des relais que seuls les tests appellent encore). **Relais résolus** en M11-c2 : 124 lignes de classe, 6 méthodes publiques et la propriété `registry` (lue par la route d'inspection d'image). Les 10 relais réservés aux tests sont supprimés, ainsi que le setter de `registry` et `_inspected` ; `get` et `decrypt_secrets` restent, car `apps/handlers.py` et `backups/service.py` les appellent en production.
 
@@ -288,7 +288,7 @@ Second rang :
 4. ~~`core/fs` pour `confined`, `tree_size`, `remove_tree` et `receive_upload` (§4.5)~~ fait le 01/10 (lot S0) ; reste `_Zip` à rendre public (§9.11).
 5. Topologie branchée sur l'état du pare-feu en cache (§4.6).
 6. `ZoneIn` renommé (ex. `AppZoneIn`) pour supprimer le contournement de `__module__` ; commit séparé, le contrat OpenAPI change.
-7. Cycle d'import `sites/__init__` → `core` → `servers` (§4.1, constaté le 12/10).
+7. ~~Cycle d'import `sites/__init__` → `core` → `servers` (§4.1, constaté le 12/10).~~ réglé le 12/10.
 8. `topology-view.tsx` repassé sous 300 lignes (situation au 12/10).
 9. Mutations hors `jobs` restantes : règles UFW, bannissements fail2ban, réglages des jails, listes de joueurs (les blocages et les routes statiques, eux, passent par `jobs`).
 
@@ -411,7 +411,7 @@ Le graphe est dans `graphify-out/` (non versionné, reconstruit par un hook git 
   - **Import Cycles** : doit rester « None detected ». Attention : Graphify ne voit pas les cycles masqués par imports différés ; les chercher à la main (`grep` des imports dans les fonctions et sous `TYPE_CHECKING`).
   - **Communautés à faible cohésion** avec beaucoup de nœuds : candidates au découpage.
   - **Connexions surprenantes** entre modules censés être indépendants.
-- **Relevé de référence** : noter dans `PROGRESS.md` les chiffres clés (nœuds, liens, top 10 des God Nodes) à chaque revue, pour comparer dans le temps. Relevé du 29/09 (`e283b3f`) : 3 402 nœuds, 9 206 liens ; God Nodes métier : `AppService` (62), `ValidationError` (57), `EventBus` (42). **Dernier relevé (12/10, `b8639f5`)** : 4 443 nœuds, 14 295 liens, 221 communautés. Top 10 des God Nodes : la section « Réseau et applications » de `docs/PROGRESS.md` (362, référence documentaire, pas du couplage de code), puis des utilitaires légitimes (`useI18n` 208, `admin` 117 et `wait_job` 111 des tests, `api` 114, `cn` 96, `react` 84) et les erreurs et le bus transverses (`EventBus` 92, `ValidationError` 92, `ConflictError` 83) ; plus aucun service métier, `AppService` compris. **Import Cycles : 1 détecté** (`sites`, §4.1).
+- **Relevé de référence** : noter dans `PROGRESS.md` les chiffres clés (nœuds, liens, top 10 des God Nodes) à chaque revue, pour comparer dans le temps. Relevé du 29/09 (`e283b3f`) : 3 402 nœuds, 9 206 liens ; God Nodes métier : `AppService` (62), `ValidationError` (57), `EventBus` (42). **Dernier relevé (12/10, `b8639f5`)** : 4 443 nœuds, 14 295 liens, 221 communautés. Top 10 des God Nodes : la section « Réseau et applications » de `docs/PROGRESS.md` (362, référence documentaire, pas du couplage de code), puis des utilitaires légitimes (`useI18n` 208, `admin` 117 et `wait_job` 111 des tests, `api` 114, `cn` 96, `react` 84) et les erreurs et le bus transverses (`EventBus` 92, `ValidationError` 92, `ConflictError` 83) ; plus aucun service métier, `AppService` compris. **Import Cycles : 1 détecté** (`sites`, §4.1), réglé le même jour : « None detected » (relevé suivant, 4 416 nœuds, 14 377 liens).
 - **Mesures complémentaires** hors Graphify : taille des fichiers et classes (script `ast`), dépendances sortantes par module (analyse des imports `hivora.*`).
 
 ## 14. Checklist architecture avant chaque gros commit
