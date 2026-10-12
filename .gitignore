@@ -32,3 +32,6 @@ graphify-out/
 
 # Local technical reports (not versioned)
 .report/
+
+# Local Claude Code prompt history export (personal, never versioned)
+history.txt
