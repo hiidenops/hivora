@@ -1,6 +1,6 @@
 # ARCHITECT_BRAIN — mémoire architecturale de Hivora
 
-*Créé le 29/09/2026, à la suite du découpage de `AppService` ; mis à jour le même jour après le découpage de `apps/api.py`.*
+*Créé le 29/09/2026, à la suite du découpage de `AppService` ; mis à jour le même jour après le découpage de `apps/api.py`, puis le 12/10/2026 (état des lieux après les lots K et R : §7, §13).*
 
 Ce document garde **pourquoi** le code est organisé ainsi, et les règles qui empêchent de retomber dans les travers corrigés. Il complète :
 
@@ -146,6 +146,7 @@ Rapport complet : `.report/architecture-apres-decoupage-2026-09-29.md` (local, n
 ## 4. Règles de dépendance entre modules
 
 1. **Le graphe est orienté et sans cycle, y compris en tenant compte des imports différés.** Un import dans une fonction, dans `__post_init__` ou sous `TYPE_CHECKING` pour contourner un cycle **est** un cycle.
+   - *Dette constatée le 12/10* (relevé Graphify, vérifiée dans le code) : `sites/servers.py` fait `from hivora.sites import httpd, nginx`, donc importe le paquet `sites`, dont `__init__.py` importe `core`, qui importe `servers` : cycle `sites/__init__` → `core` → `servers` → `sites/__init__` (introduit le 09/10, `eabaf31`, profils de serveur web). Python le tolère (sous-modules résolus à la volée), la règle non. Correction prévue, commit séparé : importer les sous-modules directement (`import hivora.sites.httpd as httpd`), sans passer par le paquet.
 2. **Au sein d'un module découpé** : `core` ← sous-modules ← façade.
    - `core` n'importe aucun sous-module ni la façade.
    - Un sous-module importe `core` et, si besoin, un autre sous-module, sans jamais créer de boucle (exemple : `revisions` → `custom_images`, `compose_edit`).
@@ -241,6 +242,25 @@ Situation au 07/10/2026 (lot M8-a ; mesures de `wc -l`, classes par `ast`) :
 | `sites/files.py` | 301 lignes | sous le seuil ; fonctions pures et service `SiteFiles` (75 lignes) à séparer s'il grossit |
 | `sites/hosting.py` | 295 lignes, classe `SiteHosting` 235, 10 méthodes publiques | **résolu** (417 et 306 au 07/10, avant M8-a) : vérifications de port dans `sites/port_check.py`, types et vue dans `sites/views.py` |
 
+Situation au 12/10/2026 (après les lots K et R ; `wc -l`, classes par `ast`) :
+
+| Fichier | Taille | Niveau |
+|---|---|---|
+| `features/topology/topology-view.tsx` | 347 lignes | **alerte** (composant React > 300) : 236 après M9-b2, regrossi avec les sites dans la topologie, la sélection groupée et l'aimantation (08–09/10) ; extraire la sélection et l'aimantation (la logique pure est déjà dans `snap.ts`) |
+| `features/deploy/generated-form.tsx` | 345 lignes | alerte (inchangé) |
+| `features/activity/host-charts.tsx` | 321 lignes | alerte (inchangé) |
+| `features/firewall/ports.tsx` | 316 lignes | alerte (nouveau : découpage de la page Pare-feu du 09/10) |
+| `features/firewall/firewall-panel.tsx` | 53 lignes | **résolu** (372 avant) : la page Pare-feu découpée en sous-pages (`host`, `overview`, `ports`, `connections`, `blocked`, `fail2ban`, `routes`, `static-routes`) |
+| `templates/schema.py` | 496 lignes | alerte (inchangé) |
+| `hostfw/service.py` | 367 lignes | sous le seuil (400), à surveiller : les fonctions ajoutées depuis (connexions, blocage, routes) vivent dans leurs propres fichiers |
+| `hostfw/` (lots K et R) | `blocking.py` 195, `static_routes.py` 179, `routing.py` 194 (pur), `blocklist.py` 52 (pur), `connections.py` 199 | sous les seuils ; `Blocking` et `StaticRoutes` : dépendances explicites (5 à 7), verrou d'instance, aucune I/O dans une transaction, mutations par `jobs` |
+| `docker_gateway/local.py` | 370 lignes, classe 183 | sous le seuil (inchangé) |
+| `vpn/service.py` | 353 lignes, classe `VpnTools` 269 | sous les seuils (inchangé depuis M11-b) |
+| `sites/hosting.py` | 310 lignes, classe `SiteHosting` 247, 11 méthodes publiques | sous les seuils |
+| `apps/revisions.py` | 305 lignes, classe `Revisions` 234 | sous les seuils |
+
+Aucun fichier au seuil bloquant. **Nouvelle dette** : le cycle d'import du module `sites` (§4.1).
+
 `AppService` (`apps/service.py`, 245 lignes, classe 171) : **résolu** en M10-a pour le seuil bloquant des dépendances injectées (13 → 9 : `registry`, inutilisé, retiré ; `secret_settings` et `public_address`, utilisés par le seul planificateur, et `gateway`, par les seuls gestionnaires de jobs, posés par `Runtime` comme `site_ports`) et 34 → 17 méthodes publiques (alerte à 15 : 12 sont des relais que seuls les tests appellent encore). **Relais résolus** en M11-c2 : 124 lignes de classe, 6 méthodes publiques et la propriété `registry` (lue par la route d'inspection d'image). Les 10 relais réservés aux tests sont supprimés, ainsi que le setter de `registry` et `_inspected` ; `get` et `decrypt_secrets` restent, car `apps/handlers.py` et `backups/service.py` les appellent en production.
 
 Accès inter-modules du module `sites` (§9.9) : **résolu** en M8-a. `sites` lit les apps par `apps.queries` (`hosting_app`, `hosting_app_id`, `volume_source`) et `apps.core.latest_revision`, marque un hôte par `Application.mark_hosting()`, lit les jobs par `jobs.queries` (`get_job`, `last_job`) ; il ne fait plus de requête sur les tables `application`, `service` ni `job`.
@@ -268,6 +288,9 @@ Second rang :
 4. ~~`core/fs` pour `confined`, `tree_size`, `remove_tree` et `receive_upload` (§4.5)~~ fait le 01/10 (lot S0) ; reste `_Zip` à rendre public (§9.11).
 5. Topologie branchée sur l'état du pare-feu en cache (§4.6).
 6. `ZoneIn` renommé (ex. `AppZoneIn`) pour supprimer le contournement de `__module__` ; commit séparé, le contrat OpenAPI change.
+7. Cycle d'import `sites/__init__` → `core` → `servers` (§4.1, constaté le 12/10).
+8. `topology-view.tsx` repassé sous 300 lignes (situation au 12/10).
+9. Mutations hors `jobs` restantes : règles UFW, bannissements fail2ban, réglages des jails, listes de joueurs (les blocages et les routes statiques, eux, passent par `jobs`).
 
 ## 8. Règles concernant `Runtime` et les services transverses
 
@@ -331,7 +354,7 @@ Second rang :
 1. `ruff check` et `ruff format --check`.
 2. `mypy` en mode strict.
 3. **Tests ciblés** sur les fichiers concernés. Vérifier que le nombre de tests passés est > 0 ; `no tests ran` est un échec de la commande, pas un succès.
-4. `pytest` complet (référence au 29/09 : 208 passés).
+4. `pytest` complet (référence au 12/10 : 498 passés ; 208 au 29/09).
 5. Parcours e2e Playwright, **sortie complète conservée** ; un échec non expliqué est signalé, même si la relance passe.
 6. **Aucun cycle** : le nouveau fichier n'importe ni la façade ni un module qui l'importe.
 7. **Diff relu** : aucun code dupliqué, aucun import mort, aucune logique modifiée.
@@ -388,7 +411,7 @@ Le graphe est dans `graphify-out/` (non versionné, reconstruit par un hook git 
   - **Import Cycles** : doit rester « None detected ». Attention : Graphify ne voit pas les cycles masqués par imports différés ; les chercher à la main (`grep` des imports dans les fonctions et sous `TYPE_CHECKING`).
   - **Communautés à faible cohésion** avec beaucoup de nœuds : candidates au découpage.
   - **Connexions surprenantes** entre modules censés être indépendants.
-- **Relevé de référence** : noter dans `PROGRESS.md` les chiffres clés (nœuds, liens, top 10 des God Nodes) à chaque revue, pour comparer dans le temps. Dernier relevé (29/09, `e283b3f`) : 3 402 nœuds, 9 206 liens ; God Nodes métier : `AppService` (62), `ValidationError` (57), `EventBus` (42). Les sections de `docs/PROGRESS.md` apparaissent aussi dans le graphe (« Réseau et applications » : 91 liens) : ce sont des références documentaires, pas du couplage de code.
+- **Relevé de référence** : noter dans `PROGRESS.md` les chiffres clés (nœuds, liens, top 10 des God Nodes) à chaque revue, pour comparer dans le temps. Relevé du 29/09 (`e283b3f`) : 3 402 nœuds, 9 206 liens ; God Nodes métier : `AppService` (62), `ValidationError` (57), `EventBus` (42). **Dernier relevé (12/10, `b8639f5`)** : 4 443 nœuds, 14 295 liens, 221 communautés. Top 10 des God Nodes : la section « Réseau et applications » de `docs/PROGRESS.md` (362, référence documentaire, pas du couplage de code), puis des utilitaires légitimes (`useI18n` 208, `admin` 117 et `wait_job` 111 des tests, `api` 114, `cn` 96, `react` 84) et les erreurs et le bus transverses (`EventBus` 92, `ValidationError` 92, `ConflictError` 83) ; plus aucun service métier, `AppService` compris. **Import Cycles : 1 détecté** (`sites`, §4.1).
 - **Mesures complémentaires** hors Graphify : taille des fichiers et classes (script `ast`), dépendances sortantes par module (analyse des imports `hivora.*`).
 
 ## 14. Checklist architecture avant chaque gros commit
@@ -414,7 +437,7 @@ Le graphe est dans `graphify-out/` (non versionné, reconstruit par un hook git 
 - [ ] `ruff check` et `ruff format --check` : OK.
 - [ ] `mypy` strict : « no issues found ».
 - [ ] Tests ciblés : nombre de tests passés > 0.
-- [ ] `pytest` complet : tous verts (208 au 29/09, jamais moins sans raison notée).
+- [ ] `pytest` complet : tous verts (498 au 12/10, jamais moins sans raison notée).
 - [ ] e2e Playwright : vert (sortie complète gardée ; tout échec non expliqué est signalé).
 - [ ] Routes touchées : ordre des routes et schéma OpenAPI identiques (octet par octet et en contenu), ou changement de contrat explicitement validé.
 - [ ] Frontend touché : `npm run check:bundle` sous 520 Ko gzip par page.
