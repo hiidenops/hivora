@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowRight, Ban, Cable, Route as RouteIcon, ScanLine, ShieldCheck } from "lucide-react";
+import { ArrowRight, Ban, Cable, Route as RouteIcon, ScanLine, ShieldBan, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
+import { useBlocked } from "./blocked";
 import { useConnections } from "./connections";
 import { useHost } from "./host";
 import { reachable, useListening } from "./ports";
@@ -34,13 +35,14 @@ function Tile({ href, icon, title, tone, children }: { href: string; icon: React
   );
 }
 
-/** The firewall's essentials: UFW, what is exposed, who is connected, bans, routes. */
+/** The firewall's essentials: UFW, what is exposed, who is connected, blocks, bans, routes. */
 export function Overview() {
   const { t } = useI18n();
   const { state } = useHost();
   const { data: ports } = useListening();
   const { data: live } = useConnections();
   const { data: routes } = useRoutes();
+  const { data: blocked } = useBlocked();
   const s = state.data;
   if (!s) return null;
 
@@ -70,6 +72,9 @@ export function Overview() {
       <Tile href="/firewall/connections/" icon={<Cable className="size-4" />} title={t("fw.tab.connections")} tone={internet ? "warn" : "ok"}>
         <span>{t("fw.tile.ips", { n: ips.length })}</span>
         {internet > 0 && <span>{t("fw.tile.internet", { n: internet })}</span>}
+      </Tile>
+      <Tile href="/firewall/blocked/" icon={<ShieldBan className="size-4" />} title={t("fw.blocked")} tone={blocked?.length ? "ok" : "idle"}>
+        <span>{t("fw.tile.blocked", { n: blocked?.length ?? 0 })}</span>
       </Tile>
       <Tile
         href="/firewall/fail2ban/"

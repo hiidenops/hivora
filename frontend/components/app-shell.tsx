@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Ban, Boxes, BrickWall, Cable, Globe, LayoutDashboard, LayoutGrid, LogOut, Network, Route, Settings, Share2, ShieldCheck, Users } from "lucide-react";
+import { Activity, Ban, Boxes, BrickWall, Cable, Globe, LayoutDashboard, LayoutGrid, LogOut, Network, Route, Settings, Share2, ShieldBan, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment, createContext, useContext, useEffect, useState, type ReactNode } from "react";
@@ -41,6 +41,7 @@ export const FIREWALL_TABS: Entry[] = [
   { href: "/firewall/", label: "fw.tab.overview", icon: LayoutDashboard },
   { href: "/firewall/ports/", label: "fw.tab.ports", icon: ShieldCheck },
   { href: "/firewall/connections/", label: "fw.tab.connections", icon: Cable },
+  { href: "/firewall/blocked/", label: "fw.tab.blocked", icon: ShieldBan },
   { href: "/firewall/fail2ban/", label: "fw.tab.fail2ban", icon: Ban },
   { href: "/firewall/routes/", label: "fw.tab.routes", icon: Route },
 ];

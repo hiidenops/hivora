@@ -70,36 +70,55 @@ test("firewall: host agent turned on, sections, then off", async ({ page }) => {
   await expect(row).toContainText("Internet", { timeout: 10_000 }); // the next refresh
   await expect(row).toContainText("survie :25565");
   await expect(row).toContainText("il y a 3 min");
-  // Banned from its row in a fail2ban jail (a host with two jails, sshd picked), then unbanned.
-  let banned: string[] = [];
-  const sent: unknown[] = [];
-  await page.route(/\/api\/v1\/host-firewall\?fresh=true$/, async (route) => {
-    const json = await (await route.fetch()).json();
-    route.fulfill({ json: { ...json, fail2ban_installed: true, fail2ban_running: true, jails: [
-      { name: "recidive", banned: [], total_banned: 0, failed: 0 },
-      { name: "sshd", banned, total_banned: banned.length, failed: 0 },
-    ] } });
-  }); // prettier-ignore
-  await page.route("**/api/v1/host-firewall/fail2ban/sshd", (route) => {
-    const body = route.request().postDataJSON() as { ip: string; ban: boolean };
-    sent.push(body);
-    banned = body.ban ? [body.ip] : [];
-    return route.fulfill({ json: { output: "" } });
-  });
-  await page.reload(); // the firewall's state read again, with the jails
-  await expect(live.getByLabel("Jail pour bannir")).toHaveValue("sshd");
-  await expect(live.getByText("pas l'accès aux apps publiées par Docker", { exact: false })).toBeVisible();
+  // Blocked from its row (an Internet address: the plain confirmation), as a job in a pop-up;
+  // the note says where it was seen. The real backend, the fake host agent.
+  const blockedNow = async () =>
+    ((await (await page.request.get("/api/v1/host-firewall/blocked")).json()) as { address: string; note: string }[]).map((b) => [b.address, b.note]);
   page.once("dialog", (d) => {
-    expect(d.message()).toContain("Bannir 203.0.113.24 dans la jail « sshd »");
+    expect(d.message()).toContain("Bloquer 203.0.113.24 ?");
+    expect(d.message()).toContain("ni les apps publiées par Docker");
     void d.accept();
   });
-  await row.getByRole("button", { name: "Bannir 203.0.113.24" }).click();
-  await expect(row).toContainText("Bannie (sshd)");
-  await row.getByRole("button", { name: "Débannir 203.0.113.24" }).click();
-  await expect(row.getByRole("button", { name: "Bannir 203.0.113.24" })).toBeVisible();
-  expect(sent).toEqual([{ ip: "203.0.113.24", ban: true }, { ip: "203.0.113.24", ban: false }]);
-  await page.unroute(/\/api\/v1\/host-firewall\?fresh=true$/);
-  await page.unroute("**/api/v1/host-firewall/fail2ban/sshd");
+  await row.getByRole("button", { name: "Bloquer 203.0.113.24" }).click();
+  const toasts = page.getByRole("region", { name: "Suivi des tâches" });
+  await expect(toasts.getByRole("status", { name: "Pare-feu de l'hôte" }).last().getByText("Réussi")).toBeVisible({ timeout: 20_000 });
+  await expect(row).toContainText("Bloquée");
+  expect(await blockedNow()).toEqual([["203.0.113.24", "survie :25565"]]);
+
+  // The Blocked tab: the list, an address by hand with a note, the host's own refused.
+  await tabs.getByRole("link", { name: "Bloquées" }).click();
+  const list = page.getByRole("region", { name: "Adresses bloquées" });
+  await expect(list.getByRole("row").filter({ hasText: "203.0.113.24" })).toContainText("survie :25565");
+  const form = list.getByRole("form", { name: "Bloquer une adresse" });
+  const typed = form.getByLabel("Adresse IP à bloquer");
+  await typed.fill("198.51.100.3");
+  await form.getByLabel("Note").fill("scan de ports");
+  page.once("dialog", (d) => void d.accept());
+  await form.getByRole("button", { name: "Bloquer une adresse" }).click();
+  await expect(list.getByRole("row").filter({ hasText: "198.51.100.3" })).toContainText("scan de ports");
+  await expect(typed).toHaveValue(""); // accepted: emptied
+  await typed.fill("192.168.1.30"); // the local network: stronger words (cancelled here)
+  page.once("dialog", (d) => {
+    expect(d.message()).toContain("est une adresse du réseau local");
+    void d.dismiss();
+  });
+  await form.getByRole("button", { name: "Bloquer une adresse" }).click();
+  await typed.fill("203.0.113.7"); // the host's public address (HIVORA_HOST_PUBLIC_IP)
+  page.once("dialog", (d) => void d.accept());
+  await form.getByRole("button", { name: "Bloquer une adresse" }).click();
+  await expect(page.getByText("Adresse de cette machine ou d'un de ses conteneurs", { exact: false })).toBeVisible();
+  await expect(typed).toHaveValue("203.0.113.7"); // refused: what was typed stays
+  await list.getByRole("button", { name: "Débloquer 198.51.100.3" }).click();
+  await expect(list.getByRole("row").filter({ hasText: "198.51.100.3" })).toHaveCount(0);
+  expect(await blockedNow()).toEqual([["203.0.113.24", "survie :25565"]]);
+  await tabs.getByRole("link", { name: "Vue d'ensemble" }).click();
+  await expect(page.getByRole("link", { name: "Adresses bloquées" })).toContainText("1 adresse(s) bloquée(s)");
+
+  // Unblocked from its row.
+  await tabs.getByRole("link", { name: "Connexions" }).click();
+  await row.getByRole("button", { name: "Débloquer 203.0.113.24" }).click();
+  await expect(row.getByRole("button", { name: "Bloquer 203.0.113.24" })).toBeVisible({ timeout: 10_000 });
+  expect(await blockedNow()).toEqual([]);
   await expect(live.getByText("conntrack n'est pas installé", { exact: false })).toBeVisible(); // apps unseen
   // Installed on request: confirmed, then a job followed in a pop-up.
   page.once("dialog", (d) => {
