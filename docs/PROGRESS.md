@@ -58,7 +58,7 @@ Tests : 498 backend (pytest), 21 tests e2e Playwright en 16 fichiers, 4 tests un
 
 ## En attente de ton retour
 
-Le panel de dev tourne sur la VM : **http://192.168.70.150:8000** (données dans `~/hivora-dev`, Docker réel). Relancé le 12/10 à 02:28, avant le lot K1 : sa base est encore en migration 0018 et il ne connaît ni le blocage d'adresses (lot K) ni les routes statiques (lot R). Le relancer applique les migrations 0019 et 0020, puis, sur la page Pare-feu (agent hôte activé), à tester :
+Le panel de dev tourne sur la VM : **http://192.168.70.150:8000** (données dans `~/hivora-dev`, Docker réel). Relancé le 12/10 à 15:29 sur le code actuel (`563285b`) : sa base est passée de la migration 0018 à 0020 (sauvegarde cohérente d'avant : `~/hivora-dev/hivora.db.before-0019-20261012.bak`) ; journal dans `~/hivora-dev/panel.log`. Sur la page Pare-feu (agent hôte activé), à tester :
 
 1. **Connexions** : « Bloquer » sur une ligne, badge « Bloquée », « Débloquer ».
 2. **Bloquées** : liste, ajout d'une adresse avec une note, déblocage ; tuile de la vue d'ensemble.
