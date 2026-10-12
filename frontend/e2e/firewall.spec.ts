@@ -56,6 +56,38 @@ test("firewall: host agent turned on, sections, then off", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "fail2ban", level: 3 })).toBeVisible();
   await page.locator("aside").getByRole("link", { name: "Routes" }).click();
   await expect(page.getByRole("heading", { name: "Routes de l'hôte (lecture seule)", level: 3 })).toBeVisible();
+  // Static routes (the e2e host's table: LAN 192.168.1.0/24 on eth0): one added, confirmed,
+  // set by a job; one over the LAN refused (said, what was typed kept); removed.
+  const statics = page.getByRole("region", { name: "Routes statiques" });
+  await expect(statics.getByText("Aucune route statique.")).toBeVisible();
+  const routeForm = statics; // the add row: its fields under the table's columns
+  await routeForm.getByLabel("Destination").fill("10.8.0.5/24");
+  await routeForm.getByLabel("Passerelle").fill("192.168.1.254");
+  await routeForm.getByLabel("Interface").selectOption("eth0");
+  await routeForm.getByLabel("Note").fill("VPN du bureau");
+  page.once("dialog", (d) => {
+    expect(d.message()).toContain("Ajouter la route vers 10.8.0.5/24 via 192.168.1.254 ?");
+    void d.accept();
+  });
+  await routeForm.getByRole("button", { name: "Ajouter une route" }).click();
+  const routeRow = statics.getByRole("row").filter({ hasText: "10.8.0.0/24" }); // canonical
+  await expect(routeRow).toContainText("Appliquée", { timeout: 20_000 }); // read again at the job's end
+  await expect(routeRow).toContainText("192.168.1.254");
+  await expect(routeRow).toContainText("eth0");
+  await expect(routeRow).toContainText("VPN du bureau");
+  await expect(routeForm.getByLabel("Destination")).toHaveValue("");
+  await routeForm.getByLabel("Destination").fill("192.168.1.128/25");
+  await routeForm.getByLabel("Passerelle").fill("192.168.1.254");
+  page.once("dialog", (d) => void d.accept());
+  await routeForm.getByRole("button", { name: "Ajouter une route" }).click();
+  await expect(page.getByText("recouvre un réseau directement connecté", { exact: false })).toBeVisible();
+  await expect(routeForm.getByLabel("Destination")).toHaveValue("192.168.1.128/25");
+  page.once("dialog", (d) => {
+    expect(d.message()).toContain("Supprimer la route vers 10.8.0.0/24 (via 192.168.1.254) ?");
+    void d.accept();
+  });
+  await routeRow.getByRole("button", { name: "Supprimer la route vers 10.8.0.0/24" }).click();
+  await expect(statics.getByText("Aucune route statique.")).toBeVisible();
   await tabs.getByRole("link", { name: "Connexions" }).click();
 
   // Who is connected now, read every 3 s: none on the fake host, then an answer replaced.
@@ -113,6 +145,7 @@ test("firewall: host agent turned on, sections, then off", async ({ page }) => {
   expect(await blockedNow()).toEqual([["203.0.113.24", "survie :25565"]]);
   await tabs.getByRole("link", { name: "Vue d'ensemble" }).click();
   await expect(page.getByRole("link", { name: "Adresses bloquées" })).toContainText("1 adresse(s) bloquée(s)");
+  await expect(page.getByLabel("Routes", { exact: true })).toContainText("0 route(s) statique(s)"); // the tile; removed above
 
   // Unblocked from its row.
   await tabs.getByRole("link", { name: "Connexions" }).click();

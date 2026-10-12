@@ -3,6 +3,7 @@
 uvicorn --factory e2e_app:app --app-dir tests   (settings from HIVORA_* env)
 """
 
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -13,14 +14,47 @@ from hivora.core.config import Settings
 from hivora.core.events import Event
 from hivora.docker_gateway import ContainerInfo, ContainerState, StatsSample
 from hivora.docker_gateway.fake import FakeDockerGateway
+from hivora.hostfw.service import HOST
 from hivora.main import create_app
 from hivora.runtime import Runtime
 
 FAKE_COMPOSE = [sys.executable, str(Path(__file__).parent / "fake_compose.py")]
+# The host's routing table as the agent would read it: a LAN, a Docker bridge, the default
+# route. The routes Hivora sets (proto 241) are kept in memory, changed by replace and del.
+HOST_TABLE = [
+    {"dst": "default", "gateway": "192.168.1.1", "dev": "eth0", "protocol": "dhcp"},
+    {"dst": "172.18.0.0/16", "dev": "br-1", "protocol": "kernel", "scope": "link"},
+    {"dst": "192.168.1.0/24", "dev": "eth0", "protocol": "kernel", "scope": "link"},
+]
+
+
+def fake_ip(gateway: FakeDockerGateway) -> None:
+    """``ip`` on the host, behind the fake host agent (only what the static routes use)."""
+    marked: dict[str, dict[str, Any]] = {}
+    real = gateway.exec_run
+
+    async def exec_run(
+        container_id: str, cmd: list[str], user: str | None = None
+    ) -> tuple[int, str]:
+        argv = cmd[len(HOST) :]
+        if argv == ["ip", "-j", "route"]:
+            return 0, json.dumps(HOST_TABLE + list(marked.values()))
+        if argv == ["ip", "-j", "route", "show", "proto", "241"]:
+            return 0, json.dumps(list(marked.values()))
+        if argv[:3] == ["ip", "route", "replace"]:
+            marked[argv[3]] = {"dst": argv[3].removesuffix("/32"), "gateway": argv[5]}
+            return 0, ""
+        if argv[:3] == ["ip", "route", "del"]:
+            marked.pop(argv[3], None)
+            return 0, ""
+        return await real(container_id, cmd, user)
+
+    gateway.exec_run = exec_run  # type: ignore[method-assign]
 
 
 def app() -> FastAPI:
     gateway = FakeDockerGateway()
+    fake_ip(gateway)
     runtime = Runtime.build(
         Settings(),
         gateway=gateway,

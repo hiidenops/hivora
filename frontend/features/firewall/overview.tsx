@@ -12,6 +12,7 @@ import { useConnections } from "./connections";
 import { useHost } from "./host";
 import { reachable, useListening } from "./ports";
 import { useRoutes } from "./routes";
+import { useStaticRoutes } from "./static-routes";
 
 type Tone = "ok" | "warn" | "danger" | "idle";
 const DOT: Record<Tone, string> = {
@@ -43,6 +44,7 @@ export function Overview() {
   const { data: live } = useConnections();
   const { data: routes } = useRoutes();
   const { data: blocked } = useBlocked();
+  const { data: statics } = useStaticRoutes();
   const s = state.data;
   if (!s) return null;
 
@@ -88,6 +90,7 @@ export function Overview() {
       <Tile href="/firewall/routes/" icon={<RouteIcon className="size-4" />} title={t("fw.tab.routes")} tone="idle">
         <span>{gateway ? t("fw.tile.gateway", { gw: gateway }) : t("fw.tile.noGateway")}</span>
         <span>{t("fw.tile.forwards", { n: routes?.forwards.length ?? 0 })}</span>
+        <span>{t("fw.tile.staticRoutes", { n: statics?.length ?? 0 })}</span>
       </Tile>
     </div>
   );
