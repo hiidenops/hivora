@@ -87,11 +87,14 @@ class GraphBuilder:
                 except Exception:  # template gone from the catalog
                     spec = None
                 vpn = spec.vpn if spec else None
-                if spec:
-                    template_ports[app.id] = {(name, p.container, p.protocol): p.exposure
-                                              for name, svc in spec.services.items()
-                                              for p in svc.ports}  # fmt: skip
                 latest = await latest_revision(session, app.id)
+                if spec:  # a port set by a form field: the exposure picked there
+                    chosen = latest.inputs if latest else {}
+                    template_ports[app.id] = {
+                        (name, p.container, p.protocol):
+                            chosen.get(p.exposure_field or "") or p.exposure
+                        for name, svc in spec.services.items() for p in svc.ports
+                    }  # fmt: skip
                 if latest and latest.overrides:
                     overridden[app.id] = {
                         (name, key): value

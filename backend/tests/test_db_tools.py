@@ -104,7 +104,7 @@ def test_database_settings_reach_the_server_and_odd_ones_are_refused(client: Any
         assert r.status_code == 422 and code(r) == "form_invalid", (template, extra)
 
 
-def test_databases_and_tools_deployed_in_1_0_0_are_offered_1_1_0(client: Any) -> None:
+def test_databases_and_tools_deployed_in_1_0_0_are_offered_the_latest(client: Any) -> None:
     admin(client)
     db = deploy(client, "mariadb", "Ancienne", {"db_password": DB_PASSWORD})
     pma = deploy(client, "phpmyadmin", "Outil", {"web_port": 8405})
@@ -112,12 +112,49 @@ def test_databases_and_tools_deployed_in_1_0_0_are_offered_1_1_0(client: Any) ->
     with sqlite3.connect(rt.settings.db_path) as conn:  # deployed from the 1.0.0 templates
         conn.execute("UPDATE template_version SET version = '1.0.0' "
                      "WHERE slug IN ('mariadb', 'phpmyadmin')")  # fmt: skip
-    for app in (db, pma):
+    for app, latest in ((db, "1.2.0"), (pma, "1.1.0")):
         status = client.get(f"{API}/apps/{app['id']}/upgrade").json()
-        assert status["available"] and (status["current"], status["latest"]) == ("1.0.0", "1.1.0")
+        assert status["available"] and (status["current"], status["latest"]) == ("1.0.0", latest)
         job = client.post(f"{API}/apps/{app['id']}/upgrade", json={}).json()
         assert wait_job(client, job["id"])["status"] == "succeeded"
     assert "--max-connections=151" in compose_of(client, db["id"])["services"]["server"]["command"]
     update(client, pma["id"], {"web_port": 8405, "database": db["slug"]})  # now it can link
     assert compose_of(client, pma["id"])["services"]["server"]["environment"]["PMA_HOST"] == (
         "ancienne-server-1")  # fmt: skip
+
+
+def test_a_database_opens_to_the_lan_or_the_internet_only_when_asked(client: Any) -> None:
+    admin(client)
+    db = deploy(client, "mariadb", "Ouverte", {"db_password": DB_PASSWORD})
+    server = compose_of(client, db["id"])["services"]["server"]
+    assert server["expose"] == ["3306/tcp"] and "ports" not in server  # closed by default
+    base = {"db_password": "", "host_port": 3307}
+
+    update(client, db["id"], {**base, "expose": "lan"})
+    server = compose_of(client, db["id"])["services"]["server"]
+    assert server["ports"] == [
+        {"target": 3306, "published": "3307", "protocol": "tcp", "host_ip": "192.168.1.10"}
+    ]
+    plan = client.post(f"{API}/apps/{db['id']}/settings/plan",
+                       json={"inputs": {**base, "expose": "public"}}).json()  # fmt: skip
+    assert plan["public_ports"] == [3307]  # the usual public alert
+    update(client, db["id"], {**base, "expose": "public"})
+    assert compose_of(client, db["id"])["services"]["server"]["ports"] == [
+        {"target": 3306, "published": "3307", "protocol": "tcp"}  # every interface
+    ]
+    node = next(n for n in client.get(f"{API}/topology").json()["nodes"] if n.get("id") == db["id"])
+    assert node["ports"][0]["default"] == "public"  # what the form chose, not "internal"
+
+    pg = client.post(
+        f"{API}/apps/plan",
+        json={
+            "template": "postgresql",
+            "name": "Voisine",
+            "inputs": {"db_password": PG_PASSWORD, "expose": "lan", "host_port": 3307},
+        },
+    )
+    assert [c["port"] for c in pg.json()["conflicts"]] == [3307]  # taken by the MariaDB
+
+    update(client, db["id"], {**base, "expose": "internal"})  # closed again
+    server = compose_of(client, db["id"])["services"]["server"]
+    assert server["expose"] == ["3306/tcp"] and "ports" not in server

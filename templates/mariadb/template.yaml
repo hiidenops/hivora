@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: mariadb
   name: MariaDB
-  version: 1.1.0
+  version: 1.2.0
   category: services
   tags: [database, sql, mysql]
   icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/mariadb.svg" }
@@ -29,8 +29,8 @@ form:
       default: app
       pattern: "[A-Za-z_][A-Za-z0-9_]{0,62}"
       help:
-        fr: "Joignable uniquement par les apps de la même zone (zone « reliées entre elles »), à l'adresse « <nom de l'app>-server-1:3306 ». L'ouverture sur le réseau local n'est pas encore disponible."
-        en: "Reachable only by the apps of the same zone (zone “linked together”), at “<app name>-server-1:3306”. Opening it to the local network is not available yet."
+        fr: "Joignable uniquement par les apps de la même zone (zone « reliées entre elles »), à l'adresse « <nom de l'app>-server-1:3306 ». Pour l'ouvrir au réseau local ou à Internet : mode avancé, « Accès réseau »."
+        en: "Reachable only by the apps of the same zone (zone “linked together”), at “<app name>-server-1:3306”. To open it to the local network or the Internet: advanced mode, “Network access”."
     - id: db_user
       group: { fr: Base de données, en: Database }
       label: { fr: Utilisateur, en: User }
@@ -47,6 +47,26 @@ form:
         fr: "Au moins 12 caractères. Il n'est plus affiché ensuite : notez-le pour vous connecter. Une montée de version majeure demande une migration manuelle ; une sauvegarde ne se restaure que sur la même version majeure."
         en: "At least 12 characters. It is not shown again: write it down to connect. A major version upgrade needs a manual migration; a backup only restores on the same major version."
   advanced:
+    - id: expose
+      group: { fr: Accès réseau, en: Network access }
+      label: { fr: Ouvrir la base, en: Open the database }
+      type: select
+      default: internal
+      options:
+        - { value: internal, label: { fr: "Non (seulement les apps de sa zone et les outils liés)", en: "No (only the apps of its zone and the linked tools)" } }
+        - { value: lan, label: { fr: Au réseau local, en: To the local network } }
+        - { value: public, label: { fr: À Internet, en: To the Internet } }
+      help:
+        fr: "Réseau local : la base répond sur l'adresse de la machine dans le réseau local, pour un logiciel installé sur un poste (DBeaver, HeidiSQL…). Internet : elle répond sur toutes les adresses de la machine ; attention, n'importe qui peut alors tenter de s'y connecter, le pare-feu de l'hôte ne la protège pas (Docker le contourne) : mot de passe long, et préférez le VPN."
+        en: "Local network: the database answers on the machine's local network address, for software on a computer (DBeaver, HeidiSQL…). Internet: it answers on every address of the machine; careful, anyone can then try to connect, the host firewall does not protect it (Docker bypasses it): long password, and prefer the VPN."
+    - id: host_port
+      group: { fr: Accès réseau, en: Network access }
+      label: { fr: Port sur la machine, en: Port on the machine }
+      type: port
+      default: 3306
+      help:
+        fr: "Utilisé seulement si la base est ouverte. Les apps de la zone et les outils liés gardent le port 3306."
+        en: "Used only when the database is open. The apps of the zone and the linked tools keep port 3306."
     - id: root_password
       group: { fr: Avancé, en: Advanced }
       label: { fr: Mot de passe root, en: Root password }
@@ -105,7 +125,7 @@ services:
       MARIADB_MYSQL_LOCALHOST_GRANTS: USAGE
       TZ: "{{ host.timezone }}"
     ports:
-      - { container: 3306, purpose: other, exposure: internal }
+      - { container: 3306, host: "{{ form.host_port }}", purpose: other, exposure: internal, exposure_field: expose }
     volumes:
       - { name: data, target: /var/lib/mysql, backup: true }
     healthcheck:

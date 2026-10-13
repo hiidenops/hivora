@@ -172,6 +172,8 @@ class PortSpec(_Strict):
     protocol: Literal["tcp", "udp"] = "tcp"
     purpose: Literal["web", "game", "rcon", "query", "other"] = "other"
     exposure: Exposure = "lan"
+    # A select field of the form (internal / lan / public) that sets the exposure instead.
+    exposure_field: Annotated[str, Field(pattern=FIELD_ID)] | None = None
 
 
 class VolumeSpec(_Strict):
@@ -516,6 +518,14 @@ class Template(_Strict):
                 raise ValueError(f"service {name!r}: env_if: unknown env {sorted(undeclared)}")
             if unknown := set(svc.env_if.values()) - set(fields):
                 raise ValueError(f"service {name!r}: env_if: unknown fields {sorted(unknown)}")
+            for port in svc.ports:
+                if (ref := port.exposure_field) is None:
+                    continue
+                field = fields.get(ref)
+                choices = {o.value for o in (field.options or [])} if field else set()
+                if not field or field.type != "select" or choices - {"internal", "lan", "public"}:
+                    raise ValueError(f"service {name!r}: exposure_field needs a select field "
+                                     "of internal, lan, public")  # fmt: skip
         exprs = (e for text in iter_strings(self.model_dump()) for e in find_expressions(text))
         for expr in exprs:
             ns, rest = expr.namespace, expr.path[1:]

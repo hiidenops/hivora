@@ -30,3 +30,36 @@ test("db tools: phpMyAdmin picks a deployed MariaDB", async ({ page }) => {
   const removed = await page.request.delete(`/api/v1/apps/${created.app.id}`, { headers });
   await done((await removed.json()).id);
 });
+
+// A database opened from "Edit": to the local network, then a look at the Internet (the
+// usual public warning), and closed again; removed at the end like the one above.
+test("db tools: a MariaDB opened to the local network from its settings", async ({ page }) => {
+  await signIn(page);
+  const { headers, done } = await adminApi(page);
+  const created = await (await page.request.post("/api/v1/apps", {
+    headers, data: { template: "mariadb", name: "Comptes", inputs: { db_password: "mariadb-pass-123" } },
+  })).json(); // prettier-ignore
+  await done(created.job.id);
+  const id = created.app.id;
+
+  await page.goto(`/edit/?id=${id}`);
+  await page.getByText("Réglages avancés", { exact: true }).click();
+  const open = page.getByLabel("Ouvrir la base", { exact: true });
+  await expect(open).toHaveValue("internal");
+  await page.getByLabel("Port sur la machine", { exact: true }).fill("3316");
+  await open.selectOption({ label: "À Internet" });
+  await page.getByRole("button", { name: "Vérifier les changements" }).click();
+  await expect(page.getByText(/Exposé sur Internet/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Retour" }).click();
+  await page.getByText("Réglages avancés", { exact: true }).click(); // closed again on the way back
+  await open.selectOption({ label: "Au réseau local" });
+  await page.getByRole("button", { name: "Vérifier les changements" }).click();
+  await expect(page.getByText(/\+ +published: '3316'/)).toBeVisible(); // the compose diff
+  await expect(page.getByText(/Exposé sur Internet/)).toBeHidden();
+  await page.getByRole("button", { name: "Appliquer", exact: true }).click();
+  await expect.poll(async () => (await (await page.request.get(`/api/v1/apps/${id}/settings`)).json()).values.expose, { timeout: 20_000 }).toBe("lan");
+
+  const removed = await page.request.delete(`/api/v1/apps/${id}`, { headers });
+  await done((await removed.json()).id);
+});

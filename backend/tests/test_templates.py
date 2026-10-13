@@ -426,6 +426,25 @@ def test_link_fields_and_connections_are_checked_at_load() -> None:
             parse_template(manifest, require_pinned=True)
 
 
+def test_the_exposure_field_must_be_a_select_of_known_exposures() -> None:
+    opened = LINKED_DB.replace("services:", """  advanced:
+    - id: expose
+      label: {fr: Ouvrir, en: Open}
+      type: select
+      default: internal
+      options:
+        - {value: internal, label: {fr: Fermée, en: Closed}}
+        - {value: lan, label: {fr: LAN, en: LAN}}
+services:""").replace("    image: postgres", """    image: postgres
+    ports: [{container: 5432, exposure: internal, exposure_field: expose}]""")  # fmt: skip
+    parse_template(opened, require_pinned=True)
+    for bad in (opened.replace("value: lan", "value: vpn"),
+                opened.replace("exposure_field: expose", "exposure_field: db_name"),
+                opened.replace("exposure_field: expose", "exposure_field: nope")):  # fmt: skip
+        with pytest.raises(TemplateInvalidError, match="exposure_field"):
+            parse_template(bad, require_pinned=True)
+
+
 def test_link_expressions_render_and_the_password_stays_a_reference() -> None:
     ctx = {"link": {"db": {"host": "pg-server-1", "port": 5432, "user": "admin", "database": None}}}
     assert render("{{ link.db.host }}:{{ link.db.port }}", ctx) == "pg-server-1:5432"
