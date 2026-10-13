@@ -9,6 +9,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TileSkeletons } from "@/components/ui/skeleton";
+import { ZoneActions } from "@/features/zones/zone-actions";
 import { ZoneDialog } from "@/features/zones/zone-dialog";
 import { useApps, useDeleteZone, useZones } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
@@ -62,6 +63,7 @@ export default function ZonesPage() {
                   ))}
                 </ul>
               )}
+              <ZoneActions zone={z} operator={operator} hasApps={inside.length > 0} />
               {operator && (
                 <div className="flex gap-2">
                   <ZoneDialog zone={z} trigger={<Button variant="outline" size="sm"><Pencil /> {t("zones.edit")}</Button>} />
