@@ -247,6 +247,7 @@ def test_every_repo_template_compiles_on_its_architectures(catalog: Catalog) -> 
         "gslt": "TOKEN",
         "cluster_token": "pds-g^x",
         "admin_password": "correct-horse-12",
+        "email": "admin@example.org",  # pgAdmin's login
     }
     for entry in catalog.entries():
         t = entry.template
@@ -342,3 +343,15 @@ def test_nginx_serves_its_main_site_and_includes_the_sites(catalog: Catalog) -> 
     assert template.backup is not None and template.backup.volumes == ["html", "sites"]
     assert [v.backup for v in template.services["server"].volumes] == [True, True, False]
     assert compiled.access == {"web": "http://192.168.1.10:8095"}
+
+
+def test_pgadmin_refuses_the_emails_pgadmin_itself_would_refuse(catalog: Catalog) -> None:
+    """pgAdmin will not start with an e-mail on a special-use domain: refused by the form."""
+    t = next(e.template for e in catalog.entries() if e.slug == "pgadmin")
+    base = {"password": "correct-horse-12"}
+    for good in ("admin@example.org", "vous@exemple.fr", "ops@srv.lan"):
+        validate_inputs(t, {**base, "email": good}, {"app": {"name": "Test"}})
+    for bad in ("admin@hivora.local", "a@x.localhost", "a@x.test", "a@x.invalid", "a@x.onion",
+                "a@x.home.arpa", "admin@localhost"):  # fmt: skip
+        with pytest.raises(FormValidationError):
+            validate_inputs(t, {**base, "email": bad}, {"app": {"name": "Test"}})

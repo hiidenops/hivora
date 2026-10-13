@@ -1,0 +1,76 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: pgadmin
+  name: pgAdmin 4
+  version: 1.0.0
+  category: development
+  tags: [database, sql, postgresql, admin]
+  icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/pgadmin.svg" }
+  description:
+    fr: Interface web d'administration de PostgreSQL (requêtes, schémas, sauvegardes, tableaux de bord).
+    en: PostgreSQL administration web interface (queries, schemas, backups, dashboards).
+  links:
+    site: https://www.pgadmin.org
+    doc: https://www.pgadmin.org/docs/pgadmin4/latest/container_deployment.html
+  maintainer: hivora
+  license: PostgreSQL License (image)
+  source: https://hub.docker.com/r/dpage/pgadmin4
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 256Mi, recommended: 512Mi }
+  disk: { min: 500Mi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8089
+      help:
+        fr: "Les serveurs PostgreSQL s'ajoutent ensuite dans pgAdmin : nom du conteneur de la base (« <nom de l'app>-server-1 », port 5432) si pgAdmin est dans la même zone, reliée entre elles."
+        en: "PostgreSQL servers are added in pgAdmin afterwards: the database container's name (“<app name>-server-1”, port 5432) if pgAdmin is in the same zone, linked together."
+    - id: email
+      group: { fr: Compte pgAdmin, en: pgAdmin account }
+      label: { fr: E-mail de connexion, en: Login e-mail }
+      type: email
+      required: true
+      # pgAdmin refuses the special-use domains at its start (it would not run): refused here.
+      pattern: "[^@\\s]+@(?![^@\\s]*\\.(local|localhost|invalid|test|onion|home\\.arpa)$)[^@\\s]+\\.[A-Za-z]{2,63}"
+      help:
+        fr: "L'identifiant pour se connecter à pgAdmin, ex. vous@exemple.fr. pgAdmin refuse les domaines réservés (.local, .localhost, .test, .invalid, .onion, home.arpa)."
+        en: "The login to pgAdmin, e.g. you@example.org. pgAdmin refuses reserved domains (.local, .localhost, .test, .invalid, .onion, home.arpa)."
+    - id: password
+      group: { fr: Compte pgAdmin, en: pgAdmin account }
+      label: { fr: Mot de passe, en: Password }
+      type: secret
+      required: true
+      pattern: ".{12,128}"
+      help:
+        fr: "Au moins 12 caractères. Il n'est plus affiché ensuite : notez-le. Les mots de passe des bases se saisissent dans pgAdmin."
+        en: "At least 12 characters. It is not shown again: write it down. The databases' passwords are typed in pgAdmin."
+services:
+  server:
+    role: main
+    image: dpage/pgadmin4
+    tag: "9.18.0@sha256:c332c5f6dfba995d9ebc4af261d93506d6876085d712eaaa3defc8dd1a3f26de"
+    track: minor
+    env:
+      TZ: "{{ host.timezone }}"
+      PGADMIN_DEFAULT_EMAIL: "{{ form.email }}"
+      PGADMIN_DEFAULT_PASSWORD: "{{ secret.password }}"
+      PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED: "False"  # no call to pgadmin.org at each login
+    ports:
+      - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+    volumes:
+      # Its settings and saved servers; the image runs as pgadmin (5050:5050).
+      - { name: data, target: /var/lib/pgadmin, backup: true, owner: "5050:5050" }
+    stop_grace_period: 20s
+backup:
+  volumes: [data]
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

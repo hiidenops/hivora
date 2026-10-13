@@ -1,0 +1,69 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: phpmyadmin
+  name: phpMyAdmin
+  version: 1.0.0
+  category: development
+  tags: [database, sql, mysql, mariadb, admin]
+  icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/phpmyadmin.svg" }
+  description:
+    fr: Interface web pour gérer vos bases MariaDB et MySQL depuis le navigateur (tables, requêtes, import et export).
+    en: Web interface to manage your MariaDB and MySQL databases from the browser (tables, queries, import and export).
+  links:
+    site: https://www.phpmyadmin.net
+    doc: https://docs.phpmyadmin.net
+  maintainer: hivora
+  license: GPL-2.0 (image)
+  source: https://hub.docker.com/_/phpmyadmin
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 64Mi, recommended: 128Mi }
+  disk: { min: 100Mi }
+form:
+  basic:
+    - id: web_port
+      group: { fr: Accès, en: Access }
+      label: { fr: Port web, en: Web port }
+      type: port
+      default: 8088
+      help:
+        fr: "phpMyAdmin ne garde aucune donnée : il se connecte à une base existante avec ses identifiants (ceux de la base, pas d'Hivora)."
+        en: "phpMyAdmin keeps no data: it connects to an existing database with its credentials (the database's, not Hivora's)."
+    - id: default_server
+      group: { fr: Connexion, en: Connection }
+      label: { fr: Serveur proposé par défaut, en: Default server }
+      type: string
+      pattern: "[A-Za-z0-9._:-]{1,253}"
+      help:
+        fr: "Facultatif. Nom du conteneur de la base (ex. « mariadb-server-1 », soit « <nom de l'app>-server-1 ») si phpMyAdmin est dans la même zone, reliée entre elles ; ou adresse IP:port. Sur la page de connexion, laissez le champ « Serveur » vide pour l'utiliser, ou saisissez-en un autre."
+        en: "Optional. Database container name (e.g. “mariadb-server-1”, that is “<app name>-server-1”) if phpMyAdmin is in the same zone, linked together; or IP:port address. On the login page, leave the “Server” field empty to use it, or type another one."
+  advanced:
+    - id: upload_limit
+      group: { fr: Import, en: Import }
+      label: { fr: Taille maximale d'un import, en: Largest import }
+      type: string
+      default: 64M
+      pattern: "[1-9][0-9]{0,4}[KMG]"
+      help:
+        fr: "Fichier SQL importé par la page Import (ex. 64M, 1G)."
+        en: "SQL file imported through the Import page (e.g. 64M, 1G)."
+services:
+  server:
+    role: main
+    image: phpmyadmin
+    tag: "5.2.3-apache@sha256:7ebeef41095cbe071a00e3c85c8b44309f110eee546c7b3a6d1fcfe259d58e59"
+    track: minor
+    env:
+      TZ: "{{ host.timezone }}"
+      PMA_HOST: "{{ form.default_server }}"
+      PMA_ARBITRARY: "1"  # the login page asks for the server (any reachable one)
+      UPLOAD_LIMIT: "{{ form.upload_limit }}"
+    ports:
+      - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
+access:
+  web: "http://{{ host.lan_ip }}:{{ form.web_port }}"
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

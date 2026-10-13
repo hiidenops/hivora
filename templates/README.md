@@ -24,6 +24,15 @@ Images officielles Docker Hub, variantes Alpine, multi-architecture (amd64 + arm
 | `httpd` | Apache HTTP Server (serveur web statique) | Services | `httpd:2.4.68-alpine` | 8086 | `htdocs` (vide au départ : liste vide) |
 | `adminer` | Adminer (interface des bases de données) | Développement | `adminer:5.5.1-standalone` | 8087 | aucun (pas de données) ; serveur par défaut facultatif (`ADMINER_DEFAULT_SERVER`) |
 
+## Outils d'administration des bases (13/10/2026)
+
+Multi-architecture (amd64 + arm64), figées par digest, suivi des versions `minor`, exposition LAN. Chacun se connecte à une base de la même zone (zone « reliées entre elles »), par le nom de son conteneur `<nom de l'app>-server-1`.
+
+| Slug | Application | Catégorie | Image | Port par défaut | Données |
+|---|---|---|---|---|---|
+| `phpmyadmin` | phpMyAdmin (MariaDB / MySQL) | Développement | `phpmyadmin:5.2.3-apache` (officielle) | 8088 | aucune ; serveur par défaut facultatif (`PMA_HOST`, utilisé quand le champ « Serveur » de la page de connexion reste vide ; `PMA_ARBITRARY=1` : tout autre serveur joignable) ; taille d'import en mode avancé (`UPLOAD_LIMIT`, 64M) |
+| `pgadmin` | pgAdmin 4 (PostgreSQL) | Développement | `dpage/pgadmin4:9.18.0` (éditeur) | 8089 | volume `data` (`/var/lib/pgadmin`, propriétaire `5050:5050`, sauvegardé) ; e-mail et mot de passe de connexion demandés au déploiement (mot de passe chiffré) ; l'e-mail refuse les domaines à usage spécial que pgAdmin refuse au démarrage (`.local`, `.localhost`, `.test`, `.invalid`, `.onion`, `home.arpa`) ; vérification de mise à jour de pgAdmin coupée (`PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED=False`) |
+
 ## Bases de données (lot L2, 01/10/2026)
 
 Images officielles Docker Hub, amd64 + arm64, figées par digest, suivi `minor` (jamais de changement de version majeure automatique : migration manuelle ; une sauvegarde ne se restaure que sur la même version majeure). **Joignables uniquement par les apps de la même zone** (zone « reliées entre elles »), à l'adresse `<nom de l'app>-server-1:<port>` ; l'ouverture sur le réseau local viendra avec une correction du moteur. Mots de passe choisis par l'utilisateur (12 caractères au moins, jamais réaffichés).
