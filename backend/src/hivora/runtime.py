@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from hivora.apps import AppJobHandlers, AppService
 from hivora.apps.custom_images import check_images
+from hivora.apps.zone_actions import ZoneActions
 from hivora.audit import AuditRecorder
 from hivora.auth.service import AuthService
 from hivora.backups.service import BackupService
@@ -81,6 +82,7 @@ class Runtime:
     hostfw: HostFirewall
     blocking: Blocking
     static_routes: StaticRoutes
+    zone_actions: ZoneActions
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
     consoles: "ConsoleManager" = field(init=False)
@@ -173,12 +175,15 @@ class Runtime:
         blocking.register()  # the host_firewall job
         static_routes = StaticRoutes(fw=hostfw, sessions=sessions, jobs=jobs, bus=bus, clock=clock)
         static_routes.register()  # the host_route job
+        zone_actions = ZoneActions(sessions=sessions, jobs=jobs, lifecycle=apps.lifecycle,
+                                   store=state.store, bus=bus)  # fmt: skip
+        zone_actions.register()  # the zone_action job
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
                    public_address, AppMetrics(gateway, state.store, bus), backups,
                    sites, site_files, site_config, site_hosting, tasks, vpn, hostfw,
-                   blocking, static_routes)  # fmt: skip
+                   blocking, static_routes, zone_actions)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.

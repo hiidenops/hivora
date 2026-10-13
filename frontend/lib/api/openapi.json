@@ -1318,6 +1318,24 @@
         "title": "DeclaredIn",
         "type": "object"
       },
+      "DependencyIO": {
+        "properties": {
+          "after": {
+            "title": "After",
+            "type": "integer"
+          },
+          "app": {
+            "title": "App",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "app",
+          "after"
+        ],
+        "title": "DependencyIO",
+        "type": "object"
+      },
       "DeployIn": {
         "properties": {
           "inputs": {
@@ -3897,6 +3915,103 @@
         "title": "SiteToggleIn",
         "type": "object"
       },
+      "StartupApp": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "status"
+        ],
+        "title": "StartupApp",
+        "type": "object"
+      },
+      "StartupIn": {
+        "properties": {
+          "dependencies": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyIO"
+            },
+            "maxItems": 500,
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "timeout_s": {
+            "default": 120,
+            "maximum": 3600.0,
+            "minimum": 10.0,
+            "title": "Timeout S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dependencies"
+        ],
+        "title": "StartupIn",
+        "type": "object"
+      },
+      "StartupOut": {
+        "properties": {
+          "apps": {
+            "items": {
+              "$ref": "#/components/schemas/StartupApp"
+            },
+            "title": "Apps",
+            "type": "array"
+          },
+          "dependencies": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyIO"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "steps": {
+            "items": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "timeout_s": {
+            "title": "Timeout S",
+            "type": "integer"
+          },
+          "zone": {
+            "title": "Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "zone",
+          "timeout_s",
+          "apps",
+          "dependencies",
+          "steps"
+        ],
+        "title": "StartupOut",
+        "type": "object"
+      },
       "StaticRouteIn": {
         "properties": {
           "destination": {
@@ -5183,6 +5298,24 @@
           "worlds"
         ],
         "title": "WorldsOut",
+        "type": "object"
+      },
+      "ZoneActionIn": {
+        "properties": {
+          "action": {
+            "enum": [
+              "start",
+              "stop",
+              "restart"
+            ],
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "ZoneActionIn",
         "type": "object"
       },
       "ZoneOut": {
@@ -11428,6 +11561,153 @@
           }
         },
         "summary": "Edit",
+        "tags": [
+          "zones"
+        ]
+      }
+    },
+    "/api/v1/zones/{slug}/actions": {
+      "post": {
+        "description": "Start, stop or restart the zone's apps in their order (one job; one at a time).",
+        "operationId": "zone_action_api_v1_zones__slug__actions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZoneActionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Zone Action",
+        "tags": [
+          "zones"
+        ]
+      }
+    },
+    "/api/v1/zones/{slug}/startup": {
+      "get": {
+        "description": "The zone's apps, the dependencies between them, the start order and the timeout.",
+        "operationId": "get_startup_api_v1_zones__slug__startup_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Startup",
+        "tags": [
+          "zones"
+        ]
+      },
+      "put": {
+        "description": "Replace the zone's dependencies (same zone, no loop) and its start timeout.",
+        "operationId": "put_startup_api_v1_zones__slug__startup_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Startup",
         "tags": [
           "zones"
         ]

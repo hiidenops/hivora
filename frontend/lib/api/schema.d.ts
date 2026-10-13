@@ -2177,6 +2177,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/zones/{slug}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Zone Action
+         * @description Start, stop or restart the zone's apps in their order (one job; one at a time).
+         */
+        post: operations["zone_action_api_v1_zones__slug__actions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/zones/{slug}/startup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Startup
+         * @description The zone's apps, the dependencies between them, the start order and the timeout.
+         */
+        get: operations["get_startup_api_v1_zones__slug__startup_get"];
+        /**
+         * Put Startup
+         * @description Replace the zone's dependencies (same zone, no loop) and its start timeout.
+         */
+        put: operations["put_startup_api_v1_zones__slug__startup_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2630,6 +2674,13 @@ export interface components {
             kind: "firewall" | "router" | "vpn" | "device" | "note";
             /** Label */
             label: string;
+        };
+        /** DependencyIO */
+        DependencyIO: {
+            /** After */
+            after: number;
+            /** App */
+            app: number;
         };
         /** DeployIn */
         DeployIn: {
@@ -3546,6 +3597,40 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /** StartupApp */
+        StartupApp: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Status */
+            status: string;
+        };
+        /** StartupIn */
+        StartupIn: {
+            /** Dependencies */
+            dependencies: components["schemas"]["DependencyIO"][];
+            /**
+             * Timeout S
+             * @default 120
+             */
+            timeout_s: number;
+        };
+        /** StartupOut */
+        StartupOut: {
+            /** Apps */
+            apps: components["schemas"]["StartupApp"][];
+            /** Dependencies */
+            dependencies: components["schemas"]["DependencyIO"][];
+            /** Steps */
+            steps: number[][];
+            /** Timeout S */
+            timeout_s: number;
+            /** Zone */
+            zone: string;
+        };
         /** StaticRouteIn */
         StaticRouteIn: {
             /** Destination */
@@ -3990,6 +4075,14 @@ export interface components {
             active: string;
             /** Worlds */
             worlds: components["schemas"]["WorldOut"][];
+        };
+        /** ZoneActionIn */
+        ZoneActionIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "start" | "stop" | "restart";
         };
         /** ZoneOut */
         ZoneOut: {
@@ -8347,6 +8440,107 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    zone_action_api_v1_zones__slug__actions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZoneActionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_startup_api_v1_zones__slug__startup_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_startup_api_v1_zones__slug__startup_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartupIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartupOut"];
+                };
             };
             /** @description Validation Error */
             422: {

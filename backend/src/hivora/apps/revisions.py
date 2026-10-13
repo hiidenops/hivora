@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.compose_edit import ComposeEdit
@@ -20,7 +20,7 @@ from hivora.apps.core import (
     store_secrets,
 )
 from hivora.apps.custom_images import CustomImages
-from hivora.apps.models import Application, AppRevision, AppSecret, RevisionStatus
+from hivora.apps.models import AppDependency, Application, AppRevision, AppSecret, RevisionStatus
 from hivora.apps.planner import AppPlanner, DeployPlan, services_from
 from hivora.core.clock import Clock
 from hivora.core.errors import ConflictError, NotFoundError
@@ -284,6 +284,9 @@ class Revisions:
         async with self.sessions() as session, session.begin():
             app = await get_app(session, app_id)
             zone = await get_zone(session, zone_slug) if zone_slug else None
+            if app.zone_id != (zone.id if zone else None):  # its start order belonged there
+                mine = or_(AppDependency.app_id == app.id, AppDependency.depends_on_id == app.id)
+                await session.execute(delete(AppDependency).where(mine))
             app.zone_id = zone.id if zone else None
         async with self.sessions() as session:
             values = (await self.planner.current_settings(session, app_id)).values

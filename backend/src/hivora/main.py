@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from hivora import __version__
 from hivora.apps.api import router as apps_router
+from hivora.apps.api.zone_actions import router as zone_actions_router
 from hivora.audit.api import router as audit_router
 from hivora.auth.api import router as auth_router
 from hivora.auth.users_api import router as users_router
@@ -62,6 +63,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
     for prefix, router in (
         ("/system", system_router), ("/auth", auth_router), ("/users", users_router),
         ("/templates", templates_router), ("/apps", apps_router), ("/zones", zones_router),
+        ("/zones", zone_actions_router),
         ("/jobs", jobs_router), ("/audit", audit_router), ("/metrics", metrics_router),
         ("/modpacks", modpacks_router), ("/topology", topology_router),
         ("/host-firewall", hostfw_router),
