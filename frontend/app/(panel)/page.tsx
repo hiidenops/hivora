@@ -8,11 +8,13 @@ import { useMemo, useState } from "react";
 import { PageHeader, useSession } from "@/components/app-shell";
 import { AppIcon } from "@/components/app-icon";
 import { StatusBadge } from "@/components/status-badge";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TileSkeletons } from "@/components/ui/skeleton";
 import { AppActions } from "@/features/apps/app-actions";
+import { StartOrderButton, ZoneActionButtons, useZoneActions } from "@/features/zones/zone-actions";
 import type { App, Zone } from "@/lib/api/client";
 import { useApps, useZones } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
@@ -106,10 +108,14 @@ export default function DashboardPage() {
       <div className="grid gap-8">
         {sections.map(({ zone, apps: list }) => (
           <section key={zone?.id ?? "none"}>
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              <span className="size-2.5 rounded-full" style={{ background: zone?.color ?? "var(--idle)" }} />
-              {zone?.name ?? t("dashboard.unclassified")}
-            </h2>
+            {zone ? (
+              <ZoneHeading zone={zone} operator={can("operator")} />
+            ) : (
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                <span className="size-2.5 rounded-full" style={{ background: "var(--idle)" }} />
+                {t("dashboard.unclassified")}
+              </h2>
+            )}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">
               {list.map((app, i) => (
                 <div key={app.id} className="animate-enter" style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}>
@@ -121,5 +127,25 @@ export default function DashboardPage() {
         ))}
       </div>
     </>
+  );
+}
+
+/** A zone's title over its apps, its shortcuts right beside its name: start, stop, restart
+ *  the zone in its order, and its start order. */
+function ZoneHeading({ zone, operator }: { zone: Zone; operator: boolean }) {
+  const { errorMessage } = useI18n();
+  const { run, error } = useZoneActions(zone);
+  return (
+    <div className="mb-3 grid gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="size-2.5 rounded-full" style={{ background: zone.color }} />
+          {zone.name}
+        </h2>
+        {operator && <ZoneActionButtons zone={zone} run={run} compact />}
+        <StartOrderButton zone={zone} />
+      </div>
+      {!!error && <Alert tone="danger">{errorMessage(error)}</Alert>}
+    </div>
   );
 }

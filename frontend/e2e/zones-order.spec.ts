@@ -31,8 +31,18 @@ test("zones: start order with arrows, then the zone started in that order", asyn
   const webAfter = sheet.getByRole("group", { name: "Web démarre après" });
   const handle = (app: string, side: "source" | "target") =>
     graph.locator(".react-flow__node").filter({ hasText: app }).locator(`.react-flow__handle.${side}`);
-  const from = (await handle("Base", "source").boundingBox())!;
-  const to = (await handle("Web", "target").boundingBox())!;
+  // The panel slides in: the handles' places are read once they no longer move.
+  const settled = async (h: ReturnType<typeof handle>) => {
+    let box = await h.boundingBox();
+    for (;;) {
+      await page.waitForTimeout(150);
+      const next = await h.boundingBox();
+      if (box && next && box.x === next.x && box.y === next.y) return next;
+      box = next;
+    }
+  };
+  const from = await settled(handle("Base", "source"));
+  const to = await settled(handle("Web", "target"));
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
@@ -71,7 +81,20 @@ test("zones: start order with arrows, then the zone started in that order", asyn
   const toast = page.getByRole("region", { name: "Suivi des tâches" }).getByRole("status", { name: "Démarrage ou arrêt d'une zone" });
   await expect(toast.getByText("Réussi")).toBeVisible({ timeout: 30_000 });
 
-  // A viewer: the order, read only; no action.
+  // The same shortcuts on the dashboard, in the zone's title: started from there too.
+  await page.goto("/");
+  const shortcuts = page.getByRole("group", { name: "Actions de la zone « Ordre »" });
+  page.once("dialog", (d) => {
+    expect(d.message()).toContain("2. Web");
+    void d.accept();
+  });
+  await shortcuts.getByRole("button", { name: "Démarrer la zone « Ordre »", exact: true }).click();
+  await expect(toast.getByText("Réussi").first()).toBeVisible({ timeout: 30_000 });
+  // Each zone's section has its own (other tests leave other zones with apps): Ordre's here.
+  const section = (p: typeof page) => p.locator("section").filter({ has: p.getByRole("heading", { name: "Ordre", exact: true }) });
+  await expect(section(page).getByRole("button", { name: "Ordre de démarrage" })).toBeVisible();
+
+  // A viewer: the order, read only; no action (zones page and dashboard).
   const viewer = await signInViewer(page, browser, "zone-viewer");
   await viewer.goto("/zones/");
   const seen = viewer.getByRole("article", { name: "Ordre" });
@@ -80,5 +103,9 @@ test("zones: start order with arrows, then the zone started in that order", asyn
   const box = viewer.getByRole("dialog").getByRole("group", { name: "Web démarre après" }).getByRole("checkbox", { name: "Base" });
   await expect(box).toBeChecked();
   await expect(box).toBeDisabled();
+  await viewer.keyboard.press("Escape");
+  await viewer.goto("/");
+  await expect(section(viewer).getByRole("button", { name: "Ordre de démarrage" })).toBeVisible();
+  await expect(viewer.getByRole("group", { name: "Actions de la zone « Ordre »" })).toHaveCount(0);
   await viewer.close();
 });
