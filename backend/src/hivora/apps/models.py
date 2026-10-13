@@ -7,7 +7,15 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, ForeignKey, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    ForeignKey,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from hivora.db.base import Base, UTCDateTime, str_enum
@@ -169,3 +177,19 @@ class AppSecret(Base):
     key: Mapped[str] = mapped_column(String(63))
     ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
     nonce: Mapped[bytes] = mapped_column(LargeBinary)
+
+
+class AppDependency(Base):
+    """An app of a zone starts after another one of the same zone (``depends_on_id``), and
+    stops before it. Both in the same zone: checked by the service, and the dependencies of
+    an app that changes zone are removed with the move."""
+
+    __tablename__ = "app_dependency"
+    __table_args__ = (CheckConstraint("app_id != depends_on_id", name="not_self"),)
+
+    app_id: Mapped[int] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE"), primary_key=True
+    )
+    depends_on_id: Mapped[int] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE"), primary_key=True, index=True
+    )

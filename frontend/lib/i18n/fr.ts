@@ -689,6 +689,7 @@ export const fr = {
   "job.kind.host_package": "Installation d'un paquet sur la machine",
   "job.kind.host_firewall": "Pare-feu de l'hôte",
   "job.kind.host_route": "Routes de l'hôte",
+  "job.kind.zone_action": "Démarrage ou arrêt d'une zone",
   "job.kind.stop": "Arrêt",
   "job.kind.restart": "Redémarrage",
   "job.kind.remove": "Suppression",

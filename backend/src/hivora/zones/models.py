@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import String, Text
+from sqlalchemy import CheckConstraint, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from hivora.db.base import Base, UTCDateTime, str_enum
@@ -18,6 +18,9 @@ class NetworkMode(StrEnum):
 
 class Zone(Base):
     __tablename__ = "zone"
+    __table_args__ = (
+        CheckConstraint("start_timeout_s BETWEEN 10 AND 3600", name="start_timeout_range"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     slug: Mapped[str] = mapped_column(String(63), unique=True)
@@ -31,4 +34,6 @@ class Zone(Base):
     docker_network_id: Mapped[str | None] = mapped_column(String(64))
     sort_order: Mapped[int] = mapped_column(default=0)
     is_system: Mapped[bool] = mapped_column(default=False)
+    # Starting the zone: how long an app may take to be healthy before its dependents give up.
+    start_timeout_s: Mapped[int] = mapped_column(default=120, server_default="120")
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)

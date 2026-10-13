@@ -309,3 +309,68 @@ def test_migration_0020_static_routes_and_host_route_job_kind(tmp_path: Path) ->
         add_job(conn, "host_route")
         add_route(conn, "10.8.0.0/24")
     engine.dispose()
+
+
+def test_migration_0021_zone_start_order(tmp_path: Path) -> None:
+    db = tmp_path / "hivora.db"
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0020")
+    engine = make_sync_engine(db)
+    now = "2026-10-13 10:00:00"
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO zone (id, slug, name, color, description, network_mode,"
+                          " sort_order, is_system, created_at) VALUES (5, 'labo', 'Labo',"
+                          " '#888888', '', 'none', 0, 0, :t)"), {"t": now})  # fmt: skip
+        for app_id, slug in ((1, "pg"), (2, "cloud"), (3, "proxy")):
+            conn.execute(text("INSERT INTO application (id, slug, name, origin, desired_state,"
+                              " notes, created_at, zone_id) VALUES (:i, :s, :s, 'template',"
+                              " 'running', '', :t, 5)"),
+                         {"i": app_id, "s": slug, "t": now})  # fmt: skip
+
+    def zone_action_job(conn: Connection) -> None:
+        conn.execute(text("INSERT INTO job (kind, params, status, progress, log, created_at)"
+                          " VALUES ('zone_action', '{}', 'queued', 0, '', :t)"),
+                     {"t": now})  # fmt: skip
+
+    def depend(conn: Connection, *pairs: tuple[int, int]) -> None:
+        conn.execute(text("INSERT INTO app_dependency (app_id, depends_on_id) VALUES (:a, :d)"),
+                     [{"a": a, "d": d} for a, d in pairs])  # fmt: skip
+
+    with pytest.raises(IntegrityError), engine.begin() as conn:  # not a job kind yet
+        zone_action_job(conn)
+
+    command.upgrade(cfg, "0021")
+    with engine.begin() as conn:
+        assert conn.execute(text("SELECT start_timeout_s FROM zone")).scalar() == 120
+        depend(conn, (2, 1), (3, 2))
+        zone_action_job(conn)
+    refused = [
+        "INSERT INTO app_dependency (app_id, depends_on_id) VALUES (2, 1)",  # twice
+        "INSERT INTO app_dependency (app_id, depends_on_id) VALUES (1, 1)",  # after itself
+        "INSERT INTO app_dependency (app_id, depends_on_id) VALUES (1, 99)",  # an unknown app
+        "UPDATE zone SET start_timeout_s = 5",  # out of range
+        "UPDATE zone SET start_timeout_s = 3601",
+    ]
+    for statement in refused:
+        with pytest.raises(IntegrityError), engine.begin() as conn:
+            conn.execute(text(statement))
+    with engine.begin() as conn:  # an app removed: its dependencies, both ways, go with it
+        conn.execute(text("DELETE FROM application WHERE id = 2"))
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT count(*) FROM app_dependency")).scalar() == 0
+        assert conn.execute(text("PRAGMA integrity_check")).scalar() == "ok"
+        assert conn.execute(text("PRAGMA foreign_key_check")).all() == []
+
+    command.downgrade(cfg, "0020")
+    with engine.connect() as conn:
+        assert "app_dependency" not in inspect(engine).get_table_names()
+        assert "start_timeout_s" not in {c["name"] for c in inspect(engine).get_columns("zone")}
+        kinds = conn.execute(text("SELECT kind FROM job")).scalars().all()
+        assert "zone_action" not in kinds
+        assert "labo" in conn.execute(text("SELECT slug FROM zone")).scalars().all()  # kept
+        assert conn.execute(text("PRAGMA integrity_check")).scalar() == "ok"
+
+    command.upgrade(cfg, "head")  # and back up again
+    with engine.begin() as conn:
+        depend(conn, (3, 1))
+    engine.dispose()

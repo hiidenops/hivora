@@ -32,6 +32,7 @@ class JobKind(StrEnum):
     HOST_PACKAGE = "host_package"  # a package the host agent needs, installed on the host
     HOST_FIREWALL = "host_firewall"  # the blocked addresses applied to the host
     HOST_ROUTE = "host_route"  # the static routes applied to the host
+    ZONE_ACTION = "zone_action"  # a zone started, stopped or restarted in dependency order
 
 
 class JobStatus(StrEnum):
