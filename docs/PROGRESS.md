@@ -58,12 +58,13 @@ Tests : 498 backend (pytest), 21 tests e2e Playwright en 16 fichiers, 4 tests un
 
 ## En attente de ton retour
 
-Le panel de dev tourne sur la VM : **http://192.168.70.150:8000** (données dans `~/hivora-dev`, Docker réel). Relancé le 13/10 à 10:35 sur le code actuel (`e3a8514`) : sa base est passée de la migration 0020 à 0021 (sauvegardes cohérentes d'avant : `~/hivora-dev/hivora.db.before-0021-20261013.bak`, et `…before-0019-20261012.bak` pour le relancement du 12/10) ; journal dans `~/hivora-dev/panel.log`. Sur la page Pare-feu (agent hôte activé), à tester :
+Le panel de dev tourne sur la VM : **http://192.168.70.150:8000** (données dans `~/hivora-dev`, Docker réel). Relancé le 13/10 à 10:35 (`e3a8514`), puis à 12:15 sur le code actuel (`f5b9725`, catalogue rechargé, sans migration) : sa base est passée de la migration 0020 à 0021 au premier (sauvegardes cohérentes d'avant : `~/hivora-dev/hivora.db.before-0021-20261013.bak`, et `…before-0019-20261012.bak` pour le relancement du 12/10) ; journal dans `~/hivora-dev/panel.log`. Sur la page Pare-feu (agent hôte activé), à tester :
 
 1. **Vue d'ensemble** : les connexions en cours sous les tuiles ; « Bloquer » sur une ligne, badge « Bloquée », « Débloquer ».
 2. **Bloquées** : liste, ajout d'une adresse avec une note, déblocage ; tuile de la vue d'ensemble.
 3. **Routes** : tableau « Routes statiques » (ajout, état « Appliquée », suppression) au-dessus de la table de l'hôte.
 4. **Zones** : sur une zone qui contient des apps, « Ordre de démarrage » (flèches entre les apps, liste au clavier, enregistrer), puis « Démarrer », « Arrêter », « Redémarrer » (l'ordre affiché dans la confirmation).
+5. **Catalogue** : phpMyAdmin et pgAdmin 4 (Développement), à déployer dans une zone « reliées entre elles » à côté de MariaDB ou PostgreSQL.
 
 Si la VM a redémarré, voir « Relancer le serveur de test » plus bas.
 
