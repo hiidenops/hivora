@@ -62,7 +62,7 @@ Conséquences : pas de streams `stats` permanents (échantillonnage one-shot tou
 - **Transparence radicale** : toute action montre son équivalent compose ou commande avant exécution.
 - **Simple par défaut** : toute nouvelle option naît dans le mode avancé.
 - Actions destructives : lister ce qui sera supprimé, case « supprimer aussi les données » décochée par défaut.
-- Templates `hivora/v1` : YAML déclaratif, **aucune logique exécutable**, substitutions limitées (`form.*`, `secret.*`, `app.*`, `host.*`, `service.<nom>.host`) et filtres `default`, `lower`, `upper`, `quote` uniquement. Les templates officiels figent chaque image par digest ; `latest` est interdit.
+- Templates `hivora/v1` : YAML déclaratif, **aucune logique exécutable**, substitutions limitées (`form.*`, `secret.*`, `app.*`, `host.*`, `service.<nom>.host`, et depuis le 13/10/2026, lot B, `link.<champ>.host|port|database|user|password` : l'app choisie par un champ « lien vers une app » du formulaire, que le modèle de cette app décrit dans sa section déclarative `connection` ; l'outil rejoint alors le réseau Docker de cette app ; `link.<champ>.password` est un secret : jamais écrit dans le compose, seulement dans le `.env` (0600) de l'outil, et seulement si l'utilisateur a demandé la connexion automatique) et filtres `default`, `lower`, `upper`, `quote` uniquement. Les templates officiels figent chaque image par digest ; `latest` est interdit.
 - i18n FR et EN dès la V1 : aucune chaîne en dur dans l'UI, tout passe par des clés de traduction.
 - Typographie : Outfit pour l'interface, JetBrains Mono pour tout ce qui est technique.
 
