@@ -3,12 +3,12 @@ kind: Template
 metadata:
   slug: phpmyadmin
   name: phpMyAdmin
-  version: 1.0.0
+  version: 1.1.0
   category: development
   tags: [database, sql, mysql, mariadb, admin]
   icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/phpmyadmin.svg" }
   description:
-    fr: Interface web pour gérer vos bases MariaDB et MySQL depuis le navigateur (tables, requêtes, import et export).
+    fr: Interface web pour gérer vos bases MariaDB et MySQL depuis le navigateur (tables, requêtes, import et export) ; choisissez la base dans la liste au déploiement.
     en: Web interface to manage your MariaDB and MySQL databases from the browser (tables, queries, import and export).
   links:
     site: https://www.phpmyadmin.net
@@ -30,14 +30,14 @@ form:
       help:
         fr: "phpMyAdmin ne garde aucune donnée : il se connecte à une base existante avec ses identifiants (ceux de la base, pas d'Hivora)."
         en: "phpMyAdmin keeps no data: it connects to an existing database with its credentials (the database's, not Hivora's)."
-    - id: default_server
+    - id: database
       group: { fr: Connexion, en: Connection }
-      label: { fr: Serveur proposé par défaut, en: Default server }
-      type: string
-      pattern: "[A-Za-z0-9._:-]{1,253}"
+      label: { fr: Base de données, en: Database }
+      type: app
+      link: { templates: [mariadb], password_if: auto_login }
       help:
-        fr: "Facultatif. Nom du conteneur de la base (ex. « mariadb-server-1 », soit « <nom de l'app>-server-1 ») si phpMyAdmin est dans la même zone, reliée entre elles ; ou adresse IP:port. Sur la page de connexion, laissez le champ « Serveur » vide pour l'utiliser, ou saisissez-en un autre."
-        en: "Optional. Database container name (e.g. “mariadb-server-1”, that is “<app name>-server-1”) if phpMyAdmin is in the same zone, linked together; or IP:port address. On the login page, leave the “Server” field empty to use it, or type another one."
+        fr: "Facultatif. La base MariaDB déployée dans Hivora que phpMyAdmin ouvre par défaut, quelle que soit sa zone. Sur la page de connexion, laissez le champ « Serveur » vide pour l'utiliser, ou saisissez-en un autre."
+        en: "Optional. The MariaDB database deployed in Hivora that phpMyAdmin opens by default, whatever its zone. On the login page, leave the “Server” field empty to use it, or type another one."
   advanced:
     - id: upload_limit
       group: { fr: Import, en: Import }
@@ -48,6 +48,14 @@ form:
       help:
         fr: "Fichier SQL importé par la page Import (ex. 64M, 1G)."
         en: "SQL file imported through the Import page (e.g. 64M, 1G)."
+    - id: auto_login
+      group: { fr: Connexion, en: Connection }
+      label: { fr: Connexion automatique à la base, en: Log in to the database automatically }
+      type: boolean
+      default: false
+      help:
+        fr: "phpMyAdmin ouvre la base liée sans demander ses identifiants. Attention : toute personne qui atteint phpMyAdmin sur le réseau entre alors dans la base. Le mot de passe reste un secret (jamais dans le compose)."
+        en: "phpMyAdmin opens the linked database without asking for its credentials. Careful: anyone who reaches phpMyAdmin on the network then gets into the database. The password stays a secret (never in the compose)."
 services:
   server:
     role: main
@@ -56,9 +64,15 @@ services:
     track: minor
     env:
       TZ: "{{ host.timezone }}"
-      PMA_HOST: "{{ form.default_server }}"
+      PMA_HOST: "{{ link.database.host }}"
+      PMA_PORT: "{{ link.database.port }}"
       PMA_ARBITRARY: "1"  # the login page asks for the server (any reachable one)
       UPLOAD_LIMIT: "{{ form.upload_limit }}"
+      PMA_USER: "{{ link.database.user }}"
+      PMA_PASSWORD: "{{ link.database.password }}"
+    # The auto-login's credentials only when asked (a user alone would make phpMyAdmin try
+    # to log in without a password instead of showing its login page).
+    env_if: { PMA_USER: auto_login, PMA_PASSWORD: auto_login }
     ports:
       - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
 access:

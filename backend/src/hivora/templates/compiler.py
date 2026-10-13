@@ -279,7 +279,11 @@ def compile_template(
             svc["user"] = _render_str(spec.user, ctx)
         # An empty value means "not set": optional fields (seed, modpack, custom
         # properties) must not reach images that reject empty variables.
-        env = {k: _render_str(v, ctx) for k, v in spec.env.items()}
+        env = {
+            k: _render_str(v, ctx)
+            for k, v in spec.env.items()
+            if k not in spec.env_if or form.values.get(spec.env_if[k]) not in (None, "", False)
+        }
         if env := {k: v for k, v in env.items() if v != ""}:
             svc["environment"] = env
         published = [p for p in ports if p.host_port is not None]

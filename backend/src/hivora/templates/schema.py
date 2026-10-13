@@ -256,6 +256,9 @@ class ServiceSpec(_Strict):
     image: str
     tag: str
     env: dict[str, str | int | bool] = {}
+    # A variable written only when this form field is set (checked, chosen, filled): e.g.
+    # an auto-login's user, that would otherwise make the tool try to log in without it.
+    env_if: dict[str, Annotated[str, Field(pattern=FIELD_ID)]] = {}
     arch: dict[Arch, ArchVariant] = {}
     tag_select: TagSelect | None = None  # default: ``tag``
     files: list[FileSpec] = []
@@ -509,6 +512,10 @@ class Template(_Strict):
                 raise ValueError(f"service {name!r}: image for unsupported arch {sorted(extra)}")
             if unknown := set(svc.depends_on) - names:
                 raise ValueError(f"service {name!r} depends on unknown {sorted(unknown)}")
+            if undeclared := set(svc.env_if) - set(svc.env):
+                raise ValueError(f"service {name!r}: env_if: unknown env {sorted(undeclared)}")
+            if unknown := set(svc.env_if.values()) - set(fields):
+                raise ValueError(f"service {name!r}: env_if: unknown fields {sorted(unknown)}")
         exprs = (e for text in iter_strings(self.model_dump()) for e in find_expressions(text))
         for expr in exprs:
             ns, rest = expr.namespace, expr.path[1:]

@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: postgresql
   name: PostgreSQL
-  version: 1.0.0
+  version: 1.1.0
   category: services
   tags: [database, sql]
   icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/postgresql.svg" }
@@ -46,12 +46,43 @@ form:
       help:
         fr: "Au moins 12 caractères. Il n'est plus affiché ensuite : notez-le pour vous connecter. Une montée de version majeure demande une migration manuelle ; une sauvegarde ne se restaure que sur la même version majeure."
         en: "At least 12 characters. It is not shown again: write it down to connect. A major version upgrade needs a manual migration; a backup only restores on the same major version."
+  advanced:
+    - id: max_connections
+      group: { fr: Réglages du serveur, en: Server settings }
+      label: { fr: Connexions simultanées max, en: Max simultaneous connections }
+      type: integer
+      default: 100
+      range: [10, 10000]
+    - id: shared_buffers
+      group: { fr: Réglages du serveur, en: Server settings }
+      label: { fr: Mémoire de cache (shared_buffers), en: Cache memory (shared_buffers) }
+      type: string
+      default: 128MB
+      pattern: "[1-9][0-9]{0,6}(kB|MB|GB)"
+      help:
+        fr: "La mémoire partagée qui garde les données en cache (ex. 128MB, 1GB ; souvent un quart de la mémoire de la machine)."
+        en: "The shared memory that caches the data (e.g. 128MB, 1GB; often a quarter of the machine's memory)."
+    - id: work_mem
+      group: { fr: Réglages du serveur, en: Server settings }
+      label: { fr: Mémoire par tri (work_mem), en: Memory per sort (work_mem) }
+      type: string
+      default: 4MB
+      pattern: "[1-9][0-9]{0,6}(kB|MB|GB)"
+    - id: extra_args
+      group: { fr: Réglages du serveur, en: Server settings }
+      label: { fr: Paramètres supplémentaires, en: Extra settings }
+      type: string
+      pattern: "-c [a-z_.]{1,64}=[A-Za-z0-9_.,:/+-]{1,128}( -c [a-z_.]{1,64}=[A-Za-z0-9_.,:/+-]{1,128}){0,39}"
+      help:
+        fr: "Facultatif. D'autres paramètres de PostgreSQL, ex. « -c log_min_duration_statement=500 -c timezone=Europe/Paris »."
+        en: "Optional. Other PostgreSQL settings, e.g. “-c log_min_duration_statement=500 -c timezone=Europe/Paris”."
 services:
   server:
     role: main
     image: postgres
     tag: "18.6-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873"
     track: minor
+    command: "postgres -c max_connections={{ form.max_connections }} -c shared_buffers={{ form.shared_buffers }} -c work_mem={{ form.work_mem }} {{ form.extra_args }}"
     env:
       POSTGRES_DB: "{{ form.db_name }}"
       POSTGRES_USER: "{{ form.db_user }}"
@@ -71,6 +102,12 @@ services:
     stop_grace_period: 30s
 backup:
   volumes: [data]
+# How a linked tool (pgAdmin) reaches this database (link.<field>.*).
+connection:
+  port: 5432
+  database: "{{ form.db_name }}"
+  user: "{{ form.db_user }}"
+  password: db_password
 update:
   strategy: manual
 defaults:

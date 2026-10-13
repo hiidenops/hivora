@@ -9,6 +9,8 @@ import { api } from "@/lib/api/client";
 import { Switch, Input, Label, Select } from "@/components/ui/input";
 import { useI18n, type Localized, type MessageKey } from "@/lib/i18n";
 
+import { AppLinkSelect } from "./app-link-select";
+
 export interface FieldDef {
   id: string;
   label: Localized;
@@ -25,6 +27,7 @@ export interface FieldDef {
   options_param?: string; // e.g. the Steam app id
   suggestions?: { value: string; description: Localized }[];
   group?: Localized; // section title, shared by consecutive fields
+  link?: { templates: string[] }; // type "app": the deployed apps it may link to
 }
 
 export type Values = Record<string, unknown>;
@@ -127,6 +130,18 @@ export function GeneratedForm({
             </option>
           ))}
         </Select>
+      );
+    } else if (f.type === "app") {
+      control = (
+        <AppLinkSelect
+          id={id}
+          templates={f.link?.templates ?? []}
+          required={f.required}
+          value={values[f.id] === undefined ? "" : String(values[f.id])}
+          onChange={(v) => onChange(f.id, v)}
+          invalid={!!error}
+          describedBy={describe}
+        />
       );
     } else if (f.options_from) {
       control = (

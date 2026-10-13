@@ -418,6 +418,8 @@ def test_link_fields_and_connections_are_checked_at_load() -> None:
         (LINKED_DB.replace("password: db_password", "password: db_name"), "secret field"),
         (LINKED_DB.replace("connection:\n", "connection:\n  service: nope\n"), "unknown service"),
         (LINKED_DB.replace("{{ form.db_name }}", "{{ nowhere.db_name }}"), "namespace"),
+        (LINKING_TOOL + "    env_if: {DB_NOPE: auto_login}\n", "unknown env"),
+        (LINKING_TOOL + "    env_if: {DB_PASSWORD: nope}\n", "unknown fields"),
     ]  # fmt: skip
     for manifest, why in refused:
         with pytest.raises(TemplateInvalidError, match=why):

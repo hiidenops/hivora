@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: mariadb
   name: MariaDB
-  version: 1.0.0
+  version: 1.1.0
   category: services
   tags: [database, sql, mysql]
   icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/mariadb.svg" }
@@ -56,12 +56,45 @@ form:
       help:
         fr: "Laissé vide, il est généré et n'est pas affiché : utilisez l'utilisateur ci-dessus. Saisissez-le si vous avez besoin du compte root."
         en: "Left empty, it is generated and not shown: use the user above. Enter one if you need the root account."
+    - id: max_connections
+      group: { fr: Réglages du serveur, en: Server settings }
+      label: { fr: Connexions simultanées max, en: Max simultaneous connections }
+      type: integer
+      default: 151
+      range: [10, 10000]
+    - id: charset
+      group: { fr: Réglages du serveur, en: Server settings }
+      label: { fr: Jeu de caractères, en: Character set }
+      type: select
+      default: utf8mb4
+      options:
+        - { value: utf8mb4, label: { fr: "utf8mb4 (recommandé : tout Unicode, émojis compris)", en: "utf8mb4 (recommended: all of Unicode, emoji included)" } }
+        - { value: utf8mb3, label: { fr: "utf8mb3 (ancien UTF-8, sans émojis)", en: "utf8mb3 (older UTF-8, no emoji)" } }
+        - { value: latin1, label: { fr: "latin1 (Europe de l'Ouest, anciennes apps)", en: "latin1 (Western Europe, older apps)" } }
+    - id: innodb_buffer_pool
+      group: { fr: Réglages du serveur, en: Server settings }
+      label: { fr: Mémoire de cache InnoDB, en: InnoDB cache memory }
+      type: string
+      default: 128M
+      pattern: "[1-9][0-9]{0,5}[MG]"
+      help:
+        fr: "La mémoire qui garde les données en cache (ex. 128M, 1G) : plus elle est grande, plus la base est rapide, dans la limite de la mémoire de la machine."
+        en: "The memory that caches the data (e.g. 128M, 1G): the larger, the faster the database, within the machine's memory."
+    - id: extra_args
+      group: { fr: Réglages du serveur, en: Server settings }
+      label: { fr: Paramètres supplémentaires, en: Extra settings }
+      type: string
+      pattern: "--[a-z0-9_-]{1,64}(=[A-Za-z0-9_.,:/+-]{1,128})?( --[a-z0-9_-]{1,64}(=[A-Za-z0-9_.,:/+-]{1,128})?){0,39}"
+      help:
+        fr: "Facultatif. D'autres options du serveur MariaDB, séparées par des espaces, ex. « --max-allowed-packet=64M --wait-timeout=600 »."
+        en: "Optional. Other MariaDB server options, separated by spaces, e.g. “--max-allowed-packet=64M --wait-timeout=600”."
 services:
   server:
     role: main
     image: mariadb
     tag: "11.8.9@sha256:79d59758afc91b89b120b0a8904d637f5a3b3e1c4900f29b740d6d46c72fef68"
     track: minor
+    command: "--character-set-server={{ form.charset }} --max-connections={{ form.max_connections }} --innodb-buffer-pool-size={{ form.innodb_buffer_pool }} {{ form.extra_args }}"
     env:
       MARIADB_ROOT_PASSWORD: "{{ secret.root_password }}"
       MARIADB_DATABASE: "{{ form.db_name }}"
@@ -84,6 +117,12 @@ services:
     stop_grace_period: 30s
 backup:
   volumes: [data]
+# How a linked tool (phpMyAdmin) reaches this database (link.<field>.*).
+connection:
+  port: 3306
+  database: "{{ form.db_name }}"
+  user: "{{ form.db_user }}"
+  password: db_password
 update:
   strategy: manual
 defaults:

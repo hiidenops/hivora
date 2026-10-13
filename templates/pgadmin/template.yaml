@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: pgadmin
   name: pgAdmin 4
-  version: 1.0.0
+  version: 1.1.0
   category: development
   tags: [database, sql, postgresql, admin]
   icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/pgadmin.svg" }
@@ -30,6 +30,14 @@ form:
       help:
         fr: "Les serveurs PostgreSQL s'ajoutent ensuite dans pgAdmin : nom du conteneur de la base (« <nom de l'app>-server-1 », port 5432) si pgAdmin est dans la même zone, reliée entre elles."
         en: "PostgreSQL servers are added in pgAdmin afterwards: the database container's name (“<app name>-server-1”, port 5432) if pgAdmin is in the same zone, linked together."
+    - id: database
+      group: { fr: Connexion, en: Connection }
+      label: { fr: Base de données, en: Database }
+      type: app
+      link: { templates: [postgresql] }
+      help:
+        fr: "Facultatif. La base PostgreSQL déployée dans Hivora, déjà enregistrée dans pgAdmin à son premier démarrage (hôte, port, base, utilisateur), quelle que soit sa zone. À la première connexion, cochez « Save password » dans pgAdmin pour qu'il garde le mot de passe de la base."
+        en: "Optional. The PostgreSQL database deployed in Hivora, already registered in pgAdmin at its first start (host, port, database, user), whatever its zone. At the first connection, check “Save password” in pgAdmin to keep the database's password."
     - id: email
       group: { fr: Compte pgAdmin, en: pgAdmin account }
       label: { fr: E-mail de connexion, en: Login e-mail }
@@ -60,6 +68,16 @@ services:
       PGADMIN_DEFAULT_EMAIL: "{{ form.email }}"
       PGADMIN_DEFAULT_PASSWORD: "{{ secret.password }}"
       PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED: "False"  # no call to pgadmin.org at each login
+      # The linked database, registered at pgAdmin's first start (its own settings after).
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers-hivora.json
+    env_if: { PGADMIN_SERVER_JSON_FILE: database }
+    files:
+      - target: /pgadmin4/servers-hivora.json
+        content: |
+          {"Servers": {"1": {"Name": "{{ link.database.host }}", "Group": "Hivora",
+            "Host": "{{ link.database.host }}", "Port": {{ link.database.port }},
+            "MaintenanceDB": "{{ link.database.database }}",
+            "Username": "{{ link.database.user }}", "SSLMode": "prefer"}}}
     ports:
       - { container: 80, host: "{{ form.web_port }}", purpose: web, exposure: lan }
     volumes:
