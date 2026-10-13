@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+import hivora.apps.links as links
 from hivora.apps.core import (
     DeployRequest,
     PortConflictError,
@@ -155,6 +156,10 @@ class Lifecycle:
             if vpns := await self.planner.vpns_reaching(session, app.slug):
                 raise ConflictError("this app is behind a VPN: detach it from the VPN first",
                                     vpn=", ".join(vpns))  # fmt: skip
+            # A tool linked to it would lose its network (it would not start any more).
+            if tools := await links.linked_by(session, self.planner.catalog, app.slug):
+                raise links.LinkedAppError("tools are linked to this app: unlink them first",
+                                           tools=", ".join(tools))  # fmt: skip
             job = self.jobs.add(
                 session,
                 JobKind.REMOVE,

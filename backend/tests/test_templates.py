@@ -355,3 +355,99 @@ def test_pgadmin_refuses_the_emails_pgadmin_itself_would_refuse(catalog: Catalog
                 "a@x.home.arpa", "admin@localhost"):  # fmt: skip
         with pytest.raises(FormValidationError):
             validate_inputs(t, {**base, "email": bad}, {"app": {"name": "Test"}})
+
+
+# --- link fields (lot B): an app field, the linked app's connection, link.<field>.* -------
+
+LINKED_DB = """
+apiVersion: hivora/v1
+kind: Template
+metadata: {slug: testdb, name: Test DB, version: 1.0.0, category: services}
+requirements: {arch: [amd64, arm64]}
+form:
+  basic:
+    - {id: db_name, label: {fr: Base, en: Database}, type: string, default: app}
+    - {id: db_user, label: {fr: Utilisateur, en: User}, type: string, default: admin}
+    - {id: db_password, label: {fr: Mot de passe, en: Password}, type: secret, required: true}
+services:
+  server:
+    image: postgres
+    tag: "18@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+connection:
+  port: 5432
+  database: "{{ form.db_name }}"
+  user: "{{ form.db_user }}"
+  password: db_password
+"""
+
+LINKING_TOOL = """
+apiVersion: hivora/v1
+kind: Template
+metadata: {slug: testtool, name: Test tool, version: 1.0.0, category: development}
+requirements: {arch: [amd64, arm64]}
+form:
+  basic:
+    - id: database
+      label: {fr: Base, en: Database}
+      type: app
+      link: {templates: [testdb], password_if: auto_login}
+    - {id: auto_login, label: {fr: Auto, en: Auto}, type: boolean, default: false}
+services:
+  server:
+    image: adminer
+    tag: "5@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    env:
+      DB_HOST: "{{ link.database.host }}"
+      DB_PORT: "{{ link.database.port }}"
+      DB_URL: "{{ link.database.user }}@{{ link.database.host }}/{{ link.database.database }}"
+      DB_PASSWORD: "{{ link.database.password }}"
+"""
+
+
+def test_link_fields_and_connections_are_checked_at_load() -> None:
+    assert parse_template(LINKED_DB, require_pinned=True).connection is not None
+    tool = parse_template(LINKING_TOOL, require_pinned=True)
+    assert tool.form.fields[0].link is not None
+    refused = [
+        (LINKING_TOOL.replace("      link: {templates: [testdb], password_if: auto_login}\n", ""),
+         "needs a link"),  # an app field without its link
+        (LINKING_TOOL.replace("type: boolean", "type: string"), "password_if"),
+        (LINKING_TOOL.replace("{{ link.database.host }}", "{{ link.auto_login.host }}"),
+         "app field"),  # link.* on a field that is not an app field
+        (LINKING_TOOL.replace("{{ link.database.port }}", "{{ link.database.nope }}"), "link"),
+        (LINKED_DB.replace("password: db_password", "password: db_name"), "secret field"),
+        (LINKED_DB.replace("connection:\n", "connection:\n  service: nope\n"), "unknown service"),
+        (LINKED_DB.replace("{{ form.db_name }}", "{{ nowhere.db_name }}"), "namespace"),
+    ]  # fmt: skip
+    for manifest, why in refused:
+        with pytest.raises(TemplateInvalidError, match=why):
+            parse_template(manifest, require_pinned=True)
+
+
+def test_link_expressions_render_and_the_password_stays_a_reference() -> None:
+    ctx = {"link": {"db": {"host": "pg-server-1", "port": 5432, "user": "admin", "database": None}}}
+    assert render("{{ link.db.host }}:{{ link.db.port }}", ctx) == "pg-server-1:5432"
+    assert render("{{ link.db.port }}", ctx) == 5432  # alone: its native type
+    assert render("{{ link.db.database | default('app') }}", ctx) == "app"
+    assert render("{{ link.db.password }}", ctx) == "${HV_SECRET_LINK_DB_PASSWORD:-}"
+    for bad in ("link.db", "link.db.nope", "link.db.host.more", "link.db.password | upper"):
+        with pytest.raises(TemplateExpressionError):
+            parse_expression(bad)
+
+
+def test_a_linked_app_is_compiled_in_never_its_password() -> None:
+    from hivora.templates import LinkTarget
+
+    tool = parse_template(LINKING_TOOL, require_pinned=True)
+    form = validate_inputs(tool, {"database": "pg"}, {})
+    app = AppContext(slug="tool", name="Tool", revision=1, extra_networks=("pg_default",))
+    links = {"database": LinkTarget(host="pg-server-1", port=5432, database="app", user="admin")}
+    compiled = compile_template(tool, app, HostInfo(lan_ip="192.168.1.10"), form, Path("/srv"),
+                                None, links)  # fmt: skip
+    env = compiled.compose["services"]["server"]["environment"]
+    assert env["DB_HOST"] == "pg-server-1" and env["DB_PORT"] == "5432"
+    assert env["DB_URL"] == "admin@pg-server-1/app"
+    assert env["DB_PASSWORD"] == "${HV_SECRET_LINK_DATABASE_PASSWORD:-}"  # a reference only
+    assert compiled.compose["networks"]["reach0"] == {"name": "pg_default", "external": True}
+    with pytest.raises(FormValidationError):  # an app field holds a slug, nothing else
+        validate_inputs(tool, {"database": "pg; rm -rf /"}, {})

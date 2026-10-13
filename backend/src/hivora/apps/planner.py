@@ -3,12 +3,13 @@ plan every deploy and settings change is reviewed and applied from (``AppPlanner
 the service rows a compiled app gives (``services_from``)."""
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import hivora.apps.links as links
 from hivora.apps.core import decrypt_secrets, get_app, latest_revision
 from hivora.apps.models import (
     Application,
@@ -144,6 +145,13 @@ class AppPlanner:
         host = self.host
         defaults_ctx = build_context(app_ctx, host, FormValues(), list(entry.template.services))
         form = validate_inputs(entry.template, inputs, defaults_ctx)
+        # The apps its link fields chose: their networks joined, their passwords only for an
+        # asked auto-login (then one of this app's secrets, gone once the box is unchecked).
+        linked = await links.resolve(session, self.catalog, self.box, entry.template, form.values)
+        if linked.secrets:
+            form = FormValues(form.values, {**form.secrets, **linked.secrets})
+        if linked.networks:
+            app_ctx = replace(app_ctx, extra_networks=(*app_ctx.extra_networks, *linked.networks))
         overrides = overrides or Overrides()
         # The sites' ports are compiled in but never stored in the revision's overrides:
         # every compile (update, upgrade, restore) publishes the sites as they are now.
@@ -156,7 +164,7 @@ class AppPlanner:
                 update={"services": {**overrides.services, main: with_sites}}
             )
         compiled = compile_template(entry.template, app_ctx, host, form, self.settings.volumes_root,
-                                    compiled_with)  # fmt: skip
+                                    compiled_with, linked.targets)  # fmt: skip
         used = await used_ports(session, self.state, exclude_app=slug)
         conflicts = find_conflicts((p for s in compiled.services for p in s.ports), used)
         return DeployPlan(slug, name, entry, zone, compiled, form, conflicts, overrides)

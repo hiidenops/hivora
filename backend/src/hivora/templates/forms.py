@@ -18,6 +18,7 @@ _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _URL = re.compile(r"^https?://[^\s/$.?#].[^\s]*$")
 _DOMAIN = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
 _SECRET_ALPHABET = string.ascii_letters + string.digits
+_APP = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")  # an app's slug (a link field)
 
 
 class FormValidationError(ValidationError):
@@ -72,6 +73,8 @@ def _coerce(f: FormField, raw: Any) -> Any:
         if t in checks and not checks[t].match(value.lower() if t == "domain" else value):
             raise ValueError("invalid_format")
         if t == "path" and not value.startswith("/"):
+            raise ValueError("invalid_format")
+        if t == "app" and not _APP.match(value):  # its existence: checked by the planner
             raise ValueError("invalid_format")
     if f.range and not f.range[0] <= value <= f.range[1]:
         raise ValueError("out_of_range")

@@ -7,10 +7,12 @@ Grammar (deliberately tiny, no logic):
     filter  := "lower" | "upper" | "quote" | "default" "(" literal ")"
     literal := "..." | '...' | number | true | false
 
-Namespaces: form, secret, app, host, service. Secrets are never rendered as
+Namespaces: form, secret, app, host, service, link. Secrets are never rendered as
 values: they become ``${HV_SECRET_<KEY>:-}`` references resolved by Compose
 from the app's ``.env`` file (empty when a secret is unset, e.g. an optional
-API key, without a "variable is not set" warning).
+API key, without a "variable is not set" warning). ``link.<field>.host|port|database|user``
+read the app a link field chose; ``link.<field>.password`` is a secret like the others
+(``HV_SECRET_LINK_<FIELD>_PASSWORD``), set only for an auto-login the user asked for.
 """
 
 import json
@@ -21,7 +23,8 @@ from typing import Any
 
 from hivora.core.errors import ValidationError
 
-NAMESPACES = frozenset({"form", "secret", "app", "host", "service"})
+NAMESPACES = frozenset({"form", "secret", "app", "host", "service", "link"})
+LINK_KEYS = frozenset({"host", "port", "database", "user", "password"})
 FILTERS = frozenset({"default", "lower", "upper", "quote"})
 
 # An expression never spans "}}", so "{{ a }}:{{ b }}" is two expressions.
@@ -51,9 +54,19 @@ class Expression:
     def namespace(self) -> str:
         return self.path[0]
 
+    @property
+    def secret(self) -> bool:
+        """A reference to a secret (never its value): secret.*, link.<field>.password."""
+        return self.namespace == "secret" or self.path[:1] + self.path[2:] == ("link", "password")
+
 
 def secret_env_name(key: str) -> str:
     return "HV_SECRET_" + re.sub(r"[^A-Z0-9]", "_", key.upper())
+
+
+def link_secret(field: str) -> str:
+    """The secret key of the password a link field reads (``link.<field>.password``)."""
+    return f"link_{field}_password"
 
 
 def _parse_literal(raw: str, source: str) -> Any:
@@ -77,6 +90,8 @@ def parse_expression(source: str) -> Expression:
     segments = tuple(path.split("."))
     if segments[0] not in NAMESPACES:
         raise TemplateExpressionError(f"unknown namespace {segments[0]!r} in {source!r}")
+    if segments[0] == "link" and (len(segments) != 3 or segments[2] not in LINK_KEYS):
+        raise TemplateExpressionError(f"link.<field>.{'|'.join(sorted(LINK_KEYS))}: {source!r}")
     filters = []
     for raw in parts[1:]:
         m = _FILTER.match(raw)
@@ -86,9 +101,10 @@ def parse_expression(source: str) -> Expression:
             raise TemplateExpressionError(f"bad arguments for {m['name']!r} in {source!r}")
         arg = _parse_literal(m["arg"], source) if m["arg"] is not None else None
         filters.append(Filter(m["name"], arg))
-    if segments[0] == "secret" and filters:
+    expr = Expression(source, segments, tuple(filters))
+    if expr.secret and filters:
         raise TemplateExpressionError(f"filters cannot apply to secrets: {source!r}")
-    return Expression(source, segments, tuple(filters))
+    return expr
 
 
 def find_expressions(text: str) -> list[Expression]:
@@ -122,8 +138,9 @@ def _lookup(context: Mapping[str, Any], path: tuple[str, ...]) -> Any:
 
 
 def evaluate(expr: Expression, context: Mapping[str, Any]) -> Any:
-    if expr.namespace == "secret":
-        return "${" + secret_env_name(expr.path[1]) + ":-}"
+    if expr.secret:
+        key = expr.path[1] if expr.namespace == "secret" else link_secret(expr.path[1])
+        return "${" + secret_env_name(key) + ":-}"
     value = _lookup(context, expr.path)
     for f in expr.filters:
         value = _apply(value, f)
@@ -143,11 +160,11 @@ def render(
     if whole:
         expr = parse_expression(whole.group(1))
         value = evaluate(expr, context)
-        return value if expr.namespace == "secret" or not isinstance(value, str) else escape(value)
+        return value if expr.secret or not isinstance(value, str) else escape(value)
 
     def substitute(m: re.Match[str]) -> str:
         expr = parse_expression(m.group(1))
         value = _stringify(evaluate(expr, context))
-        return value if expr.namespace == "secret" else escape(value)
+        return value if expr.secret else escape(value)
 
     return _EXPR.sub(substitute, text)

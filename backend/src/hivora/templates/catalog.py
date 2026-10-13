@@ -14,6 +14,7 @@ import yaml
 from pydantic import ValidationError as PydanticValidationError
 
 from hivora.core.errors import NotFoundError, ValidationError
+from hivora.templates.expressions import TemplateExpressionError
 from hivora.templates.schema import Template
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,9 @@ def parse_template(manifest: str, *, require_pinned: bool) -> Template:
         template = Template.model_validate(yaml.safe_load(manifest))
         if require_pinned:
             template.check_pinned()
-    except (PydanticValidationError, ValueError, yaml.YAMLError) as exc:
+    except (PydanticValidationError, ValueError, yaml.YAMLError, TemplateExpressionError) as exc:
+        # An expression the grammar refuses makes the template invalid too (skipped at load,
+        # never a crash of the whole catalog).
         raise TemplateInvalidError(str(exc)) from exc
     return template
 

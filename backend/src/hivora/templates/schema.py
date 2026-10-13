@@ -19,7 +19,7 @@ DIGEST = re.compile(r"@sha256:[0-9a-f]{64}$")
 
 FieldType = Literal[
     "string", "text", "integer", "number", "boolean", "select", "secret",
-    "port", "path", "email", "url", "domain",
+    "port", "path", "email", "url", "domain", "app",
 ]  # fmt: skip
 Exposure = Literal["public", "lan", "vpn", "internal"]
 Language = Literal["fr", "en"]
@@ -105,6 +105,16 @@ class Suggestion(_Strict):
     description: Localized
 
 
+class Link(_Strict):
+    """A field of type "app": one of the deployed apps of these templates (its slug). The
+    tool joins that app's network and reads it through ``link.<field>.*`` (its
+    ``connection``); its password only when the boolean field ``password_if`` is checked."""
+
+    templates: Annotated[list[Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9-]*$")]],
+                         Field(min_length=1)]  # fmt: skip
+    password_if: Annotated[str, Field(pattern=FIELD_ID)] | None = None
+
+
 class FormField(_Strict):
     id: Annotated[str, Field(pattern=FIELD_ID)]
     label: Localized
@@ -128,11 +138,14 @@ class FormField(_Strict):
     # Changing this value on an existing app wipes its volumes (e.g. a game
     # version whose saves cannot be read by another one). Always confirmed.
     reset_data_on_change: bool = False
+    link: Link | None = None  # type "app" only
 
     @model_validator(mode="after")
     def _check(self) -> "FormField":
         if self.type == "select" and not self.options:
             raise ValueError(f"select field {self.id!r} needs options")
+        if (self.type == "app") != (self.link is not None):
+            raise ValueError(f"field {self.id!r}: an app field needs a link, and only it has one")
         if (self.options_from == "steam_branches") != bool(self.options_param):
             raise ValueError(f"field {self.id!r}: steam_branches needs options_param (app id)")
         if (self.generate or self.from_setting) and self.type != "secret":
@@ -413,6 +426,18 @@ class Defaults(_Strict):
     restart: Literal["no", "always", "unless-stopped", "on-failure"] = "unless-stopped"
 
 
+class Connection(_Strict):
+    """How a tool reaches this app through a link field (``link.<field>.*``): its service
+    (default: the main one) and port; the database, user and password as this app's own
+    form knows them (``database``, ``user``: expressions; ``password``: a secret field)."""
+
+    service: str | None = None
+    port: Annotated[int, Field(ge=1, le=65535)]
+    database: str | None = None
+    user: str | None = None
+    password: Annotated[str, Field(pattern=FIELD_ID)] | None = None
+
+
 class Template(_Strict):
     api_version: Literal["hivora/v1"] = Field(alias="apiVersion")
     kind: Literal["Template"]
@@ -429,6 +454,7 @@ class Template(_Strict):
     defaults: Defaults = Defaults()
     # Form fields highlighted on the app page (e.g. server type, version, memory).
     summary: list[str] = []
+    connection: Connection | None = None  # how a linked tool reaches this app
 
     @property
     def main_service(self) -> str:
@@ -443,6 +469,15 @@ class Template(_Strict):
             raise ValueError("duplicate form field ids")
         if unknown := set(self.summary) - set(fields):
             raise ValueError(f"summary lists unknown fields {sorted(unknown)}")
+        for f in fields.values():
+            flag = f.link.password_if if f.link else None
+            if flag and (flag not in fields or fields[flag].type != "boolean"):
+                raise ValueError(f"field {f.id!r}: password_if must name a boolean field")
+        if c := self.connection:
+            if c.service is not None and c.service not in self.services:
+                raise ValueError(f"connection: unknown service {c.service!r}")
+            if c.password and (c.password not in fields or fields[c.password].type != "secret"):
+                raise ValueError("connection.password must name a secret field")
         if self.vpn:
             v = self.vpn
             refs = (v.endpoint_field, v.dns_field, v.allowed_ips_field, v.zones_field,
@@ -485,6 +520,8 @@ class Template(_Strict):
                     raise ValueError(f"{expr.source!r}: use secret.* for secret fields only")
             elif ns == "service" and (rest[0] not in names or rest[1:] != ("host",)):
                 raise ValueError(f"{expr.source!r}: expected service.<name>.host")
+            elif ns == "link" and (rest[0] not in fields or fields[rest[0]].type != "app"):
+                raise ValueError(f"{expr.source!r}: link.<field> needs an app field")
         return self
 
     def check_pinned(self) -> None:

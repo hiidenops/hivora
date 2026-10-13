@@ -4,6 +4,7 @@ The output is plain Compose: it runs with ``docker compose up`` without
 Hivora. Secrets are ``${HV_SECRET_*}`` references resolved from ``.env``.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,17 @@ class AppContext:
     zone: str | None = None
     zone_network: str | None = None  # Docker network shared by the zone's apps
     extra_networks: tuple[str, ...] = ()  # other zones' networks (a VPN reaching them)
+
+
+@dataclass(frozen=True, slots=True)
+class LinkTarget:
+    """The app a link field chose, as ``link.<field>.*`` reads it (its ``connection``). Its
+    password is a secret of the app (planner: only for an asked auto-login), in ``.env``."""
+
+    host: str
+    port: int
+    database: str | None = None
+    user: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,9 +242,14 @@ def compile_template(
     form: FormValues,
     volumes_root: Path,
     overrides: Overrides | None = None,
+    links: Mapping[str, LinkTarget] | None = None,
 ) -> CompiledApp:
-    """``overrides``: the app's advanced settings, applied on top of the template."""
+    """``overrides``: the app's advanced settings, applied on top of the template.
+    ``links``: the apps the link fields chose (their networks: in ``app.extra_networks``)."""
+    links = links or {}
     ctx = build_context(app, host, form, list(template.services))
+    ctx["link"] = {f: {"host": t.host, "port": t.port, "database": t.database, "user": t.user}
+                   for f, t in links.items()}  # fmt: skip
     overrides = overrides or Overrides()
     if unknown := set(overrides.services) - set(template.services):
         raise ValidationError("advanced settings name unknown services", services=sorted(unknown))
