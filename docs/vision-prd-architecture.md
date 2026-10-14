@@ -105,7 +105,7 @@ La V1 couvre le cycle complet d'une application sur un hôte unique : installer,
 | F-20 | Mises à jour | Détecter qu'une nouvelle image est disponible (digest), mise à jour manuelle en un clic | Should |
 | F-21 | Jeux | Fiche jeu : adresse de connexion copiable, joueurs max, version, lien vers la console | Should |
 | F-22 | Audit | Journal de toutes les actions (qui, quoi, quand, résultat) | Must |
-| F-23 | Système | Mise à jour d'Hivora depuis l'interface | Could |
+| F-23 | Système | Version installée et disponible (GitHub Releases), notes de version, commande de mise à jour ; bouton « Mettre à jour » en M13 (voir « Distribution et versions ») | Could |
 | F-24 | Console | Accès rapide à la console : ouverture en un clic depuis la tuile d'app, le détail, la topologie ou ⌘K, dans un tiroir persistant multi-onglets, sans quitter l'écran courant | Must |
 
 ### Parcours clés
@@ -230,21 +230,57 @@ Toute modification produit une nouvelle révision : on peut comparer deux révis
 
 ### Sécurité
 
-- **Exposition par défaut** : port 8443 en HTTPS auto-signé ; option « lier à 127.0.0.1 / interface WireGuard uniquement ».
-- **WireGuard** : conteneur wg-easy ou équivalent déployé comme app système dans la zone Administration, jamais imposé aux autres apps.
+- **Exposition par défaut** : port 8443 en HTTPS auto-signé, publié sur l'IP LAN seulement, et panel joignable par le VPN d'administration (mode « VPN + LAN », voir « Installation »). Le mode public n'est jamais un défaut.
+- **WireGuard** : app système gérée par le module `vpn` (`linuxserver/wireguard`), dans la zone Administration, jamais imposée aux autres apps. Elle porte l'accès d'administration au panel (voir « VPN d'administration »).
 - Cookies `Secure`, `HttpOnly`, `SameSite=Strict` ; jeton CSRF ; session expirée après 12 h d'inactivité.
-- Console et exec derrière une re-confirmation TOTP si activé, valable 15 min pour toutes les consoles : la sécurité ne casse pas l'accès rapide.
+- Console et exec derrière une re-confirmation TOTP si activé, valable 15 min pour toutes les consoles : la sécurité ne casse pas l'accès rapide. **En mode d'accès public, le TOTP est obligatoire** : sans TOTP actif, la session n'autorise que sa configuration (comme le changement de mot de passe initial).
 - Le conteneur Hivora s'exécute sans `privileged` ; il ne monte que le socket, `/opt/hivora/data` et `/srv/hivora`.
 
-### Installation (`get.hivora.io`)
+### Installation (décisions du 14/10/2026, M12)
 
-1. Vérifie OS, architecture, droits root ; affiche ce qu'il va faire et demande confirmation (flag `--yes` pour l'automatisation).
-2. Installe Docker via les dépôts officiels si absent.
-3. Crée `/opt/hivora` et `/srv/hivora`, lance le conteneur `hivora` avec `restart: unless-stopped`.
-4. Option `--wireguard` : déploie l'app système WireGuard et restreint le panel à cette interface.
-5. Affiche l'URL et les identifiants initiaux `admin` / `admin`, à changer obligatoirement à la première connexion.
+Commande officielle, sans domaine ni service tiers : le script est un fichier de chaque GitHub Release, publié avec sa somme SHA-256.
 
-Le script est court, versionné dans le dépôt, signé, avec une somme SHA-256 publiée pour ceux qui refusent `curl | bash`.
+```
+curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh | sudo sh
+```
+
+1. Vérifie OS, distribution, architecture (amd64, arm64), droits root ; affiche ce qu'il va faire et demande confirmation (`--yes` pour l'automatisation, `--dry-run` pour seulement afficher les commandes). Tout le script est une fonction appelée à la dernière ligne : un téléchargement interrompu n'exécute rien.
+2. Installe Docker par le script officiel (`get.docker.com`) si absent ; exige Docker Engine ≥ 24. Compose v2 n'est pas requis sur l'hôte : l'image Hivora embarque son propre binaire.
+3. Détecte IP LAN, fuseau, PUID/PGID, ports libres (8443/tcp, 51820/udp).
+4. Écrit `/opt/hivora/data/install.env` (0600) : **source de vérité des options de lancement** du conteneur (version exacte, image, mode d'accès, port, adresses, PUID/PGID, fuseau). Relancer le script le relit : c'est ainsi qu'on met à jour ou qu'on change de mode.
+5. Sauvegarde le panel avant toute mise à jour (`hivora.db` par instantané cohérent, `secret.key`, `install.env`).
+6. Lance le conteneur `hivora` (`restart: unless-stopped`), version exacte résolue à l'installation (jamais `latest` en dur), attend « healthy ».
+7. Initialise par `python -m hivora bootstrap` **dans le conteneur** : le script ne touche jamais la base ni les fichiers WireGuard ; le bootstrap construit les vrais services (migrations, secrets chiffrés, jobs), est idempotent et ne recrée rien qui existe.
+8. Affiche l'URL, l'identifiant `admin` et son **mot de passe aléatoire** (à changer à la première connexion, comme avant), le chemin de `admin.conf` et son QR code.
+
+Pas de PostgreSQL ni de composant séparé : une seule image sert l'API, le WebSocket et le frontend statique, sur SQLite. Le lancement manuel (`deploy/compose.yaml`) garde le compte initial `admin` / `admin`, changement obligatoire.
+
+**Distributions officiellement supportées** : Debian 12 et plus, Ubuntu 22.04 et plus, Raspberry Pi OS 64 bits. Les autres Linux amd64/arm64 avec Docker ≥ 24 fonctionnent « au mieux », avec un message clair ; Docker rootless et Podman sont refusés.
+
+### VPN d'administration
+
+Le panel est joignable par WireGuard sans publier son port sur l'hôte : le conteneur `hivora` rejoint le réseau Docker de la zone Administration, à une **IP fixe réservée** ; le serveur WireGuard (module `vpn`) donne accès à cette zone par le mécanisme « Zones accessibles » existant.
+
+| Mode | Ports publiés sur l'hôte | Panel joignable depuis |
+|---|---|---|
+| **VPN + LAN** (défaut) | 51820/udp, `IP_LAN:8443` | clients VPN autorisés, réseau local |
+| **VPN uniquement** | 51820/udp | clients VPN autorisés sur la zone Administration |
+| **Public** | `0.0.0.0:8443` (+ 51820/udp) | partout ; alerte permanente, TOTP obligatoire |
+
+- `bootstrap --vpn` : zone Administration, app WireGuard (par un job), `hivora` dans le réseau de la zone, client VPN `admin` (zone Administration seulement, ni Internet ni LAN), `/opt/hivora/data/admin.conf` (0600, root, régénérable) et QR code dans le terminal.
+- Le mode d'accès est un réglage de lancement : il vit dans `install.env`, le panel l'affiche en lecture seule avec la commande pour le changer (`install.sh --access vpn|lan|public`). Hivora ne recrée jamais son propre conteneur (jusqu'à M13).
+- Contre l'enfermement : en mode VPN uniquement, supprimer l'app WireGuard d'administration ou le dernier client admin actif est refusé ; porte de secours locale `install.sh --access lan` ; `bootstrap --rescue-admin` régénère un `admin.conf`.
+
+### Distribution et versions
+
+- **Licence** : AGPL-3.0 (`LICENSE` à la racine).
+- **Source de vérité de la version** : le tag git `vX.Y.Z` (SemVer ; avant 1.0, une mineure peut casser, la release le dit). La CI refuse un tag différent de la version du paquet Python. L'image porte les labels OCI `version` et `revision` ; le frontend embarque la version de son build.
+- **Version disponible** : GitHub Releases du dépôt, seule source. Canaux `stable` (défaut) et `pre` (`vX.Y.Z-rc.N`). Vérification activée par défaut, désactivable, au plus toutes les 12 h, cache en mémoire, aucune donnée envoyée hors `User-Agent: Hivora/<version>`, échec silencieux hors ligne.
+- **Changelog** : `CHANGELOG.md` (format Keep a Changelog, en français), section du tag reprise comme corps de la release (la CI échoue si elle manque), embarqué dans l'image pour les notes de la version installée. Les notes distantes sont affichées assainies (texte, aucun contenu tiers chargé).
+- **Images** : `ghcr.io/hiidenops/hivora`, tags `vX.Y.Z`, `X.Y`, `latest` (stable seulement) ; digest publié dans la release.
+- **Migrations** : additives d'une mineure à l'autre ; une base plus récente que le code est refusée au démarrage.
+- **Mise à jour (M12)** : détection et affichage (version, notes, commande `install.sh` à copier) ; la mise à jour elle-même est la relance du script (sauvegarde du panel, nouvelle image, mêmes options).
+- **Bouton « Mettre à jour » (M13)** : conteneur éphémère `hivora-updater` de la même image, lancé par `docker_gateway`, qui télécharge, vérifie le digest, recrée `hivora` depuis `install.env`, attend « healthy » et revient à l'image précédente sinon ; job `self_update` terminé par le nouveau processus. Exception de sécurité (Hivora recrée son propre conteneur) à valider avant M13.
 
 ---
 

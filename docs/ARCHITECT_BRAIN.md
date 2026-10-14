@@ -1,6 +1,6 @@
 # ARCHITECT_BRAIN — mémoire architecturale de Hivora
 
-*Créé le 29/09/2026, à la suite du découpage de `AppService` ; mis à jour le même jour après le découpage de `apps/api.py`, puis le 12/10/2026 (état des lieux après les lots K et R : §7, §13).*
+*Créé le 29/09/2026, à la suite du découpage de `AppService` ; mis à jour le même jour après le découpage de `apps/api.py`, puis le 12/10/2026 (état des lieux après les lots K et R : §7, §13), puis le 14/10/2026 (règles de la distribution, M12-0 : §15).*
 
 Ce document garde **pourquoi** le code est organisé ainsi, et les règles qui empêchent de retomber dans les travers corrigés. Il complète :
 
@@ -446,3 +446,14 @@ Le graphe est dans `graphify-out/` (non versionné, reconstruit par un hook git 
 - [ ] Note datée dans `docs/PROGRESS.md` (contenu, décisions, tailles, tests, suite).
 - [ ] Le commit ne contient que les fichiers prévus (`git diff --cached --name-only` relu).
 - [ ] `graphify update .` lancé ; aucune hausse anormale de liens sur un service métier.
+
+## 15. Distribution et installation (M12, décidé le 14/10/2026)
+
+Décisions D1 à D10 : `CLAUDE.md` (« Distribution ») et le document de référence (« Installation », « VPN d'administration », « Distribution et versions »). Règles d'architecture qui en découlent :
+
+1. **Le script d'installation ne contient aucune logique métier.** Il prépare l'hôte (Docker, dossiers, `install.env`) et lance le conteneur ; tout le reste passe par `python -m hivora bootstrap` dans le conteneur, qui construit les services comme `Runtime.build` et agit par eux (migrations, secrets, jobs). Jamais d'écriture directe dans `hivora.db`, `wg0.conf` ou les dossiers des apps depuis le shell.
+2. **Le bootstrap est idempotent** : relancé, il ne recrée ni l'admin, ni la zone Administration, ni l'app WireGuard, ni le client `admin` s'ils existent. Un test le vérifie (deux lancements, un seul de chaque).
+3. **Une commande en ligne est une bordure, comme une route** : elle reçoit `Runtime` (adaptateur de sortie toléré, §8.3), appelle des services aux dépendances explicites, ne contient pas de logique testable ailleurs.
+4. **Sources de vérité de la distribution** : le tag git pour la version ; `install.env` pour les options de lancement du conteneur `hivora` (Hivora le lit, ne l'écrit pas) ; les GitHub Releases pour la version disponible, état d'exécution gardé en mémoire (cache), seul le réglage « vérifier » va en base.
+5. **Lectures de santé et de version** (`system/status`, `system/releases`) : sous-modules de `system`, lecture seule (§4.6), dépendances injectées, aucun état global ; un contrôle coûteux (`PRAGMA quick_check`) seulement à la demande.
+6. **Hivora ne touche pas à son propre conteneur** avant l'exception M13 (conteneur `hivora-updater`, retour arrière automatique), à valider dans `CLAUDE.md` avant tout code.

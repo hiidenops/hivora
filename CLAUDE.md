@@ -44,16 +44,19 @@ Conséquences : pas de streams `stats` permanents (échantillonnage one-shot tou
 - Pas de shell sur l'hôte, seulement `exec` dans les conteneurs. **Exception validée le 29/09/2026** : l'agent hôte optionnel (`hostfw`, conteneur `hivora-host-agent` privilégié, PID/réseau de l'hôte) n'exécute que des lignes de commande fixes (`ufw`, `fail2ban-client`, `ss`, `ip route`, et depuis le 09/10/2026 `conntrack -L -p tcp --state ESTABLISHED`, en lecture seule, sans argument venant de l'utilisateur, pour lister les connexions vers les apps Docker) aux arguments validés, jamais du code shell construit ; seules écritures : `jail.d/hivora.local`, contenu généré par Hivora passé en argument d'un script fixe, et, depuis le 09/10/2026, l'installation du seul paquet `conntrack` (`apt-get install -y --no-install-recommends conntrack`, précédée au besoin d'un `apt-get update`, lignes fixes, par un job, Debian et Ubuntu seulement) ; et, depuis le 09/10/2026 (lot K), le **blocage d'adresses IP** pour l'hôte et les apps Docker : `iptables` et `ip6tables` en lignes fixes (`-S HIVORA-BLOCK`, `-N HIVORA-BLOCK`, `-C`/`-I INPUT 1 -j HIVORA-BLOCK`, `-C`/`-I DOCKER-USER 1 -j HIVORA-BLOCK`), puis `iptables-restore --noflush` / `ip6tables-restore --noflush` d'un contenu généré par Hivora qui ne touche que la chaîne `HIVORA-BLOCK` (une règle `-s <IP> -j DROP` par adresse validée, IP seule, pas de réseau), passé en argument d'un script fixe, appliqué par un job et réappliqué au démarrage ; l'IP de l'admin qui fait la demande est toujours refusée ; et, depuis le 12/10/2026 (lot R), les **routes statiques IPv4** de l'hôte : `ip -j route show proto 241` (lecture), puis `ip route replace <réseau> via <passerelle> [dev <interface>] [metric <n>] proto 241` et `ip route del <réseau> proto 241`, lignes fixes aux arguments validés, appliquées par un job depuis la base et réappliquées au démarrage ; Hivora ne touche que les routes marquées `proto 241`, jamais celles de DHCP, du noyau, de Docker ou posées à la main ; refusés : la route par défaut, une destination qui contient l'IP de l'admin qui fait la demande ou recouvre un réseau directement connecté, une passerelle hors des réseaux directement connectés, une interface inconnue ; désactivé par défaut, admin + TOTP récent, tout est audité.
 - **Les secrets n'apparaissent jamais** dans `inputs`, les logs de job, l'audit ou les logs applicatifs : ils sont référencés par clé et chiffrés en AES-GCM (clé maître `/opt/hivora/data/secret.key`, 0600).
 - Auth : Argon2id, cookies `Secure`/`HttpOnly`/`SameSite=Strict`, CSRF, TOTP RFC 6238, rate limiting (5 échecs → délai exponentiel).
-- Compte initial `admin` / `admin` créé au premier démarrage : tant que son mot de passe n'est pas changé, la session n'autorise que `me`, `password` et `logout` (403 partout ailleurs).
+- Compte initial `admin` : **mot de passe aléatoire** créé par l'installeur (`python -m hivora bootstrap`, décision D3 du 14/10/2026) et affiché une fois ; `admin` / `admin` seulement pour un lancement manuel sans installeur (`deploy/compose.yaml`). Dans les deux cas, tant que son mot de passe n'est pas changé, la session n'autorise que `me`, `password` et `logout` (403 partout ailleurs).
+- **Mode d'accès public** (panel publié sur toutes les adresses) : TOTP obligatoire avant toute autre action (D4).
 - Rôles : `admin` (tout, dont comptes et configuration), `operator` (apps, déploiements, jobs), `viewer` (lecture). Chaque route déclare son rôle minimal. Jamais zéro admin actif.
 - Console : ouverture journalisée (sans les frappes), 8 sessions max, fermeture après 30 min d'inactivité.
 - Docker contourne UFW : ne jamais présenter UFW comme une protection. Toute exposition `public` génère une alerte.
+- **Accès d'administration** (M12, 14/10/2026) : modes `VPN + LAN` (défaut), `VPN uniquement`, `public`, fixés au lancement (`/opt/hivora/data/install.env`, jamais modifiés par Hivora lui-même). Pour le VPN, le conteneur `hivora` rejoint le réseau de la zone Administration à une IP fixe ; aucun port du panel n'est publié pour cela. Hivora ne crée, ne recrée ni ne supprime **son propre conteneur** : l'auto-mise à jour (`hivora-updater`, M13) demandera une exception validée ici avant d'être codée.
 
 ## Données sur disque
 
 - `/opt/hivora/data/hivora.db`, `/opt/hivora/data/secret.key`
 - `/opt/hivora/data/apps/<app_slug>/compose.yaml` (utilisable sans Hivora, secrets référencés en `${HV_SECRET_*}`), `.env` (valeurs des secrets, 0600) et `hivora.yaml` (valeurs saisies, hors secrets)
 - `/opt/hivora/data/templates/<source>/` (cache des dépôts)
+- `/opt/hivora/data/install.env` (0600) : options de lancement du conteneur écrites par l'installeur (version, mode d'accès, port, adresses) ; `admin.conf` (0600, client VPN d'administration, régénérable) ; `backups/_hivora/` (sauvegardes du panel avant mise à jour)
 - `/srv/hivora/<app_slug>/<volume>/` sur l'hôte : volumes bind des apps (créés avec PUID/PGID)
 
 ## Produit
@@ -65,6 +68,15 @@ Conséquences : pas de streams `stats` permanents (échantillonnage one-shot tou
 - Templates `hivora/v1` : YAML déclaratif, **aucune logique exécutable**, substitutions limitées (`form.*`, `secret.*`, `app.*`, `host.*`, `service.<nom>.host`, et depuis le 13/10/2026, lot B, `link.<champ>.host|port|database|user|password` : l'app choisie par un champ « lien vers une app » du formulaire, que le modèle de cette app décrit dans sa section déclarative `connection` ; l'outil rejoint alors le réseau Docker de cette app ; `link.<champ>.password` est un secret : jamais écrit dans le compose, seulement dans le `.env` (0600) de l'outil, et seulement si l'utilisateur a demandé la connexion automatique) et filtres `default`, `lower`, `upper`, `quote` uniquement. Les templates officiels figent chaque image par digest ; `latest` est interdit.
 - i18n FR et EN dès la V1 : aucune chaîne en dur dans l'UI, tout passe par des clés de traduction.
 - Typographie : Outfit pour l'interface, JetBrains Mono pour tout ce qui est technique.
+
+## Distribution (décisions D1 à D10 du 14/10/2026, détail : document de référence, « Installation », « VPN d'administration », « Distribution et versions »)
+
+- **Licence** : AGPL-3.0.
+- **Installation** : `curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh | sudo sh` (script et `.sha256` publiés dans chaque GitHub Release ; pas de domaine ni de service tiers). Le script ne touche jamais la base ni les fichiers des apps : il délègue à `python -m hivora bootstrap` dans le conteneur, qui passe par les services et les jobs.
+- **Base** : SQLite seulement (pas de PostgreSQL, D2).
+- **Versions** : le tag git `vX.Y.Z` est la source de vérité, égal à la version du paquet ; version disponible lue dans les GitHub Releases (vérification activée par défaut, désactivable, sans télémétrie) ; `CHANGELOG.md` en français.
+- **Mise à jour** : relancer le script (sauvegarde du panel avant). Bouton « Mettre à jour » reporté à M13.
+- **Distributions supportées** : Debian 12+, Ubuntu 22.04+, Raspberry Pi OS 64 bits.
 
 ## Hors périmètre V1 (ne pas implémenter sans demande explicite)
 
