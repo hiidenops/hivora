@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from hivora.apps.api.common import AppOut, PortOut, app_out
+from hivora.apps.api.database import DatabaseOut, database_of
 from hivora.apps.core import get_app as app_by_id  # get_app: this module's route
 from hivora.apps.models import RevisionStatus
 from hivora.apps.queries import (
@@ -72,6 +73,7 @@ class AppDetailOut(AppOut):
     started_at: datetime | None  # main container, when running
     access: dict[str, str]  # where to connect (web / game)
     summary: list[SummaryItemOut]  # template-chosen settings (type, version...)
+    database: DatabaseOut | None = None  # how to reach it, when tools may link to it
 
 
 class RevisionOut(BaseModel):
@@ -186,6 +188,7 @@ async def get_app(app_id: int, _: Viewer, rt: RuntimeDep) -> AppDetailOut:
             started_at=started_at,
             access=access,
             summary=summary,
+            database=await database_of(rt, session, app, template),
         )  # fmt: skip
 
 

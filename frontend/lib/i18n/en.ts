@@ -983,4 +983,13 @@ export const en: Record<MessageKey, string> = {
   "console.shellHint": "Commands run inside the container, never on the host.",
   "error.too_many_consoles": "Too many consoles open (8 at most).",
   "error.console_unavailable": "Console unavailable: {message}",
+  "db.title": "Connection",
+  "db.help": "To connect from an app in its zone or a linked tool. The password is the one chosen at deployment.",
+  "db.host": "Host",
+  "db.port": "Port",
+  "db.database": "Database",
+  "db.user": "User",
+  "db.network": "From the network",
+  "db.openIn": "Open in {tool}",
+  "db.install": "Install {tool} for this database",
 };

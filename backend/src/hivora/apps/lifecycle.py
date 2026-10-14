@@ -159,7 +159,7 @@ class Lifecycle:
             # A tool linked to it would lose its network (it would not start any more).
             if tools := await links.linked_by(session, self.planner.catalog, app.slug):
                 raise links.LinkedAppError("tools are linked to this app: unlink them first",
-                                           tools=", ".join(tools))  # fmt: skip
+                                           tools=", ".join(a.name for a in tools))  # fmt: skip
             job = self.jobs.add(
                 session,
                 JobKind.REMOVE,

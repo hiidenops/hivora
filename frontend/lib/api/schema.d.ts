@@ -2314,6 +2314,7 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            database?: components["schemas"]["DatabaseOut"] | null;
             desired_state: components["schemas"]["DesiredState"];
             /** Drift */
             drift: boolean;
@@ -2664,6 +2665,37 @@ export interface components {
              * @default false
              */
             web: boolean;
+        };
+        /** DatabaseOut */
+        DatabaseOut: {
+            /** Database */
+            database: string | null;
+            /** Host */
+            host: string;
+            /** Installable */
+            installable: components["schemas"]["DbToolTemplateOut"][];
+            /** Port */
+            port: number;
+            /** Tools */
+            tools: components["schemas"]["DbToolOut"][];
+            /** User */
+            user: string | null;
+        };
+        /** DbToolOut */
+        DbToolOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Web */
+            web: string | null;
+        };
+        /** DbToolTemplateOut */
+        DbToolTemplateOut: {
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
         };
         /** DeclaredIn */
         DeclaredIn: {

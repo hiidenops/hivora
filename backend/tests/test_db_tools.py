@@ -158,3 +158,28 @@ def test_a_database_opens_to_the_lan_or_the_internet_only_when_asked(client: Any
     update(client, db["id"], {**base, "expose": "internal"})  # closed again
     server = compose_of(client, db["id"])["services"]["server"]
     assert server["expose"] == ["3306/tcp"] and "ports" not in server
+
+
+def test_a_database_page_says_how_to_reach_it_and_which_tools_open_it(client: Any) -> None:
+    admin(client)
+    db = deploy(client, "mariadb", "Base", {"db_password": DB_PASSWORD, "db_name": "shop"})
+    card = client.get(f"{API}/apps/{db['id']}").json()["database"]
+    assert (card["host"], card["port"], card["database"], card["user"]) == (
+        "base-server-1",
+        3306,
+        "shop",
+        "app",
+    )
+    assert card["tools"] == [] and card["installable"] == [
+        {"slug": "phpmyadmin", "name": "phpMyAdmin"}
+    ]
+    assert DB_PASSWORD not in str(card)
+    pma = deploy(client, "phpmyadmin", "Admin", {"web_port": 8405, "database": db["slug"]})
+    (tool,) = client.get(f"{API}/apps/{db['id']}").json()["database"]["tools"]
+    assert (tool["id"], tool["name"]) == (pma["id"], "Admin") and ":8405" in tool["web"]
+    pg = deploy(client, "postgresql", "Pg", {"db_password": PG_PASSWORD})
+    assert (
+        client.get(f"{API}/apps/{pg['id']}").json()["database"]["installable"][0]["slug"]
+        == "pgadmin"
+    )
+    assert client.get(f"{API}/apps/{pma['id']}").json()["database"] is None  # not a database

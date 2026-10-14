@@ -31,8 +31,9 @@ test("db tools: phpMyAdmin picks a deployed MariaDB", async ({ page }) => {
   await done((await removed.json()).id);
 });
 
-// A database opened from "Edit": to the local network, then a look at the Internet (the
-// usual public warning), and closed again; removed at the end like the one above.
+// A database opened from "Edit": to the local network, after a look at the Internet (the
+// usual public warning); its page then shows where to reach it and links to phpMyAdmin's
+// form, prefilled with it. Removed at the end like the one above.
 test("db tools: a MariaDB opened to the local network from its settings", async ({ page }) => {
   await signIn(page);
   const { headers, done } = await adminApi(page);
@@ -59,6 +60,13 @@ test("db tools: a MariaDB opened to the local network from its settings", async 
   await expect(page.getByText(/Exposé sur Internet/)).toBeHidden();
   await page.getByRole("button", { name: "Appliquer", exact: true }).click();
   await expect.poll(async () => (await (await page.request.get(`/api/v1/apps/${id}/settings`)).json()).values.expose, { timeout: 20_000 }).toBe("lan");
+
+  // Its page says how to reach it, now from the network too, and offers phpMyAdmin for it.
+  await page.goto(`/app/?id=${id}`);
+  await expect(page.getByRole("button", { name: "comptes-server-1" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /:3316$/ })).toBeVisible();
+  await page.getByRole("link", { name: "Installer phpMyAdmin pour cette base" }).click();
+  await expect(page.getByLabel("Base de données", { exact: true })).toHaveValue("comptes");
 
   const removed = await page.request.delete(`/api/v1/apps/${id}`, { headers });
   await done((await removed.json()).id);

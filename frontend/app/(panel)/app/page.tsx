@@ -18,6 +18,7 @@ import { hostsSites } from "@/features/hosting/server";
 // Only VPN apps need it: loaded on demand (page budget).
 const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.VpnCard));
 const UpgradeBanner = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.UpgradeBanner));
+const DatabaseCard = dynamic(() => import("@/features/apps/database-card").then((m) => m.DatabaseCard));
 const HostedSitesCard = dynamic(() => import("@/features/hosting/hosted-sites-card").then((m) => m.HostedSitesCard));
 import { ApiError } from "@/lib/api/client";
 import { useApp } from "@/lib/api/hooks";
@@ -84,6 +85,7 @@ function AppDetail() {
         <StatusHero app={app} status={status} />
         {can("operator") && app.template && <UpgradeBanner appId={app.id} onJob={setActiveJob} />}
         {hostsSites(app.template) && <HostedSitesCard appId={app.id} template={app.template!} hosting={app.hosting} onJob={setActiveJob} />}
+        {app.database && <DatabaseCard app={app} />}
         {["healthy", "starting", "degraded"].includes(status) && <AppUsage slug={app.slug} />}
         {app.game && (
           <GamePanel

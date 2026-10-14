@@ -38,7 +38,7 @@ function useNow(ms = 30_000): number {
   return now;
 }
 
-function CopyAddress({ value }: { value: string }) {
+export function CopyAddress({ value }: { value: string }) {
   const { t } = useI18n();
   const { copied, copy, bubble } = useCopy();
   return (

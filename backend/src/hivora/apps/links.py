@@ -53,27 +53,44 @@ async def resolve(session: AsyncSession, catalog: Catalog, box: SecretBox, templ
         source = await template_slug(session, app)
         if source not in f.link.templates:
             raise LinkInvalidError("this app cannot be linked here", field=f.id, app=slug)
-        target = catalog.get(source).template
-        conn = target.connection
-        if conn is None:
+        target = await target_of(session, catalog.get(source).template, app)
+        if target is None:
             raise LinkInvalidError("this app does not say how to reach it", field=f.id, app=slug)
-        revision = await latest_revision(session, app.id)
-        ctx = {"form": revision.inputs if revision else {},
-               "app": {"slug": app.slug, "name": app.name}}  # fmt: skip
-        service = conn.service or target.main_service
-        targets[f.id] = LinkTarget(host=f"{app.slug}-{service}-1", port=conn.port,
-                                   database=_text(conn.database, ctx),
-                                   user=_text(conn.user, ctx))  # fmt: skip
+        targets[f.id] = target
         networks.append(f"{app.slug}_default")
-        if f.link.password_if and values.get(f.link.password_if) is True and conn.password:
+        conn = catalog.get(source).template.connection
+        if f.link.password_if and values.get(f.link.password_if) is True and conn and conn.password:
             password = (await decrypt_secrets(session, box, app.id)).get(conn.password)
             if password:
                 secrets[link_secret(f.id)] = password
     return Links(targets, tuple(networks), secrets)
 
 
-async def linked_by(session: AsyncSession, catalog: Catalog, slug: str) -> list[str]:
-    """The names of the apps whose link fields chose this app (they reach its network)."""
+async def target_of(session: AsyncSession, template: Template,
+                    app: Application) -> LinkTarget | None:  # fmt: skip
+    """How a tool reaches ``app`` (its template's ``connection`` on its latest form; None:
+    the template does not say)."""
+    conn = template.connection
+    if conn is None:
+        return None
+    revision = await latest_revision(session, app.id)
+    ctx = {"form": revision.inputs if revision else {},
+           "app": {"slug": app.slug, "name": app.name}}  # fmt: skip
+    service = conn.service or template.main_service
+    return LinkTarget(host=f"{app.slug}-{service}-1", port=conn.port,
+                      database=_text(conn.database, ctx), user=_text(conn.user, ctx))  # fmt: skip
+
+
+def tool_templates(catalog: Catalog, source: str) -> list[Template]:
+    """The catalog's templates with a link field that may choose an app of ``source``."""
+    return sorted((e.template for e in catalog.entries()
+                  if any(f.link and source in f.link.templates
+                         for f in e.template.form.fields)),
+                  key=lambda t: t.metadata.slug)  # fmt: skip
+
+
+async def linked_by(session: AsyncSession, catalog: Catalog, slug: str) -> list[Application]:
+    """The apps whose link fields chose this app (they reach its network)."""
     out = []
     for app, source in await apps_with_template(session):
         try:
@@ -86,7 +103,7 @@ async def linked_by(session: AsyncSession, catalog: Catalog, slug: str) -> list[
         revision = await latest_revision(session, app.id)
         inputs = revision.inputs if revision else {}
         if any(inputs.get(f) == slug for f in links):
-            out.append(app.name)
+            out.append(app)
     return out
 
 

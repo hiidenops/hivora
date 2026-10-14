@@ -206,6 +206,16 @@
             "title": "Created At",
             "type": "string"
           },
+          "database": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatabaseOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "desired_state": {
             "$ref": "#/components/schemas/DesiredState"
           },
@@ -1289,6 +1299,112 @@
           "host"
         ],
         "title": "CustomPortIn",
+        "type": "object"
+      },
+      "DatabaseOut": {
+        "properties": {
+          "database": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Database"
+          },
+          "host": {
+            "title": "Host",
+            "type": "string"
+          },
+          "installable": {
+            "items": {
+              "$ref": "#/components/schemas/DbToolTemplateOut"
+            },
+            "title": "Installable",
+            "type": "array"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/DbToolOut"
+            },
+            "title": "Tools",
+            "type": "array"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User"
+          }
+        },
+        "required": [
+          "host",
+          "port",
+          "database",
+          "user",
+          "tools",
+          "installable"
+        ],
+        "title": "DatabaseOut",
+        "type": "object"
+      },
+      "DbToolOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "web": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Web"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "web"
+        ],
+        "title": "DbToolOut",
+        "type": "object"
+      },
+      "DbToolTemplateOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name"
+        ],
+        "title": "DbToolTemplateOut",
         "type": "object"
       },
       "DeclaredIn": {

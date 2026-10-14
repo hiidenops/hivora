@@ -982,6 +982,15 @@ export const fr = {
   "console.shellHint": "Commandes exécutées dans le conteneur, jamais sur la machine hôte.",
   "error.too_many_consoles": "Trop de consoles ouvertes (8 au maximum).",
   "error.console_unavailable": "Console indisponible : {message}",
+  "db.title": "Connexion",
+  "db.help": "Pour s'y connecter depuis une app de sa zone ou un outil lié. Le mot de passe est celui choisi au déploiement.",
+  "db.host": "Hôte",
+  "db.port": "Port",
+  "db.database": "Base",
+  "db.user": "Utilisateur",
+  "db.network": "Depuis le réseau",
+  "db.openIn": "Ouvrir dans {tool}",
+  "db.install": "Installer {tool} pour cette base",
 } as const;
 
 export type MessageKey = keyof typeof fr;
