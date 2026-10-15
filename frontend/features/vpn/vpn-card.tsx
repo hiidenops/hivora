@@ -183,6 +183,7 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
                       <Switch
                         aria-label={t("vpn.enabled", { name: c.name })}
                         checked={c.active}
+                        disabled={c.protected}
                         onChange={(e) => {
                           const enabled = e.target.checked; // read now: React restores the controlled input before the mutation runs
                           act.mutate(() => api(`/apps/${appId}/vpn/clients/${c.id}`, { method: "PUT", body: { enabled } }));
@@ -195,6 +196,11 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
                         title={c.online ? t("vpn.online") : t("vpn.offline")}
                       />
                       <span className="font-medium">{c.name}</span>
+                      {c.protected && (
+                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary" title={t("vpn.protectedHelp")}>
+                          {t("vpn.protected")}
+                        </span>
+                      )}
                       <span className="font-mono text-xs text-muted-foreground">{c.address}</span>
                       <span className="text-xs text-muted-foreground">
                         {c.online ? t("vpn.online") : c.latest_handshake ? t("vpn.seen", { when: new Date(c.latest_handshake).toLocaleString(lang) }) : t("vpn.never")}
@@ -232,15 +238,17 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
                         >
                           <KeyRound />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          aria-label={t("vpn.delete", { name: c.name })}
-                          title={t("vpn.delete", { name: c.name })}
-                          onClick={() => window.confirm(t("vpn.deleteConfirm", { name: c.name })) && act.mutate(() => api(`/apps/${appId}/vpn/clients/${c.id}`, { method: "DELETE" }))}
-                        >
-                          <Trash2 className="text-danger" />
-                        </Button>
+                        {!c.protected && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label={t("vpn.delete", { name: c.name })}
+                            title={t("vpn.delete", { name: c.name })}
+                            onClick={() => window.confirm(t("vpn.deleteConfirm", { name: c.name })) && act.mutate(() => api(`/apps/${appId}/vpn/clients/${c.id}`, { method: "DELETE" }))}
+                          >
+                            <Trash2 className="text-danger" />
+                          </Button>
+                        )}
                       </span>
                     </div>
                     <ClientSettings key={JSON.stringify([c.name, c.address, c.access, c.routing, c.allowed_ips, c.expires_at])} appId={appId} client={c} vpn={data} zones={zones ?? []} onSaved={refresh} />

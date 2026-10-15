@@ -10,3 +10,5 @@ export const HOST =
 export const PORT = 18500;
 // A second server, as a panel reachable from the Internet (HIVORA_ACCESS=public).
 export const PUBLIC_PORT = 18501;
+// A third one, reached through the admin VPN (HIVORA_ACCESS=vpn): admin-vpn.spec.ts.
+export const VPN_PORT = 18502;

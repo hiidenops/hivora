@@ -8,8 +8,10 @@ One Uvicorn worker, as the whole design assumes a single process.
 in <data>/backups/_hivora/ and print the archive's path.
 `python -m hivora bootstrap`: the initial admin with a random password (installer, before
 the server starts); `python -m hivora reset-admin-password [user]`: a new random one;
-`python -m hivora reset-totp [user]`: two-factor authentication off (lost phone).
-Both print KEY=value lines.
+`python -m hivora reset-totp [user]`: two-factor authentication off (lost phone);
+`python -m hivora rescue-admin`: new keys for the admin VPN client at the next start.
+They print KEY=value lines. `python -m hivora admin-vpn`: the path of admin.conf
+(ADMIN_CONF=...), then its QR code.
 """
 
 import ipaddress
@@ -28,8 +30,14 @@ from cryptography.x509.oid import NameOID
 from hivora.core.config import Settings
 from hivora.core.errors import NotFoundError
 from hivora.db.migrate import SchemaTooNewError
-from hivora.system.bootstrap import bootstrap, reset_admin_password, reset_admin_totp
+from hivora.system.bootstrap import (
+    bootstrap,
+    rescue_admin_vpn,
+    reset_admin_password,
+    reset_admin_totp,
+)
 from hivora.system.panel_backup import backup_panel
+from hivora.vpn.admin import terminal_qr
 
 
 def self_signed(tls_dir: Path, names: list[str]) -> tuple[Path, Path]:
@@ -70,16 +78,23 @@ def command(settings: Settings, args: list[str]) -> None:
         if args == ["backup-self"]:
             print(backup_panel(settings.data_dir))
             return
+        if args == ["admin-vpn"]:
+            path = settings.data_dir / "admin.conf"
+            print(f"ADMIN_CONF={path}\n{terminal_qr(path.read_text())}", end="")
+            return
         if args == ["bootstrap"]:
             out = bootstrap(settings)
         elif args[0] == "reset-admin-password" and len(args) <= 2:
             out = reset_admin_password(settings, *args[1:])
         elif args[0] == "reset-totp" and len(args) <= 2:
             out = reset_admin_totp(settings, *args[1:])
+        elif args == ["rescue-admin"]:
+            out = rescue_admin_vpn(settings)
         else:
             sys.exit(
                 "usage: python -m hivora "
-                "[backup-self | bootstrap | reset-admin-password [user] | reset-totp [user]]"
+                "[backup-self | bootstrap | reset-admin-password [user] | reset-totp [user]"
+                " | rescue-admin | admin-vpn]"
             )
     except (SchemaTooNewError, NotFoundError, FileNotFoundError) as error:
         sys.exit(f"error: {error}")

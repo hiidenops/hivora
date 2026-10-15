@@ -267,9 +267,9 @@ Le panel est joignable par WireGuard sans publier son port sur l'hôte : le cont
 | **VPN uniquement** | 51820/udp | clients VPN autorisés sur la zone Administration |
 | **Public** | `0.0.0.0:8443` (+ 51820/udp) | partout ; alerte permanente, TOTP obligatoire |
 
-- `bootstrap --vpn` : zone Administration, app WireGuard (par un job), `hivora` dans le réseau de la zone, client VPN `admin` (zone Administration seulement, ni Internet ni LAN), `/opt/hivora/data/admin.conf` (0600, root, régénérable) et QR code dans le terminal.
+- **Mise en conformité au démarrage du serveur** (M12-5a ; et non `bootstrap --vpn`, car le déploiement est un job et la file de jobs vit dans le processus du serveur) : en mode `vpn` ou `vpn+lan`, la zone Administration passe en réseau partagé, l'app WireGuard « Admin VPN » y est déployée (réseau du VPN `10.254.253.0/24`, port `HIVORA_ADMIN_VPN_PORT`, adresse des clients `HIVORA_ADMIN_VPN_HOST`, sinon l'adresse publique, sinon l'IP LAN), avec un client VPN `admin` (zone Administration seulement, ni Internet ni LAN), et `/opt/hivora/data/admin.conf` (0600, réécrit quand ses clés changent) ; le réglage `vpn.admin` garde ce qui a été créé : rien n'est créé deux fois. `python -m hivora admin-vpn` affiche le fichier et son QR code dans le terminal. Adressage fixe partagé avec l'installeur (M12-5b) : réseau de la zone `10.254.254.0/24`, plage donnée par Docker `10.254.254.0/25`, panel `10.254.254.254`.
 - Le mode d'accès est un réglage de lancement : il vit dans `install.env`, le panel l'affiche en lecture seule avec la commande pour le changer (`install.sh --access vpn|lan|public`). Hivora ne recrée jamais son propre conteneur (jusqu'à M13).
-- Contre l'enfermement : en mode VPN uniquement, supprimer l'app WireGuard d'administration ou le dernier client admin actif est refusé ; porte de secours locale `install.sh --access lan` ; `bootstrap --rescue-admin` régénère un `admin.conf`.
+- Contre l'enfermement : dans les deux modes VPN, supprimer l'app « Admin VPN », supprimer ou désactiver (ou faire expirer) son client `admin` est refusé (`409 admin_vpn_protected`) ; porte de secours locale `install.sh --access lan` ; `python -m hivora rescue-admin` donne de nouvelles clés au client `admin` (réactivé, sans expiration) au démarrage suivant, et l'ancien `admin.conf` ne fonctionne plus.
 
 ### Distribution et versions
 

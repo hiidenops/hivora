@@ -4,6 +4,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,6 +35,10 @@ class Settings(BaseSettings):
     # How the panel is reached, as the installer published it (install.env, passed as
     # HIVORA_ACCESS; never stored). "public": every account needs TOTP (auth.totp).
     access: Literal["lan", "public", "vpn", "vpn+lan"] = "lan"
+    # The admin VPN (vpn modes, vpn.admin): address and UDP port its clients connect to.
+    # No host: the public address, else the LAN one.
+    admin_vpn_host: str | None = None
+    admin_vpn_port: int = Field(default=51820, ge=1, le=65535)
 
     # How to run Compose v2: the docker CLI plugin, or the standalone binary
     # (the Hivora image ships only that: HIVORA_COMPOSE_CMD='["docker-compose"]').

@@ -45,4 +45,5 @@ async def removal_plan(app_id: int, _: Operator, rt: RuntimeDep) -> RemovalPlanO
 @removal_router.delete("/{app_id}", status_code=202)
 async def remove(app_id: int, _: Operator, rt: RuntimeDep, remove_data: bool = False) -> JobRef:
     """Data is kept unless ``remove_data=true`` is passed explicitly."""
+    await rt.admin_vpn.check_app_removal(app_id)
     return job_ref(await rt.apps.lifecycle.remove(app_id, remove_data=remove_data))

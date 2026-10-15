@@ -43,6 +43,7 @@ from hivora.system.secrets import SecretSettings
 from hivora.tasks.service import TaskTools, run_scheduler
 from hivora.templates import Catalog
 from hivora.templates.icons import IconCache
+from hivora.vpn.admin import AdminVpn, follow_admin_client
 from hivora.vpn.service import VpnTools, expire_clients, follow_deploys
 
 if TYPE_CHECKING:
@@ -96,6 +97,7 @@ class Runtime:
     blocking: Blocking
     static_routes: StaticRoutes
     zone_actions: ZoneActions
+    admin_vpn: AdminVpn
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
     consoles: "ConsoleManager" = field(init=False)
@@ -190,12 +192,14 @@ class Runtime:
         zone_actions = ZoneActions(sessions=sessions, jobs=jobs, lifecycle=apps.lifecycle,
                                    store=state.store, bus=bus)  # fmt: skip
         zone_actions.register()  # the zone_action job
+        admin_vpn = AdminVpn(settings=settings, sessions=sessions, apps=apps, vpn=vpn, jobs=jobs,
+                             public_address=public_address.current, clock=clock)  # fmt: skip
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
                    public_address, AppMetrics(gateway, state.store, bus), backups,
                    sites, site_files, site_config, site_hosting, tasks, vpn, hostfw,
-                   blocking, static_routes, zone_actions)  # fmt: skip
+                   blocking, static_routes, zone_actions, admin_vpn)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
@@ -219,10 +223,13 @@ class Runtime:
             asyncio.create_task(expire_clients(self.vpn), name="vpn-expiry"),
             asyncio.create_task(run_scheduler(self.tasks), name="task-scheduler"),
             asyncio.create_task(check_images(self.apps.custom), name="free-image-updates"),
+            asyncio.create_task(follow_admin_client(self.admin_vpn, self.bus), name="admin-conf"),
         ]
         await self.blocking.reapply()  # the host may have rebooted: its rules are gone
         await self.static_routes.reapply()  # and its static routes
         await self.jobs.start()
+        # The vpn modes: the admin VPN needs the job queue running (its deploy is a job).
+        self._vpn_tasks.append(asyncio.create_task(self.admin_vpn.ensure(), name="admin-vpn"))
 
     async def tasks_tick(self) -> None:
         """Run the scheduled tasks that are due (the scheduler calls this every minute)."""

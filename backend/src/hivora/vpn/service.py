@@ -282,7 +282,8 @@ class VpnTools:
         self.bus.publish("vpn.client_renewed", app=vpn.slug, target=peer.name)
         return peer.id
 
-    async def configuration(self, app_id: int, cid: int) -> str:
+    async def configuration(self, app_id: int, cid: int, *, quiet: bool = False) -> str:
+        """``quiet``: written by Hivora itself (admin.conf), not downloaded: not audited."""
         vpn = await self._vpn(app_id)
         async with self._lock, self.sessions() as session, session.begin():
             server, _ = await self._peers(session, vpn)
@@ -294,7 +295,8 @@ class VpnTools:
                 self._private(peer), peer.address, vpn.value(vpn.spec.dns_field),
                 server.public_key, vpn.endpoint, allowed, self._psk(peer),
             )  # fmt: skip
-        self.bus.publish("vpn.config_downloaded", app=vpn.slug, target=peer.name)
+        if not quiet:
+            self.bus.publish("vpn.config_downloaded", app=vpn.slug, target=peer.name)
         return text
 
     async def qrcode(self, app_id: int, cid: int) -> str:

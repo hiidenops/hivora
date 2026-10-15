@@ -4058,6 +4058,11 @@ export interface components {
             name: string;
             /** Online */
             online: boolean;
+            /**
+             * Protected
+             * @default false
+             */
+            protected: boolean;
             /** Public Key */
             public_key: string | null;
             /**

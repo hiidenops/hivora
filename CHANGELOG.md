@@ -17,6 +17,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 - Mode d'accès public : la double authentification (TOTP) est obligatoire pour tous les comptes ; page « Double authentification obligatoire » après la première connexion, puis le panel dans la même session ; elle ne peut pas y être désactivée.
 - `python -m hivora reset-totp [utilisateur]` : retire la double authentification d'un compte (téléphone et codes de secours perdus), depuis la machine.
+- VPN d'administration (modes d'accès `vpn` et `vpn+lan`, côté serveur) : au démarrage, Hivora met en place une seule fois l'app WireGuard « Admin VPN » dans la zone Administration (réseau partagé), son client `admin` limité à cette zone et `admin.conf` (0600) ; ce client et cette app ne peuvent être ni supprimés ni désactivés (badge « Accès d'administration ») ; `python -m hivora admin-vpn` affiche `admin.conf` en QR code dans le terminal, `python -m hivora rescue-admin` lui donne de nouvelles clés au démarrage suivant. Réglages `HIVORA_ADMIN_VPN_HOST` et `HIVORA_ADMIN_VPN_PORT`.
 
 ### Modifié
 

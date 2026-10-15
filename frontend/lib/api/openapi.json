@@ -5259,6 +5259,11 @@
             "title": "Online",
             "type": "boolean"
           },
+          "protected": {
+            "default": false,
+            "title": "Protected",
+            "type": "boolean"
+          },
           "public_key": {
             "anyOf": [
               {

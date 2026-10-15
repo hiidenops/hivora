@@ -38,6 +38,7 @@ class VpnClientOut(BaseModel):
     public_key: str | None
     latest_handshake: str | None
     online: bool  # handshake in the last 3 minutes
+    protected: bool = False  # the admin VPN's client: the panel is reached through it
     endpoint: str | None  # where the client connects from
     rx: int
     tx: int
@@ -95,7 +96,12 @@ def _check_ips(ips: list[str] | None) -> None:
 
 @router.get("/{app_id}/vpn")
 async def overview(app_id: int, _: Operator, rt: RuntimeDep) -> VpnOut:
-    return VpnOut(**await rt.vpn.overview(app_id))
+    out = VpnOut(**await rt.vpn.overview(app_id))
+    state = await rt.admin_vpn.protected()
+    if state and state.get("app_id") == app_id:
+        for c in out.clients:
+            c.protected = c.id == state.get("client_id")
+    return out
 
 
 @router.post("/{app_id}/vpn/clients", status_code=201)
@@ -114,11 +120,13 @@ async def update(app_id: int, cid: int, body: ClientUpdateIn, _: Operator, rt: R
         changes.pop("name", None)
     if changes.get("routing") is None:
         changes.pop("routing", None)
+    await rt.admin_vpn.check_client_change(app_id, cid, changes=changes)
     await rt.vpn.update(app_id, cid, **changes)
 
 
 @router.delete("/{app_id}/vpn/clients/{cid}", status_code=204)
 async def delete(app_id: int, cid: int, _: Operator, rt: RuntimeDep) -> None:
+    await rt.admin_vpn.check_client_change(app_id, cid, delete=True)
     await rt.vpn.delete(app_id, cid)
 
 

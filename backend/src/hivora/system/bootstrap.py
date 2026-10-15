@@ -1,4 +1,4 @@
-"""`python -m hivora bootstrap`, `reset-admin-password` and `reset-totp`: run by the
+"""`python -m hivora bootstrap`, `reset-admin-password`, `reset-totp` and `rescue-admin`: run by the
 installer (or by hand on the machine) in a one-off container, before the server starts.
 They build only what they use: the prepared database, the auth service; no Docker.
 
@@ -16,6 +16,7 @@ from hivora.core.events import EventBus
 from hivora.crypto.cipher import SecretBox, load_or_create_master_key
 from hivora.db.engine import make_engine, make_sessionmaker
 from hivora.runtime import prepare_database
+from hivora.vpn.admin import request_rescue
 
 
 def bootstrap(settings: Settings) -> dict[str, str]:
@@ -32,6 +33,21 @@ def reset_admin_password(settings: Settings, username: str = DEFAULT_ADMIN) -> d
 def reset_admin_totp(settings: Settings, username: str = DEFAULT_ADMIN) -> dict[str, str]:
     """Two-factor authentication off for ``username`` (to set up again on a public panel)."""
     return asyncio.run(_reset_totp(settings, username))
+
+
+def rescue_admin_vpn(settings: Settings) -> dict[str, str]:
+    """New keys for the admin VPN client at the next start (the old admin.conf stops)."""
+    return asyncio.run(_rescue(settings))
+
+
+async def _rescue(settings: Settings) -> dict[str, str]:
+    prepare_database(settings)
+    engine = make_engine(settings.db_path)
+    try:
+        await request_rescue(make_sessionmaker(engine))
+    finally:
+        await engine.dispose()
+    return {"ADMIN_VPN": "rescue_requested"}
 
 
 async def _bootstrap(settings: Settings) -> dict[str, str]:
