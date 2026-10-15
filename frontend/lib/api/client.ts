@@ -15,6 +15,7 @@ export type SystemInfo = Schemas["SystemInfo"];
 export type SystemStatus = Schemas["StatusOut"];
 export type SystemCheck = Schemas["CheckOut"];
 export type Health = Schemas["Health"];
+export type Releases = Schemas["ReleasesOut"];
 export type TemplateDetail = Schemas["TemplateDetail"];
 export type User = Schemas["UserOut"];
 export type Role = User["role"];

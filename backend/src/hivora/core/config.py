@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     admin_vpn_host: str | None = None
     admin_vpn_port: int = Field(default=51820, ge=1, le=65535)
 
+    # The installed version's notes (shipped in the image; the repository's in development).
+    changelog_path: Path = Path("/app/CHANGELOG.md")
+
     # Where this version's source code is (AGPL-3.0, section 13): a modified version
     # points to its own.
     source_url: str = Field(default="https://github.com/hiidenops/hivora",

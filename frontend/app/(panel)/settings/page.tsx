@@ -20,6 +20,7 @@ import { LANGS, useI18n, type Lang, type MessageKey } from "@/lib/i18n";
 import { readPref, writePref } from "@/lib/prefs";
 
 const StatusCard = dynamic(() => import("@/features/system/status-card").then((m) => m.StatusCard));
+const ReleasesCard = dynamic(() => import("@/features/system/releases-card").then((m) => m.ReleasesCard));
 
 function Sessions() {
   const { t, lang } = useI18n();
@@ -172,6 +173,7 @@ export default function SettingsPage() {
           </Card>
         )}
         {can("admin") && <StatusCard />}
+        {can("admin") && <ReleasesCard />}
       </div>
     </>
   );

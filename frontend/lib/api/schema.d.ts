@@ -1893,6 +1893,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Releases
+         * @description The latest version of the channel (GitHub Releases, cached 12 h; nothing when off).
+         */
+        get: operations["releases_api_v1_system_releases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/releases/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Release Prefs */
+        put: operations["set_release_prefs_api_v1_system_releases_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/status": {
         parameters: {
             query?: never;
@@ -3340,6 +3377,56 @@ export interface components {
         RecoveryCodesOut: {
             /** Recovery Codes */
             recovery_codes: string[];
+        };
+        /** ReleaseOut */
+        ReleaseOut: {
+            /** Date */
+            date: string | null;
+            /** Notes */
+            notes: string;
+            /** Prerelease */
+            prerelease: boolean;
+            /** Tag */
+            tag: string;
+            /** Url */
+            url: string | null;
+            /** Version */
+            version: string;
+        };
+        /** ReleasePrefsIn */
+        ReleasePrefsIn: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "stable" | "pre";
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** ReleasesOut */
+        ReleasesOut: {
+            /** Available */
+            available: boolean;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "stable" | "pre";
+            /** Checked At */
+            checked_at: string | null;
+            /** Command */
+            command: string | null;
+            /** Current */
+            current: string;
+            /** Current Notes */
+            current_notes: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Error */
+            error: string | null;
+            latest: components["schemas"]["ReleaseOut"] | null;
+            /** Newer */
+            newer: boolean;
         };
         /** RemovalPlanOut */
         RemovalPlanOut: {
@@ -7866,6 +7953,68 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AddressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    releases_api_v1_system_releases_get: {
+        parameters: {
+            query?: {
+                refresh?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleasesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_release_prefs_api_v1_system_releases_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReleasePrefsIn"];
             };
         };
         responses: {

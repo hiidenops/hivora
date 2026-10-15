@@ -79,4 +79,17 @@ def app() -> FastAPI:
         return publish(topic, **payload)
 
     runtime.bus.publish = with_fake_containers  # type: ignore[method-assign]
+    runtime.releases.fetch = fake_github  # never the network during the e2e tests
     return create_app(runtime=runtime)
+
+
+async def fake_github(url: str, headers: dict[str, str]) -> tuple[int, Any]:
+    """GitHub Releases as the e2e tests see them: a stable release, a newer candidate."""
+    page = "https://github.com/hiidenops/hivora/releases/tag/"
+    return 200, [
+        {"tag_name": "v9.1.0", "prerelease": False, "draft": False, "html_url": page + "v9.1.0",
+         "published_at": "2026-10-20T10:00:00Z", "body": "### Ajouté\n\n- Tout ce qui manquait."},
+        {"tag_name": "v9.2.0-rc.1", "prerelease": True, "draft": False,
+         "html_url": page + "v9.2.0-rc.1", "published_at": "2026-10-25T10:00:00Z",
+         "body": "Candidate"},
+    ]  # fmt: skip

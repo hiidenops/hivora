@@ -74,7 +74,7 @@ Conséquences : pas de streams `stats` permanents (échantillonnage one-shot tou
 - **Licence** : AGPL-3.0.
 - **Installation** : `curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh | sudo sh` (script et `.sha256` publiés dans chaque GitHub Release ; pas de domaine ni de service tiers). Le script ne touche jamais la base ni les fichiers des apps : il délègue à `python -m hivora bootstrap` dans le conteneur, qui passe par les services et les jobs.
 - **Base** : SQLite seulement (pas de PostgreSQL, D2).
-- **Versions** : le tag git `vX.Y.Z` est la source de vérité, égal à la version du paquet ; version disponible lue dans les GitHub Releases (vérification activée par défaut, désactivable, sans télémétrie) ; `CHANGELOG.md` en français.
+- **Versions** : le tag git `vX.Y.Z` est la source de vérité, égal à la version du paquet ; version disponible lue dans les GitHub Releases (M12-7 : `system/releases.py`, carte « Mises à jour » de Paramètres ; activée par défaut, désactivable, au plus toutes les 12 h, seul l'en-tête `User-Agent` est envoyé, aucune requête quand c'est désactivé) ; `CHANGELOG.md` en français, embarqué dans l'image (`/app/CHANGELOG.md`) pour les notes de la version installée.
 - **Mise à jour** : relancer le script (sauvegarde du panel avant). Bouton « Mettre à jour » reporté à M13.
 - **Distributions supportées** : Debian 12+, Ubuntu 22.04+, Raspberry Pi OS 64 bits.
 - **Code source** (AGPL-3.0, section 13) : lien vers la version en cours, visible de tous avant connexion (`/system/health` → `source_url`, réglable par `HIVORA_SOURCE_URL` pour une version modifiée).

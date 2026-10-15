@@ -3229,6 +3229,177 @@
         "title": "RecoveryCodesOut",
         "type": "object"
       },
+      "ReleaseOut": {
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "prerelease": {
+            "title": "Prerelease",
+            "type": "boolean"
+          },
+          "tag": {
+            "title": "Tag",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "version",
+          "date",
+          "url",
+          "notes",
+          "prerelease"
+        ],
+        "title": "ReleaseOut",
+        "type": "object"
+      },
+      "ReleasePrefsIn": {
+        "properties": {
+          "channel": {
+            "enum": [
+              "stable",
+              "pre"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "channel"
+        ],
+        "title": "ReleasePrefsIn",
+        "type": "object"
+      },
+      "ReleasesOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "channel": {
+            "enum": [
+              "stable",
+              "pre"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "current": {
+            "title": "Current",
+            "type": "string"
+          },
+          "current_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Notes"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReleaseOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "newer": {
+            "title": "Newer",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "channel",
+          "available",
+          "current",
+          "current_notes",
+          "latest",
+          "newer",
+          "command",
+          "checked_at",
+          "error"
+        ],
+        "title": "ReleasesOut",
+        "type": "object"
+      },
       "RemovalPlanOut": {
         "properties": {
           "containers": {
@@ -10925,6 +11096,84 @@
           }
         },
         "summary": "Set Public Address",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/releases": {
+      "get": {
+        "description": "The latest version of the channel (GitHub Releases, cached 12 h; nothing when off).",
+        "operationId": "releases_api_v1_system_releases_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleasesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Releases",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/releases/settings": {
+      "put": {
+        "operationId": "set_release_prefs_api_v1_system_releases_settings_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleasePrefsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Release Prefs",
         "tags": [
           "system"
         ]

@@ -1,12 +1,14 @@
 """HTTP routes of the system module."""
 
 import platform
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from hivora import __version__
+from hivora.system.releases import Channel
 from hivora.system.secrets import SecretSetting
 from hivora.system.status import Level, SystemStatus, worst
 from hivora.web.deps import Admin, RuntimeDep, Viewer
@@ -69,6 +71,45 @@ async def status(_: Admin, rt: RuntimeDep, deep: bool = False) -> StatusOut:
     checks = await status.checks(deep=deep)
     out = [CheckOut(id=c.id, level=c.level, values=c.values) for c in checks]
     return StatusOut(worst=worst(checks), access=rt.settings.access, checks=out)
+
+
+class ReleaseOut(BaseModel):
+    tag: str  # v0.2.0
+    version: str  # 0.2.0
+    date: str | None
+    url: str | None  # the release page
+    notes: str  # plain text, never rendered
+    prerelease: bool
+
+
+class ReleasesOut(BaseModel):
+    enabled: bool  # check for new versions (Settings; on by default)
+    channel: Channel  # stable, or pre (release candidates too)
+    available: bool  # the source is a GitHub repository (else: no check possible)
+    current: str
+    current_notes: str | None  # the installed version's CHANGELOG.md section
+    latest: ReleaseOut | None
+    newer: bool
+    command: str | None  # the release's installer, to copy (the update itself: M13)
+    checked_at: datetime | None
+    error: str | None  # offline, rate_limited, not_found, unavailable
+
+
+class ReleasePrefsIn(BaseModel):
+    enabled: bool
+    channel: Channel
+
+
+@router.get("/releases")
+async def releases(_: Admin, rt: RuntimeDep, refresh: bool = False) -> ReleasesOut:
+    """The latest version of the channel (GitHub Releases, cached 12 h; nothing when off)."""
+    return ReleasesOut(**await rt.releases.view(refresh=refresh))
+
+
+@router.put("/releases/settings", status_code=204)
+async def set_release_prefs(body: ReleasePrefsIn, _: Admin, rt: RuntimeDep) -> None:
+    await rt.releases.set_prefs(body.enabled, body.channel)
+    rt.bus.publish("settings.releases_updated", target=body.channel, enabled=body.enabled)
 
 
 class IntegrationsOut(BaseModel):

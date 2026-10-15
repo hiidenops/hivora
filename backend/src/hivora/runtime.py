@@ -39,6 +39,7 @@ from hivora.sites.ports import site_ports
 from hivora.state import StateService
 from hivora.system.panel_backup import backup_panel
 from hivora.system.public_address import PublicAddress
+from hivora.system.releases import ReleaseChecker
 from hivora.system.secrets import SecretSettings
 from hivora.tasks.service import TaskTools, run_scheduler
 from hivora.templates import Catalog
@@ -98,6 +99,7 @@ class Runtime:
     static_routes: StaticRoutes
     zone_actions: ZoneActions
     admin_vpn: AdminVpn
+    releases: ReleaseChecker
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
     consoles: "ConsoleManager" = field(init=False)
@@ -199,7 +201,8 @@ class Runtime:
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
                    public_address, AppMetrics(gateway, state.store, bus), backups,
                    sites, site_files, site_config, site_hosting, tasks, vpn, hostfw,
-                   blocking, static_routes, zone_actions, admin_vpn)  # fmt: skip
+                   blocking, static_routes, zone_actions, admin_vpn,
+                   ReleaseChecker(settings=settings, sessions=sessions, clock=clock))  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.

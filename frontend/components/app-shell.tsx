@@ -10,7 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Switch } from "@/components/ui/input";
 import { SystemAlerts, needsAttention } from "@/features/system/system-alerts";
 import { ApiError, api, type Me, type Role } from "@/lib/api/client";
-import { useLogout, useMe, useSystemStatus } from "@/lib/api/hooks";
+import { useLogout, useMe, useReleases, useSystemStatus } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { readPref, writePref } from "@/lib/prefs";
 import { RealtimeProvider, useConnected } from "@/lib/realtime";
@@ -62,6 +62,12 @@ const NAV: (Entry & { role: Role; also?: string; sub?: Entry[] })[] = [
   { href: "/settings/", label: "nav.settings", icon: Settings, role: "viewer" },
 ];
 
+const DOT = {
+  error: { label: "system.dotError", color: "bg-danger" },
+  warn: { label: "system.dotWarn", color: "bg-warn" },
+  update: { label: "system.dotUpdate", color: "bg-info" },
+} as const;
+
 function ConnectionDot() {
   const { t } = useI18n();
   const connected = useConnected();
@@ -92,7 +98,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Admins: the System checks (the Settings dot, the exposure banner), once the panel is open.
   const ready = !!me && !me.must_change_password && (me.totp_enabled || probe.isSuccess);
   const { data: status } = useSystemStatus(ready && me?.role === "admin");
-  const attention = needsAttention(status);
+  const { data: releases } = useReleases(ready && me?.role === "admin");
+  // Health first (orange, red); otherwise a newer version (blue).
+  const attention = needsAttention(status) ?? (releases?.newer ? "update" : null);
   const logout = useLogout();
   const [advanced, setAdvancedState] = useState(false);
 
@@ -150,9 +158,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                         {n.href === "/settings/" && attention && (
                           <span
                             role="img"
-                            aria-label={t(attention === "error" ? "system.dotError" : "system.dotWarn")}
-                            title={t(attention === "error" ? "system.dotError" : "system.dotWarn")}
-                            className={cn("ml-auto size-2 shrink-0 rounded-full", attention === "error" ? "bg-danger" : "bg-warn")}
+                            aria-label={t(DOT[attention].label)}
+                            title={t(DOT[attention].label)}
+                            className={cn("ml-auto size-2 shrink-0 rounded-full", DOT[attention].color)}
                           />
                         )}
                       </Link>

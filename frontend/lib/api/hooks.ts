@@ -23,6 +23,7 @@ import {
   type SystemInfo,
   type SystemStatus,
   type Health,
+  type Releases,
   type TemplateSummary,
   type UpdatePlan,
   type User,
@@ -174,6 +175,15 @@ export const useSystemStatus = (enabled: boolean) =>
     enabled,
     staleTime: 300_000,
     refetchInterval: 300_000,
+  });
+/** Available versions (admins): GitHub is asked at most every 12 h by the server. */
+export const useReleases = (enabled: boolean) =>
+  useQuery({
+    queryKey: ["system-releases"],
+    queryFn: () => api<Releases>("/system/releases"),
+    enabled,
+    staleTime: 3_600_000,
+    refetchInterval: 3_600_000,
   });
 export const useSystemInfo = () =>
   useQuery({ queryKey: ["system-info"], queryFn: () => api<SystemInfo>("/system/info"), staleTime: 300_000 });

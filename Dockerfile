@@ -30,6 +30,7 @@ COPY --from=docker/compose-bin:v2.40.3@sha256:e39da8206cc48c6e2c99ce371935eef9d7
 COPY --from=py /venv /venv
 COPY --from=ui /ui/out /app/frontend
 COPY templates /app/templates
+COPY CHANGELOG.md /app/CHANGELOG.md
 ENV PATH=/venv/bin:$PATH \
     HIVORA_COMPOSE_CMD='["docker-compose"]' \
     HIVORA_FRONTEND_DIR=/app/frontend \
