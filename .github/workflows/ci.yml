@@ -22,6 +22,12 @@ jobs:
       - run: uv run mypy src tests
       - run: uv run pytest
 
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck deploy/install.sh .github/scripts/*.sh
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

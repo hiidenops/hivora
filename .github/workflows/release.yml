@@ -85,7 +85,9 @@ jobs:
           DIGEST: ${{ needs.image.outputs.digest }}
           PRERELEASE: ${{ needs.check.outputs.prerelease }}
         run: |
-          cp deploy/install.sh install.sh
+          # The published script installs this release by default.
+          sed "s/^SCRIPT_VERSION=\"\"/SCRIPT_VERSION=\"$GITHUB_REF_NAME\"/" deploy/install.sh > install.sh
+          grep -q "^SCRIPT_VERSION=\"$GITHUB_REF_NAME\"" install.sh
           sha256sum install.sh > install.sh.sha256
           image="ghcr.io/$GITHUB_REPOSITORY"
           cat >> notes.md <<NOTES

@@ -13,6 +13,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 - Sauvegarde du panel (base, clé maître, options de lancement) dans `backups/_hivora/` avant chaque migration de la base et par `python -m hivora backup-self` ; les 5 dernières sont gardées.
 - `python -m hivora bootstrap` : crée le compte `admin` avec un mot de passe aléatoire affiché une seule fois (à changer à la première connexion), ou remplace `admin` / `admin` s'il n'a jamais été changé ; sans effet sur un compte déjà configuré.
 - `python -m hivora reset-admin-password [utilisateur]` : nouveau mot de passe aléatoire, à changer à la connexion suivante, depuis la machine seulement.
+- Installeur officiel (`install.sh`, publié avec chaque release) : version exacte de la release, options gardées dans `install.env` et reprises à chaque relance, vérification de la distribution (Debian 12+, Ubuntu 22.04+, Raspberry Pi OS 64 bits), de Docker (24+, ni rootless ni Podman) et du port, sauvegarde du panel avant une mise à jour, compte `admin` créé avant le démarrage avec un mot de passe aléatoire, accès `lan` ou `public` (confirmation explicite), `--dry-run`.
 
 ### Modifié
 

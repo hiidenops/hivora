@@ -1,5 +1,6 @@
 # Hivora with Docker Compose (alternative to install.sh). Adjust HIVORA_HOST_LAN_IP,
 # HIVORA_TIMEZONE and the published address, then: docker compose up -d
+# First login: admin / admin, to change right away (install.sh sets a random password instead).
 # The data and volume folders are mounted at the same path inside and outside:
 # the compose files Hivora generates use host paths.
 services:
