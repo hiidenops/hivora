@@ -10,6 +10,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
+import { SourceLink } from "@/features/system/source-link";
 import { ApiError, api } from "@/lib/api/client";
 import { useLogin } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
@@ -54,7 +55,7 @@ export default function LoginPage() {
   if (entering) return <EnteringScreen />;
 
   return (
-    <main className="grid min-h-screen place-items-center p-4">
+    <main className="flex min-h-screen flex-col items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center gap-5 text-center">
           <Brand large />
@@ -84,6 +85,7 @@ export default function LoginPage() {
           </form>
         </CardContent>
       </Card>
+      <SourceLink className="mt-4" />
     </main>
   );
 }

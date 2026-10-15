@@ -1893,6 +1893,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Status
+         * @description The panel's health, read only; ``deep``: also check the database (slower).
+         */
+        get: operations["status_api_v1_system_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/templates": {
         parameters: {
             query?: never;
@@ -2494,6 +2514,20 @@ export interface components {
             /** Working Dir */
             working_dir: string | null;
         };
+        /** CheckOut */
+        CheckOut: {
+            /** Id */
+            id: string;
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "ok" | "warn" | "error" | "unknown";
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
+        };
         /** ClearedOut */
         ClearedOut: {
             /** Deleted */
@@ -2862,6 +2896,8 @@ export interface components {
         Health: {
             /** First Start */
             first_start: boolean;
+            /** Source Url */
+            source_url: string;
             /** Status */
             status: string;
             /** Version */
@@ -3699,6 +3735,18 @@ export interface components {
             metric: number | null;
             /** Note */
             note: string | null;
+        };
+        /** StatusOut */
+        StatusOut: {
+            /** Access */
+            access: string;
+            /** Checks */
+            checks: components["schemas"]["CheckOut"][];
+            /**
+             * Worst
+             * @enum {string}
+             */
+            worst: "ok" | "warn" | "error" | "unknown";
         };
         /** SummaryItemOut */
         SummaryItemOut: {
@@ -7827,6 +7875,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_v1_system_status_get: {
+        parameters: {
+            query?: {
+                deep?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOut"];
+                };
             };
             /** @description Validation Error */
             422: {

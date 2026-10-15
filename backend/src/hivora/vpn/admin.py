@@ -112,6 +112,22 @@ class AdminVpn:
         async with self.sessions() as session:
             return await read_state(session)
 
+    async def health(self) -> dict[str, bool] | None:
+        """For the System page (None outside the vpn modes): set up, admin.conf, running."""
+        if not self.active:
+            return None
+        running = False
+        async with self.sessions() as session:
+            state = await read_state(session) or {}
+            if state.get("app_id"):
+                try:
+                    _, _, container = await self.apps.main_container(session, state["app_id"])
+                    running = container is not None
+                except NotFoundError:
+                    pass
+        return {"initialized": bool(state.get("initialized_at")),
+                "conf": self.conf_path.exists(), "running": running}  # fmt: skip
+
     async def check_app_removal(self, app_id: int) -> None:
         state = await self.protected()
         if state and state.get("app_id") == app_id:

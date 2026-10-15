@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     admin_vpn_host: str | None = None
     admin_vpn_port: int = Field(default=51820, ge=1, le=65535)
 
+    # Where this version's source code is (AGPL-3.0, section 13): a modified version
+    # points to its own.
+    source_url: str = Field(default="https://github.com/hiidenops/hivora",
+                            pattern=r"^https?://[^\s]{3,500}$")  # fmt: skip
+
     # How to run Compose v2: the docker CLI plugin, or the standalone binary
     # (the Hivora image ships only that: HIVORA_COMPOSE_CMD='["docker-compose"]').
     compose_cmd: list[str] = ["docker", "compose"]

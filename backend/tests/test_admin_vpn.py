@@ -388,3 +388,15 @@ def test_the_panel_cannot_change_what_install_env_sets(tmp_path: Path) -> None:
         values = c.get(url).json()["values"]
         r = c.put(url, json={"inputs": {**values, "host": "other.example.org"}})
         assert r.status_code == 202, r.text
+
+
+def test_the_system_page_reports_the_admin_vpn_without_its_keys(tmp_path: Path) -> None:
+    with panel(tmp_path) as c:
+        r = c.get(f"{API}/system/status")
+        assert r.status_code == 200, r.text
+        vpn = next(x for x in r.json()["checks"] if x["id"] == "admin_vpn")
+        # The fake Docker runs nothing: set up, admin.conf there, the container not running.
+        assert vpn["values"] == {"initialized": True, "conf": True, "running": False}
+        assert vpn["level"] == "warn" and r.json()["access"] == "vpn"
+        for secret in keys(tmp_path):
+            assert secret not in r.text

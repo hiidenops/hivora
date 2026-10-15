@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -12,10 +13,13 @@ import { Switch, Label, Select } from "@/components/ui/input";
 import { IntegrationsCard, PublicAddressCard } from "@/features/account/integrations-card";
 import { PasswordForm } from "@/features/account/password-form";
 import { TotpCard } from "@/features/account/totp-card";
+import { SourceLink } from "@/features/system/source-link";
 import { api } from "@/lib/api/client";
 import { useLogout, useMySessions, useSystemInfo } from "@/lib/api/hooks";
 import { LANGS, useI18n, type Lang, type MessageKey } from "@/lib/i18n";
 import { readPref, writePref } from "@/lib/prefs";
+
+const StatusCard = dynamic(() => import("@/features/system/status-card").then((m) => m.StatusCard));
 
 function Sessions() {
   const { t, lang } = useI18n();
@@ -163,9 +167,11 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </dl>
+              <SourceLink className="mt-4" />
             </CardContent>
           </Card>
         )}
+        {can("admin") && <StatusCard />}
       </div>
     </>
   );

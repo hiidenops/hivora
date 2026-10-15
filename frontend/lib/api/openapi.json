@@ -799,6 +799,36 @@
         "title": "CandidateOut",
         "type": "object"
       },
+      "CheckOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "ok",
+              "warn",
+              "error",
+              "unknown"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": true,
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "level",
+          "values"
+        ],
+        "title": "CheckOut",
+        "type": "object"
+      },
       "ClearedOut": {
         "properties": {
           "deleted": {
@@ -1784,6 +1814,10 @@
             "title": "First Start",
             "type": "boolean"
           },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -1796,7 +1830,8 @@
         "required": [
           "status",
           "version",
-          "first_start"
+          "first_start",
+          "source_url"
         ],
         "title": "Health",
         "type": "object"
@@ -4272,6 +4307,38 @@
           "applied"
         ],
         "title": "StaticRouteOut",
+        "type": "object"
+      },
+      "StatusOut": {
+        "properties": {
+          "access": {
+            "title": "Access",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/CheckOut"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "worst": {
+            "enum": [
+              "ok",
+              "warn",
+              "error",
+              "unknown"
+            ],
+            "title": "Worst",
+            "type": "string"
+          }
+        },
+        "required": [
+          "worst",
+          "access",
+          "checks"
+        ],
+        "title": "StatusOut",
         "type": "object"
       },
       "SummaryItemOut": {
@@ -10858,6 +10925,50 @@
           }
         },
         "summary": "Set Public Address",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/status": {
+      "get": {
+        "description": "The panel's health, read only; ``deep``: also check the database (slower).",
+        "operationId": "status_api_v1_system_status_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "deep",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Deep",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Status",
         "tags": [
           "system"
         ]

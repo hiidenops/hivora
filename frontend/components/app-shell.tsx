@@ -8,8 +8,9 @@ import { Fragment, createContext, useContext, useEffect, useState, type ReactNod
 import { useQuery } from "@tanstack/react-query";
 
 import { Switch } from "@/components/ui/input";
+import { SystemAlerts, needsAttention } from "@/features/system/system-alerts";
 import { ApiError, api, type Me, type Role } from "@/lib/api/client";
-import { useLogout, useMe } from "@/lib/api/hooks";
+import { useLogout, useMe, useSystemStatus } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { readPref, writePref } from "@/lib/prefs";
 import { RealtimeProvider, useConnected } from "@/lib/realtime";
@@ -88,6 +89,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   });
   const totpSetup = probe.error instanceof ApiError && probe.error.code === "totp_setup_required";
   const held = !!me && !me.totp_enabled && (probe.isPending || totpSetup);
+  // Admins: the System checks (the Settings dot, the exposure banner), once the panel is open.
+  const ready = !!me && !me.must_change_password && (me.totp_enabled || probe.isSuccess);
+  const { data: status } = useSystemStatus(ready && me?.role === "admin");
+  const attention = needsAttention(status);
   const logout = useLogout();
   const [advanced, setAdvancedState] = useState(false);
 
@@ -142,6 +147,14 @@ export function AppShell({ children }: { children: ReactNode }) {
                         )}
                       >
                         <n.icon className="size-4 shrink-0" /> {t(n.label)}
+                        {n.href === "/settings/" && attention && (
+                          <span
+                            role="img"
+                            aria-label={t(attention === "error" ? "system.dotError" : "system.dotWarn")}
+                            title={t(attention === "error" ? "system.dotError" : "system.dotWarn")}
+                            className={cn("ml-auto size-2 shrink-0 rounded-full", attention === "error" ? "bg-danger" : "bg-warn")}
+                          />
+                        )}
                       </Link>
                       {active && n.sub && (
                         <div className="ml-4 hidden flex-col gap-0.5 border-l pl-2 md:flex">
@@ -185,6 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
             </aside>
             <main key={pathname} className="animate-enter min-w-0 flex-1 p-4 md:p-8">
+              <SystemAlerts status={status} />
               {children}
             </main>
           </div>

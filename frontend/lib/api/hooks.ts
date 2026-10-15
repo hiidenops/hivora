@@ -21,6 +21,8 @@ import {
   type SessionInfo,
   type TemplateDetail,
   type SystemInfo,
+  type SystemStatus,
+  type Health,
   type TemplateSummary,
   type UpdatePlan,
   type User,
@@ -162,6 +164,17 @@ export const useRemovalPlan = (id: number, enabled: boolean) =>
     enabled,
   });
 
+export const useHealth = () =>
+  useQuery({ queryKey: ["health"], queryFn: () => api<Health>("/system/health"), staleTime: 300_000 });
+/** The System page's checks (admins); refreshed every 5 minutes for the sidebar's dot. */
+export const useSystemStatus = (enabled: boolean) =>
+  useQuery({
+    queryKey: ["system-status"],
+    queryFn: () => api<SystemStatus>("/system/status"),
+    enabled,
+    staleTime: 300_000,
+    refetchInterval: 300_000,
+  });
 export const useSystemInfo = () =>
   useQuery({ queryKey: ["system-info"], queryFn: () => api<SystemInfo>("/system/info"), staleTime: 300_000 });
 export const useTemplates = () =>
