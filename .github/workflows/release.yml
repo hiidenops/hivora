@@ -1,0 +1,104 @@
+name: Release
+
+# A tag vX.Y.Z (or vX.Y.Z-rc.N, a pre-release) on a commit of main: checks the version
+# everywhere, publishes the image (amd64 + arm64) and creates the GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tagged commit is on main (tested there by CI)
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Tag, pyproject.toml and package.json agree; CHANGELOG.md has the section
+        id: check
+        run: sh .github/scripts/release-check.sh "$GITHUB_REF_NAME" notes.md >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notes
+          path: notes.md
+
+  image:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
+          # A pre-release gets its own tag only: never X.Y, never latest.
+          tags: |
+            type=raw,value=${{ github.ref_name }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ needs.check.outputs.prerelease == 'false' }}
+            type=raw,value=latest,enable=${{ needs.check.outputs.prerelease == 'false' }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.check.outputs.version }}
+            org.opencontainers.image.licenses=AGPL-3.0-only
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+
+  release:
+    needs: [check, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: notes
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+          PRERELEASE: ${{ needs.check.outputs.prerelease }}
+        run: |
+          cp deploy/install.sh install.sh
+          sha256sum install.sh > install.sh.sha256
+          image="ghcr.io/$GITHUB_REPOSITORY"
+          cat >> notes.md <<NOTES
+
+          ## Installation
+
+          \`\`\`sh
+          curl -fsSL https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/install.sh | sudo sh
+          \`\`\`
+
+          Image : \`$image:$GITHUB_REF_NAME\`, digest \`$DIGEST\` (\`$image@$DIGEST\`).
+          NOTES
+          flag=""
+          [ "$PRERELEASE" = "true" ] && flag="--prerelease"
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Hivora $GITHUB_REF_NAME" \
+            --notes-file notes.md $flag install.sh install.sh.sha256

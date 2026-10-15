@@ -1,3 +1,5 @@
 """Hivora — Docker control panel for homelab and game servers."""
 
-__version__ = "0.0.1"
+from importlib.metadata import version
+
+__version__ = version("hivora")  # pyproject.toml is the one source (checked against the tag)

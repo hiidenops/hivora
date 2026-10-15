@@ -1,6 +1,6 @@
 # ARCHITECT_BRAIN — mémoire architecturale de Hivora
 
-*Créé le 29/09/2026, à la suite du découpage de `AppService` ; mis à jour le même jour après le découpage de `apps/api.py`, puis le 12/10/2026 (état des lieux après les lots K et R : §7, §13), puis le 14/10/2026 (règles de la distribution, M12-0 : §15).*
+*Créé le 29/09/2026, à la suite du découpage de `AppService` ; mis à jour le même jour après le découpage de `apps/api.py`, puis le 12/10/2026 (état des lieux après les lots K et R : §7, §13), puis le 14/10/2026 (règles de la distribution, M12-0 et M12-1 : §11, §14, §15).*
 
 Ce document garde **pourquoi** le code est organisé ainsi, et les règles qui empêchent de retomber dans les travers corrigés. Il complète :
 
@@ -379,7 +379,7 @@ Second rang :
 8. **i18n FR et EN**, aucune chaîne en dur ; option avancée d'abord dans le mode avancé.
 9. **Tests** : au moins un test qui échoue si la logique casse (parseur, branche, chemin de sécurité). Pour un bug, un test de non-régression qui reproduit le bug sur l'ancien code.
 10. **Vérifications** : `ruff`, `mypy`, `pytest` complet, e2e, budget bundle (`npm run check:bundle`, < 520 Ko gzip par page).
-11. **`docs/PROGRESS.md`** dans le même commit.
+11. **`docs/PROGRESS.md`** dans le même commit ; et, pour un lot fonctionnel (un changement visible par l'utilisateur ou l'administrateur), **une ligne dans `CHANGELOG.md`**, section `[Non publié]`, en français.
 12. **`graphify update .`**, puis vérifier que le nœud modifié ne gagne pas de liens anormalement (§13).
 
 ## 12. Signaux d'alerte : un module devient dangereux
@@ -444,6 +444,7 @@ Le graphe est dans `graphify-out/` (non versionné, reconstruit par un hook git 
 
 **Traçabilité**
 - [ ] Note datée dans `docs/PROGRESS.md` (contenu, décisions, tailles, tests, suite).
+- [ ] Lot fonctionnel : une ligne dans `CHANGELOG.md`, section `[Non publié]`.
 - [ ] Le commit ne contient que les fichiers prévus (`git diff --cached --name-only` relu).
 - [ ] `graphify update .` lancé ; aucune hausse anormale de liens sur un service métier.
 
@@ -456,4 +457,6 @@ Décisions D1 à D10 : `CLAUDE.md` (« Distribution ») et le document de réfé
 3. **Une commande en ligne est une bordure, comme une route** : elle reçoit `Runtime` (adaptateur de sortie toléré, §8.3), appelle des services aux dépendances explicites, ne contient pas de logique testable ailleurs.
 4. **Sources de vérité de la distribution** : le tag git pour la version ; `install.env` pour les options de lancement du conteneur `hivora` (Hivora le lit, ne l'écrit pas) ; les GitHub Releases pour la version disponible, état d'exécution gardé en mémoire (cache), seul le réglage « vérifier » va en base.
 5. **Lectures de santé et de version** (`system/status`, `system/releases`) : sous-modules de `system`, lecture seule (§4.6), dépendances injectées, aucun état global ; un contrôle coûteux (`PRAGMA quick_check`) seulement à la demande.
-6. **Hivora ne touche pas à son propre conteneur** avant l'exception M13 (conteneur `hivora-updater`, retour arrière automatique), à valider dans `CLAUDE.md` avant tout code.
+6. **Une seule source de version** (M12-1) : `version` de `backend/pyproject.toml`. `hivora.__version__` la lit dans les métadonnées du paquet installé (`importlib.metadata`), jamais écrite en dur ; `frontend/package.json` la recopie. `.github/scripts/release-check.sh` refuse un tag qui diffère de l'une ou de l'autre, ou sans section dans `CHANGELOG.md`. En développement, changer la version demande `uv sync` (fait par `uv run`) pour mettre à jour les métadonnées.
+7. **Publier, c'est `release.yml` seulement** (tag `v*` sur un commit de `main`) : image multi-arch, tags `vX.Y.Z`, `X.Y`, `latest` (une pré-release `-rc.N` n'a que son propre tag), labels OCI, GitHub Release. `image.yml` ne fait plus que vérifier les budgets.
+8. **Hivora ne touche pas à son propre conteneur** avant l'exception M13 (conteneur `hivora-updater`, retour arrière automatique), à valider dans `CLAUDE.md` avant tout code.

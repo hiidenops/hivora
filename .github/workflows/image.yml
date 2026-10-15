@@ -3,12 +3,11 @@ name: Image
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
 
+# Checks the image budgets; publishing is release.yml's job (on a tag).
 permissions:
   contents: read
-  packages: write
 
 jobs:
   image:
@@ -50,21 +49,3 @@ jobs:
           mem=$(docker stats --no-stream --format '{{.MemUsage}}' hivora | awk '{print $1}')
           echo "RAM at rest: $mem"
           python3 -c "import re,sys; v,u=re.match(r'([\d.]+)(\w+)','$mem').groups(); mb=float(v)*{'KiB':1/1024,'MiB':1,'GiB':1024}[u]; sys.exit(mb>=150)"
-
-      - name: Publish (tags only; amd64 + arm64)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - if: startsWith(github.ref, 'refs/tags/v')
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-            ghcr.io/${{ github.repository }}:latest
-          cache-from: type=gha
