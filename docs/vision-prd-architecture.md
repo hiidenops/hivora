@@ -244,6 +244,7 @@ Commande officielle, sans domaine ni service tiers : le script est un fichier de
 curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh | sudo sh
 ```
 
+0. **Écrans** (M12-5c, seulement dans un terminal, jamais avec `--yes`) : langue (Français / English) ; mode d'accès en quatre choix pratiques (« Réseau local uniquement », « Réseau local + VPN », « Uniquement par le VPN », « Internet (avancé) »), avec la machine détectée et le défaut (VPN + LAN sur IP privée, VPN seul sans réseau privé ; sans IP privée, les deux premiers sont indisponibles sauf `--bind`) ; en mode VPN, adresse publique détectée (`api.ipify.org`) à confirmer ou à remplacer par une IP ou un nom DNS (nom qui ne se résout pas : avertissement) ; mot à taper pour « VPN seul » et « Internet » ; récapitulatif. Une relance ne pose aucune question (mode et langue repris d'`install.env`) ; `--reconfigure` repose le menu (mode actuel présélectionné, avertissements de transition).
 1. Vérifie OS, distribution, architecture (amd64, arm64), droits root ; affiche ce qu'il va faire et demande confirmation (`--yes` pour l'automatisation, `--dry-run` pour seulement afficher les commandes). Tout le script est une fonction appelée à la dernière ligne : un téléchargement interrompu n'exécute rien.
 2. Installe Docker par le script officiel (`get.docker.com`) si absent ; exige Docker Engine ≥ 24. Compose v2 n'est pas requis sur l'hôte : l'image Hivora embarque son propre binaire.
 3. Détecte IP LAN, fuseau, PUID/PGID, ports libres (8443/tcp, 51820/udp).
@@ -251,7 +252,7 @@ curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.
 5. Sauvegarde le panel avant toute mise à jour (`hivora.db` par instantané cohérent, `secret.key`, `install.env`).
 6. Lance le conteneur `hivora` (`restart: unless-stopped`), version exacte résolue à l'installation (jamais `latest` en dur), attend « healthy ».
 7. Initialise par `python -m hivora bootstrap` **dans le conteneur** : le script ne touche jamais la base ni les fichiers WireGuard ; le bootstrap construit les vrais services (migrations, secrets chiffrés, jobs), est idempotent et ne recrée rien qui existe.
-8. Affiche l'URL, l'identifiant `admin` et son **mot de passe aléatoire** (à changer à la première connexion, comme avant), le chemin de `admin.conf` et son QR code.
+8. Affiche d'abord le bloc « HIVORA EST PRÊT » : URL, identifiant `admin` et son **mot de passe aléatoire** (à changer à la première connexion, comme avant) ; ensuite seulement le VPN : rien en mode réseau local (rappel de `--reconfigure`) ; en VPN + LAN, VPN disponible ou en préparation, sans attente ni QR code (`admin.conf` et la commande `python -m hivora admin-vpn`) ; en VPN seul, attente du VPN, procédure pas à pas et QR code en dernier.
 
 Pas de PostgreSQL ni de composant séparé : une seule image sert l'API, le WebSocket et le frontend statique, sur SQLite. Le lancement manuel (`deploy/compose.yaml`) garde le compte initial `admin` / `admin`, changement obligatoire.
 
