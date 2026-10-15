@@ -18,12 +18,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 - Mode d'accès public : la double authentification (TOTP) est obligatoire pour tous les comptes ; page « Double authentification obligatoire » après la première connexion, puis le panel dans la même session ; elle ne peut pas y être désactivée.
 - `python -m hivora reset-totp [utilisateur]` : retire la double authentification d'un compte (téléphone et codes de secours perdus), depuis la machine.
 - VPN d'administration (modes d'accès `vpn` et `vpn+lan`, côté serveur) : au démarrage, Hivora met en place une seule fois l'app WireGuard « Admin VPN » dans la zone Administration (réseau partagé), son client `admin` limité à cette zone et `admin.conf` (0600) ; ce client et cette app ne peuvent être ni supprimés ni désactivés (badge « Accès d'administration ») ; `python -m hivora admin-vpn` affiche `admin.conf` en QR code dans le terminal, `python -m hivora rescue-admin` lui donne de nouvelles clés au démarrage suivant. Réglages `HIVORA_ADMIN_VPN_HOST` et `HIVORA_ADMIN_VPN_PORT`.
+- Installeur : modes d'accès `vpn+lan` (défaut d'une nouvelle installation) et `vpn` (aucun port du panel publié) ; le panel rejoint le réseau de la zone Administration à l'adresse fixe `10.254.254.254` (`https://10.254.254.254:8443` par le VPN) ; vérification du port UDP, des plages d'adresses et du réseau existant ; QR code du client VPN affiché à la fin de l'installation ; options `--vpn-host`, `--vpn-port` et `--rescue-admin` (nouvelles clés du client VPN d'administration).
 
 ### Modifié
 
 - Hivora refuse de démarrer sur une base écrite par une version plus récente (retour à une ancienne image), avec un message clair, sans rien modifier.
 - La réinitialisation de la double authentification d'un compte par un administrateur coupe aussi ses sessions.
 - Une valeur inconnue de `HIVORA_ACCESS` empêche le démarrage.
+- Une nouvelle installation est en mode `vpn+lan` par défaut (avant : `lan`) ; une installation existante garde son mode.
 
 ## [0.1.0]
 

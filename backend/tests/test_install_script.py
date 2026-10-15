@@ -25,20 +25,50 @@ case "$1" in
     esac ;;
   port) echo "0.0.0.0:${FAKE_HIVORA_PORT:-8443}" ;;
   pull|image) ;;
-  exec) echo "/data/backups/_hivora/panel-x.tar.gz" ;;
+  network) case "$2" in
+      inspect) [ -f "$FAKE_STATE/network" ] || exit 1; cat "$FAKE_STATE/network" ;;
+      create) printf '%s ' "$(echo "$*" | sed 's/.*--subnet \([^ ]*\).*/\1/')" \
+                > "$FAKE_STATE/network" ;;
+    esac ;;
+  ps) [ -z "${FAKE_ADMIN_VPN_RUNNING:-}" ] || echo 5678efab ;;
+  exec) case "$*" in
+      *backup-self) echo "/data/backups/_hivora/panel-x.tar.gz" ;;
+      *rescue-admin) touch "$FAKE_STATE/rescue"; echo ADMIN_VPN=rescue_requested ;;
+      *admin-vpn) echo "ADMIN_CONF=$FAKE_DATA/admin.conf"
+        echo "[QR $(cat "$FAKE_DATA/admin.conf")]" ;;
+    esac ;;
+  restart) [ ! -f "$FAKE_STATE/rescue" ] || echo "PrivateKey = new" > "$FAKE_DATA/admin.conf" ;;
   rm) rm -f "$FAKE_STATE/running"; echo hivora ;;
   run) case "$*" in
       *"python -m hivora bootstrap") printf '%s\n' "$FAKE_BOOTSTRAP" ;;
-      *" -d "*) touch "$FAKE_STATE/running"; echo 0123abcd ;;
+      *" -d "*) touch "$FAKE_STATE/running"
+        conf="$FAKE_DATA/admin.conf"
+        case "$*" in *HIVORA_ACCESS=vpn*) [ -n "${FAKE_NO_ADMIN_CONF:-}" ] \
+          || [ -f "$conf" ] || echo "PrivateKey = first" > "$conf" ;;
+        esac
+        echo 0123abcd ;;
       *) exit 1 ;;
     esac ;;
   *) echo "unexpected: docker $*" >&2; exit 1 ;;
 esac
 """
+FAKE_SS = r"""#!/bin/sh
+case "$1" in
+  -ltnH) [ -z "${FAKE_PORT_BUSY:-}" ] || echo "LISTEN 0 4096 0.0.0.0:8443 x" ;;
+  -lunH) [ -z "${FAKE_UDP_BUSY:-}" ] || echo "UNCONN 0 0 0.0.0.0:51820 x" ;;
+esac
+"""
+FAKE_IP = r"""#!/bin/sh
+if [ "$3" = get ]; then
+  echo "1.1.1.1 via 192.168.1.1 dev eth0 src ${FAKE_LAN:-192.168.1.10} uid 0"
+else
+  echo "default via 192.168.1.1 dev eth0"; printf "%b" "${FAKE_ROUTES:-}"
+fi
+"""
 FAKES = {
     "docker": FAKE_DOCKER,
-    "ss": '#!/bin/sh\n[ -z "${FAKE_PORT_BUSY:-}" ] || echo "LISTEN 0 4096 0.0.0.0:8443 x"\n',
-    "ip": "#!/bin/sh\necho '1.1.1.1 via 192.168.1.1 dev eth0 src 192.168.1.10 uid 0'\n",
+    "ss": FAKE_SS,
+    "ip": FAKE_IP,
     "id": '#!/bin/sh\nif [ "$1" = "-u" ]; then echo 0; else exec /usr/bin/id "$@"; fi\n',
     "timedatectl": "#!/bin/sh\necho Europe/Paris\n",
 }
@@ -67,6 +97,7 @@ class Machine:
         self.log.unlink(missing_ok=True)
         full = {"PATH": f"{self.bin}:/usr/bin:/bin", "HOME": str(self.root),
                 "FAKE_LOG": str(self.log), "FAKE_STATE": str(self.state),
+                "FAKE_DATA": str(self.data), "HIVORA_VPN_TIMEOUT": "4",
                 "FAKE_BOOTSTRAP": self.bootstrap, "HIVORA_OS_RELEASE": str(self.os_release),
                 "HIVORA_HEALTH_TIMEOUT": "4", **(env or {})}  # fmt: skip
         cmd = ["/bin/sh", str(script), "--data", str(self.data), "--srv", str(self.srv), *args]
@@ -77,8 +108,10 @@ class Machine:
         return self.log.read_text().splitlines() if self.log.exists() else []
 
     def changes(self) -> list[str]:
-        """The calls that change something (pull, run, rm, exec)."""
-        return [c for c in self.calls() if c.split()[1] in ("pull", "run", "rm", "exec")]
+        """The calls that change something (pull, run, rm, exec, restart, network create)."""
+        return [c for c in self.calls() if c.split()[1] in ("pull", "run", "rm", "restart")
+                or (c.startswith(("docker network create", "docker exec"))
+                    and "admin-vpn" not in c)]  # fmt: skip
 
     def env(self) -> dict[str, str]:
         lines = (self.data / "install.env").read_text().splitlines()
@@ -93,11 +126,17 @@ def machine(tmp_path: Path) -> Machine:
 def test_a_fresh_install_bootstraps_before_the_server(machine: Machine) -> None:
     done = machine.install("--yes", "--version", "v1.2.3")
     assert done.returncode == 0, done.stderr
-    pull, boot, start = machine.changes()
+    pull, boot, network, start = machine.changes()
     assert pull == "docker pull ghcr.io/hiidenops/hivora:v1.2.3"
     assert "--rm" in boot and boot.endswith("hivora:v1.2.3 python -m hivora bootstrap")
     assert "docker.sock" not in boot  # the bootstrap needs no Docker
-    assert "-p 192.168.1.10:8443:8443" in start and "HIVORA_ACCESS=lan" in start
+    assert network == ("docker network create --driver bridge --subnet 10.254.254.0/24 "
+                       "--ip-range 10.254.254.0/25 --label io.hivora.zone-network=1 "
+                       "hivora-zone-administration")  # fmt: skip
+    # vpn+lan by default: the LAN port and the admin network at the panel's fixed address
+    assert "-p 192.168.1.10:8443:8443" in start and "HIVORA_ACCESS=vpn+lan" in start
+    assert "--network hivora-zone-administration --ip 10.254.254.254" in start
+    assert "HIVORA_ADMIN_VPN_PORT=51820" in start and "ADMIN_VPN_HOST" not in start
     assert f"-v {machine.data}:{machine.data}" in start
     assert f"Password: {PASSWORD}" in done.stdout
     assert machine.env()["HIVORA_VERSION"] == '"v1.2.3"'
@@ -195,10 +234,11 @@ def test_a_truncated_download_runs_nothing(machine: Machine, tmp_path: Path) -> 
 
 
 def test_access_modes(machine: Machine) -> None:
-    for mode in ("vpn", "vpn+lan"):
-        done = machine.install("--yes", "--version", "v1.2.3", "--access", mode)
-        assert done.returncode == 1 and "admin VPN" in done.stderr
-        assert machine.changes() == []
+    done = machine.install("--yes", "--version", "v1.2.3", "--access", "lan")
+    assert done.returncode == 0, done.stderr
+    start = machine.changes()[-1]
+    assert "-p 192.168.1.10:8443:8443" in start and "HIVORA_ACCESS=lan" in start
+    assert "--network" not in start and "admin VPN" not in done.stdout
     done = machine.install("--yes", "--version", "v1.2.3", "--access", "public")
     assert done.returncode == 1 and "--i-understand" in done.stderr
     done = machine.install("--yes", "--version", "v1.2.3", "--access", "public", "--i-understand")
@@ -208,6 +248,8 @@ def test_access_modes(machine: Machine) -> None:
         and "HIVORA_ACCESS=public" in machine.changes()[-1]
     )
     assert machine.env()["HIVORA_ACCESS"] == '"public"'
+    done = machine.install("--yes", "--access", "unknown")
+    assert done.returncode == 1 and "invalid --access" in done.stderr
 
 
 def test_a_repository_script_needs_a_version(machine: Machine) -> None:
@@ -228,3 +270,99 @@ def test_a_failed_bootstrap_says_how_to_go_back(machine: Machine) -> None:
     assert "--version v1.2.3" in done.stderr
     assert os.path.exists(machine.data / "install.env")
     assert machine.env()["HIVORA_VERSION"] == '"v1.2.3"'  # untouched until success
+
+
+def test_admin_vpn_only_publishes_no_panel_port(machine: Machine) -> None:
+    done = machine.install("--yes", "--version", "v1.2.3", "--access", "vpn",
+                           "--vpn-host", "vpn.example.org", "--vpn-port", "51830")  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    start = machine.changes()[-1]
+    assert " -p " not in start and "HIVORA_ACCESS=vpn " in start
+    assert "--network hivora-zone-administration --ip 10.254.254.254" in start
+    assert "HIVORA_ADMIN_VPN_PORT=51830" in start
+    assert "HIVORA_ADMIN_VPN_HOST=vpn.example.org" in start
+    assert "Through the admin VPN: https://10.254.254.254:8443" in done.stdout
+    assert "On this network" not in done.stdout
+    assert "[QR PrivateKey = first]" in done.stdout  # shown once, at its creation
+    assert "Open UDP port 51830" in done.stdout
+    env = machine.env()
+    assert env["HIVORA_VPN_HOST"] == '"vpn.example.org"' and env["HIVORA_VPN_PORT"] == '"51830"'
+    machine.bootstrap = "ADMIN=kept"
+    again = machine.install("--yes", env={"FAKE_UDP_BUSY": "1", "FAKE_ADMIN_VPN_RUNNING": "1"})
+    assert again.returncode == 0, again.stderr  # the port is the admin VPN's own
+    assert not any(c.startswith("docker network create") for c in machine.changes())
+    assert "HIVORA_ADMIN_VPN_PORT=51830" in machine.changes()[-1]  # kept from install.env
+    assert "[QR" not in again.stdout and "python -m hivora admin-vpn" in again.stdout
+
+
+def test_an_existing_install_keeps_its_mode(machine: Machine) -> None:
+    assert machine.install("--yes", "--version", "v1.2.3", "--access", "lan").returncode == 0
+    machine.bootstrap = "ADMIN=kept"
+    done = machine.install("--yes", env={"FAKE_PORT_BUSY": "1"})
+    assert done.returncode == 0, done.stderr
+    assert "HIVORA_ACCESS=lan" in machine.changes()[-1]
+    (machine.data / "install.env").unlink()  # installed before install.env existed
+    done = machine.install("--yes", "--version", "v1.2.4", env={"FAKE_PORT_BUSY": "1"})
+    assert done.returncode == 0 and "HIVORA_ACCESS=lan" in machine.changes()[-1]
+
+
+@pytest.mark.parametrize(("env", "message"), [
+    ({"FAKE_UDP_BUSY": "1"}, "UDP port 51820 is already in use"),
+    ({"FAKE_LAN": "10.254.254.20"}, "overlaps 10.254.254.0/24"),
+    ({"FAKE_ROUTES": "10.254.253.0/24 dev wg0 scope link\\n"}, "overlaps 10.254.253.0/24"),
+])  # fmt: skip
+def test_admin_vpn_checks_before_anything_changes(machine: Machine, env: dict[str, str],
+                                                  message: str) -> None:  # fmt: skip
+    done = machine.install("--yes", "--version", "v1.2.3", env=env)
+    assert done.returncode == 1 and message in done.stderr, done.stderr
+    assert machine.changes() == []
+
+
+def test_an_admin_network_with_other_addresses_is_refused(machine: Machine) -> None:
+    (machine.state / "network").write_text("172.23.0.0/16 ")  # made by Docker, not here
+    done = machine.install("--yes", "--version", "v1.2.3")
+    assert done.returncode == 1 and "another address range (172.23.0.0/16" in done.stderr
+    assert machine.changes() == []
+    (machine.state / "network").write_text("10.254.254.0/24 ")  # as this script makes it
+    route = {"FAKE_ROUTES": "10.254.254.0/24 dev br-1 proto kernel scope link\\n"}  # its own
+    done = machine.install("--yes", "--version", "v1.2.3", env=route)
+    assert done.returncode == 0, done.stderr
+    assert not any(c.startswith("docker network create") for c in machine.changes())
+
+
+def test_an_admin_vpn_not_ready_in_time_is_a_warning(machine: Machine) -> None:
+    done = machine.install("--yes", "--version", "v1.2.3", env={"FAKE_NO_ADMIN_CONF": "1"})
+    assert done.returncode == 0, done.stderr
+    assert "admin VPN is not ready yet" in done.stderr and "admin-vpn" in done.stderr
+    assert machine.env()["HIVORA_ACCESS"] == '"vpn+lan"'  # installed all the same
+
+
+def test_rescue_admin(machine: Machine) -> None:
+    done = machine.install("--yes", "--rescue-admin")
+    assert done.returncode == 1 and "not running" in done.stderr and machine.changes() == []
+    assert machine.install("--yes", "--version", "v1.2.3").returncode == 0
+    dry = machine.install("--yes", "--rescue-admin", "--dry-run")
+    assert dry.returncode == 0 and machine.changes() == []
+    assert "+ docker exec hivora python -m hivora rescue-admin" in dry.stderr
+    done = machine.install("--yes", "--rescue-admin")
+    assert done.returncode == 0, done.stderr
+    assert machine.changes() == [
+        "docker exec hivora python -m hivora rescue-admin",
+        "docker restart hivora",
+    ]  # nothing reinstalled
+    assert "[QR PrivateKey = new]" in done.stdout
+
+
+def test_a_dry_run_shows_the_admin_network(machine: Machine) -> None:
+    done = machine.install("--yes", "--dry-run", "--version", "v1.2.3")
+    assert done.returncode == 0 and machine.changes() == []
+    assert "+ docker network create --driver bridge --subnet 10.254.254.0/24" in done.stderr
+
+
+def test_the_addressing_is_the_servers(machine: Machine) -> None:
+    from hivora.vpn import admin
+
+    text = SCRIPT.read_text()
+    for name in ("ADMIN_ZONE_SUBNET", "ADMIN_ZONE_RANGE", "PANEL_IP", "ADMIN_VPN_SUBNET"):
+        assert f'\n{name}="{getattr(admin, name)}"\n' in text, name
+    assert f'ADMIN_NETWORK="hivora-zone-{admin.ADMIN_ZONE}"' in text

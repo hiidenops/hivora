@@ -37,7 +37,7 @@ from hivora.system.bootstrap import (
     reset_admin_totp,
 )
 from hivora.system.panel_backup import backup_panel
-from hivora.vpn.admin import terminal_qr
+from hivora.vpn.admin import PANEL_IP, VPN_MODES, terminal_qr
 
 
 def self_signed(tls_dir: Path, names: list[str]) -> tuple[Path, Path]:
@@ -70,6 +70,13 @@ def self_signed(tls_dir: Path, names: list[str]) -> tuple[Path, Path]:
                                       serialization.NoEncryption()))  # fmt: skip
     cert.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
     return cert, key
+
+
+def cert_names(settings: Settings) -> list[str]:
+    """Where the panel is reached: the certificate's names (the admin VPN's fixed address)."""
+    vpn = PANEL_IP if settings.access in VPN_MODES else ""
+    return ["localhost", "127.0.0.1", socket.gethostname(), settings.host_lan_ip or "",
+            settings.host_public_ip or "", vpn]  # fmt: skip
 
 
 def command(settings: Settings, args: list[str]) -> None:
@@ -109,9 +116,7 @@ def main(args: list[str] | None = None) -> None:
         return
     options: dict[str, object] = {}
     if settings.tls:
-        names = ["localhost", "127.0.0.1", socket.gethostname(), settings.host_lan_ip or "",
-                 settings.host_public_ip or ""]  # fmt: skip
-        cert, key = self_signed(settings.data_dir / "tls", names)
+        cert, key = self_signed(settings.data_dir / "tls", cert_names(settings))
         options = {"ssl_certfile": str(cert), "ssl_keyfile": str(key)}
     uvicorn.run(
         "hivora.main:app", factory=True, host="0.0.0.0", port=settings.port,  # noqa: S104

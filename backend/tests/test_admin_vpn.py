@@ -286,3 +286,12 @@ def test_a_taken_port_leaves_the_panel_up_and_retries_at_the_next_start(tmp_path
     with panel(tmp_path):  # the port is free now
         pass
     assert (state(tmp_path) or {}).get("initialized_at") and conf(tmp_path).exists()
+
+
+def test_the_certificate_names_the_panel_vpn_address(tmp_path: Path) -> None:
+    from hivora.__main__ import cert_names
+    from hivora.vpn.admin import PANEL_IP
+
+    assert PANEL_IP in cert_names(settings_for(tmp_path, "vpn+lan"))
+    assert PANEL_IP in cert_names(settings_for(tmp_path, "vpn"))
+    assert PANEL_IP not in cert_names(settings_for(tmp_path, "lan"))
