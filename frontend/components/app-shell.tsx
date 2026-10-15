@@ -5,8 +5,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment, createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
+import { useQuery } from "@tanstack/react-query";
+
 import { Switch } from "@/components/ui/input";
-import { ApiError, type Me, type Role } from "@/lib/api/client";
+import { ApiError, api, type Me, type Role } from "@/lib/api/client";
 import { useLogout, useMe } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { readPref, writePref } from "@/lib/prefs";
@@ -76,6 +78,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { data: me, error, isPending } = useMe();
+  // No TOTP: one guarded request tells whether this panel requires it (public); held on
+  // the spinner meanwhile, so nothing of the panel shows before /setup-totp/.
+  const probe = useQuery({
+    queryKey: ["totp-probe", me?.id],
+    queryFn: () => api<unknown>("/auth/sessions"),
+    enabled: !!me && !me.must_change_password && !me.totp_enabled,
+    retry: false,
+  });
+  const totpSetup = probe.error instanceof ApiError && probe.error.code === "totp_setup_required";
+  const held = !!me && !me.totp_enabled && (probe.isPending || totpSetup);
   const logout = useLogout();
   const [advanced, setAdvancedState] = useState(false);
 
@@ -83,9 +95,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (error instanceof ApiError && error.status === 401) router.replace("/login/");
     else if (me?.must_change_password) router.replace("/change-password/");
-  }, [error, me, router]);
+    else if (totpSetup) router.replace("/setup-totp/");
+  }, [error, me, router, totpSetup]);
 
-  if (isPending || !me || me.must_change_password) {
+  if (isPending || !me || me.must_change_password || held) {
     return (
       <div className="grid min-h-screen place-items-center">
         <div role="status" aria-label={t("common.loading")} className="size-10 animate-spin rounded-full border-4 border-muted border-t-primary" />

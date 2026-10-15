@@ -991,6 +991,11 @@ export const fr = {
   "db.network": "Depuis le réseau",
   "db.openIn": "Ouvrir dans {tool}",
   "db.install": "Installer {tool} pour cette base",
+  "error.totp_setup_required": "Activez la double authentification pour continuer.",
+  "error.totp_mandatory": "Ce panel est accessible depuis Internet : la double authentification ne peut pas être désactivée.",
+  "setupTotp.title": "Double authentification obligatoire",
+  "setupTotp.why": "Ce panel est accessible depuis Internet : chaque compte doit activer la double authentification (TOTP) avant de continuer. Hivora a un accès administrateur à Docker : elle protège toute la machine.",
+  "settings.totp.continue": "J'ai noté mes codes, continuer",
 } as const;
 
 export type MessageKey = keyof typeof fr;

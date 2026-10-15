@@ -15,9 +15,14 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 - `python -m hivora reset-admin-password [utilisateur]` : nouveau mot de passe aléatoire, à changer à la connexion suivante, depuis la machine seulement.
 - Installeur officiel (`install.sh`, publié avec chaque release) : version exacte de la release, options gardées dans `install.env` et reprises à chaque relance, vérification de la distribution (Debian 12+, Ubuntu 22.04+, Raspberry Pi OS 64 bits), de Docker (24+, ni rootless ni Podman) et du port, sauvegarde du panel avant une mise à jour, compte `admin` créé avant le démarrage avec un mot de passe aléatoire, accès `lan` ou `public` (confirmation explicite), `--dry-run`.
 
+- Mode d'accès public : la double authentification (TOTP) est obligatoire pour tous les comptes ; page « Double authentification obligatoire » après la première connexion, puis le panel dans la même session ; elle ne peut pas y être désactivée.
+- `python -m hivora reset-totp [utilisateur]` : retire la double authentification d'un compte (téléphone et codes de secours perdus), depuis la machine.
+
 ### Modifié
 
 - Hivora refuse de démarrer sur une base écrite par une version plus récente (retour à une ancienne image), avec un message clair, sans rien modifier.
+- La réinitialisation de la double authentification d'un compte par un administrateur coupe aussi ses sessions.
+- Une valeur inconnue de `HIVORA_ACCESS` empêche le démarrage.
 
 ## [0.1.0]
 

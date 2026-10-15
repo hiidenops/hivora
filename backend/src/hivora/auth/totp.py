@@ -14,6 +14,12 @@ from hivora.crypto.totp import (
 )
 
 
+def setup_required(access: str, totp_enabled: bool) -> bool:
+    """A panel reachable from the Internet (``access`` public): no account without TOTP.
+    Checked by every guarded route (`web.deps.require`) and the WebSocket."""
+    return access == "public" and not totp_enabled
+
+
 @dataclass(frozen=True, slots=True)
 class TotpEnrollment:
     secret: str

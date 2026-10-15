@@ -233,7 +233,7 @@ Toute modification produit une nouvelle révision : on peut comparer deux révis
 - **Exposition par défaut** : port 8443 en HTTPS auto-signé, publié sur l'IP LAN seulement, et panel joignable par le VPN d'administration (mode « VPN + LAN », voir « Installation »). Le mode public n'est jamais un défaut.
 - **WireGuard** : app système gérée par le module `vpn` (`linuxserver/wireguard`), dans la zone Administration, jamais imposée aux autres apps. Elle porte l'accès d'administration au panel (voir « VPN d'administration »).
 - Cookies `Secure`, `HttpOnly`, `SameSite=Strict` ; jeton CSRF ; session expirée après 12 h d'inactivité.
-- Console et exec derrière une re-confirmation TOTP si activé, valable 15 min pour toutes les consoles : la sécurité ne casse pas l'accès rapide. **En mode d'accès public, le TOTP est obligatoire** : sans TOTP actif, la session n'autorise que sa configuration (comme le changement de mot de passe initial).
+- Console et exec derrière une re-confirmation TOTP si activé, valable 15 min pour toutes les consoles : la sécurité ne casse pas l'accès rapide. **En mode d'accès public, le TOTP est obligatoire** : sans TOTP actif, la session n'autorise que sa configuration (comme le changement de mot de passe initial) : page `/setup-totp/`, puis le panel dans la même session ; il ne peut pas être désactivé ; récupération par codes de secours, par un autre admin ou par `python -m hivora reset-totp` sur la machine.
 - Le conteneur Hivora s'exécute sans `privileged` ; il ne monte que le socket, `/opt/hivora/data` et `/srv/hivora`.
 
 ### Installation (décisions du 14/10/2026, M12)

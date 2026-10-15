@@ -992,4 +992,9 @@ export const en: Record<MessageKey, string> = {
   "db.network": "From the network",
   "db.openIn": "Open in {tool}",
   "db.install": "Install {tool} for this database",
+  "error.totp_setup_required": "Turn on two-factor authentication to continue.",
+  "error.totp_mandatory": "This panel is reachable from the Internet: two-factor authentication cannot be turned off.",
+  "setupTotp.title": "Two-factor authentication required",
+  "setupTotp.why": "This panel is reachable from the Internet: every account must turn on two-factor authentication (TOTP) before going on. Hivora has administrator access to Docker: it protects the whole machine.",
+  "settings.totp.continue": "I wrote my codes down, continue",
 };

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from hivora.auth.models import User
 from hivora.auth.passwords import DEFAULT_ADMIN
 from hivora.auth.sessions import revoke_sessions
+from hivora.auth.totp import clear_totp
 from hivora.auth.users import UserNotFoundError
 from hivora.crypto.passwords import hash_password, verify_password
 from hivora.db.models import Setting
@@ -56,11 +57,25 @@ async def reset_password(sessions: async_sessionmaker[AsyncSession], username: s
                          password: str) -> None:  # fmt: skip
     """A new password for ``username``, to change at next login; its sessions end."""
     async with sessions() as session, session.begin():
-        user = await session.scalar(select(User).where(User.username == username))
-        if user is None:
-            raise UserNotFoundError(username)
+        user = await _named(session, username)
         user.password_hash = hash_password(password)
         user.must_change_password = True
         await revoke_sessions(session, user.id)
         if username == DEFAULT_ADMIN:
             await mark_chosen(session)
+
+
+async def reset_totp(sessions: async_sessionmaker[AsyncSession], username: str) -> None:
+    """Two-factor authentication off for ``username`` (lost phone and recovery codes); its
+    sessions end. On a public panel it must set it up again at next login."""
+    async with sessions() as session, session.begin():
+        user = await _named(session, username)
+        clear_totp(user)
+        await revoke_sessions(session, user.id)
+
+
+async def _named(session: AsyncSession, username: str) -> User:
+    user = await session.scalar(select(User).where(User.username == username))
+    if user is None:
+        raise UserNotFoundError(username)
+    return user

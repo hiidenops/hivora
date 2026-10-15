@@ -31,6 +31,10 @@ class Settings(BaseSettings):
 
     job_workers: int = 2
 
+    # How the panel is reached, as the installer published it (install.env, passed as
+    # HIVORA_ACCESS; never stored). "public": every account needs TOTP (auth.totp).
+    access: Literal["lan", "public", "vpn", "vpn+lan"] = "lan"
+
     # How to run Compose v2: the docker CLI plugin, or the standalone binary
     # (the Hivora image ships only that: HIVORA_COMPOSE_CMD='["docker-compose"]').
     compose_cmd: list[str] = ["docker", "compose"]

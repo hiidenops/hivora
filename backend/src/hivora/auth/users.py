@@ -94,6 +94,7 @@ class UserAdmin:
         async with self.sessions() as session, session.begin():
             user = await get_user(session, user_id)
             clear_totp(user)
+            await revoke_sessions(session, user.id)  # a stolen session cannot enroll a new one
         self.bus.publish("user.totp_reset", target=user.username)
 
     async def delete_user(self, user_id: int, *, acting_user_id: int) -> None:

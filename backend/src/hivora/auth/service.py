@@ -49,6 +49,10 @@ class TotpRequiredError(AuthError):
     code = "totp_required"
 
 
+class TotpMandatoryError(ConflictError):
+    code = "totp_mandatory"  # a public panel: TOTP cannot be turned off
+
+
 @dataclass(frozen=True, slots=True)
 class LoginResult:
     user: User
@@ -246,5 +250,9 @@ class AuthService:
             user = await get_user(session, user_id)
             if not verify_password(user.password_hash, password):
                 raise InvalidCredentialsError("password is wrong")
+            if self.settings.access == "public":
+                raise TotpMandatoryError(
+                    "this panel is public: two-factor authentication is required"
+                )
             clear_totp(user)
         self.bus.publish("auth.totp_disabled", user_id=user_id)

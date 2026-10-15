@@ -1,6 +1,6 @@
-"""`python -m hivora bootstrap` and `reset-admin-password`: run by the installer (or by
-hand on the machine) in a one-off container, before the server starts. They build only
-what they use: the prepared database, the auth service; no Docker.
+"""`python -m hivora bootstrap`, `reset-admin-password` and `reset-totp`: run by the
+installer (or by hand on the machine) in a one-off container, before the server starts.
+They build only what they use: the prepared database, the auth service; no Docker.
 
 Output: ``KEY=value`` lines a shell script reads without jq. The password appears there
 only (shown once): never in the logs.
@@ -8,7 +8,7 @@ only (shown once): never in the logs.
 
 import asyncio
 
-from hivora.auth.initial import random_password, reset_password, secure_default_admin
+from hivora.auth.initial import random_password, reset_password, reset_totp, secure_default_admin
 from hivora.auth.passwords import DEFAULT_ADMIN
 from hivora.auth.service import AuthService
 from hivora.core.config import Settings
@@ -27,6 +27,11 @@ def bootstrap(settings: Settings) -> dict[str, str]:
 def reset_admin_password(settings: Settings, username: str = DEFAULT_ADMIN) -> dict[str, str]:
     """A new random password for ``username`` (to change at next login)."""
     return asyncio.run(_reset(settings, username))
+
+
+def reset_admin_totp(settings: Settings, username: str = DEFAULT_ADMIN) -> dict[str, str]:
+    """Two-factor authentication off for ``username`` (to set up again on a public panel)."""
+    return asyncio.run(_reset_totp(settings, username))
 
 
 async def _bootstrap(settings: Settings) -> dict[str, str]:
@@ -57,3 +62,13 @@ async def _reset(settings: Settings, username: str) -> dict[str, str]:
     finally:
         await engine.dispose()
     return {"ADMIN": "reset", "ADMIN_USER": username, "ADMIN_PASSWORD": password}
+
+
+async def _reset_totp(settings: Settings, username: str) -> dict[str, str]:
+    prepare_database(settings)
+    engine = make_engine(settings.db_path)
+    try:
+        await reset_totp(make_sessionmaker(engine), username)
+    finally:
+        await engine.dispose()
+    return {"TOTP": "reset", "TOTP_USER": username}

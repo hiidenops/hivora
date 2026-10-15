@@ -19,7 +19,9 @@ async function qrSvg(uri: string): Promise<string> {
   return qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
 }
 
-export function TotpCard() {
+/** `onContinue`: the forced setup of a public panel (/setup-totp/): no "Disable", and a
+ *  button to leave once the recovery codes are shown. */
+export function TotpCard({ onContinue }: { onContinue?: () => void } = {}) {
   const { t, errorMessage } = useI18n();
   const qc = useQueryClient();
   const { data: me } = useMe();
@@ -58,6 +60,11 @@ export function TotpCard() {
         <div className="grid gap-2">
           <Alert tone="warn">{t("settings.totp.recovery")}</Alert>
           <CodeView code={codes.join("\n")} />
+          {onContinue && (
+            <Button className="justify-self-start" onClick={onContinue}>
+              {t("settings.totp.continue")}
+            </Button>
+          )}
         </div>
       )}
       {!me?.totp_enabled && !enrollment && (
@@ -88,7 +95,7 @@ export function TotpCard() {
           </Button>
         </form>
       )}
-      {me?.totp_enabled && (
+      {me?.totp_enabled && !onContinue && (
         <form
           className="flex flex-wrap items-end gap-2"
           onSubmit={(e) => {

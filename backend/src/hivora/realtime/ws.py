@@ -37,6 +37,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from hivora.apps.core import decrypt_secrets
 from hivora.auth.models import Role, User
+from hivora.auth.totp import setup_required
 from hivora.core.context import Actor, current_actor
 from hivora.core.errors import HivoraError
 from hivora.core.events import Event
@@ -236,9 +237,14 @@ class Connection:
                     async with asyncio.timeout(max(0.0, next_check - loop.time())):
                         await self.forward(await sub.queue.get())
                 except TimeoutError:
-                    # Revoked sessions and disabled users lose their live feed too.
-                    if await self.rt.auth.authenticate(token) is None:
+                    # Revoked sessions and disabled users lose their live feed too; so does
+                    # an account whose TOTP was reset on a public panel.
+                    found = await self.rt.auth.authenticate(token)
+                    if found is None:
                         await self.ws.close(CLOSE_UNAUTHORIZED)
+                        return
+                    if setup_required(self.rt.settings.access, found[0].totp_enabled):
+                        await self.ws.close(CLOSE_FORBIDDEN)
                         return
                     next_check = loop.time() + REVALIDATE_EVERY_S
 
@@ -252,7 +258,7 @@ async def websocket(ws: WebSocket) -> None:
         await ws.close(CLOSE_UNAUTHORIZED)
         return
     user, session = found
-    if user.must_change_password:
+    if user.must_change_password or setup_required(runtime.settings.access, user.totp_enabled):
         await ws.close(CLOSE_FORBIDDEN)
         return
     await ws.accept()

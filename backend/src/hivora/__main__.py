@@ -7,7 +7,8 @@ One Uvicorn worker, as the whole design assumes a single process.
 `python -m hivora backup-self`: archive the panel (database, master key, launch options)
 in <data>/backups/_hivora/ and print the archive's path.
 `python -m hivora bootstrap`: the initial admin with a random password (installer, before
-the server starts); `python -m hivora reset-admin-password [user]`: a new random one.
+the server starts); `python -m hivora reset-admin-password [user]`: a new random one;
+`python -m hivora reset-totp [user]`: two-factor authentication off (lost phone).
 Both print KEY=value lines.
 """
 
@@ -27,7 +28,7 @@ from cryptography.x509.oid import NameOID
 from hivora.core.config import Settings
 from hivora.core.errors import NotFoundError
 from hivora.db.migrate import SchemaTooNewError
-from hivora.system.bootstrap import bootstrap, reset_admin_password
+from hivora.system.bootstrap import bootstrap, reset_admin_password, reset_admin_totp
 from hivora.system.panel_backup import backup_panel
 
 
@@ -73,9 +74,12 @@ def command(settings: Settings, args: list[str]) -> None:
             out = bootstrap(settings)
         elif args[0] == "reset-admin-password" and len(args) <= 2:
             out = reset_admin_password(settings, *args[1:])
+        elif args[0] == "reset-totp" and len(args) <= 2:
+            out = reset_admin_totp(settings, *args[1:])
         else:
             sys.exit(
-                "usage: python -m hivora [backup-self | bootstrap | reset-admin-password [user]]"
+                "usage: python -m hivora "
+                "[backup-self | bootstrap | reset-admin-password [user] | reset-totp [user]]"
             )
     except (SchemaTooNewError, NotFoundError, FileNotFoundError) as error:
         sys.exit(f"error: {error}")

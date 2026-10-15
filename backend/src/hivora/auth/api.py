@@ -12,6 +12,7 @@ from hivora.web.deps import (
     Principal,
     RuntimeDep,
     SessionPrincipal,
+    TotpSetup,
     Viewer,
     client_ip,
 )
@@ -114,13 +115,13 @@ async def change_password(body: PasswordIn, principal: SessionPrincipal, rt: Run
 
 
 @router.post("/totp/enroll")
-async def totp_enroll(principal: Viewer, rt: RuntimeDep) -> TotpEnrollOut:
+async def totp_enroll(principal: TotpSetup, rt: RuntimeDep) -> TotpEnrollOut:
     enrollment = await rt.auth.totp_enroll(principal.user_id)
     return TotpEnrollOut(secret=enrollment.secret, uri=enrollment.uri)
 
 
 @router.post("/totp/confirm")
-async def totp_confirm(body: CodeIn, principal: Viewer, rt: RuntimeDep) -> RecoveryCodesOut:
+async def totp_confirm(body: CodeIn, principal: TotpSetup, rt: RuntimeDep) -> RecoveryCodesOut:
     return RecoveryCodesOut(recovery_codes=await rt.auth.totp_confirm(principal.user_id, body.code))
 
 

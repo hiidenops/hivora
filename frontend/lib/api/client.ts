@@ -74,6 +74,8 @@ export async function api<T>(
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const err = data?.error ?? {};
+    // A public panel and no TOTP yet (e.g. reset by an admin meanwhile): set it up first.
+    if (err.code === "totp_setup_required" && location.pathname !== "/setup-totp/") location.assign("/setup-totp/");
     throw new ApiError(res.status, err.code ?? "http_error", err.message ?? res.statusText, err.details);
   }
   return data as T;
