@@ -6,6 +6,9 @@ One Uvicorn worker, as the whole design assumes a single process.
 
 `python -m hivora backup-self`: archive the panel (database, master key, launch options)
 in <data>/backups/_hivora/ and print the archive's path.
+`python -m hivora bootstrap`: the initial admin with a random password (installer, before
+the server starts); `python -m hivora reset-admin-password [user]`: a new random one.
+Both print KEY=value lines.
 """
 
 import ipaddress
@@ -22,6 +25,9 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
 from hivora.core.config import Settings
+from hivora.core.errors import NotFoundError
+from hivora.db.migrate import SchemaTooNewError
+from hivora.system.bootstrap import bootstrap, reset_admin_password
 from hivora.system.panel_backup import backup_panel
 
 
@@ -57,14 +63,31 @@ def self_signed(tls_dir: Path, names: list[str]) -> tuple[Path, Path]:
     return cert, key
 
 
+def command(settings: Settings, args: list[str]) -> None:
+    """A one-off command instead of the server (exit status 1 and a message on failure)."""
+    try:
+        if args == ["backup-self"]:
+            print(backup_panel(settings.data_dir))
+            return
+        if args == ["bootstrap"]:
+            out = bootstrap(settings)
+        elif args[0] == "reset-admin-password" and len(args) <= 2:
+            out = reset_admin_password(settings, *args[1:])
+        else:
+            sys.exit(
+                "usage: python -m hivora [backup-self | bootstrap | reset-admin-password [user]]"
+            )
+    except (SchemaTooNewError, NotFoundError, FileNotFoundError) as error:
+        sys.exit(f"error: {error}")
+    print("\n".join(f"{key}={value}" for key, value in out.items()))
+
+
 def main(args: list[str] | None = None) -> None:
     args = sys.argv[1:] if args is None else args
     settings = Settings()
-    if args == ["backup-self"]:
-        print(backup_panel(settings.data_dir))
-        return
     if args:
-        sys.exit("usage: python -m hivora [backup-self]")
+        command(settings, args)
+        return
     options: dict[str, object] = {}
     if settings.tls:
         names = ["localhost", "127.0.0.1", socket.gethostname(), settings.host_lan_ip or "",

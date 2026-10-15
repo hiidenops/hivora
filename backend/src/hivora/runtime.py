@@ -51,6 +51,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def prepare_database(settings: Settings) -> None:
+    """Before anything opens the database (server or ``bootstrap``): refuse a database
+    from a newer Hivora, back the panel up when a migration is pending, then migrate."""
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    schema = schema_state(settings.db_path)
+    if schema == "newer":  # an older image on a newer database: touch nothing
+        raise SchemaTooNewError(db_revision(settings.db_path) or "?")
+    if schema == "behind":  # a migration is about to run: keep a way back
+        logger.warning("panel backed up before migrating: %s", backup_panel(settings.data_dir))
+    upgrade_to_head(settings.db_path)
+
+
 @dataclass
 class Runtime:
     settings: Settings
@@ -105,13 +117,7 @@ class Runtime:
     ) -> "Runtime":
         """Synchronous wiring: migrations, keys and catalog; nothing started yet."""
         clock = clock or SystemClock()
-        settings.data_dir.mkdir(parents=True, exist_ok=True)
-        schema = schema_state(settings.db_path)
-        if schema == "newer":  # an older image on a newer database: touch nothing
-            raise SchemaTooNewError(db_revision(settings.db_path) or "?")
-        if schema == "behind":  # a migration is about to run: keep a way back
-            logger.warning("panel backed up before migrating: %s", backup_panel(settings.data_dir))
-        upgrade_to_head(settings.db_path)
+        prepare_database(settings)
         engine = make_engine(settings.db_path)
         sessions = make_sessionmaker(engine)
         box = SecretBox(load_or_create_master_key(settings.secret_key_path))

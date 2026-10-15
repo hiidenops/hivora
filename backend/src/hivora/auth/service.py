@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hivora.auth.initial import INITIAL_PASSWORD, mark_chosen
 from hivora.auth.models import Role, Session, User
 from hivora.auth.passwords import DEFAULT_ADMIN, check_password_policy, dummy_hash
 from hivora.auth.ratelimit import LoginRateLimiter
@@ -29,6 +30,7 @@ from hivora.core.events import EventBus
 from hivora.crypto.cipher import SecretBox
 from hivora.crypto.passwords import hash_password, needs_rehash, verify_password
 from hivora.crypto.totp import generate_recovery_codes, hash_recovery_code
+from hivora.db.models import Setting
 
 logger = logging.getLogger(__name__)
 
@@ -77,28 +79,39 @@ class AuthService:
 
     # --- bootstrap ------------------------------------------------------------
     async def first_start(self) -> bool:
-        """True while the only account is the initial admin/admin, not yet changed."""
+        """True while the only account is the initial admin/admin, not yet changed (not when
+        the installer chose its password: see `auth.initial`)."""
         async with self.sessions() as session:
             users = (await session.scalars(select(User).limit(2))).all()
+            chosen = await session.get(Setting, INITIAL_PASSWORD)
         return (
-            len(users) == 1 and users[0].username == DEFAULT_ADMIN and users[0].must_change_password
+            chosen is None
+            and len(users) == 1
+            and users[0].username == DEFAULT_ADMIN
+            and users[0].must_change_password
         )
 
-    async def ensure_initial_admin(self) -> bool:
-        """First start: create admin/admin, which must change its password."""
+    async def ensure_initial_admin(self, password: str | None = None) -> bool:
+        """First start: create admin, which must change its password: admin/admin, or
+        ``password`` when the installer chose it (`python -m hivora bootstrap`)."""
         async with self.sessions() as session, session.begin():
             if await session.scalar(select(func.count(User.id))):
                 return False
             session.add(
                 User(
                     username=DEFAULT_ADMIN,
-                    password_hash=hash_password(DEFAULT_ADMIN),
+                    password_hash=hash_password(password or DEFAULT_ADMIN),
                     role=Role.ADMIN,
                     must_change_password=True,
                     created_at=self.clock.now(),
                 )
             )
-        logger.warning("initial account created: admin / admin (password change required)")
+            if password:
+                await mark_chosen(session)
+        if password:  # never the password itself: the installer shows it
+            logger.warning("initial account created: admin (password shown by the installer)")
+        else:
+            logger.warning("initial account created: admin / admin (password change required)")
         return True
 
     # --- login / sessions -----------------------------------------------------

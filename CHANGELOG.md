@@ -11,6 +11,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 - Licence AGPL-3.0.
 - Versionnement et releases officiels : la version du paquet fait foi, vérifiée contre le tag ; image publiée avec ses labels OCI ; notes de version tirées de ce fichier.
 - Sauvegarde du panel (base, clé maître, options de lancement) dans `backups/_hivora/` avant chaque migration de la base et par `python -m hivora backup-self` ; les 5 dernières sont gardées.
+- `python -m hivora bootstrap` : crée le compte `admin` avec un mot de passe aléatoire affiché une seule fois (à changer à la première connexion), ou remplace `admin` / `admin` s'il n'a jamais été changé ; sans effet sur un compte déjà configuré.
+- `python -m hivora reset-admin-password [utilisateur]` : nouveau mot de passe aléatoire, à changer à la connexion suivante, depuis la machine seulement.
 
 ### Modifié
 
