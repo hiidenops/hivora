@@ -1,6 +1,12 @@
-# Hivora with Docker Compose (alternative to install.sh). Adjust HIVORA_HOST_LAN_IP,
-# HIVORA_TIMEZONE and the published address, then: docker compose up -d
-# First login: admin / admin, to change right away (install.sh sets a random password instead).
+# Hivora with Docker Compose (alternative to install.sh), local network access only.
+#
+#   HIVORA_BIND=192.168.1.10 docker compose up -d     # this machine's LAN address
+#
+# HIVORA_BIND is required: the panel listens on that address only (no IP is written here).
+# Listening on every address means the Internet mode: set HIVORA_ACCESS to "public"
+# (two-factor authentication then becomes mandatory) and publish "8443:8443".
+# First login: admin / admin, to change right away (install.sh sets a random password).
+# Pin a release rather than latest, e.g. ghcr.io/hiidenops/hivora:v0.1.0.
 # The data and volume folders are mounted at the same path inside and outside:
 # the compose files Hivora generates use host paths.
 services:
@@ -9,15 +15,16 @@ services:
     container_name: hivora
     restart: unless-stopped
     ports:
-      - "8443:8443"  # e.g. "192.168.1.10:8443:8443" to listen on the LAN address only
+      - "${HIVORA_BIND:?set HIVORA_BIND to this machine's LAN address, e.g. HIVORA_BIND=192.168.1.10}:8443:8443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/hivora/data:/opt/hivora/data
       - /srv/hivora:/srv/hivora
     environment:
-      HIVORA_HOST_LAN_IP: "192.168.1.10"
-      HIVORA_TIMEZONE: "Europe/Paris"
-      HIVORA_PUID: "1000"
-      HIVORA_PGID: "1000"
+      HIVORA_ACCESS: "lan"
+      HIVORA_HOST_LAN_IP: "${HIVORA_BIND}"
+      HIVORA_TIMEZONE: "${HIVORA_TIMEZONE:-UTC}"
+      HIVORA_PUID: "${HIVORA_PUID:-1000}"
+      HIVORA_PGID: "${HIVORA_PGID:-1000}"
     labels:
-      io.hivora.self: "true"
+      io.hivora.self: "true"  # the System page finds the panel's own container by it

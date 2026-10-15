@@ -22,6 +22,7 @@ function server(port: number, data: string, env = "") {
 // Runs against the exported UI served by the real backend, with a fake Docker.
 export default defineConfig({
   testDir: "e2e",
+  testIgnore: ["screenshots/**"], // the README's screenshots: playwright.screenshots.config.ts
   timeout: 60_000,
   // One server and one database for every file: the files run one after another, in name
   // order (apps.spec.ts first: its first-start test needs the fresh instance).

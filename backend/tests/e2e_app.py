@@ -4,6 +4,7 @@ uvicorn --factory e2e_app:app --app-dir tests   (settings from HIVORA_* env)
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,7 @@ from fastapi import FastAPI
 
 from hivora.core.config import Settings
 from hivora.core.events import Event
-from hivora.docker_gateway import ContainerInfo, ContainerState, StatsSample
+from hivora.docker_gateway import ContainerInfo, ContainerState, PublishedPort, StatsSample
 from hivora.docker_gateway.fake import FakeDockerGateway
 from hivora.hostfw.service import HOST
 from hivora.main import create_app
@@ -80,7 +81,33 @@ def app() -> FastAPI:
 
     runtime.bus.publish = with_fake_containers  # type: ignore[method-assign]
     runtime.releases.fetch = fake_github  # never the network during the e2e tests
+    if os.environ.get("HIVORA_E2E_DEMO"):  # the README's screenshots (e2e/screenshots)
+        demo(runtime, gateway)
     return create_app(runtime=runtime)
+
+
+def demo(runtime: Runtime, gateway: FakeDockerGateway) -> None:
+    """A panel as installed: its own container on the LAN, a panel backup, Docker's version,
+    up to date (the health card all green, no dot)."""
+    from hivora.__main__ import self_signed  # the image's certificate, as at a real start
+
+    self_signed(runtime.settings.data_dir / "tls", ["localhost"])
+    lan = "192.168.1.10"  # an example address, not this machine's
+    gateway.put(ContainerInfo(id="hivora-demo", name="hivora", image="hivora",
+                              state=ContainerState.RUNNING, labels={"io.hivora.self": "true"},
+                              ports=(PublishedPort(8443, "tcp", lan, 8443),)))  # fmt: skip
+
+    async def version() -> str:
+        return "27.3.1"
+
+    async def no_release(url: str, headers: dict[str, str]) -> tuple[int, Any]:
+        return 200, []
+
+    gateway.ping = version  # type: ignore[method-assign]
+    runtime.releases.fetch = no_release
+    backups = runtime.settings.data_dir / "backups" / "_hivora"
+    backups.mkdir(parents=True, exist_ok=True)
+    (backups / "panel-demo-r0021.tar.gz").write_bytes(b"")
 
 
 async def fake_github(url: str, headers: dict[str, str]) -> tuple[int, Any]:

@@ -106,7 +106,7 @@ msg_en() {
     rescue_no_conf) m 'no new admin.conf: see docker logs %s' ;;
     rescue_import) m 'Import it in the WireGuard app, then open https://%s:8443' ;;
     go_back) m '\n  To go back: docker rm -f %s' ;;
-    go_back_tar) m '; tar -xzf %s -C %s' ;;
+    go_back_tar) m '; rm -f %s/hivora.db-wal %s/hivora.db-shm; tar -xzf %s -C %s' ;;
     go_back_version) m '; then re-run this script with --version %s' ;;
     dry_done) m 'Dry run: nothing was changed.' ;;
     unchanged_access) m 'Access: %s (unchanged; to change it: --reconfigure)' ;;
@@ -249,7 +249,7 @@ msg_fr() {
     rescue_no_conf) m 'pas de nouvel admin.conf : voir docker logs %s' ;;
     rescue_import) m 'Importez-le dans l’app WireGuard, puis ouvrez https://%s:8443' ;;
     go_back) m '\n  Pour revenir en arrière : docker rm -f %s' ;;
-    go_back_tar) m ' ; tar -xzf %s -C %s' ;;
+    go_back_tar) m ' ; rm -f %s/hivora.db-wal %s/hivora.db-shm ; tar -xzf %s -C %s' ;;
     go_back_version) m ' ; puis relancez ce script avec --version %s' ;;
     dry_done) m 'Simulation : rien n’a été modifié.' ;;
     unchanged_access) m 'Accès : %s (inchangé ; pour le changer : --reconfigure)' ;;
@@ -856,7 +856,8 @@ rescue_admin() {  # --rescue-admin: new keys for the admin VPN client, nothing e
 recovery() {  # how to go back, printed after a failure once the old container is gone
   [ -n "$UPDATE" ] || return 0
   t go_back "$CONTAINER"
-  [ -z "${BACKUP:-}" ] || t go_back_tar "$BACKUP" "$DATA"
+  # The killed panel's write-ahead log belongs to the new database: never to the restored one.
+  [ -z "${BACKUP:-}" ] || t go_back_tar "$DATA" "$DATA" "$BACKUP" "$DATA"
   [ -z "$OLD_VERSION" ] || t go_back_version "$OLD_VERSION"
 }
 

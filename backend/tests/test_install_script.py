@@ -283,6 +283,9 @@ def test_a_failed_bootstrap_says_how_to_go_back(machine: Machine) -> None:
     done = machine.install("--yes", "--version", "v1.3.0")
     assert done.returncode == 1 and "could not be prepared" in done.stderr
     assert "tar -xzf /data/backups/_hivora/panel-x.tar.gz" in done.stderr
+    # the killed panel's write-ahead log removed first: else it corrupts the restored base
+    wal = f"rm -f {machine.data}/hivora.db-wal {machine.data}/hivora.db-shm; tar -xzf"
+    assert wal in done.stderr
     assert "--version v1.2.3" in done.stderr
     assert os.path.exists(machine.data / "install.env")
     assert machine.env()["HIVORA_VERSION"] == '"v1.2.3"'  # untouched until success
