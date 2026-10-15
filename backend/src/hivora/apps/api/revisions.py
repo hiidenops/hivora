@@ -115,6 +115,7 @@ async def plan_settings(
 @router.put("/{app_id}/settings", status_code=202)
 async def update_settings(app_id: int, body: SettingsIn, _: Operator, rt: RuntimeDep) -> JobRef:
     """New revision from these inputs, applied by a job (secrets left empty are kept)."""
+    await rt.admin_vpn.check_settings_change(app_id, body.inputs)
     return job_ref(await rt.apps.revisions.update(app_id, body.inputs, reset_data=body.reset_data,
                                         overrides=body.overrides))  # fmt: skip
 

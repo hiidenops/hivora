@@ -994,6 +994,7 @@ export const fr = {
   "db.openIn": "Ouvrir dans {tool}",
   "db.install": "Installer {tool} pour cette base",
   "error.totp_setup_required": "Activez la double authentification pour continuer.",
+  "error.admin_vpn_managed": "Ce réglage est fixé par l'installation (install.env) : relancez l'installeur avec --vpn-host / --vpn-port, ou --reconfigure.",
   "error.admin_vpn_protected": "C'est l'accès d'administration du panel : il ne peut être ni supprimé ni désactivé. Pour le retirer, relancez l'installeur avec --access lan.",
   "error.totp_mandatory": "Ce panel est accessible depuis Internet : la double authentification ne peut pas être désactivée.",
   "setupTotp.title": "Double authentification obligatoire",

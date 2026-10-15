@@ -57,6 +57,10 @@ class AdminVpnProtectedError(ConflictError):
     code = "admin_vpn_protected"
 
 
+class AdminVpnManagedError(ConflictError):
+    code = "admin_vpn_managed"
+
+
 async def read_state(session: AsyncSession) -> dict[str, Any] | None:
     row = await session.get(Setting, STATE)
     return dict(row.value) if row else None
@@ -125,6 +129,28 @@ class AdminVpn:
         if delete or changes.get("enabled") is False or changes.get("expires_at") is not None:
             raise AdminVpnProtectedError("the admin VPN client cannot be deleted or disabled")
 
+    def managed(self) -> dict[str, str]:
+        """The app's settings install.env sets (D17): the address, the port, only when given
+        (the default port is not a choice). They win over the panel."""
+        out = {}
+        if self.settings.admin_vpn_host:
+            out["host"] = self.settings.admin_vpn_host
+        if "admin_vpn_port" in self.settings.model_fields_set:
+            out["vpn_port"] = str(self.settings.admin_vpn_port)
+        return out
+
+    async def check_settings_change(self, app_id: int, inputs: dict[str, Any]) -> None:
+        """The panel cannot change what install.env sets (it would be undone at next start)."""
+        state = await self.protected()
+        if not state or state.get("app_id") != app_id:
+            return
+        for field, wanted in self.managed().items():
+            if field in inputs and str(inputs[field]) != wanted:
+                raise AdminVpnManagedError(
+                    "set by the installation (install.env): run the installer again",
+                    field=field,
+                )
+
     async def ensure(self) -> None:
         """Bring the admin VPN into line (on start; never fails the server)."""
         if not self.active:
@@ -156,11 +182,29 @@ class AdminVpn:
                      "initialized_at": self.clock.now().isoformat()}  # fmt: skip
             await self._save(state)
             logger.info("admin VPN initialized", extra={"app_id": app_id})
+        await self._align(app_id)
         await self.write_conf()
         if rescue:
             async with self.sessions() as session, session.begin():
                 if row := await session.get(Setting, RESCUE):
                     await session.delete(row)
+
+    async def _align(self, app_id: int) -> None:
+        """The address and port install.env sets, onto the app (a revision; keys unchanged).
+        A port taken by another app: logged, the old one kept."""
+        wanted = self.managed()
+        async with self.sessions() as session:
+            values = (await self.apps.planner.current_settings(session, app_id)).values
+        old = {k: str(values.get(k, "")) for k in wanted}
+        if old == wanted:
+            return
+        try:
+            job = await self.apps.revisions.update(app_id, {**values, **wanted})
+        except ConflictError:
+            logger.exception("admin VPN endpoint not changed", extra={"wanted": wanted})
+            return
+        logger.warning("admin VPN endpoint changed", extra={"old": old, "new": wanted})
+        await self._wait(job.id)
 
     async def _save(self, state: dict[str, Any]) -> None:
         async with self.sessions() as session, session.begin():

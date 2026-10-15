@@ -30,21 +30,29 @@ case "$1" in
       create) printf '%s ' "$(echo "$*" | sed 's/.*--subnet \([^ ]*\).*/\1/')" \
                 > "$FAKE_STATE/network" ;;
     esac ;;
-  ps) [ -z "${FAKE_ADMIN_VPN_RUNNING:-}" ] || echo 5678efab ;;
+  ps) case "$*" in *"publish=${FAKE_ADMIN_VPN_PORT:-51820}/udp"*)
+      [ -z "${FAKE_ADMIN_VPN_RUNNING:-}" ] || echo 5678efab ;; esac ;;
   exec) case "$*" in
       *backup-self) echo "/data/backups/_hivora/panel-x.tar.gz" ;;
       *rescue-admin) touch "$FAKE_STATE/rescue"; echo ADMIN_VPN=rescue_requested ;;
       *admin-vpn) echo "ADMIN_CONF=$FAKE_DATA/admin.conf"
-        echo "[QR $(cat "$FAKE_DATA/admin.conf")]" ;;
+        echo "[QR $(head -n 1 "$FAKE_DATA/admin.conf")]" ;;
     esac ;;
-  restart) [ ! -f "$FAKE_STATE/rescue" ] || echo "PrivateKey = new" > "$FAKE_DATA/admin.conf" ;;
+  restart) [ ! -f "$FAKE_STATE/rescue" ] \
+      || sed -i 's/^PrivateKey = .*/PrivateKey = new/' "$FAKE_DATA/admin.conf" ;;
   rm) rm -f "$FAKE_STATE/running"; echo hivora ;;
   run) case "$*" in
       *"python -m hivora bootstrap") printf '%s\n' "$FAKE_BOOTSTRAP" ;;
       *" -d "*) touch "$FAKE_STATE/running"
+        # As the server: admin.conf made once, its Endpoint following install.env (D17).
         conf="$FAKE_DATA/admin.conf"
-        case "$*" in *HIVORA_ACCESS=vpn*) [ -n "${FAKE_NO_ADMIN_CONF:-}" ] \
-          || [ -f "$conf" ] || echo "PrivateKey = first" > "$conf" ;;
+        case "$*" in *HIVORA_ACCESS=vpn*) [ -n "${FAKE_NO_ADMIN_CONF:-}" ] || {
+          old="$(sed -n 's/^Endpoint = \(.*\):.*/\1/p' "$conf" 2>/dev/null)"
+          host="$(echo "$*" | sed -n 's/.*HIVORA_ADMIN_VPN_HOST=\([^ ]*\).*/\1/p')"
+          port="$(echo "$*" | sed -n 's/.*HIVORA_ADMIN_VPN_PORT=\([^ ]*\).*/\1/p')"
+          key="$(sed -n 's/^PrivateKey = //p' "$conf" 2>/dev/null)"
+          printf 'PrivateKey = %s\nEndpoint = %s:%s\n' "${key:-first}" \
+            "${host:-${old:-203.0.113.7}}" "$port" > "$conf"; } ;;
         esac
         echo 0123abcd ;;
       *) exit 1 ;;
@@ -295,7 +303,8 @@ def test_admin_vpn_only_publishes_no_panel_port(machine: Machine) -> None:
     env = machine.env()
     assert env["HIVORA_VPN_HOST"] == '"vpn.example.org"' and env["HIVORA_VPN_PORT"] == '"51830"'
     machine.bootstrap = "ADMIN=kept"
-    again = machine.install("--yes", env={"FAKE_UDP_BUSY": "1", "FAKE_ADMIN_VPN_RUNNING": "1"})
+    again = machine.install("--yes", env={"FAKE_UDP_BUSY": "1", "FAKE_ADMIN_VPN_RUNNING": "1",
+                                          "FAKE_ADMIN_VPN_PORT": "51830"})  # fmt: skip
     assert again.returncode == 0, again.stderr  # the port is the admin VPN's own
     assert not any(c.startswith("docker network create") for c in machine.changes())
     assert "HIVORA_ADMIN_VPN_PORT=51830" in machine.changes()[-1]  # kept from install.env
@@ -546,16 +555,16 @@ def test_reconfigure(machine: Machine) -> None:
     done = machine.install("--reconfigure", "--yes")  # questions, but --yes: refused
     assert done.returncode == 1 and "--reconfigure asks questions" in done.stderr
     machine.bootstrap = "ADMIN=kept"
-    # vpn+lan -> VPN only: the current mode preselected, the switch confirmed; the address
-    # is the existing VPN's (no question: it changes in the panel for now).
-    done = machine.install("--reconfigure", answers="3\nvpn\n\n",
+    # vpn+lan -> VPN only: the current mode preselected, the switch confirmed; the existing
+    # VPN's address proposed and kept.
+    done = machine.install("--reconfigure", answers="3\nvpn\n\n\n",
                            env={"FAKE_PORT_BUSY": "1", "FAKE_UDP_BUSY": "1",
                                 "FAKE_ADMIN_VPN_RUNNING": "1"})  # fmt: skip
     assert done.returncode == 0, done.stderr
     assert "Your choice [2]" in done.stdout and "Langue" not in done.stdout
     assert 'Switching to "Only through the VPN"' in done.stderr
-    assert "Admin VPN address: first" not in done.stdout  # the endpoint, not the key
-    assert "Admin VPN address:" in done.stdout and "IP address or domain" not in done.stdout
+    assert "Current public address for the VPN:\n    203.0.113.7" in done.stdout
+    assert "IP address or domain" not in done.stdout and "address changes" not in done.stderr
     assert "docker exec hivora python -m hivora backup-self" in machine.changes()
     assert machine.env()["HIVORA_ACCESS"] == '"vpn"'
     # VPN only -> local network only: the Admin VPN app stays, unprotected.
@@ -563,3 +572,65 @@ def test_reconfigure(machine: Machine) -> None:
     assert done.returncode == 0, done.stderr
     assert 'the "Admin VPN" app stays installed but is no longer' in done.stderr
     assert machine.env()["HIVORA_ACCESS"] == '"lan"'
+
+
+# --- M12-5d: a new address or port for an existing admin VPN (D17) -------------------------
+OWN_UDP = {"FAKE_UDP_BUSY": "1", "FAKE_ADMIN_VPN_RUNNING": "1"}  # 51820: the admin VPN's own
+
+
+def test_a_new_vpn_address_on_a_rerun(machine: Machine) -> None:
+    assert machine.install("--yes", "--version", "v1.2.3").returncode == 0  # vpn+lan
+    machine.bootstrap = "ADMIN=kept"
+    done = machine.install("--yes", "--vpn-host", "home.example.org",
+                           env={**OWN_UDP, "FAKE_PORT_BUSY": "1"})  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    assert ("The admin VPN address changes: 203.0.113.7:51820 → home.example.org:51820"
+            in done.stderr) and "fix \"Endpoint\" in the WireGuard app" in done.stderr  # fmt: skip
+    assert "The VPN restarts: it drops for a few seconds" in done.stderr  # a new revision
+    assert "public address home.example.org (was: 203.0.113.7:51820)" in done.stdout
+    assert "HIVORA_ADMIN_VPN_HOST=home.example.org" in machine.changes()[-1]
+    assert "new address, admin.conf is being updated" in done.stdout
+    assert "Setting up the admin VPN" not in done.stdout  # vpn+lan: never waited for (D14)
+    assert machine.env()["HIVORA_VPN_HOST"] == '"home.example.org"'
+    again = machine.install("--yes", env={**OWN_UDP, "FAKE_PORT_BUSY": "1"})  # same: quiet
+    assert again.returncode == 0 and "address changes" not in again.stderr
+
+
+def test_a_new_vpn_port_on_a_rerun(machine: Machine) -> None:
+    assert machine.install("--yes", "--version", "v1.2.3").returncode == 0
+    machine.bootstrap = "ADMIN=kept"
+    busy = {**OWN_UDP, "FAKE_PORT_BUSY": "1"}  # 51830 taken too (the fake ss: every port)
+    done = machine.install("--yes", "--vpn-port", "51830", env=busy)
+    assert done.returncode == 1 and "UDP port 51830 is already in use" in done.stderr
+    assert machine.changes() == []  # the admin VPN holds 51820, not 51830: refused
+    done = machine.install("--yes", "--vpn-port", "51830", env={"FAKE_PORT_BUSY": "1"})
+    assert done.returncode == 0, done.stderr
+    assert "203.0.113.7:51820 → 203.0.113.7:51830" in done.stderr
+    assert "The VPN restarts: it drops for a few seconds" in done.stderr
+    assert "HIVORA_ADMIN_VPN_PORT=51830" in machine.changes()[-1]
+
+
+def test_reconfigure_changes_the_vpn_address(machine: Machine) -> None:
+    assert machine.install("--yes", "--version", "v1.2.3", "--lang", "fr").returncode == 0
+    machine.bootstrap = "ADMIN=kept"
+    # The current mode (Enter), the current address refused, a new one typed, continue.
+    done = machine.install("--reconfigure", answers="\nn\n82.64.12.34\n\n",
+                           env={**OWN_UDP, "FAKE_PORT_BUSY": "1"})  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    assert "Adresse publique actuelle du VPN :\n    203.0.113.7" in done.stdout
+    assert "change : 203.0.113.7:51820 → 82.64.12.34:51820" in done.stderr
+    assert "HIVORA_ADMIN_VPN_HOST=82.64.12.34" in machine.changes()[-1]
+
+
+def test_vpn_only_waits_for_the_moved_admin_conf(machine: Machine) -> None:
+    assert machine.install("--yes", "--version", "v1.2.3", "--access", "vpn").returncode == 0
+    machine.bootstrap = "ADMIN=kept"
+    done = machine.install("--yes", "--vpn-host", "home.example.org", env=OWN_UDP)
+    assert done.returncode == 0, done.stderr
+    assert (machine.data / "admin.conf").read_text().endswith("home.example.org:51820\n")
+    assert "[QR PrivateKey = first]" in done.stdout and "vpn_late" not in done.stderr
+    # admin.conf not rewritten (the server could not move it): no stale QR code, a warning.
+    done = machine.install("--yes", "--vpn-host", "other.example.org",
+                           env={**OWN_UDP, "FAKE_NO_ADMIN_CONF": "1"})  # fmt: skip
+    assert done.returncode == 0 and "admin VPN is not ready yet" in done.stderr
+    assert "[QR" not in done.stdout

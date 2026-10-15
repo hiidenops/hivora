@@ -28,22 +28,24 @@ FAKE = [sys.executable, str(Path(__file__).parent / "fake_compose.py")]
 SLUG = "admin-vpn"
 
 
-def settings_for(tmp_path: Path, access: str) -> Settings:
+def settings_for(tmp_path: Path, access: str, **launch: Any) -> Settings:
+    """``launch``: what the installer passes (admin_vpn_host, admin_vpn_port)."""
     return Settings(data_dir=tmp_path / "data", volumes_root=tmp_path / "srv",
                     catalog_dir=Path(__file__).parents[2] / "templates", access=access,  # type: ignore[arg-type]
                     dev_insecure_cookies=True, puid=os.getuid(), pgid=os.getgid(),
-                    host_lan_ip="192.168.1.10", host_public_ip="203.0.113.7")  # fmt: skip
+                    host_lan_ip="192.168.1.10", host_public_ip="203.0.113.7", **launch)  # fmt: skip
 
 
 @contextmanager
-def panel(tmp_path: Path, access: str = "vpn") -> Iterator[TestClient]:
+def panel(tmp_path: Path, access: str = "vpn", **launch: Any) -> Iterator[TestClient]:
     """The server on this data folder; in a vpn mode, once the admin VPN is in line."""
     gateway = FakeDockerGateway()
     # As the installer creates it (M12-5b): the zone's network with its fixed subnet.
     gateway.networks.append(NetworkInfo(id="adm", name="hivora-zone-administration",
                                         driver="bridge", internal=False, labels={},
                                         subnets=(ADMIN_ZONE_SUBNET,)))  # fmt: skip
-    runtime = Runtime.build(settings_for(tmp_path, access), gateway=gateway, compose_cmd=FAKE)
+    runtime = Runtime.build(settings_for(tmp_path, access, **launch), gateway=gateway,
+                            compose_cmd=FAKE)  # fmt: skip
     runtime.admin_vpn.poll_s = 0.05
     with TestClient(create_app(runtime=runtime)) as c:
         deadline = time.monotonic() + 15
@@ -295,3 +297,94 @@ def test_the_certificate_names_the_panel_vpn_address(tmp_path: Path) -> None:
     assert PANEL_IP in cert_names(settings_for(tmp_path, "vpn+lan"))
     assert PANEL_IP in cert_names(settings_for(tmp_path, "vpn"))
     assert PANEL_IP not in cert_names(settings_for(tmp_path, "lan"))
+
+
+# --- M12-5d: install.env sets the admin VPN's address and port (D17) ----------------------
+def endpoint(tmp_path: Path) -> str:
+    return fields(conf(tmp_path).read_text())["Endpoint"][0]
+
+
+def revisions(tmp_path: Path) -> int:
+    return int(db(tmp_path, "SELECT count(*) FROM app_revision")[0][0])
+
+
+def keys(tmp_path: Path) -> tuple[str, str]:
+    """(the client's private key, the server's private key): what must never change here."""
+    server = (tmp_path / "srv" / SLUG / "config" / "wg_confs" / "wg0.conf").read_text()
+    return fields(conf(tmp_path).read_text())["PrivateKey"][0], fields(server)["PrivateKey"][0]
+
+
+def test_a_new_address_reaches_the_app_and_admin_conf(tmp_path: Path) -> None:
+    with panel(tmp_path, admin_vpn_host="82.64.12.34"):
+        pass
+    assert endpoint(tmp_path) == "82.64.12.34:51820"
+    before, count = keys(tmp_path), revisions(tmp_path)
+    with panel(tmp_path, admin_vpn_host="home.example.org") as c:
+        s = state(tmp_path)
+        assert s is not None
+        values = c.get(f"{API}/apps/{s['app_id']}/settings").json()["values"]
+        assert values["host"] == "home.example.org"
+    assert endpoint(tmp_path) == "home.example.org:51820"
+    assert keys(tmp_path) == before and revisions(tmp_path) == count + 1  # only the endpoint
+    with panel(tmp_path, admin_vpn_host="home.example.org"):  # the same again: nothing
+        pass
+    assert revisions(tmp_path) == count + 1 and state(tmp_path) == s
+
+
+def test_a_new_port_reaches_the_app_and_admin_conf(tmp_path: Path) -> None:
+    with panel(tmp_path, admin_vpn_port=51820):
+        pass
+    before = keys(tmp_path)
+    with panel(tmp_path, admin_vpn_port=51830) as c:
+        s = state(tmp_path)
+        assert s is not None
+        compose = c.get(f"{API}/apps/{s['app_id']}/compose").json()["compose_yaml"]
+        assert "51830" in compose and "51820:" not in compose  # published on the new port
+    assert endpoint(tmp_path) == "203.0.113.7:51830" and keys(tmp_path) == before
+
+
+def test_nothing_is_aligned_unless_install_env_sets_it(tmp_path: Path) -> None:
+    with panel(tmp_path, admin_vpn_host="82.64.12.34", admin_vpn_port=51830):
+        pass
+    count = revisions(tmp_path)
+    with panel(tmp_path):  # launched by hand: no address, no explicit port (51820 by default)
+        pass
+    assert revisions(tmp_path) == count and endpoint(tmp_path) == "82.64.12.34:51830"
+    with panel(tmp_path, "lan", admin_vpn_host="other.example.org", admin_vpn_port=51840):
+        pass  # not a vpn mode
+    assert revisions(tmp_path) == count and endpoint(tmp_path) == "82.64.12.34:51830"
+
+
+def test_a_taken_port_keeps_the_old_one_and_the_panel_up(tmp_path: Path) -> None:
+    with panel(tmp_path):
+        pass
+    with panel(tmp_path, "lan") as c:  # the user's own VPN on 51830
+        body = {"template": "wireguard", "name": "Home",
+                "inputs": {"host": "vpn.example.org", "vpn_port": 51830}}  # fmt: skip
+        deployed = c.post(f"{API}/apps", json=body).json()
+        assert wait_job(c, deployed["job"]["id"])["status"] == "succeeded"
+    count, key = revisions(tmp_path), keys(tmp_path)[0]
+    assert run(tmp_path, "rescue-admin").returncode == 0  # asked meanwhile: still done
+    with panel(tmp_path, admin_vpn_port=51830) as c:
+        assert c.get(f"{API}/system/health").status_code == 200
+    assert revisions(tmp_path) == count and endpoint(tmp_path) == "203.0.113.7:51820"
+    assert keys(tmp_path)[0] != key  # the rest of the setup went on: new keys, admin.conf
+    assert db(tmp_path, "SELECT count(*) FROM setting WHERE key = 'vpn.admin_rescue'") == [(0,)]
+
+
+def test_the_panel_cannot_change_what_install_env_sets(tmp_path: Path) -> None:
+    with panel(tmp_path, admin_vpn_host="82.64.12.34", admin_vpn_port=51820) as c:
+        s = state(tmp_path)
+        assert s is not None
+        url = f"{API}/apps/{s['app_id']}/settings"
+        values = c.get(url).json()["values"]
+        for field, value in (("host", "other.example.org"), ("vpn_port", 51850)):
+            r = c.put(url, json={"inputs": {**values, field: value}})
+            assert r.status_code == 409 and code(r) == "admin_vpn_managed", field
+        r = c.put(url, json={"inputs": {**values, "dns": "9.9.9.9"}})  # not set by it: free
+        assert r.status_code == 202, r.text
+        assert wait_job(c, r.json()["id"])["status"] == "succeeded"
+    with panel(tmp_path) as c:  # no address in install.env: the panel may change it
+        values = c.get(url).json()["values"]
+        r = c.put(url, json={"inputs": {**values, "host": "other.example.org"}})
+        assert r.status_code == 202, r.text

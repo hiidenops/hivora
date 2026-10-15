@@ -142,7 +142,8 @@ msg_en() {
     addr_prompt) m 'IP address or domain name for the VPN: ' ;;
     addr_invalid) m '"%s" is neither a valid IP address nor a valid domain name.' ;;
     addr_noresolve) m '%s does not resolve (or not to %s).\n   The VPN will work only once that name is in place. Keep it?' ;;
-    addr_existing) m 'Admin VPN address: %s (already set up; to change it: the Admin VPN app settings in the panel).' ;;
+    vpn_moves) m 'The admin VPN address changes: %s → %s\n   Devices already set up keep their keys: fix "Endpoint" in the WireGuard app,\n   or import the configuration again (QR code: docker exec hivora python -m hivora admin-vpn, or in the panel).' ;;
+    vpn_drop) m 'The VPN restarts: it drops for a few seconds, for every device.' ;;
     confirm_vpn) m 'Only through the VPN: you will need the WireGuard app and the QR code shown\n   at the end. Keep this terminal open until the connection works.\n   Fallback on this machine: run the installer again with --access lan.' ;;
     confirm_vpn_switch) m 'Switching to "Only through the VPN": have you opened the panel through the\n   VPN at least once? Otherwise you will not be able to reach it any more.' ;;
     type_word) m 'Type %s to confirm: ' ;;
@@ -154,6 +155,7 @@ msg_en() {
     recap_through) m '(through the VPN)' ;;
     recap_vpn) m 'VPN' ;;
     recap_vpn_line) m 'UDP port %s, public address %s' ;;
+    recap_was) m ' (was: %s)' ;;
     recap_vpn_auto) m 'detected by the panel' ;;
     recap_data) m 'Data' ;;
     recap_volumes) m 'App volumes' ;;
@@ -169,6 +171,7 @@ msg_en() {
     f_cert) m 'The certificate is self-signed: your browser warns once, that is expected.' ;;
     f_lan_later) m 'Remote access later: run the installer again with --reconfigure (adds the VPN).' ;;
     f_vpn_available) m 'Admin VPN: available (optional)' ;;
+    f_vpn_updating) m 'Admin VPN: new address, admin.conf is being updated (a few moments)' ;;
     f_vpn_setup) m 'Admin VPN: being set up (optional, a few minutes the first time)' ;;
     f_through) m '  Through the VPN:  https://%s:8443' ;;
     f_file) m '  File:             %s' ;;
@@ -282,7 +285,8 @@ msg_fr() {
     addr_prompt) m 'Adresse IP ou nom de domaine pour le VPN : ' ;;
     addr_invalid) m '« %s » n’est ni une adresse IP ni un nom de domaine valide.' ;;
     addr_noresolve) m '%s ne se résout pas (ou pas vers %s).\n   Le VPN ne marchera qu’une fois ce nom en place. On le garde ?' ;;
-    addr_existing) m 'Adresse du VPN d’administration : %s (déjà en place ; pour la changer : réglages de l’app Admin VPN dans le panel).' ;;
+    vpn_moves) m 'L’adresse du VPN d’administration change : %s → %s\n   Les appareils déjà configurés gardent leurs clés : corrigez « Endpoint » dans\n   l’app WireGuard, ou réimportez la configuration (QR code : docker exec hivora python -m hivora admin-vpn, ou dans le panel).' ;;
+    vpn_drop) m 'Le VPN redémarre : il est coupé quelques secondes, pour tous les appareils.' ;;
     confirm_vpn) m 'Uniquement par le VPN : il faudra l’app WireGuard et le QR code affiché\n   à la fin. Gardez ce terminal ouvert jusqu’à ce que la connexion marche.\n   Secours sur cette machine : relancez l’installation avec --access lan.' ;;
     confirm_vpn_switch) m 'Passer en « Uniquement par le VPN » : avez-vous déjà ouvert le panel\n   par le VPN au moins une fois ? Sinon vous ne pourrez plus y accéder.' ;;
     type_word) m 'Tapez %s pour confirmer : ' ;;
@@ -294,6 +298,7 @@ msg_fr() {
     recap_through) m '(par le VPN)' ;;
     recap_vpn) m 'VPN' ;;
     recap_vpn_line) m 'port UDP %s, adresse publique %s' ;;
+    recap_was) m ' (avant : %s)' ;;
     recap_vpn_auto) m 'détectée par le panel' ;;
     recap_data) m 'Données' ;;
     recap_volumes) m 'Volumes des apps' ;;
@@ -309,6 +314,7 @@ msg_fr() {
     f_cert) m 'Le certificat est auto-signé : votre navigateur vous avertira une fois, c’est normal.' ;;
     f_lan_later) m 'Accès à distance plus tard : relancez l’installation avec --reconfigure (ajoute le VPN).' ;;
     f_vpn_available) m 'VPN d’administration : disponible (optionnel)' ;;
+    f_vpn_updating) m 'VPN d’administration : nouvelle adresse, admin.conf en cours de mise à jour (quelques instants)' ;;
     f_vpn_setup) m 'VPN d’administration : en préparation (optionnel, quelques minutes la première fois)' ;;
     f_through) m '  Par le VPN :  https://%s:8443' ;;
     f_file) m '  Fichier :     %s' ;;
@@ -463,15 +469,10 @@ detect_public_ip() {  # an IPv4 from the service, or nothing
 }
 
 choose_vpn_host() {  # screen 2: the address the VPN clients connect to (sets VPN_HOST)
-  if [ -f "$DATA/admin.conf" ]; then  # already set up: changed in the panel (M12-5d: here)
-    current="$(sed -n 's/^Endpoint = //p' "$DATA/admin.conf" | head -n 1)"
-    printf '\n  %s\n' "$(t addr_existing "${current%:*}")"
-    return 0
-  fi
   detected="$(detect_public_ip)"
-  candidate="${VPN_HOST:-$detected}"
+  candidate="${VPN_HOST:-${CUR_HOST:-$detected}}"  # an existing VPN: its current address
   if [ -n "$candidate" ]; then
-    if [ -n "$VPN_HOST" ]; then title=addr_current; else title=addr_detected; fi
+    if [ "$candidate" = "$detected" ] && [ -z "$CUR_HOST" ]; then title=addr_detected; else title=addr_current; fi
     printf '\n  %s\n    %s\n\n  %s\n\n' "$(t "$title")" "$candidate" "$(t addr_help "$VPN_PORT")"
     if ask addr_correct y; then VPN_HOST="$candidate"; return 0; fi
   else
@@ -604,7 +605,27 @@ resolve() {  # command line, then install.env (or the questions), then detection
   [ -z "$OPT_BIND" ] || BIND="$OPT_BIND"
   [ -z "$BIND" ] || matches "$BIND" '[0-9]{1,3}(\.[0-9]{1,3}){3}' || die bad_bind "$BIND"
   case "$ACCESS" in vpn|vpn+lan) VPN=1 ;; *) VPN="" ;; esac
+  current_endpoint
   if [ -n "$VPN" ] && [ -n "$INTERACTIVE" ] && [ -z "$OPT_VPN_HOST" ]; then choose_vpn_host; fi
+}
+
+current_endpoint() {  # an existing admin VPN: where its clients connect (admin.conf, read only)
+  CUR_HOST="" CUR_PORT=""
+  ep="$(sed -n 's/^Endpoint = //p' "$DATA/admin.conf" 2>/dev/null | head -n 1)"
+  [ -n "$ep" ] || return 0
+  CUR_PORT="${ep##*:}"
+  CUR_HOST="${ep%:*}"; CUR_HOST="${CUR_HOST#[}"; CUR_HOST="${CUR_HOST%]}"
+}
+
+endpoint_change() {  # install.env wins (D17): the server moves the VPN; devices must follow
+  ENDPOINT_CHANGED=""
+  [ -n "$VPN" ] && [ -n "$CUR_HOST" ] || return 0
+  OLD_ENDPOINT="$CUR_HOST:$CUR_PORT"
+  new="${VPN_HOST:-$CUR_HOST}:$VPN_PORT"  # no address given: the server keeps the current one
+  [ "$new" != "$OLD_ENDPOINT" ] || return 0
+  ENDPOINT_CHANGED=1
+  printf '\n'; warn vpn_moves "$OLD_ENDPOINT" "$new"
+  warn vpn_drop  # a new revision recreates the WireGuard container, address or port alike
 }
 
 # --- checks (nothing changed yet) --------------------------------------------------------
@@ -668,7 +689,7 @@ check_port() {  # free, or already Hivora's own (an update)
 check_vpn() {  # the admin VPN: its UDP port, its fixed addresses, its network
   [ -n "$VPN" ] || return 0
   if [ -n "$(ss -lunH "sport = :$VPN_PORT" 2>/dev/null || true)" ] \
-      && [ -z "$(docker ps -q --filter label=io.hivora.app=admin-vpn 2>/dev/null)" ]; then
+      && [ -z "$(docker ps -q --filter label=io.hivora.app=admin-vpn --filter "publish=$VPN_PORT/udp" 2>/dev/null)" ]; then
     die udp_busy "$VPN_PORT"
   fi
   subnet="$(docker network inspect "$ADMIN_NETWORK" \
@@ -714,7 +735,9 @@ recap() {  # screen 4
     else
       printf '    %-16s https://%s:8443 %s\n' "$(t recap_panel)" "$PANEL_IP" "$(t recap_through)"
     fi
-    printf '    %-16s %s\n' "$(t recap_vpn)" "$(t recap_vpn_line "$VPN_PORT" "${VPN_HOST:-$(t recap_vpn_auto)}")"
+    was=""
+    [ -z "$ENDPOINT_CHANGED" ] || was="$(t recap_was "$OLD_ENDPOINT")"
+    printf '    %-16s %s%s\n' "$(t recap_vpn)" "$(t recap_vpn_line "$VPN_PORT" "${VPN_HOST:-${CUR_HOST:-$(t recap_vpn_auto)}}")" "$was"
   else
     printf '    %-16s %s\n' "$(t recap_panel)" "$panel"
   fi
@@ -875,7 +898,10 @@ summary() {  # the panel first (URL, account), then the VPN as the mode needs it
   case "$ACCESS" in
     lan) line f_lan_later ;;
     vpn+lan)  # optional: never waited for, never a QR code here (D14)
-      if [ -f "$DATA/admin.conf" ]; then
+      if [ -n "$ENDPOINT_CHANGED" ]; then
+        line f_vpn_updating; line f_through "$PANEL_IP"; line f_file "$DATA/admin.conf"
+        line f_qr "$CONTAINER"
+      elif [ -f "$DATA/admin.conf" ]; then
         line f_vpn_available; line f_through "$PANEL_IP"; line f_file "$DATA/admin.conf"
         line f_qr "$CONTAINER"
       else
@@ -883,7 +909,7 @@ summary() {  # the panel first (URL, account), then the VPN as the mode needs it
       fi
       line f_udp "$VPN_PORT" ;;
     vpn)  # the only way in: wait for it, then the steps and the QR code, last
-      wait_admin_vpn ""
+      if [ -n "$ENDPOINT_CHANGED" ]; then wait_admin_vpn "$BEFORE_START"; else wait_admin_vpn ""; fi
       printf '\n%s\n' "$(t f_steps)"
       line f_step1; line f_step2 "$VPN_PORT"; line f_step3 "$DATA/admin.conf"; line f_step4 "$PANEL_IP"
       printf '\n'
@@ -931,6 +957,7 @@ main() {
   check_docker
   check_port
   check_vpn
+  endpoint_change
   confirm_public
   recap
   ask continue y || die cancelled
@@ -946,6 +973,7 @@ main() {
     run docker rm -f "$CONTAINER" >/dev/null
   fi
   bootstrap
+  BEFORE_START="$(admin_conf_sum)"  # an address change: wait for the rewritten admin.conf
   start
   write_env
   if [ -n "$DRY" ]; then

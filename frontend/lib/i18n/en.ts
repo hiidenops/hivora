@@ -995,6 +995,7 @@ export const en: Record<MessageKey, string> = {
   "db.openIn": "Open in {tool}",
   "db.install": "Install {tool} for this database",
   "error.totp_setup_required": "Turn on two-factor authentication to continue.",
+  "error.admin_vpn_managed": "This setting is set by the installation (install.env): run the installer again with --vpn-host / --vpn-port, or --reconfigure.",
   "error.admin_vpn_protected": "This is the panel's admin access: it cannot be deleted or disabled. To remove it, run the installer again with --access lan.",
   "error.totp_mandatory": "This panel is reachable from the Internet: two-factor authentication cannot be turned off.",
   "setupTotp.title": "Two-factor authentication required",
