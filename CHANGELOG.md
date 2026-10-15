@@ -10,6 +10,11 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 - Licence AGPL-3.0.
 - Versionnement et releases officiels : la version du paquet fait foi, vérifiée contre le tag ; image publiée avec ses labels OCI ; notes de version tirées de ce fichier.
+- Sauvegarde du panel (base, clé maître, options de lancement) dans `backups/_hivora/` avant chaque migration de la base et par `python -m hivora backup-self` ; les 5 dernières sont gardées.
+
+### Modifié
+
+- Hivora refuse de démarrer sur une base écrite par une version plus récente (retour à une ancienne image), avec un message clair, sans rien modifier.
 
 ## [0.1.0]
 

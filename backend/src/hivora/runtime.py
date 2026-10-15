@@ -20,7 +20,7 @@ from hivora.core.config import Settings
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import SecretBox, load_or_create_master_key
 from hivora.db.engine import make_engine, make_sessionmaker
-from hivora.db.migrate import upgrade_to_head
+from hivora.db.migrate import SchemaTooNewError, db_revision, schema_state, upgrade_to_head
 from hivora.docker_gateway import DockerGateway
 from hivora.games.modpacks import ModpackCatalog
 from hivora.games.worlds import WorldJobs
@@ -37,6 +37,7 @@ from hivora.sites.files import SiteFiles
 from hivora.sites.hosting import SiteHosting
 from hivora.sites.ports import site_ports
 from hivora.state import StateService
+from hivora.system.panel_backup import backup_panel
 from hivora.system.public_address import PublicAddress
 from hivora.system.secrets import SecretSettings
 from hivora.tasks.service import TaskTools, run_scheduler
@@ -105,6 +106,11 @@ class Runtime:
         """Synchronous wiring: migrations, keys and catalog; nothing started yet."""
         clock = clock or SystemClock()
         settings.data_dir.mkdir(parents=True, exist_ok=True)
+        schema = schema_state(settings.db_path)
+        if schema == "newer":  # an older image on a newer database: touch nothing
+            raise SchemaTooNewError(db_revision(settings.db_path) or "?")
+        if schema == "behind":  # a migration is about to run: keep a way back
+            logger.warning("panel backed up before migrating: %s", backup_panel(settings.data_dir))
         upgrade_to_head(settings.db_path)
         engine = make_engine(settings.db_path)
         sessions = make_sessionmaker(engine)

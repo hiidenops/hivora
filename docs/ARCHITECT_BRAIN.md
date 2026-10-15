@@ -1,6 +1,6 @@
 # ARCHITECT_BRAIN — mémoire architecturale de Hivora
 
-*Créé le 29/09/2026, à la suite du découpage de `AppService` ; mis à jour le même jour après le découpage de `apps/api.py`, puis le 12/10/2026 (état des lieux après les lots K et R : §7, §13), puis le 14/10/2026 (règles de la distribution, M12-0 et M12-1 : §11, §14, §15).*
+*Créé le 29/09/2026, à la suite du découpage de `AppService` ; mis à jour le même jour après le découpage de `apps/api.py`, puis le 12/10/2026 (état des lieux après les lots K et R : §7, §13), puis le 14/10/2026 (règles de la distribution, M12-0 à M12-2 : §11, §14, §15).*
 
 Ce document garde **pourquoi** le code est organisé ainsi, et les règles qui empêchent de retomber dans les travers corrigés. Il complète :
 
@@ -459,4 +459,5 @@ Décisions D1 à D10 : `CLAUDE.md` (« Distribution ») et le document de réfé
 5. **Lectures de santé et de version** (`system/status`, `system/releases`) : sous-modules de `system`, lecture seule (§4.6), dépendances injectées, aucun état global ; un contrôle coûteux (`PRAGMA quick_check`) seulement à la demande.
 6. **Une seule source de version** (M12-1) : `version` de `backend/pyproject.toml`. `hivora.__version__` la lit dans les métadonnées du paquet installé (`importlib.metadata`), jamais écrite en dur ; `frontend/package.json` la recopie. `.github/scripts/release-check.sh` refuse un tag qui diffère de l'une ou de l'autre, ou sans section dans `CHANGELOG.md`. En développement, changer la version demande `uv sync` (fait par `uv run`) pour mettre à jour les métadonnées.
 7. **Publier, c'est `release.yml` seulement** (tag `v*` sur un commit de `main`) : image multi-arch, tags `vX.Y.Z`, `X.Y`, `latest` (une pré-release `-rc.N` n'a que son propre tag), labels OCI, GitHub Release. `image.yml` ne fait plus que vérifier les budgets.
-8. **Hivora ne touche pas à son propre conteneur** avant l'exception M13 (conteneur `hivora-updater`, retour arrière automatique), à valider dans `CLAUDE.md` avant tout code.
+8. **Aucune migration sans moyen de revenir** (M12-2) : au démarrage, `schema_state` (lecture seule) ; base plus récente que le code (`newer`) : refus (`SchemaTooNewError`), rien n'est écrit ; base en retard (`behind`) : `system/panel_backup.backup_panel` (base par `VACUUM INTO`, `secret.key`, `install.env`, 0600, 5 archives gardées dans `backups/_hivora/`) **avant** `upgrade_to_head`. Une base neuve ou à jour ne déclenche rien. Aucune restauration automatique : elle reste un geste manuel documenté.
+9. **Hivora ne touche pas à son propre conteneur** avant l'exception M13 (conteneur `hivora-updater`, retour arrière automatique), à valider dans `CLAUDE.md` avant tout code.

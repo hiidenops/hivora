@@ -3,11 +3,15 @@
 HTTPS by default: a self-signed certificate is created in <data>/tls/ on first
 start (the browser warns once; replace the two files with your own anytime).
 One Uvicorn worker, as the whole design assumes a single process.
+
+`python -m hivora backup-self`: archive the panel (database, master key, launch options)
+in <data>/backups/_hivora/ and print the archive's path.
 """
 
 import ipaddress
 import os
 import socket
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -18,6 +22,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
 from hivora.core.config import Settings
+from hivora.system.panel_backup import backup_panel
 
 
 def self_signed(tls_dir: Path, names: list[str]) -> tuple[Path, Path]:
@@ -52,8 +57,14 @@ def self_signed(tls_dir: Path, names: list[str]) -> tuple[Path, Path]:
     return cert, key
 
 
-def main() -> None:
+def main(args: list[str] | None = None) -> None:
+    args = sys.argv[1:] if args is None else args
     settings = Settings()
+    if args == ["backup-self"]:
+        print(backup_panel(settings.data_dir))
+        return
+    if args:
+        sys.exit("usage: python -m hivora [backup-self]")
     options: dict[str, object] = {}
     if settings.tls:
         names = ["localhost", "127.0.0.1", socket.gethostname(), settings.host_lan_ip or "",
