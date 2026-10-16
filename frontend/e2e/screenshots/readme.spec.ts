@@ -22,15 +22,15 @@ async function deploy(page: Page, headers: Record<string, string>, template: str
 
 test("README screenshots", async ({ page }) => {
   const headers = await signIn(page);
-  for (const [name, color] of [["Media", "#7c3aed"], ["Games", "#16a34a"], ["Home", "#0284c7"]]) {
+  for (const [name, color] of [["Médias", "#7c3aed"], ["Jeux", "#16a34a"], ["Maison", "#0284c7"]]) {
     await page.request.post("/api/v1/zones", { headers, data: { name, color, network_mode: "shared" } });
   }
-  await deploy(page, headers, "jellyfin", "Jellyfin", "media");
-  await deploy(page, headers, "immich", "Immich", "media");
-  await deploy(page, headers, "minecraft", "Minecraft", "games", { eula: true });
-  await deploy(page, headers, "terraria", "Terraria", "games");
-  await deploy(page, headers, "home-assistant", "Home Assistant", "home");
-  await deploy(page, headers, "vaultwarden", "Vaultwarden", "home");
+  await deploy(page, headers, "jellyfin", "Jellyfin", "medias");
+  await deploy(page, headers, "immich", "Immich", "medias");
+  await deploy(page, headers, "minecraft", "Minecraft", "jeux", { eula: true });
+  await deploy(page, headers, "terraria", "Terraria", "jeux");
+  await deploy(page, headers, "home-assistant", "Home Assistant", "maison");
+  await deploy(page, headers, "vaultwarden", "Vaultwarden", "maison");
   await deploy(page, headers, "uptime-kuma", "Uptime Kuma", "administration");
 
   await page.goto("/");
@@ -46,9 +46,11 @@ test("README screenshots", async ({ page }) => {
   await page.screenshot({ path: `${OUT}/catalog.png` });
 
   await page.goto("/settings/");
-  const heading = page.getByRole("heading", { name: "Panel health" });
+  const heading = page.getByRole("heading", { name: "Santé du panel" });
   await heading.waitFor();
-  await page.waitForTimeout(1500);
-  await heading.scrollIntoViewIfNeeded();
-  await page.locator("div").filter({ has: heading }).filter({ hasText: "Check the database" }).last().screenshot({ path: `${OUT}/health.png` });
+  await page.waitForTimeout(1500); // the cards' entrance animation
+  await heading.evaluate((el) => { el.scrollIntoView({ block: "start" }); window.scrollBy(0, -48); }); // the whole card, a margin above
+  await page.mouse.move(0, 799);
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${OUT}/health.png` }); // the whole window, as the others
 });

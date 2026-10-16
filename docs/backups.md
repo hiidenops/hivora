@@ -1,32 +1,35 @@
-# Backups
+# Sauvegardes
 
-## The panel
+## Le panel
 
-The panel's own state is small: its database (`hivora.db`), its master key (`secret.key`,
-which encrypts the secrets of your apps) and its launch options (`install.env`).
+L'état propre au panel est petit : sa base (`hivora.db`), sa clé maître (`secret.key`, qui
+chiffre les secrets de vos applications) et ses options de lancement (`install.env`).
 
-- It is saved automatically **before every update** and **before every database
-  migration**, in `/opt/hivora/data/backups/_hivora/` (the 5 most recent archives are kept).
-- To save it now:
+- Il est sauvegardé automatiquement **avant chaque mise à jour** et **avant chaque migration
+  de la base**, dans `/opt/hivora/data/backups/_hivora/` (les 5 archives les plus récentes
+  sont gardées).
+- Pour le sauvegarder maintenant :
   ```sh
   sudo docker exec hivora python -m hivora backup-self
   ```
-- **Settings → Panel health** shows the date of the last archive.
+- **Paramètres → Santé du panel** affiche la date de la dernière archive.
 
-Keep a copy of these archives elsewhere: without `secret.key`, the secrets of your apps
-cannot be read again.
+Gardez une copie de ces archives ailleurs : sans `secret.key`, les secrets de vos
+applications ne peuvent plus être lus.
 
-## The apps
+## Les applications
 
-Each app has a **Backups** card (on its page): back up now, or on a schedule, with a
-retention. Archives are written to `/opt/hivora/data/backups/<app>/`; they can be
-restored or downloaded from the same card.
+Chaque application a une carte **Sauvegardes** (sur sa page) : sauvegarder maintenant, ou
+selon un horaire, avec une rétention. Les archives sont écrites dans
+`/opt/hivora/data/backups/<application>/` ; elles se restaurent ou se téléchargent depuis la
+même carte.
 
-## Everything, to rebuild elsewhere
+## Tout, pour reconstruire ailleurs
 
-Copy these two folders (Hivora and the apps stopped, or from a filesystem snapshot):
+Copiez ces deux dossiers (Hivora et les applications arrêtés, ou depuis un instantané du
+système de fichiers) :
 
-- `/opt/hivora/data`: the panel, the apps' compose files and their backups
-- `/srv/hivora`: the apps' data (volumes)
+- `/opt/hivora/data` : le panel, les fichiers compose des applications et leurs sauvegardes
+- `/srv/hivora` : les données des applications (volumes)
 
-On the new machine, put them back at the same paths and run the installer.
+Sur la nouvelle machine, remettez-les aux mêmes chemins et lancez l'installeur.

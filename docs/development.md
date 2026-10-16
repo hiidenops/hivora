@@ -1,17 +1,17 @@
-# Development
+# Développement
 
-## Layout
+## Organisation
 
-| Path | What |
+| Chemin | Contenu |
 |---|---|
-| `backend/src/hivora/` | the server (Python 3.13, FastAPI, SQLAlchemy on SQLite, Alembic): one module per domain (`apps`, `vpn`, `zones`, `system`, …), `runtime.py` wires them |
-| `backend/tests/` | pytest; `e2e_app.py` runs the real API with a fake Docker for the browser tests |
-| `frontend/` | the panel (Next.js exported as static files, TypeScript, Tailwind), `e2e/` Playwright tests |
-| `templates/` | the catalog (one `template.yaml` per app or game) |
-| `deploy/` | `install.sh` and `compose.yaml` |
-| `docs/` | user documentation (English); `ARCHITECT_BRAIN.md`, `PROGRESS.md` and `vision-prd-architecture.md` are the project's design notes (French) |
+| `backend/src/hivora/` | le serveur (Python 3.13, FastAPI, SQLAlchemy sur SQLite, Alembic) : un module par domaine (`apps`, `vpn`, `zones`, `system`…), `runtime.py` les assemble |
+| `backend/tests/` | pytest ; `e2e_app.py` fait tourner la vraie API avec un faux Docker pour les tests dans le navigateur |
+| `frontend/` | le panel (Next.js exporté en fichiers statiques, TypeScript, Tailwind), tests Playwright dans `e2e/` |
+| `templates/` | le catalogue (un `template.yaml` par application ou jeu) |
+| `deploy/` | `install.sh` et `compose.yaml` |
+| `docs/` | la documentation utilisateur ; `ARCHITECT_BRAIN.md`, `PROGRESS.md` et `vision-prd-architecture.md` sont les notes de conception du projet |
 
-## Running the tests
+## Lancer les tests
 
 ```sh
 cd backend
@@ -22,12 +22,12 @@ uv run pytest -q
 cd ../frontend
 npm ci
 npm run lint && npm test && npm run build && npm run check:bundle
-npx playwright test          # starts the backend itself, with a fake Docker
+npx playwright test          # démarre lui-même le backend, avec un faux Docker
 ```
 
-`npm run gen:api` regenerates the frontend's API types after a change of the routes.
+`npm run gen:api` régénère les types de l'API côté frontend après un changement des routes.
 
-## Running the panel from the sources
+## Lancer le panel depuis les sources
 
 ```sh
 cd frontend && npm run build
@@ -38,16 +38,19 @@ HIVORA_DEV_INSECURE_COOKIES=true HIVORA_CHANGELOG_PATH=../CHANGELOG.md \
 uv run uvicorn --factory hivora.main:app --host 0.0.0.0 --port 8000
 ```
 
-This uses the machine's real Docker.
+Le panel utilise alors le vrai Docker de la machine.
 
-## Rules for a change
+## Règles pour une modification
 
-- **`CHANGELOG.md`**: every functional change adds one line under `## [Non publié]`
-  (French), in the same commit. It becomes the release notes (see
+- **`CHANGELOG.md`** : chaque modification fonctionnelle ajoute une ligne sous
+  `## [Non publié]`, dans le même commit. Elle devient les notes de version (voir
   [releasing.md](releasing.md)).
-- Changes to the API: regenerate `frontend/lib/api/openapi.json` and the types.
-- Texts of the panel: in French and in English (`frontend/lib/i18n/`).
-- Changes to the installer: keep [installation.md](installation.md) in step; a test checks
-  that the options and commands the documentation names exist.
-- The architecture rules (module boundaries, jobs for changes, no external call inside a
-  database transaction, size limits) are in `docs/ARCHITECT_BRAIN.md`.
+- Modification de l'API : régénérer `frontend/lib/api/openapi.json` et les types.
+- Textes du panel : en français et en anglais (`frontend/lib/i18n/`).
+- Modification de l'installeur : garder [installation.md](installation.md) à jour ; un test
+  vérifie que les options et commandes citées par la documentation existent.
+- Captures de la documentation (`docs/images/`) : `npx playwright test -c
+  playwright.screenshots.config.ts` dans `frontend/`.
+- Les règles d'architecture (frontières des modules, modifications par tâches, aucun appel
+  externe dans une transaction de base, limites de taille) sont dans
+  `docs/ARCHITECT_BRAIN.md`.

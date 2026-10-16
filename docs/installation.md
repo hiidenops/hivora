@@ -1,26 +1,26 @@
 # Installation
 
-Hivora runs as one Docker container (`hivora`) on a Linux machine. The installer sets it
-up, and running it again updates it or changes its options.
+Hivora tourne dans un seul conteneur Docker (`hivora`) sur une machine Linux. L'installeur
+le met en place ; le relancer le met à jour ou change ses options.
 
-## Requirements
+## Prérequis
 
-- Debian 12+, Ubuntu 22.04+ or Raspberry Pi OS 64-bit (other Linux distributions work
-  on a best-effort basis, after a warning)
-- an amd64 or arm64 CPU
-- root access (`sudo`)
-- Docker Engine 24 or newer; the installer offers to install it if it is missing
-  (rootless Docker and Podman are not supported)
+- Debian 12+, Ubuntu 22.04+ ou Raspberry Pi OS 64 bits (les autres distributions Linux
+  fonctionnent « au mieux », après un avertissement)
+- un processeur amd64 ou arm64
+- un accès root (`sudo`)
+- Docker Engine 24 ou plus récent ; l'installeur propose de l'installer s'il manque
+  (Docker sans root et Podman ne sont pas pris en charge)
 
-## One command
+## Une commande
 
 ```sh
 curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh | sudo sh
 ```
 
-### Checking the script first
+### Vérifier le script d'abord
 
-Every release publishes `install.sh` with its SHA-256 checksum:
+Chaque release publie `install.sh` avec sa somme SHA-256 :
 
 ```sh
 curl -fsSLO https://github.com/hiidenops/hivora/releases/latest/download/install.sh
@@ -28,76 +28,80 @@ curl -fsSLO https://github.com/hiidenops/hivora/releases/latest/download/install
 sha256sum -c install.sh.sha256 && sudo sh install.sh
 ```
 
-## What the installer asks
+## Ce que demande l'installeur
 
-1. **Language**: Français or English (for the installer only; the panel has its own setting).
-2. **How you will reach the panel** (see [Access modes](#access-modes)).
-3. In the VPN modes, **the public address** your devices will use: the detected one, or an
-   IP address or domain name you type.
-4. A **summary**, then *Continue?*
+1. **La langue** : Français ou English (pour l'installeur seulement ; le panel a son propre
+   réglage).
+2. **La façon d'accéder au panel** (voir [Modes d'accès](#modes-daccès)).
+3. En mode VPN, **l'adresse publique** qu'utiliseront vos appareils : celle détectée, ou une
+   adresse IP ou un nom de domaine que vous saisissez.
+4. Un **récapitulatif**, puis *Continuer ?*
 
-At the end it shows the panel's URL, the `admin` user and its password (once only).
+À la fin, il affiche l'URL du panel, l'utilisateur `admin` et son mot de passe (une seule
+fois).
 
-## Access modes
+## Modes d'accès
 
-| Mode | The panel is reached | Ports opened on the machine |
+| Mode | Le panel est joignable | Ports ouverts sur la machine |
 |---|---|---|
-| Local network only (`lan`) | from your local network | the panel's port, on the LAN address |
-| Local network + VPN (`vpn+lan`, default) | from your network, and from anywhere through WireGuard | the panel's port on the LAN address, and a UDP port for the VPN |
-| Only through the VPN (`vpn`) | through WireGuard only | a UDP port for the VPN |
-| Internet (`public`, not recommended) | from everywhere | the panel's port on every address; two-factor authentication becomes mandatory |
+| Réseau local uniquement (`lan`) | depuis votre réseau local | le port du panel, sur l'adresse LAN |
+| Réseau local + VPN (`vpn+lan`, par défaut) | depuis votre réseau, et de partout par WireGuard | le port du panel sur l'adresse LAN, et un port UDP pour le VPN |
+| Uniquement par le VPN (`vpn`) | par WireGuard seulement | un port UDP pour le VPN |
+| Internet (`public`, déconseillé) | de partout | le port du panel sur toutes les adresses ; la double authentification devient obligatoire |
 
-On a machine that only has a public IP address (a VPS), the two local network modes are
-refused (they would publish the panel on the Internet without the protections of the
-Internet mode): the default there is `vpn`. `--bind IP` overrides this if you know what
-you are doing.
+Sur une machine qui n'a qu'une adresse IP publique (un VPS), les deux modes « réseau local »
+sont refusés (ils publieraient le panel sur Internet sans les protections du mode
+Internet) : le défaut y est `vpn`. `--bind IP` passe outre si vous savez ce que vous faites.
 
-To change the mode later, run the installer again with `--reconfigure`.
+Pour changer de mode plus tard, relancez l'installeur avec `--reconfigure`.
 
-## Options (automated installs)
+## Options (installations automatiques)
 
-Without a terminal, or with `--yes`, the installer asks nothing and uses the options, then
-the saved ones, then the defaults; its messages are in English unless `--lang fr`.
+Sans terminal, ou avec `--yes`, l'installeur ne pose aucune question et utilise les options,
+puis celles enregistrées, puis les valeurs par défaut ; ses messages sont en anglais, sauf
+avec `--lang fr`.
 
 ```sh
 curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh \
-  | sudo sh -s -- --yes --lang en --access vpn+lan --vpn-host home.example.org
+  | sudo sh -s -- --yes --lang fr --access vpn+lan --vpn-host maison.example.org
 ```
 
-| Option | Meaning |
+| Option | Rôle |
 |---|---|
-| `--yes` | no questions (the Internet mode still needs `--i-understand`) |
-| `--dry-run` | show the commands, change nothing |
-| `--lang fr\|en` | the installer's language |
-| `--version TAG` | the Hivora version (default: the script's own release) |
-| `--image REF` | another image (default `ghcr.io/hiidenops/hivora`) |
-| `--access MODE` | `vpn+lan`, `vpn`, `lan` or `public` |
-| `--reconfigure` | ask again how the panel is reached |
-| `--port N` | the panel's port on the machine (8443) |
-| `--bind IP` | the address the panel listens on |
-| `--vpn-host HOST` | the address VPN clients connect to (default: the public IP) |
-| `--vpn-port N` | the admin VPN's UDP port (51820) |
-| `--rescue-admin` | new keys for the admin VPN client (see [Admin VPN](admin-vpn.md)) |
-| `--data DIR` | the panel's data (`/opt/hivora/data`) |
-| `--srv DIR` | the apps' volumes (`/srv/hivora`) |
-| `--i-understand` | confirms `--access public` with `--yes` |
+| `--yes` | aucune question (le mode Internet demande aussi `--i-understand`) |
+| `--dry-run` | afficher les commandes, ne rien changer |
+| `--lang fr\|en` | la langue de l'installeur |
+| `--version TAG` | la version d'Hivora (par défaut : celle de la release du script) |
+| `--image REF` | une autre image (par défaut `ghcr.io/hiidenops/hivora`) |
+| `--access MODE` | `vpn+lan`, `vpn`, `lan` ou `public` |
+| `--reconfigure` | redemander la façon d'accéder au panel |
+| `--port N` | le port du panel sur la machine (8443) |
+| `--bind IP` | l'adresse sur laquelle le panel écoute |
+| `--vpn-host HOST` | l'adresse à laquelle se connectent les clients VPN (par défaut : l'IP publique) |
+| `--vpn-port N` | le port UDP du VPN d'administration (51820) |
+| `--rescue-admin` | de nouvelles clés pour le client du VPN d'administration (voir [VPN d'administration](admin-vpn.md)) |
+| `--data DIR` | les données du panel (`/opt/hivora/data`) |
+| `--srv DIR` | les volumes des applications (`/srv/hivora`) |
+| `--i-understand` | confirme `--access public` avec `--yes` |
 
-The options are kept in `/opt/hivora/data/install.env` and reused by every later run.
+Les options sont gardées dans `/opt/hivora/data/install.env` et reprises à chaque relance.
 
-## First login
+## Première connexion
 
-- Open the URL shown at the end. The certificate is self-signed: your browser warns once,
-  that is expected.
-- Sign in as `admin` with the password shown by the installer, then choose your own.
-- Turn on two-factor authentication in **Settings** (mandatory in the Internet mode).
+- Ouvrez l'URL affichée à la fin. Le certificat est auto-signé : votre navigateur vous
+  avertit une fois, c'est normal.
+- Connectez-vous en `admin` avec le mot de passe affiché par l'installeur, puis choisissez
+  le vôtre.
+- Activez la double authentification dans **Paramètres** (obligatoire en mode Internet).
 
-## Without the installer: Docker Compose
+## Sans l'installeur : Docker Compose
 
-[`deploy/compose.yaml`](../deploy/compose.yaml) runs Hivora on the local network only:
+[`deploy/compose.yaml`](../deploy/compose.yaml) fait tourner Hivora sur le réseau local
+seulement :
 
 ```sh
 HIVORA_BIND=192.168.1.10 docker compose -f deploy/compose.yaml up -d
 ```
 
-`HIVORA_BIND` is this machine's LAN address. The first login is then `admin` / `admin`,
-to change right away. There is no admin VPN in this setup.
+`HIVORA_BIND` est l'adresse LAN de cette machine. La première connexion est alors `admin` /
+`admin`, à changer tout de suite. Ce mode n'a pas de VPN d'administration.

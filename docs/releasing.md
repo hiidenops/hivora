@@ -1,45 +1,47 @@
-# Releasing
+# Publier une version
 
-`CHANGELOG.md` is the source of truth of what changed. Every functional change adds its
-line under `## [Non publié]` (in French) in the same commit. A release turns that section
-into the version's, and the GitHub Release publishes it automatically.
+`CHANGELOG.md` est la source de vérité de ce qui a changé. Chaque modification fonctionnelle
+ajoute sa ligne sous `## [Non publié]` dans le même commit. Une release transforme cette
+section en celle de la version, et la GitHub Release la publie automatiquement.
 
-## Steps
+## Étapes
 
-1. In `CHANGELOG.md`, rename `## [Non publié]` to `## [X.Y.Z] - YYYY-MM-DD` and add a new,
-   empty `## [Non publié]` above it. If a `## [X.Y.Z]` section already exists (as for
-   0.1.0, which also holds a summary of the first version), move the lines of
-   `[Non publié]` into it instead, and leave `[Non publié]` empty.
-2. Set the version in `backend/pyproject.toml` and `frontend/package.json` to `X.Y.Z`, then
-   update both lock files: `uv lock` in `backend/` (the CI runs `uv sync --locked`, which
-   fails on a lock with the old version; `uv.lock` writes it normalized, e.g. `0.1.0rc1`)
-   and `npm install --package-lock-only` in `frontend/` (the root `version` of
-   `package-lock.json`). Check with `uv lock --check` and `npm ci --dry-run`.
-3. Commit (`release: vX.Y.Z`) on `main`, push, and wait for the CI to pass.
-4. Tag and push the tag:
+1. Dans `CHANGELOG.md`, renommer `## [Non publié]` en `## [X.Y.Z] - AAAA-MM-JJ` et ajouter
+   au-dessus un nouveau `## [Non publié]` vide. Si une section `## [X.Y.Z]` existe déjà
+   (comme pour la 0.1.0, qui contient aussi un résumé de la première version), y déplacer
+   plutôt les lignes de `[Non publié]`, et laisser `[Non publié]` vide.
+2. Mettre la version `X.Y.Z` dans `backend/pyproject.toml` et `frontend/package.json`, puis
+   mettre à jour les deux fichiers de verrouillage : `uv lock` dans `backend/` (la CI lance
+   `uv sync --locked`, qui échoue avec un verrou portant l'ancienne version ; `uv.lock`
+   l'écrit normalisée, par exemple `0.1.0rc1`) et `npm install --package-lock-only` dans
+   `frontend/` (la `version` racine de `package-lock.json`). Contrôler avec
+   `uv lock --check` et `npm ci --dry-run`.
+3. Commiter (`release: vX.Y.Z`) sur `main`, pousser, et attendre que la CI passe.
+4. Taguer et pousser le tag :
    ```sh
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-5. `.github/workflows/release.yml` then:
-   - checks that the tagged commit is on `main`, that the tag, `pyproject.toml` and
-     `package.json` agree, and that `CHANGELOG.md` has a non-empty section for the version
-     (`.github/scripts/release-check.sh`; it fails otherwise);
-   - builds and publishes the image (`amd64`, `arm64`): `vX.Y.Z`, `X.Y` and `latest`;
-   - creates the GitHub Release: **the version's `CHANGELOG.md` section**, the install
-     command and the image digest, with `install.sh` (set to this version) and its
-     `.sha256`.
-6. Check the release page, then install it on a clean machine with the README's command.
+5. `.github/workflows/release.yml` alors :
+   - vérifie que le commit tagué est sur `main`, que le tag, `pyproject.toml` et
+     `package.json` concordent, et que `CHANGELOG.md` a une section non vide pour la version
+     (`.github/scripts/release-check.sh` ; sinon il échoue) ;
+   - construit et publie l'image (`amd64`, `arm64`) : `vX.Y.Z`, `X.Y` et `latest` ;
+   - crée la GitHub Release : **la section de la version dans `CHANGELOG.md`**, la commande
+     d'installation et le digest de l'image, avec `install.sh` (réglé sur cette version) et
+     son `.sha256`.
+6. Vérifier la page de la release, puis l'installer sur une machine vierge avec la commande
+   du README.
 
 ## Release candidates
 
-Tag `vX.Y.Z-rc.N` (with the same version in both files and both lock files). The notes
-are the `## [X.Y.Z-rc.N]` section, or else `## [X.Y.Z]`: for a candidate, gather the lines
-of `[Non publié]` under `## [X.Y.Z]` **without a date** (and leave `[Non publié]` empty);
-the date is added by the final release's commit, which only sets it and the version. The image only gets its own tag (never
-`X.Y` nor `latest`) and the GitHub Release is marked as a pre-release: panels on the
-**Pre-releases** channel see it.
+Taguer `vX.Y.Z-rc.N` (avec la même version dans les deux fichiers et les deux verrous). Les
+notes sont la section `## [X.Y.Z-rc.N]`, sinon `## [X.Y.Z]` : pour une candidate,
+rassembler les lignes de `[Non publié]` sous `## [X.Y.Z]` **sans date** (et laisser
+`[Non publié]` vide) ; la date est ajoutée par le commit de la version finale, qui ne change
+qu'elle et la version. L'image ne reçoit que son propre tag (jamais `X.Y` ni `latest`) et la
+GitHub Release est marquée pré-version : les panels sur le canal **Pré-versions** la voient.
 
-## Trying the check locally
+## Essayer la vérification en local
 
 ```sh
 sh .github/scripts/release-check.sh vX.Y.Z notes.md && cat notes.md

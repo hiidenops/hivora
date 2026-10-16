@@ -1,51 +1,52 @@
-# Admin VPN
+# VPN d'administration
 
-In the `vpn+lan` and `vpn` access modes, the panel is reached through a WireGuard VPN that
-Hivora sets up itself. Nothing else is needed on your router than one UDP port.
+Dans les modes d'accès `vpn+lan` et `vpn`, le panel est joignable par un VPN WireGuard
+qu'Hivora met en place lui-même. Il suffit d'ouvrir un port UDP sur votre box.
 
-## How it works
+## Fonctionnement
 
-- The panel's container joins the Docker network of the **Administration** zone
-  (`hivora-zone-administration`, `10.254.254.0/24`) at a fixed address: **`10.254.254.254`**.
-- On start, the server deploys an app named **Admin VPN** (WireGuard) in that zone, with a
-  client named `admin` that reaches that zone only (neither the Internet nor your local
-  network go through it). VPN addresses: `10.254.253.0/24`.
-- The client's configuration is written to `/opt/hivora/data/admin.conf` (readable by root
-  only).
-- In these modes the Admin VPN app and its `admin` client cannot be deleted or disabled
-  from the panel.
+- Le conteneur du panel rejoint le réseau Docker de la zone **Administration**
+  (`hivora-zone-administration`, `10.254.254.0/24`) à une adresse fixe : **`10.254.254.254`**.
+- Au démarrage, le serveur déploie dans cette zone une application **Admin VPN** (WireGuard),
+  avec un client `admin` qui n'atteint que cette zone (ni Internet ni votre réseau local ne
+  passent par lui). Adresses du VPN : `10.254.253.0/24`.
+- La configuration du client est écrite dans `/opt/hivora/data/admin.conf` (lisible par root
+  seulement).
+- Dans ces modes, l'application Admin VPN et son client `admin` ne peuvent être ni supprimés
+  ni désactivés depuis le panel.
 
-## Connecting a device
+## Connecter un appareil
 
-1. Install the WireGuard app (phone or computer).
-2. Forward the VPN's UDP port (51820 by default) from your router to this machine.
-3. Import `admin.conf`, or scan its QR code:
+1. Installez l'application WireGuard (téléphone ou ordinateur).
+2. Redirigez le port UDP du VPN (51820 par défaut) de votre box vers cette machine.
+3. Importez `admin.conf`, ou scannez son QR code :
    ```sh
    sudo docker exec hivora python -m hivora admin-vpn
    ```
-   (in `vpn+lan` mode the QR code is also in the panel: Applications → Admin VPN).
-4. Turn the tunnel on and open **https://10.254.254.254:8443**.
+   (en mode `vpn+lan`, le QR code est aussi dans le panel : Applications → Admin VPN).
+4. Activez le tunnel et ouvrez **https://10.254.254.254:8443**.
 
-## Changing the address or the port
+## Changer l'adresse ou le port
 
-The address your devices connect to and the UDP port come from the installation:
+L'adresse à laquelle se connectent vos appareils et le port UDP viennent de l'installation :
 
 ```sh
-sudo sh install.sh --vpn-host home.example.org   # or --vpn-port 51830, or --reconfigure
+sudo sh install.sh --vpn-host maison.example.org   # ou --vpn-port 51830, ou --reconfigure
 ```
 
-The VPN is updated at the panel's next start (it restarts for a few seconds). Devices keep
-their keys: change *Endpoint* in their WireGuard app, or import the new configuration.
-While the installation sets them, these two settings cannot be changed in the panel.
+Le VPN est mis à jour au prochain démarrage du panel (il redémarre quelques secondes). Les
+appareils gardent leurs clés : corrigez *Endpoint* dans leur application WireGuard, ou
+importez la nouvelle configuration. Tant que l'installation les fixe, ces deux réglages ne
+peuvent pas être changés dans le panel.
 
-## Lost access
+## Accès perdu
 
-- **New keys** for the `admin` client (a lost or leaked `admin.conf`):
+- **De nouvelles clés** pour le client `admin` (`admin.conf` perdu ou divulgué) :
   ```sh
   sudo sh install.sh --rescue-admin
   ```
-  The old configuration stops working; the new QR code is shown.
-- **No VPN at all**: from the machine itself, switch to the local network mode:
+  L'ancienne configuration cesse de fonctionner ; le nouveau QR code s'affiche.
+- **Plus de VPN du tout** : depuis la machine elle-même, passez en mode réseau local :
   ```sh
   sudo sh install.sh --access lan
   ```

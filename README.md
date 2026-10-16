@@ -1,99 +1,104 @@
 # Hivora
 
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/hiidenops/hivora?include_prereleases)](https://github.com/hiidenops/hivora/releases)
+[![Licence : AGPL-3.0](https://img.shields.io/badge/licence-AGPL--3.0-blue)](LICENSE)
+[![Version](https://img.shields.io/github/v/release/hiidenops/hivora?include_prereleases)](https://github.com/hiidenops/hivora/releases)
 [![CI](https://github.com/hiidenops/hivora/actions/workflows/ci.yml/badge.svg)](https://github.com/hiidenops/hivora/actions/workflows/ci.yml)
 
-## Hivora in a few words
+## Hivora en quelques mots
 
-Hivora is a self-hosted web panel for one Linux machine: install apps and game servers
-from a catalog, run them with Docker, organize them in zones, reach the panel through its
-own WireGuard VPN, and keep everything backed up. One container, one command to install,
-in French or English.
+Hivora est un panel web auto-hébergé pour une machine Linux : installez des applications et
+des serveurs de jeux depuis un catalogue, faites-les tourner avec Docker, rangez-les en zones,
+accédez au panel par son propre VPN WireGuard, et gardez tout sauvegardé. Un conteneur, une
+commande pour l'installer, en français ou en anglais.
 
-## Key features
+## Fonctionnalités clés
 
-- **Catalog**: apps (Nextcloud, Jellyfin, Immich, Vaultwarden, Home Assistant, …), databases
-  and game servers (Minecraft and its modpacks, Valheim, Palworld, Terraria, …), or any
-  Docker image
-- **Zones and topology**: group apps, link their networks, see what is exposed and how
-- **Admin VPN**: the panel reachable through WireGuard only, with a QR code to scan
-- **Backups**: per app, on demand or scheduled; every change is a revision you can go back to
-- **Host firewall**: UFW rules, fail2ban, blocked addresses, static routes
-- **Panel health and updates**: disk, Docker, jobs, exposure, available versions
-- **Users and roles**, two-factor authentication, an audit log
+- **Catalogue** : applications (Nextcloud, Jellyfin, Immich, Vaultwarden, Home Assistant…),
+  bases de données et serveurs de jeux (Minecraft et ses modpacks, Valheim, Palworld,
+  Terraria…), ou n'importe quelle image Docker
+- **Zones et topologie** : regroupez les applications, reliez leurs réseaux, voyez ce qui est
+  exposé et comment
+- **VPN d'administration** : le panel joignable uniquement par WireGuard, avec un QR code à
+  scanner
+- **Sauvegardes** : par application, à la demande ou planifiées ; chaque modification est une
+  révision vers laquelle revenir
+- **Pare-feu de l'hôte** : règles UFW, fail2ban, adresses bloquées, routes statiques
+- **Santé du panel et mises à jour** : disque, Docker, tâches, exposition, versions disponibles
+- **Utilisateurs et rôles**, double authentification, journal d'audit
 
-## Quick install
+## Installation rapide
 
-On Debian 12+, Ubuntu 22.04+ or Raspberry Pi OS 64-bit (amd64 or arm64), as root:
+Sur Debian 12+, Ubuntu 22.04+ ou Raspberry Pi OS 64 bits (amd64 ou arm64), en root :
 
 ```sh
 curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh | sudo sh
 ```
 
-The installer sets up Docker if needed, asks for its language and how you will reach the
-panel, then prints the URL and the admin password. Options, automated installs and checking
-the script: [docs/installation.md](docs/installation.md).
+L'installeur met en place Docker si besoin, demande sa langue et la façon dont vous
+accéderez au panel, puis affiche l'URL et le mot de passe administrateur. Options,
+installations automatiques et vérification du script : [docs/installation.md](docs/installation.md).
 
-## Access modes
+## Modes d'accès
 
-| Mode | Reach the panel |
+| Mode | Accès au panel |
 |---|---|
-| Local network only | from your local network |
-| Local network + VPN (default) | from your network, and from anywhere through WireGuard |
-| Only through the VPN | through WireGuard only |
-| Internet (advanced) | from everywhere; two-factor authentication is mandatory |
+| Réseau local uniquement | depuis votre réseau local |
+| Réseau local + VPN (par défaut) | depuis votre réseau, et de partout par WireGuard |
+| Uniquement par le VPN | par WireGuard seulement |
+| Internet (avancé) | de partout ; double authentification obligatoire |
 
-On a machine with a public IP only (a VPS), the default is *Only through the VPN*. Change
-the mode later with `--reconfigure`. Details: [docs/admin-vpn.md](docs/admin-vpn.md).
+Sur une machine qui n'a qu'une IP publique (un VPS), le défaut est *Uniquement par le VPN*.
+Changez de mode plus tard avec `--reconfigure`. Détails : [docs/admin-vpn.md](docs/admin-vpn.md).
 
-## First login
+## Première connexion
 
-Sign in as `admin` with the password the installer printed (it is shown once), then choose
-your own. Turn on two-factor authentication in **Settings**. The certificate is
-self-signed: your browser warns once, that is expected.
+Connectez-vous en `admin` avec le mot de passe affiché par l'installeur (il n'est montré
+qu'une fois), puis choisissez le vôtre. Activez la double authentification dans
+**Paramètres**. Le certificat est auto-signé : votre navigateur vous avertit une fois, c'est
+normal.
 
-## Screenshots
+## Captures d'écran
 
-| Dashboard | Catalog | Panel health |
+| Tableau de bord | Catalogue | Santé du panel |
 |---|---|---|
-| ![Dashboard](docs/images/dashboard.png) | ![Catalog](docs/images/catalog.png) | ![Panel health](docs/images/health.png) |
+| ![Tableau de bord](docs/images/dashboard.png) | ![Catalogue](docs/images/catalog.png) | ![Santé du panel](docs/images/health.png) |
 
 ## Documentation
 
-- [Installation](docs/installation.md): requirements, options, access modes, Docker Compose
-- [Admin VPN](docs/admin-vpn.md): how it works, connecting a device, lost access
-- [Updating](docs/updating.md): new versions, updating, rollback
-- [Backups](docs/backups.md): the panel, the apps, moving to another machine
-- [Troubleshooting](docs/troubleshooting.md): logs, lost password or two-factor device
-- [Uninstalling](docs/uninstall.md)
+- [Installation](docs/installation.md) : prérequis, options, modes d'accès, Docker Compose
+- [VPN d'administration](docs/admin-vpn.md) : fonctionnement, connecter un appareil, accès perdu
+- [Mises à jour](docs/updating.md) : nouvelles versions, mise à jour, retour arrière
+- [Sauvegardes](docs/backups.md) : le panel, les applications, changer de machine
+- [Dépannage](docs/troubleshooting.md) : journaux, mot de passe ou appareil de double authentification perdu
+- [Désinstallation](docs/uninstall.md)
 
-Release history: [CHANGELOG.md](CHANGELOG.md) (in French) and the
-[GitHub Releases](https://github.com/hiidenops/hivora/releases), whose notes come from it.
+Historique des versions : [CHANGELOG.md](CHANGELOG.md) et les
+[GitHub Releases](https://github.com/hiidenops/hivora/releases), dont les notes en sont tirées.
 
-## Security
+## Sécurité
 
-Hivora controls Docker on its machine, which amounts to root access: keep the panel on your
-local network or behind its VPN, and turn on two-factor authentication. Docker bypasses
-UFW. The panel contacts third parties only for what you use: GitHub (new versions, can be
-turned off), `api.ipify.org` (the public address), image registries and the catalog's
-sources.
+Hivora pilote Docker sur sa machine, ce qui revient à un accès root : gardez le panel sur
+votre réseau local ou derrière son VPN, et activez la double authentification. Docker
+contourne UFW. Le panel ne contacte des tiers que pour ce que vous utilisez : GitHub
+(nouvelles versions, désactivable), `api.ipify.org` (l'adresse publique), les registres
+d'images et les sources du catalogue.
 
-Please report vulnerabilities privately:
-[Report a vulnerability](https://github.com/hiidenops/hivora/security/advisories/new)
-(see [SECURITY.md](SECURITY.md)).
+Signalez les vulnérabilités en privé :
+[signaler une vulnérabilité](https://github.com/hiidenops/hivora/security/advisories/new)
+(voir [SECURITY.md](SECURITY.md)).
 
-## License
+## Licence
 
-[AGPL-3.0](LICENSE). The panel links to the source code of the version it runs.
+[AGPL-3.0](LICENSE). Le panel donne un lien vers le code source de la version qu'il exécute.
 
-## Development
+## Développement
 
-The server is Python (FastAPI, SQLite), the panel Next.js; tests run without a real Docker:
+Le serveur est en Python (FastAPI, SQLite), le panel en Next.js ; les tests tournent sans
+vrai Docker :
 
 ```sh
 cd backend && uv run pytest -q
 cd frontend && npm ci && npm test && npx playwright test
 ```
 
-More: [docs/development.md](docs/development.md) and [docs/releasing.md](docs/releasing.md).
+Plus : [docs/development.md](docs/development.md) et [docs/releasing.md](docs/releasing.md).

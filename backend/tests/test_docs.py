@@ -2,15 +2,16 @@
 they name exists, every relative link resolves, the README stays a short showcase."""
 
 import re
+import struct
 from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
 DOCS = [ROOT / "README.md", ROOT / "SECURITY.md", *sorted((ROOT / "docs").glob("*.md"))]
 PUBLIC = [p for p in DOCS if p.name not in {"ARCHITECT_BRAIN.md", "PROGRESS.md",
                                            "vision-prd-architecture.md"}]  # fmt: skip
-SECTIONS = ["Hivora in a few words", "Key features", "Quick install", "Access modes",
-            "First login", "Screenshots", "Documentation", "Security", "License",
-            "Development"]  # fmt: skip
+SECTIONS = ["Hivora en quelques mots", "Fonctionnalités clés", "Installation rapide",
+            "Modes d'accès", "Première connexion", "Captures d'écran", "Documentation",
+            "Sécurité", "Licence", "Développement"]  # fmt: skip
 
 
 def test_the_public_docs_are_there() -> None:
@@ -49,6 +50,8 @@ def test_relative_links_and_images_resolve() -> None:
             assert (doc.parent / target).exists(), f"{doc.name}: {target}"
     for image in (ROOT / "docs" / "images").glob("*.png"):
         assert image.stat().st_size < 300_000, image.name
+        width, height = struct.unpack(">II", image.read_bytes()[16:24])  # the PNG header
+        assert (width, height) == (1280, 800), image.name  # all the same size
 
 
 def test_the_readme_is_a_short_showcase() -> None:

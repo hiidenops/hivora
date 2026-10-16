@@ -1,54 +1,55 @@
-# Troubleshooting
+# Dépannage
 
-## First look
+## Premier coup d'œil
 
-- **Settings → Panel health**: database, disk space, Docker, jobs, panel backup, exposure,
-  certificate and admin VPN, each with its state.
-- The panel's logs:
+- **Paramètres → Santé du panel** : base, espace disque, Docker, tâches, sauvegarde du
+  panel, exposition, certificat et VPN d'administration, chacun avec son état.
+- Les journaux du panel :
   ```sh
   sudo docker logs hivora
   ```
-- Any installer run can be previewed with `--dry-run`.
+- Toute exécution de l'installeur peut être prévisualisée avec `--dry-run`.
 
-## Lost password
+## Mot de passe perdu
 
-From the machine, a new random password for an account (to change at next login; its
-sessions end):
+Depuis la machine, un nouveau mot de passe aléatoire pour un compte (à changer à la
+connexion suivante ; ses sessions sont fermées) :
 
 ```sh
 sudo docker exec hivora python -m hivora reset-admin-password          # admin
-sudo docker exec hivora python -m hivora reset-admin-password alice    # another account
+sudo docker exec hivora python -m hivora reset-admin-password alice    # un autre compte
 ```
 
-Another admin can also reset it from **Users**.
+Un autre administrateur peut aussi le réinitialiser depuis **Utilisateurs**.
 
-## Lost two-factor device and recovery codes
+## Appareil de double authentification et codes de secours perdus
 
-Turn two-factor authentication off for an account (its sessions end; in the Internet mode
-it must be set up again at next login):
+Retirer la double authentification d'un compte (ses sessions sont fermées ; en mode Internet,
+elle doit être réactivée à la connexion suivante) :
 
 ```sh
 sudo docker exec hivora python -m hivora reset-totp          # admin
 sudo docker exec hivora python -m hivora reset-totp alice
 ```
 
-## No access through the admin VPN
+## Plus d'accès par le VPN d'administration
 
-See [Admin VPN → Lost access](admin-vpn.md#lost-access): new keys with `--rescue-admin`,
-or the local network mode with `--access lan`.
+Voir [VPN d'administration → Accès perdu](admin-vpn.md#accès-perdu) : de nouvelles clés avec
+`--rescue-admin`, ou le mode réseau local avec `--access lan`.
 
-## The installer refuses to run
+## L'installeur refuse de continuer
 
-| Message | What to do |
+| Message | Que faire |
 |---|---|
-| port … is already in use | choose another with `--port N` (or `--vpn-port N` for the VPN) |
-| only has a public address | the machine is a VPS: use `--access vpn` (or `--bind IP`) |
-| overlaps 10.254.253.0/24 or 10.254.254.0/24 | your network uses the admin VPN's addresses: use `--access lan` |
-| the Docker network hivora-zone-administration exists with another address range | follow the message: move the Administration zone's apps, remove the network, run again |
-| Docker Engine 24 or newer is needed | update Docker |
+| le port … est déjà utilisé | en choisir un autre avec `--port N` (ou `--vpn-port N` pour le VPN) |
+| cette machine n'a qu'une adresse publique | c'est un VPS : utilisez `--access vpn` (ou `--bind IP`) |
+| … chevauche 10.254.253.0/24 ou 10.254.254.0/24 | votre réseau utilise les adresses du VPN d'administration : utilisez `--access lan` |
+| le réseau Docker hivora-zone-administration existe avec une autre plage d'adresses | suivez le message : déplacez les applications de la zone Administration, supprimez le réseau, relancez |
+| Docker Engine 24 ou plus récent est nécessaire | mettez Docker à jour |
 
-## A banner says the panel is published on every address
+## Un bandeau dit que le panel est publié sur toutes les adresses
 
-The panel listens on all addresses (the Internet) while its access mode is not `public`, so
-two-factor authentication is not enforced. Run the installer again with `--access lan`
-(or `--access public` to accept it, with two-factor authentication for everyone).
+Le panel écoute sur toutes les adresses (Internet) alors que son mode d'accès n'est pas
+`public` : la double authentification n'est donc pas imposée. Relancez l'installeur avec
+`--access lan` (ou `--access public` pour l'accepter, avec la double authentification pour
+tous).
