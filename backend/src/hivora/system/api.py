@@ -28,6 +28,7 @@ class SystemInfo(BaseModel):
     docker_version: str | None
     arch: str
     python: str
+    games: bool  # off: the installer's --no-games (the catalog shows no game)
 
 
 @router.get("/health")
@@ -48,6 +49,7 @@ async def info(_: Viewer, rt: RuntimeDep) -> SystemInfo:
         docker_version=docker,
         arch=rt.catalog.host_arch(),
         python=platform.python_version(),
+        games=rt.settings.games,
     )
 
 

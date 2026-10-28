@@ -3852,6 +3852,8 @@ export interface components {
             arch: string;
             /** Docker Version */
             docker_version: string | null;
+            /** Games */
+            games: boolean;
             /** Python */
             python: string;
             /** Version */

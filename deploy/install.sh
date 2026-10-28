@@ -19,6 +19,7 @@
 #   --vpn-host HOST   address the admin VPN's clients connect to (default: public IP)
 #   --vpn-port N      UDP port of the admin VPN (51820)
 #   --rescue-admin    new keys for the admin VPN client, then show its QR code
+#   --no-games        no game in the catalog (asked on a new install); --games: back on
 #   --data DIR        panel data (/opt/hivora/data)   --srv DIR   app volumes (/srv/hivora)
 #   --i-understand    confirm --access public with --yes
 #
@@ -195,6 +196,13 @@ msg_en() {
     wt_ok) m 'OK' ;;
     wt_cancel) m 'Cancel' ;;
     steps_title) m 'Installing' ;;
+    games_title) m 'Games' ;;
+    games_help) m 'The catalog offers game servers (Minecraft, Valheim...). You can leave them out,\n  for a school or a work place: they will not be shown and cannot be installed.\n  Game servers already installed keep running.' ;;
+    games_ask) m 'Show the games in the catalog?' ;;
+    recap_games) m 'Games' ;;
+    games_on) m 'in the catalog' ;;
+    games_off) m 'turned off (no game in the catalog)' ;;
+    bad_games) m 'invalid HIVORA_GAMES in install.env: %s (on or off)' ;;
   esac
 }
 
@@ -345,6 +353,13 @@ msg_fr() {
     wt_ok) m 'OK' ;;
     wt_cancel) m 'Annuler' ;;
     steps_title) m 'Installation' ;;
+    games_title) m 'Jeux' ;;
+    games_help) m 'Le catalogue propose des serveurs de jeux (Minecraft, Valheim...). Vous pouvez les\n  retirer, pour une école ou un lieu de travail : ils ne seront ni affichés ni installables.\n  Les serveurs de jeux déjà installés continuent de tourner.' ;;
+    games_ask) m 'Afficher les jeux dans le catalogue ?' ;;
+    recap_games) m 'Jeux' ;;
+    games_on) m 'dans le catalogue' ;;
+    games_off) m 'désactivés (aucun jeu dans le catalogue)' ;;
+    bad_games) m 'HIVORA_GAMES invalide dans install.env : %s (on ou off)' ;;
   esac
 }
 
@@ -722,13 +737,13 @@ run() {  # a command that changes something: only shown (on stderr) with --dry-r
   if [ -n "$DRY" ]; then printf '%s+ %s%s\n' "$D" "$*" "$N" >&2; else "$@"; fi
 }
 
-usage() { sed -n '9,26p' "$0" 2>/dev/null || true; exit 2; }
+usage() { sed -n '9,27p' "$0" 2>/dev/null || true; exit 2; }
 
 # --- options -------------------------------------------------------------------------
 parse_args() {
   YES="" DRY="" UNDERSTAND="" RESCUE="" RECONFIGURE=""
   OPT_VERSION="" OPT_IMAGE="" OPT_ACCESS="" OPT_PORT="" OPT_BIND="" OPT_DATA="" OPT_SRV=""
-  OPT_VPN_HOST="" OPT_VPN_PORT="" OPT_LANG=""
+  OPT_VPN_HOST="" OPT_VPN_PORT="" OPT_LANG="" OPT_GAMES=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --yes|-y) YES=1 ;;
@@ -736,6 +751,8 @@ parse_args() {
       --i-understand) UNDERSTAND=1 ;;
       --rescue-admin) RESCUE=1 ;;
       --reconfigure) RECONFIGURE=1 ;;
+      --no-games) OPT_GAMES="off" ;;
+      --games) OPT_GAMES="on" ;;
       --version|--image|--access|--port|--bind|--data|--srv|--vpn-host|--vpn-port|--lang)
         [ $# -ge 2 ] || die needs_value "$1"
         case "$1" in
@@ -831,6 +848,16 @@ resolve() {  # command line, then install.env (or the questions), then detection
   case "$ACCESS" in vpn|vpn+lan) VPN=1 ;; *) VPN="" ;; esac
   current_endpoint
   if [ -n "$VPN" ] && [ -n "$INTERACTIVE" ] && [ -z "$OPT_VPN_HOST" ]; then choose_vpn_host; fi
+  GAMES="${OPT_GAMES:-$(env_value HIVORA_GAMES)}"; GAMES="${GAMES:-on}"
+  case "$GAMES" in on|off) ;; *) die bad_games "$GAMES" ;; esac
+  if [ -n "$INTERACTIVE" ] && [ -z "$OPT_GAMES" ]; then choose_games; fi
+}
+
+choose_games() {  # the games in the catalog, or none (a school, a work place)
+  title "$(t games_title)"
+  printf '\n'; emit "  $D" "  $D" "$(t games_help)"; printf '\n'
+  if [ "$GAMES" = "on" ]; then default=y; else default=n; fi
+  if ask games_ask "$default"; then GAMES="on"; else GAMES="off"; fi
 }
 
 current_endpoint() {  # an existing admin VPN: where its clients connect (admin.conf, read only)
@@ -969,6 +996,7 @@ recap() {  # screen 4
   else
     row "$(t recap_panel)" "$C$panel$N"
   fi
+  if [ "$GAMES" = "on" ]; then row "$(t recap_games)" "$(t games_on)"; else row "$(t recap_games)" "$Y$(t games_off)$N"; fi
   row "$(t recap_data)" "$DATA"; row "$(t recap_volumes)" "$SRV"
   row "$(t recap_tz)" "$TZ_NAME   ${D}PUID/PGID$N $PUID/$PGID"
   [ -z "$UPDATE" ] || { printf '\n'; emit "  $Y" "  $Y" "$(t recap_update)"; }
@@ -1037,7 +1065,7 @@ start() {
     -v /var/run/docker.sock:/var/run/docker.sock \
     $(mounts) \
     -e "HIVORA_HOST_LAN_IP=$LAN_IP" -e "HIVORA_TIMEZONE=$TZ_NAME" \
-    -e "HIVORA_PUID=$PUID" -e "HIVORA_PGID=$PGID" -e "HIVORA_ACCESS=$ACCESS" \
+    -e "HIVORA_PUID=$PUID" -e "HIVORA_PGID=$PGID" -e "HIVORA_ACCESS=$ACCESS" -e "HIVORA_GAMES=$GAMES" \
     --label io.hivora.self=true \
     "$IMAGE:$VERSION" >/dev/null
   [ -z "$DRY" ] || return 0
@@ -1102,7 +1130,7 @@ write_env() {
     umask 077
     {
       echo "# Written by the Hivora installer: its options, read again when it is re-run."
-      for key in VERSION IMAGE ACCESS PORT LAN_IP TIMEZONE PUID PGID DATA SRV VPN_HOST VPN_PORT LANG; do
+      for key in VERSION IMAGE ACCESS PORT LAN_IP TIMEZONE PUID PGID DATA SRV VPN_HOST VPN_PORT LANG GAMES; do
         case "$key" in
           TIMEZONE) value="$TZ_NAME" ;;
           LANG) value="$UI_LANG" ;;

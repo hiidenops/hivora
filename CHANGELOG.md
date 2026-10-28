@@ -6,6 +6,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+
+- **Jeux coupés à l'installation** : l'installeur demande s'il faut garder les jeux dans le catalogue (`--no-games` / `--games` sans question), pour une école ou un lieu de travail. Coupés, ils ne sont ni affichés ni installables (l'API refuse avec `games_disabled`) ; les serveurs de jeux déjà installés continuent de tourner. Le choix vit dans `install.env` ; pour le changer, relancer l'installeur.
+
 ### Corrigé
 
 - **Topologie** : le panel Hivora lui-même apparaît dans la zone dont il a rejoint le réseau (Administration, dans les modes VPN), avec son port sur le réseau local et son adresse par le VPN.

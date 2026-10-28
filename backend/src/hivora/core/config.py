@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # How the panel is reached, as the installer published it (install.env, passed as
     # HIVORA_ACCESS; never stored). "public": every account needs TOTP (auth.totp).
     access: Literal["lan", "public", "vpn", "vpn+lan"] = "lan"
+    # The games of the catalog (install.env, HIVORA_GAMES; never stored). Off: hidden from
+    # the catalog and refused to new deploys; game apps already there keep running.
+    games: bool = True
     # The admin VPN (vpn modes, vpn.admin): address and UDP port its clients connect to.
     # No host: the public address, else the LAN one.
     admin_vpn_host: str | None = None

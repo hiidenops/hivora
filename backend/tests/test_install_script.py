@@ -460,7 +460,7 @@ def test_every_message_exists_in_both_languages() -> None:
 
 def test_a_french_install_on_a_vm(machine: Machine) -> None:
     # Français; mode by default (local network + VPN); detected address right; continue.
-    done = machine.install("--version", "v1.2.3", answers="1\n\n\n\n",
+    done = machine.install("--version", "v1.2.3", answers="1\n\n\nn\n\n",
                            env={**DETECTED, "FAKE_NO_ADMIN_CONF": "1"})  # fmt: skip
     assert done.returncode == 0, done.stderr
     out = done.stdout
@@ -468,6 +468,8 @@ def test_a_french_install_on_a_vm(machine: Machine) -> None:
     assert "Cette machine : 192.168.1.10 (réseau privé)" in out and "Votre choix [2]" in out
     assert "Adresse publique détectée pour le VPN :\n    82.64.12.34" in out
     assert "Hivora v1.2.3 va être installé :" in out
+    assert "Afficher les jeux dans le catalogue ? [O/n]" in out
+    assert "Jeux désactivés (aucun jeu dans le catalogue)" in flat(out)
     assert f"HIVORA EST PRÊT {RULE} URL : https://192.168.1.10:8443" in flat(out)
     assert f"Mot de passe : {PASSWORD}" in flat(out)
     vpn_line = "VPN d\u2019administration : en préparation"  # French apostrophe
@@ -477,13 +479,14 @@ def test_a_french_install_on_a_vm(machine: Machine) -> None:
     env = machine.env()
     assert env["HIVORA_LANG"] == '"fr"' and env["HIVORA_ACCESS"] == '"vpn+lan"'
     assert env["HIVORA_VPN_HOST"] == '"82.64.12.34"'
+    assert env["HIVORA_GAMES"] == '"off"' and "HIVORA_GAMES=off" in machine.changes()[-1]
 
 
 def test_an_english_vpn_only_install_with_a_domain_name(machine: Machine) -> None:
     # English; only through the VPN (typed "vpn"); the detected address is not the one:
     # a domain name that resolves to it; continue.
     resolves = {**DETECTED, "FAKE_RESOLVES": "82.64.12.34 home.example.org"}
-    answers = "2\n3\nvpn\nn\nhome.example.org\n\n"
+    answers = "2\n3\nvpn\nn\nhome.example.org\n\n\n"
     done = machine.install("--version", "v1.2.3", answers=answers, env=resolves)
     assert done.returncode == 0, done.stderr
     out = done.stdout
@@ -500,7 +503,7 @@ def test_an_english_vpn_only_install_with_a_domain_name(machine: Machine) -> Non
 
 def test_wrong_answers_are_asked_again(machine: Machine) -> None:
     # language 9 then 2; menu "x" then 1 (local network only); continue.
-    done = machine.install("--version", "v1.2.3", answers="9\n2\nx\n1\n\n")
+    done = machine.install("--version", "v1.2.3", answers="9\n2\nx\n1\n\n\n")
     assert done.returncode == 0, done.stderr
     assert "Invalid choice: type 1, 2, 3 or 4." in done.stdout
     assert "HIVORA_ACCESS=lan" in machine.changes()[-1]
@@ -508,21 +511,21 @@ def test_wrong_answers_are_asked_again(machine: Machine) -> None:
     assert "Public address" not in done.stdout  # no VPN: no address asked
     # A wrong confirmation word goes back to the menu: "public" mistyped, then lan.
     machine2 = fresh(machine, "second")
-    done = machine2.install("--version", "v1.2.3", answers="2\n4\npubliq\n1\n\n")
+    done = machine2.install("--version", "v1.2.3", answers="2\n4\npubliq\n1\n\n\n")
     assert done.returncode == 0 and "HIVORA_ACCESS=lan" in machine2.changes()[-1]
 
 
 def test_the_public_address_typed_by_hand(machine: Machine) -> None:
     # Not detected: an invalid entry, then an IP. Then a second install: a name that does not
     # resolve, not kept, then the detected IP typed.
-    done = machine.install("--version", "v1.2.3", answers="2\n2\nbad host!\n203.0.113.9\n\n")
+    done = machine.install("--version", "v1.2.3", answers="2\n2\nbad host!\n203.0.113.9\n\n\n")
     assert done.returncode == 0, done.stderr
     assert "Public address not detected" in done.stdout
     assert '"bad host!" is neither a valid IP address nor a valid domain name.' in done.stdout
     assert "HIVORA_ADMIN_VPN_HOST=203.0.113.9" in machine.changes()[-1]
     other = fresh(machine, "second")
     done = other.install("--version", "v1.2.3", env=DETECTED,
-                         answers="2\n2\nn\nnowhere.example\nn\n82.64.12.34\n\n")  # fmt: skip
+                         answers="2\n2\nn\nnowhere.example\nn\n82.64.12.34\n\n\n")  # fmt: skip
     assert done.returncode == 0, done.stderr
     assert "nowhere.example does not resolve (or not to 82.64.12.34)" in done.stdout
     assert "HIVORA_ADMIN_VPN_HOST=82.64.12.34" in other.changes()[-1]
@@ -531,7 +534,7 @@ def test_the_public_address_typed_by_hand(machine: Machine) -> None:
 def test_a_machine_with_a_public_ip_only(machine: Machine) -> None:
     vps = {"FAKE_LAN": "203.0.113.7", **DETECTED}
     # The menu: 1 and 2 unavailable, 3 by default.
-    done = machine.install("--version", "v1.2.3", answers="2\n1\n\nvpn\n\n\n", env=vps)
+    done = machine.install("--version", "v1.2.3", answers="2\n1\n\nvpn\n\n\n\n", env=vps)
     assert done.returncode == 0, done.stderr
     assert "203.0.113.7 (PUBLIC address" in done.stdout and "Your choice [3]" in done.stdout
     assert "This choice is not available on this machine." in done.stdout
@@ -565,7 +568,7 @@ def test_no_question_without_a_terminal_or_with_yes(machine: Machine) -> None:
 
 
 def test_a_rerun_asks_nothing_and_keeps_the_language(machine: Machine) -> None:
-    assert machine.install("--version", "v1.2.3", answers="1\n1\n\n").returncode == 0
+    assert machine.install("--version", "v1.2.3", answers="1\n1\n\n\n").returncode == 0
     machine.bootstrap = "ADMIN=kept"
     done = machine.install("--yes", env={"FAKE_PORT_BUSY": "1"}, answers="2\n")
     assert done.returncode == 0, done.stderr
@@ -588,7 +591,7 @@ def test_reconfigure(machine: Machine) -> None:
     machine.bootstrap = "ADMIN=kept"
     # vpn+lan -> VPN only: the current mode preselected, the switch confirmed; the existing
     # VPN's address proposed and kept.
-    done = machine.install("--reconfigure", answers="3\nvpn\n\n\n",
+    done = machine.install("--reconfigure", answers="3\nvpn\n\n\n\n",
                            env={"FAKE_PORT_BUSY": "1", "FAKE_UDP_BUSY": "1",
                                 "FAKE_ADMIN_VPN_RUNNING": "1"})  # fmt: skip
     assert done.returncode == 0, done.stderr
@@ -599,7 +602,7 @@ def test_reconfigure(machine: Machine) -> None:
     assert "docker exec hivora python -m hivora backup-self" in machine.changes()
     assert machine.env()["HIVORA_ACCESS"] == '"vpn"'
     # VPN only -> local network only: the Admin VPN app stays, unprotected.
-    done = machine.install("--reconfigure", answers="1\n\n", env={"FAKE_UDP_BUSY": "1"})
+    done = machine.install("--reconfigure", answers="1\n\n\n", env={"FAKE_UDP_BUSY": "1"})
     assert done.returncode == 0, done.stderr
     assert 'the "Admin VPN" app stays installed but is no longer' in done.stderr
     assert machine.env()["HIVORA_ACCESS"] == '"lan"'
@@ -645,7 +648,7 @@ def test_reconfigure_changes_the_vpn_address(machine: Machine) -> None:
     assert machine.install("--yes", "--version", "v1.2.3", "--lang", "fr").returncode == 0
     machine.bootstrap = "ADMIN=kept"
     # The current mode (Enter), the current address refused, a new one typed, continue.
-    done = machine.install("--reconfigure", answers="\nn\n82.64.12.34\n\n",
+    done = machine.install("--reconfigure", answers="\nn\n82.64.12.34\n\n\n",
                            env={**OWN_UDP, "FAKE_PORT_BUSY": "1"})  # fmt: skip
     assert done.returncode == 0, done.stderr
     assert "Adresse publique actuelle du VPN :\n    203.0.113.7" in done.stdout
@@ -677,12 +680,13 @@ def windows(machine: Machine) -> list[str]:
 def test_the_windows_on_a_terminal(machine: Machine) -> None:
     # Français; mode by default; detected address right (y); recap: continue (y).
     env = {**WINDOWS, **DETECTED, "HIVORA_TTY_OUT": str(machine.root / "screen")}
-    done = machine.install("--version", "v1.2.3", answers="1\n\ny\ny\n", env=env)
+    done = machine.install("--version", "v1.2.3", answers="1\n\ny\ny\ny\n", env=env)
     assert done.returncode == 0, done.stderr
-    lang, menu, address, recap, *steps = windows(machine)
+    lang, menu, address, games, recap, *steps = windows(machine)
     assert "--menu" in lang and "made by HiidenOPS" in lang and "Langue / Language" in lang
     assert "--default-item 2 --menu" in menu and "Réseau local + VPN — [recommandé]" in menu
     assert "--yesno" in address and "82.64.12.34" in address and "Est-ce correct ?" in address
+    assert "--title  Jeux " in games and "Afficher les jeux dans le catalogue ?" in games
     assert "Hivora v1.2.3 va être installé" in recap and "Continuer ?" in recap
     assert "--yes-button Oui --no-button Non" in recap
     # The steps: one window each, the current one marked, the done ones checked.
@@ -703,7 +707,7 @@ def test_a_window_cancelled_or_a_failed_step(machine: Machine) -> None:
     done = machine.install("--version", "v1.2.3", answers="2\nesc\n", env=env)
     assert done.returncode == 1 and "cancelled" in done.stderr and machine.changes() == []
     # A wrong word in the window: back to the menu; then local network only.
-    done = machine.install("--version", "v1.2.3", answers="2\n4\npubliq\n1\ny\n", env=env)
+    done = machine.install("--version", "v1.2.3", answers="2\n4\npubliq\n1\ny\ny\n", env=env)
     assert done.returncode == 0 and "HIVORA_ACCESS=lan" in machine.changes()[-1]
     assert "Type public to confirm" in windows(machine)[2]
     # A failed step: back to the terminal, its output and the error.
@@ -711,6 +715,18 @@ def test_a_window_cancelled_or_a_failed_step(machine: Machine) -> None:
     failing = "echo 'migration 0042 failed' >&2; exit 1 ;;"
     (other.bin / "docker").write_text(FAKE_DOCKER.replace(
         "printf '%s\\n' \"$FAKE_BOOTSTRAP\" ;;", failing))  # fmt: skip
-    done = other.install("--version", "v1.2.3", answers="2\n1\ny\n", env=env)
+    done = other.install("--version", "v1.2.3", answers="2\n1\ny\ny\n", env=env)
     assert done.returncode == 1, done.stderr
     assert done.stderr.index("migration 0042 failed") < done.stderr.index("could not be prepared")
+
+
+def test_the_games_without_questions(machine: Machine) -> None:
+    done = machine.install("--yes", "--version", "v1.2.3", "--no-games")
+    assert done.returncode == 0, done.stderr
+    assert "HIVORA_GAMES=off" in machine.changes()[-1] and machine.env()["HIVORA_GAMES"] == '"off"'
+    assert "Games turned off (no game in the catalog)" in flat(done.stdout)
+    # A re-run keeps them off; --games turns them back on.
+    assert machine.install("--yes").returncode == 0
+    assert "HIVORA_GAMES=off" in machine.changes()[-1]
+    machine.install("--yes", "--games")
+    assert "HIVORA_GAMES=on" in machine.changes()[-1] and machine.env()["HIVORA_GAMES"] == '"on"'

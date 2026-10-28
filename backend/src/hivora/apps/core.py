@@ -17,7 +17,7 @@ from hivora.apps.models import (
     Service,
 )
 from hivora.apps.ports import PortConflict
-from hivora.core.errors import ConflictError, NotFoundError, ValidationError
+from hivora.core.errors import ConflictError, NotFoundError, PermissionDeniedError, ValidationError
 from hivora.crypto.cipher import Purpose, Sealed, SecretBox
 from hivora.jobs import Job, JobKind, JobQueue
 
@@ -34,6 +34,10 @@ class PortConflictError(ConflictError):
 
 class UnsupportedArchitectureError(ValidationError):
     code = "unsupported_architecture"
+
+
+class GamesDisabledError(PermissionDeniedError):
+    code = "games_disabled"
 
 
 @dataclass(frozen=True, slots=True)

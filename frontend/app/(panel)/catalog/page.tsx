@@ -151,8 +151,11 @@ function Catalog() {
   const { t } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
+  const { data: system } = useSystemInfo();
+  // Games turned off at install (--no-games): no landing with two doors, the apps directly.
+  const games = system?.games !== false;
   const tab = params.get("tab") === "modpacks" ? "modpacks" : "apps";
-  const kind = tab === "modpacks" ? "games" : params.get("kind");
+  const kind = !games ? "apps" : tab === "modpacks" ? "games" : params.get("kind");
   if (kind !== "games" && kind !== "apps") {
     return (
       <>
@@ -185,7 +188,7 @@ function Catalog() {
                   <Container /> {t("custom.open")}
                 </Link>
               </Button>
-              {back}
+              {games && back}
             </>
           }
         />

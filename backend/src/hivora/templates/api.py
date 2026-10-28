@@ -62,7 +62,9 @@ def summary(rt: Runtime, entry: CatalogEntry) -> TemplateSummary:
 
 @router.get("")
 async def list_templates(_: Viewer, rt: RuntimeDep) -> list[TemplateSummary]:
-    return [summary(rt, e) for e in rt.catalog.entries()]
+    games = rt.settings.games  # off: set at install (install.env), the games are hidden
+    return [summary(rt, e) for e in rt.catalog.entries()
+            if games or e.template.metadata.category != "games"]  # fmt: skip
 
 
 @router.get("/{slug}")

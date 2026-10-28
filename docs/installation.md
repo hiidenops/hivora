@@ -35,7 +35,10 @@ sha256sum -c install.sh.sha256 && sudo sh install.sh
 2. **La façon d'accéder au panel** (voir [Modes d'accès](#modes-daccès)).
 3. En mode VPN, **l'adresse publique** qu'utiliseront vos appareils : celle détectée, ou une
    adresse IP ou un nom de domaine que vous saisissez.
-4. Un **récapitulatif**, puis *Continuer ?*
+4. **Les jeux dans le catalogue** : oui par défaut ; non pour une école ou un lieu de travail
+   (les serveurs de jeux ne sont alors ni affichés ni installables ; ceux déjà installés
+   continuent de tourner).
+5. Un **récapitulatif**, puis *Continuer ?*
 
 Dans un terminal, les questions s'affichent dans des fenêtres (whiptail, présent d'office
 sur Debian, Ubuntu et Raspberry Pi OS ; flèches et Entrée pour choisir), puis une fenêtre
@@ -84,6 +87,7 @@ sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/dow
 | `--bind IP` | l'adresse sur laquelle le panel écoute |
 | `--vpn-host HOST` | l'adresse à laquelle se connectent les clients VPN (par défaut : l'IP publique) |
 | `--vpn-port N` | le port UDP du VPN d'administration (51820) |
+| `--no-games` | aucun jeu dans le catalogue (ni affiché, ni installable) ; `--games` les remet |
 | `--rescue-admin` | de nouvelles clés pour le client du VPN d'administration (voir [VPN d'administration](admin-vpn.md)) |
 | `--data DIR` | les données du panel (`/opt/hivora/data`) |
 | `--srv DIR` | les volumes des applications (`/srv/hivora`) |

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 import hivora.apps.links as links
 from hivora.apps.core import (
     DeployRequest,
+    GamesDisabledError,
     PortConflictError,
     UnsupportedArchitectureError,
     conflict_dict,
@@ -55,6 +56,8 @@ class Deployer:
 
     async def plan_deploy(self, session: AsyncSession, req: DeployRequest) -> DeployPlan:
         entry = self.catalog.get(req.template)
+        if entry.template.metadata.category == "games" and not self.planner.settings.games:
+            raise GamesDisabledError("the games are turned off on this panel", template=entry.slug)
         if not entry.supports(self.catalog.host_arch()):
             raise UnsupportedArchitectureError(entry.slug, arch=self.catalog.host_arch())
         name = req.name.strip() or entry.template.metadata.name
