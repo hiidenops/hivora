@@ -2,8 +2,8 @@
 # Hivora installer: installs Docker if needed, then Hivora; re-running it updates Hivora
 # or changes its options (kept in <data>/install.env), apps and data stay.
 #
-#   curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh | sudo sh
-#   ... | sudo sh -s -- --yes --access lan --port 8443
+#   sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh)"
+#   sudo sh -c "$(curl ...)" install.sh --yes --access lan --port 8443
 #
 # Options:
 #   --yes             no questions (public access still needs --i-understand)

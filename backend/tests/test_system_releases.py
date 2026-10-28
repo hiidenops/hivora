@@ -78,8 +78,8 @@ def test_notes_command_repo_and_changelog() -> None:
     assert repo_of(REPO) == "hiidenops/hivora" and repo_of(f"{REPO}.git/") == "hiidenops/hivora"
     assert repo_of("https://codeberg.org/someone/hivora") is None
     assert update_command("hiidenops/hivora", "v0.2.0") == (
-        "curl -fsSL https://github.com/hiidenops/hivora/releases/download/v0.2.0/install.sh"
-        " | sudo sh"
+        'sudo sh -c "$(curl -fsSL'
+        ' https://github.com/hiidenops/hivora/releases/download/v0.2.0/install.sh)"'
     )
     text = "# Journal\n\n## [Non publié]\n\n- a\n\n## [0.1.0]\n\n### Ajouté\n\n- b\n"
     assert changelog_section(text, "0.1.0") == "### Ajouté\n\n- b"
@@ -112,7 +112,7 @@ def test_one_request_per_12_hours_and_only_the_user_agent(tmp_path: Path) -> Non
         assert r["enabled"] and r["channel"] == "stable" and r["available"]
         assert r["current"] == __version__ and r["latest"]["version"] == "0.1.0"
         assert r["newer"] is (__version__ != "0.1.0")
-        assert r["command"].endswith("/releases/download/v0.1.0/install.sh | sudo sh")
+        assert r["command"].endswith('/releases/download/v0.1.0/install.sh)"')
         url, headers = github.calls[0]
         assert url == "https://api.github.com/repos/hiidenops/hivora/releases?per_page=30"
         assert headers == {"User-Agent": f"Hivora/{__version__}",

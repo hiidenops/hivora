@@ -15,7 +15,7 @@ le met en place ; le relancer le met à jour ou change ses options.
 ## Une commande
 
 ```sh
-curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh | sudo sh
+sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh)"
 ```
 
 ### Vérifier le script d'abord
@@ -40,7 +40,7 @@ sha256sum -c install.sh.sha256 && sudo sh install.sh
 Dans un terminal, les questions s'affichent dans des fenêtres (whiptail, présent d'office
 sur Debian, Ubuntu et Raspberry Pi OS ; flèches et Entrée pour choisir), puis une fenêtre
 suit les étapes de l'installation. Sans whiptail, ou avec `HIVORA_UI=text`
-(`curl ... | sudo HIVORA_UI=text sh`), les mêmes questions sont posées en texte.
+(`sudo HIVORA_UI=text sh -c "$(curl ...)"`), les mêmes questions sont posées en texte.
 
 À la fin, il affiche l'URL du panel, l'utilisateur `admin` et son mot de passe (une seule
 fois).
@@ -67,8 +67,8 @@ puis celles enregistrées, puis les valeurs par défaut ; ses messages sont en a
 avec `--lang fr`.
 
 ```sh
-curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh \
-  | sudo sh -s -- --yes --lang fr --access vpn+lan --vpn-host maison.example.org
+sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh)" install.sh \
+  --yes --lang fr --access vpn+lan --vpn-host maison.example.org
 ```
 
 | Option | Rôle |

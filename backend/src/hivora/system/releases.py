@@ -76,7 +76,9 @@ def repo_of(source_url: str) -> str | None:
 
 def update_command(repo: str, tag: str) -> str:
     """The release's own installer: it installs that version, keeping install.env's options."""
-    return f"curl -fsSL https://github.com/{repo}/releases/download/{tag}/install.sh | sudo sh"
+    return (
+        f'sudo sh -c "$(curl -fsSL https://github.com/{repo}/releases/download/{tag}/install.sh)"'
+    )
 
 
 async def github_fetch(url: str, headers: dict[str, str]) -> tuple[int, Any]:

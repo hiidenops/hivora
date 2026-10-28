@@ -31,7 +31,7 @@ commande pour l'installer, en français ou en anglais.
 Sur Debian 12+, Ubuntu 22.04+ ou Raspberry Pi OS 64 bits (amd64 ou arm64), en root :
 
 ```sh
-curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh | sudo sh
+sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh)"
 ```
 
 L'installeur met en place Docker si besoin, demande sa langue et la façon dont vous

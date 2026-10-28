@@ -18,7 +18,7 @@ Lancez l'installeur de la nouvelle release sur la machine (la carte affiche la c
 exacte) :
 
 ```sh
-curl -fsSL https://github.com/hiidenops/hivora/releases/download/vX.Y.Z/install.sh | sudo sh
+sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/download/vX.Y.Z/install.sh)"
 ```
 
 Il garde vos options (`install.env`), sauvegarde le panel, remplace le conteneur `hivora` et

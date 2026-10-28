@@ -95,7 +95,7 @@ jobs:
           ## Installation
 
           \`\`\`sh
-          curl -fsSL https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/install.sh | sudo sh
+          sudo sh -c "\$(curl -fsSL https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/install.sh)"
           \`\`\`
 
           Image : \`$image:$GITHUB_REF_NAME\`, digest \`$DIGEST\` (\`$image@$DIGEST\`).

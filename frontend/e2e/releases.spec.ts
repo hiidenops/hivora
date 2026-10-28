@@ -14,7 +14,7 @@ test("releases: the newer version, its notes and command, the channel", async ({
   await expect(card.getByRole("link", { name: "Voir la release" })).toHaveAttribute("href", /releases\/tag\/v9\.1\.0$/);
   await card.getByText("Notes de la version 9.1.0").click();
   await expect(card.getByText("- Tout ce qui manquait.")).toBeVisible();
-  await expect(card.getByText("curl -fsSL https://github.com/hiidenops/hivora/releases/download/v9.1.0/install.sh | sudo sh")).toBeVisible();
+  await expect(card.getByText('sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/download/v9.1.0/install.sh)"')).toBeVisible();
   await card.getByRole("button", { name: "Copier" }).click();
   await expect(card.getByRole("button", { name: "Copié" })).toBeVisible();
   // Health first: with the panel backup missing the dot is orange; the update is in the card.
