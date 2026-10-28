@@ -8,7 +8,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ### Modifié
 
-- **Script d'installation** : affichage refait, avec des écrans titrés, des couleurs (seulement dans un terminal ; `NO_COLOR` les coupe), des colonnes alignées même avec des accents, des étapes repérées par ▸, les avertissements par ! et un écran de fin qui fait ressortir l'URL et le mot de passe.
+- **Script d'installation** : affichage refait, avec des écrans titrés, des couleurs (seulement dans un terminal ; `NO_COLOR` les coupe), des colonnes alignées même avec des accents, un écran effacé à chaque étape quand il y a des questions dans un terminal (l'historique reste au-dessus), des étapes repérées par ▸, les avertissements par ! et un écran de fin qui fait ressortir l'URL et le mot de passe.
 
 ## [0.1.0] - 2026-10-17
 

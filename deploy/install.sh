@@ -366,7 +366,8 @@ pad() {  # pad TEXT WIDTH: printf %-Ns counts bytes, an accent is two
   printf '%s%*s' "$1" "$(( $2 > n ? $2 - n : 0 ))" ""
 }
 
-title() {  # title TEXT [COLOUR]: a screen or a section
+title() {  # title TEXT [COLOUR]: a new screen (cleared when the questions are on a terminal)
+  [ -z "${CLEAR:-}" ] || printf '\033[H\033[2J'  # scrollback kept: earlier screens stay above
   printf '\n  %s%s%s\n  %s──────────────────────────────────────────────%s\n' "${2:-$B}" "$1" "$N" "$D" "$N"
 }
 
@@ -384,6 +385,7 @@ open_tty() {  # one channel for every answer (fd 3): reopening would read the fi
   if (exec 3<"$TTY_DEVICE") 2>/dev/null; then
     exec 3<"$TTY_DEVICE"
     TTY=1
+    [ ! -t 1 ] || [ -z "$C" ] || CLEAR=1  # a terminal that takes escape codes
   fi
 }
 
@@ -448,6 +450,7 @@ valid_host() {  # an IPv4, an IPv6 or a domain name
 choose_access() {  # screen 1: the access mode (sets ACCESS); $1 = the preselected one
   ip="${LAN_IP:-?}"
   case "$1" in lan) default=1 ;; vpn+lan) default=2 ;; vpn) default=3 ;; *) default=4 ;; esac
+  notice=""  # a wrong answer, shown on the redrawn screen
   while :; do
     title "Hivora $VERSION"
     if [ -n "$LAN_OK" ]; then emit "  $D" "" "$(t machine_private "$ip")"; else emit "  $Y" "" "$(t machine_public "$ip")"; fi
@@ -464,13 +467,14 @@ choose_access() {  # screen 1: the access mode (sets ACCESS); $1 = the preselect
       option 4 "$(t mode_public)" "$Y" "$(t tag_not_recommended)"
       printf '\n'; emit "  $Y" "  $Y" "$(t vps_explain "$ip")"; printf '\n'
     fi
+    [ -z "$notice" ] || { emit "  $Y! " "" "$notice"; printf '\n'; notice=""; }
     reply your_choice "$default"
     case "${REPLY:-$default}" in
-      1|2) [ -n "$LAN_OK" ] || { line unavailable_choice; continue; }
+      1|2) [ -n "$LAN_OK" ] || { notice="$(t unavailable_choice)"; continue; }
            if [ "${REPLY:-$default}" = 1 ]; then ACCESS="lan"; else ACCESS="vpn+lan"; fi ;;
       3) ACCESS="vpn" ;;
       4) ACCESS="public" ;;
-      *) line invalid_choice; continue ;;
+      *) notice="$(t invalid_choice)"; continue ;;
     esac
     confirm_choice && return 0
   done
@@ -622,13 +626,13 @@ resolve() {  # command line, then install.env (or the questions), then detection
   # before install.env stays on lan.
   if [ -n "$LAN_OK" ]; then default_access="vpn+lan"; else default_access="vpn"; fi
   [ -z "$UPDATE" ] || [ -f "$ENV_FILE" ] || default_access="lan"
-  ACCESS="${OPT_ACCESS:-$(env_value HIVORA_ACCESS)}"
+  ACCESS="${OPT_ACCESS:-$(env_value HIVORA_ACCESS)}" ACCESS_KEPT=""
   if [ -n "$INTERACTIVE" ] && [ -z "$OPT_ACCESS" ]; then
     choose_access "${ACCESS:-$default_access}"
   else
     ACCESS="${ACCESS:-$default_access}"
     if [ -n "$UPDATE" ] && [ -z "$OPT_ACCESS" ] && [ -f "$ENV_FILE" ]; then
-      say unchanged_access "$(mode_label "$ACCESS")"
+      ACCESS_KEPT=1  # said on the recap screen
     fi
   fi
   case "$ACCESS" in
@@ -661,8 +665,7 @@ endpoint_change() {  # install.env wins (D17): the server moves the VPN; devices
   new="${VPN_HOST:-$CUR_HOST}:$VPN_PORT"  # no address given: the server keeps the current one
   [ "$new" != "$OLD_ENDPOINT" ] || return 0
   ENDPOINT_CHANGED=1
-  printf '\n'; warn vpn_moves "$OLD_ENDPOINT" "$new"
-  warn vpn_drop  # a new revision recreates the WireGuard container, address or port alike
+  NEW_ENDPOINT="$new"  # warned about on the recap screen
 }
 
 # --- checks (nothing changed yet) --------------------------------------------------------
@@ -764,6 +767,7 @@ confirm_public() {  # without the menu (which asked already)
 recap() {  # screen 4
   title "$(t recap_title "$VERSION")"
   printf '\n'
+  [ -z "$ACCESS_KEPT" ] || { say unchanged_access "$(mode_label "$ACCESS")"; printf '\n'; }
   row "$(t recap_access)" "$B$(mode_label "$ACCESS")$N"
   panel=""
   [ -z "$BIND" ] || panel="https://$(display_host):$PORT"
@@ -783,6 +787,10 @@ recap() {  # screen 4
   row "$(t recap_data)" "$DATA"; row "$(t recap_volumes)" "$SRV"
   row "$(t recap_tz)" "$TZ_NAME   ${D}PUID/PGID$N $PUID/$PGID"
   [ -z "$UPDATE" ] || { printf '\n'; emit "  $Y" "  $Y" "$(t recap_update)"; }
+  if [ -n "$ENDPOINT_CHANGED" ]; then
+    printf '\n'; warn vpn_moves "$OLD_ENDPOINT" "$NEW_ENDPOINT"
+    warn vpn_drop  # a new revision recreates the WireGuard container, address or port alike
+  fi
   printf '\n'
 }
 
@@ -798,7 +806,6 @@ backup_panel() {  # before an update, while the old Hivora still runs
       run docker exec "$CONTAINER" python -m hivora backup-self
     else
       BACKUP="$(docker exec "$CONTAINER" python -m hivora backup-self)" || die backup_failed
-      say backup_done "$BACKUP"
     fi
   else
     say no_backup
@@ -961,6 +968,7 @@ summary() {  # the panel first (URL, account), then the VPN as the mode needs it
       line f_again "$CONTAINER"; line f_newkeys; line f_fallback ;;
     public) emit "  $R!! " "     $R" "$(t f_public)" ;;
   esac
+  [ -z "${BACKUP:-}" ] || { printf '\n'; line backup_done "$BACKUP"; }  # the steps screen is gone
   printf '\n'; emit "  $D" "  $D" "$(t f_options "$ENV_FILE" "$CONTAINER" "$CONTAINER" "$SRV")"; printf '\n'
 }
 
