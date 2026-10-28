@@ -204,3 +204,18 @@ test("topology: cards snap into alignment, Alt places freely", async ({ page }) 
   expect(Math.abs((await top("Aimant")) - (await top("Repère")))).toBeLessThan(0.5);
   await expect(guide).toHaveCount(0); // gone once dropped
 });
+
+// The graph follows the theme chosen in Hivora, not the system's: light on a dark system,
+// then dark again without a reload.
+test("topology: the chosen theme, not the system's", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await signIn(page);
+  await page.evaluate(() => localStorage.setItem("hivora.theme", "light"));
+  await page.goto("/topology/");
+  const flow = page.locator(".react-flow");
+  await expect(flow).toHaveClass(/\blight\b/);
+  await page.goto("/settings/");
+  await page.getByLabel("Thème").selectOption("dark");
+  await page.getByRole("link", { name: "Topologie", exact: true }).click();
+  await expect(flow).toHaveClass(/\bdark\b/);
+});

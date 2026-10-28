@@ -19,7 +19,7 @@ import {
   type NodeChange,
   type NodePositionChange,
 } from "@xyflow/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { useSession } from "@/components/app-shell";
 import { Alert } from "@/components/ui/alert";
@@ -41,10 +41,19 @@ import { Toolbar } from "./toolbar";
 const MAX_DETAILED = 150;
 const PENDING = "hivora.topology.pending"; // prepared changes survive refreshes
 
+// The theme chosen in Hivora is the "dark" class on <html> (applyTheme), not the system's.
+function subscribeTheme(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+}
+const isDark = () => document.documentElement.classList.contains("dark");
+
 function Canvas() {
   const { t } = useI18n();
   const { can } = useSession();
   const canEdit = can("operator");
+  const dark = useSyncExternalStore(subscribeTheme, isDark, () => false);
   const qc = useQueryClient();
   const { data: graph, error } = useQuery({ queryKey: keys.topology, queryFn: () => api<Graph>("/topology"), refetchInterval: 60_000 });
   const [level, setLevel] = useState<Level>("apps");
@@ -277,7 +286,7 @@ function Canvas() {
           fitView
           fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
           minZoom={0.2}
-          colorMode="system"
+          colorMode={dark ? "dark" : "light"}
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={24} />

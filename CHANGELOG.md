@@ -6,6 +6,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Corrigé
+
+- **Topologie** : le schéma suit le thème choisi dans Hivora (clair ou sombre), plus celui du système ; en sombre sur un système clair, ses textes étaient noirs.
+
 ### Modifié
 
 - **Script d'installation** : dans un terminal, les questions s'affichent dans des fenêtres (whiptail, présent d'office sur les distributions supportées) avec le logo Hivora, et une fenêtre suit les étapes de l'installation (faites, en cours, à venir) ; en cas d'échec, l'installeur revient au terminal avec la sortie de l'étape et l'erreur. Sans whiptail, avec `--yes` ou `HIVORA_UI=text` : écrans en texte, avec des titres, des couleurs (seulement dans un terminal ; `NO_COLOR` les coupe), des colonnes alignées même avec des accents et des étapes numérotées. L'écran de fin, en texte dans tous les cas, fait ressortir l'URL et le mot de passe. Nouvelle commande d'installation et de mise à jour : `sudo sh -c "$(curl -fsSL …/install.sh)"` (avec `curl … | sudo sh`, l'installeur marche toujours, en questions texte).
