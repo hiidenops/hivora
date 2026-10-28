@@ -8,7 +8,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ### Modifié
 
-- **Script d'installation** : affichage refait, avec des écrans titrés, des couleurs (seulement dans un terminal ; `NO_COLOR` les coupe), des colonnes alignées même avec des accents, un écran effacé à chaque étape quand il y a des questions dans un terminal (l'historique reste au-dessus), des étapes repérées par ▸, les avertissements par ! et un écran de fin qui fait ressortir l'URL et le mot de passe.
+- **Script d'installation** : dans un terminal, les questions s'affichent dans des fenêtres (whiptail, présent d'office sur les distributions supportées) avec le logo Hivora, et une fenêtre suit les étapes de l'installation (faites, en cours, à venir) ; en cas d'échec, l'installeur revient au terminal avec la sortie de l'étape et l'erreur. Sans whiptail, avec `--yes` ou `HIVORA_UI=text` : écrans en texte, avec des titres, des couleurs (seulement dans un terminal ; `NO_COLOR` les coupe), des colonnes alignées même avec des accents et des étapes numérotées. L'écran de fin, en texte dans tous les cas, fait ressortir l'URL et le mot de passe.
 
 ## [0.1.0] - 2026-10-17
 

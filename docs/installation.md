@@ -37,6 +37,11 @@ sha256sum -c install.sh.sha256 && sudo sh install.sh
    adresse IP ou un nom de domaine que vous saisissez.
 4. Un **récapitulatif**, puis *Continuer ?*
 
+Dans un terminal, les questions s'affichent dans des fenêtres (whiptail, présent d'office
+sur Debian, Ubuntu et Raspberry Pi OS ; flèches et Entrée pour choisir), puis une fenêtre
+suit les étapes de l'installation. Sans whiptail, ou avec `HIVORA_UI=text`
+(`curl ... | sudo HIVORA_UI=text sh`), les mêmes questions sont posées en texte.
+
 À la fin, il affiche l'URL du panel, l'utilisateur `admin` et son mot de passe (une seule
 fois).
 

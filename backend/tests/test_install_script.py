@@ -16,6 +16,7 @@ def flat(out: str) -> str:
     """The output with its alignment (spaces, line breaks) folded: the words, in order."""
     return " ".join(out.split())
 
+
 FAKE_DOCKER = r"""#!/bin/sh
 echo "docker $*" >> "$FAKE_LOG"
 if [ "$1 $2" = "version --format" ]; then echo "${FAKE_DOCKER_VERSION:-27.3.1}"; exit 0; fi
@@ -79,8 +80,29 @@ else
   echo "default via 192.168.1.1 dev eth0"; printf "%b" "${FAKE_ROUTES:-}"
 fi
 """
+# One line per window in the log; answers from the terminal (stdin): y or n for --yesno,
+# the item or the text otherwise (empty: the --default-item), esc for Escape.
+FAKE_WHIPTAIL = r"""#!/bin/sh
+printf 'whiptail %s\n' "$(printf '%s ' "$@" | tr '\n' ' ')" >> "$FAKE_LOG"
+box="" default=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --menu|--yesno|--inputbox|--infobox) box="$1" ;;
+    --default-item) default="$2"; shift ;;
+  esac
+  shift
+done
+[ "$box" != --infobox ] || exit 0
+read -r answer || exit 255
+[ "$answer" != esc ] || exit 255
+case "$box" in
+  --yesno) [ "$answer" != n ] ;;
+  *) echo "${answer:-$default}" >&2 ;;
+esac
+"""
 FAKES = {
     "docker": FAKE_DOCKER,
+    "whiptail": FAKE_WHIPTAIL,
     "ss": FAKE_SS,
     "ip": FAKE_IP,
     "curl": '#!/bin/sh\n[ -n "${FAKE_PUBLIC_IP:-}" ] || exit 7\necho "$FAKE_PUBLIC_IP"\n',
@@ -643,3 +665,52 @@ def test_vpn_only_waits_for_the_moved_admin_conf(machine: Machine) -> None:
                            env={**OWN_UDP, "FAKE_NO_ADMIN_CONF": "1"})  # fmt: skip
     assert done.returncode == 0 and "admin VPN is not ready yet" in done.stderr
     assert "[QR" not in done.stdout
+
+
+WINDOWS = {"HIVORA_UI": "whiptail"}  # the tests have no terminal: windows asked for
+
+
+def windows(machine: Machine) -> list[str]:
+    return [c for c in machine.calls() if c.startswith("whiptail ")]
+
+
+def test_the_windows_on_a_terminal(machine: Machine) -> None:
+    # Français; mode by default; detected address right (y); recap: continue (y).
+    env = {**WINDOWS, **DETECTED, "HIVORA_TTY_OUT": str(machine.root / "screen")}
+    done = machine.install("--version", "v1.2.3", answers="1\n\ny\ny\n", env=env)
+    assert done.returncode == 0, done.stderr
+    lang, menu, address, recap, *steps = windows(machine)
+    assert "--menu" in lang and "made by HiidenOPS" in lang and "Langue / Language" in lang
+    assert "--default-item 2 --menu" in menu and "Réseau local + VPN — [recommandé]" in menu
+    assert "--yesno" in address and "82.64.12.34" in address and "Est-ce correct ?" in address
+    assert "Hivora v1.2.3 va être installé" in recap and "Continuer ?" in recap
+    assert "--yes-button Oui --no-button Non" in recap
+    # The steps: one window each, the current one marked, the done ones checked.
+    assert all("--infobox" in w for w in steps) and len(steps) == 4
+    assert "▸ Téléchargement de Hivora v1.2.3... · Préparation du panel..." in flat(steps[0])
+    assert "✓ Préparation du panel... ✓ Création du réseau" in flat(steps[3])
+    assert "▸ Démarrage de Hivora v1.2.3..." in flat(steps[3])
+    # Nothing printed between the windows; the final screen as text, with the logo.
+    out = done.stdout
+    assert "Langue" not in out and "Comment accéderez" not in out and "Téléchargement" not in out
+    assert out.index("made by HiidenOPS") < out.index("HIVORA EST PRÊT")
+    assert f"Mot de passe : {PASSWORD}" in flat(out)
+    assert "HIVORA_ADMIN_VPN_HOST=82.64.12.34" in machine.changes()[-1]
+
+
+def test_a_window_cancelled_or_a_failed_step(machine: Machine) -> None:
+    env = {**WINDOWS, "HIVORA_TTY_OUT": str(machine.root / "screen")}
+    done = machine.install("--version", "v1.2.3", answers="2\nesc\n", env=env)
+    assert done.returncode == 1 and "cancelled" in done.stderr and machine.changes() == []
+    # A wrong word in the window: back to the menu; then local network only.
+    done = machine.install("--version", "v1.2.3", answers="2\n4\npubliq\n1\ny\n", env=env)
+    assert done.returncode == 0 and "HIVORA_ACCESS=lan" in machine.changes()[-1]
+    assert "Type public to confirm" in windows(machine)[2]
+    # A failed step: back to the terminal, its output and the error.
+    other = fresh(machine, "second")
+    failing = "echo 'migration 0042 failed' >&2; exit 1 ;;"
+    (other.bin / "docker").write_text(FAKE_DOCKER.replace(
+        "printf '%s\\n' \"$FAKE_BOOTSTRAP\" ;;", failing))  # fmt: skip
+    done = other.install("--version", "v1.2.3", answers="2\n1\ny\n", env=env)
+    assert done.returncode == 1, done.stderr
+    assert done.stderr.index("migration 0042 failed") < done.stderr.index("could not be prepared")

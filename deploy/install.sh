@@ -96,7 +96,7 @@ msg_en() {
     cannot_download) m 'cannot download %s' ;;
     preparing) m 'Preparing the panel...' ;;
     prepare_failed) m 'the panel could not be prepared (see above)%s' ;;
-    creating_network) m 'Creating the admin network %s (%s)...' ;;
+    creating_network) m 'Creating the admin network %s...' ;;
     starting) m 'Starting Hivora %s...' ;;
     not_started) m 'Hivora did not start; see: docker logs %s%s' ;;
     waiting_vpn) m 'Setting up the admin VPN (the first time, WireGuard is downloaded)...' ;;
@@ -189,6 +189,11 @@ msg_en() {
     f_public) m 'Panel reachable from the Internet: two-factor authentication will be asked\n   right after your first password change.' ;;
     f_options) m 'Options kept in %s.\nLogs: docker logs %s\nUninstall: docker rm -f %s (apps and %s stay)' ;;
     error) m 'Error:' ;;
+    installing_docker) m 'Installing Docker (get.docker.com), a few minutes...' ;;
+    wt_yes) m 'Yes' ;;
+    wt_no) m 'No' ;;
+    wt_ok) m 'OK' ;;
+    wt_cancel) m 'Cancel' ;;
     steps_title) m 'Installing' ;;
   esac
 }
@@ -241,7 +246,7 @@ msg_fr() {
     cannot_download) m 'impossible de télécharger %s' ;;
     preparing) m 'Préparation du panel...' ;;
     prepare_failed) m 'le panel n’a pas pu être préparé (voir ci-dessus)%s' ;;
-    creating_network) m 'Création du réseau d’administration %s (%s)...' ;;
+    creating_network) m 'Création du réseau d’administration %s...' ;;
     starting) m 'Démarrage de Hivora %s...' ;;
     not_started) m 'Hivora n’a pas démarré ; voir : docker logs %s%s' ;;
     waiting_vpn) m 'Préparation du VPN d’administration (la première fois, WireGuard est téléchargé)...' ;;
@@ -334,6 +339,11 @@ msg_fr() {
     f_public) m 'Panel joignable depuis Internet : la double authentification vous sera demandée\n   juste après votre premier changement de mot de passe.' ;;
     f_options) m 'Options gardées dans %s.\nJournaux : docker logs %s\nDésinstaller : docker rm -f %s (les apps et %s restent)' ;;
     error) m 'Erreur :' ;;
+    installing_docker) m 'Installation de Docker (get.docker.com), quelques minutes...' ;;
+    wt_yes) m 'Oui' ;;
+    wt_no) m 'Non' ;;
+    wt_ok) m 'OK' ;;
+    wt_cancel) m 'Annuler' ;;
     steps_title) m 'Installation' ;;
   esac
 }
@@ -345,15 +355,34 @@ t() {  # t KEY [ARGS]: the message in the chosen language, formatted
   printf -- "$fmt" "$@"  # --: some messages start with an option name
 }
 
-# Colours on a terminal only: a redirected output, NO_COLOR or TERM=dumb get plain text.
-if [ -t 1 ] && [ -t 2 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != "dumb" ]; then
+colours() {  # colours on|off: on a terminal only (a redirected output, NO_COLOR, TERM=dumb: none)
+  B="" D="" N="" R="" G="" Y="" C=""
+  { [ "$1" = on ] && [ -t 1 ] && [ -t 2 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != "dumb" ]; } \
+    || return 0
   B="$(printf '\033[1m')" D="$(printf '\033[2m')" N="$(printf '\033[0m')" R="$(printf '\033[1;31m')"
   G="$(printf '\033[1;32m')" Y="$(printf '\033[1;33m')" C="$(printf '\033[1;36m')"
-else
-  B="" D="" N="" R="" G="" Y="" C=""
-fi
+}
+colours on
+
+logo() {
+  cat <<'EOF'
+ _   _ ___ __     __  ___   ____      _
+| | | |_ _|\ \   / / / _ \ |  _ \    / \
+| |_| || |  \ \ / / | | | || |_) |  / _ \
+|  _  || |   \ V /  | |_| ||  _ <  / ___ \
+|_| |_|___|   \_/    \___/ |_| \_\/_/   \_\
+EOF
+  printf '\n%28s\n' "made by HiidenOPS"
+}
+
+banner() {  # the logo, on a cleared screen
+  [ -z "${CLEAR:-}" ] || printf '\033[H\033[2J'
+  printf '\n%s' "$C"; logo | sed 's/^/  /'; printf '%s' "$N"
+}
 
 emit() {  # emit PREFIX INDENT TEXT: the first line after PREFIX, the next ones after INDENT
+  # In a window, one paragraph: whiptail wraps it to its width.
+  if [ -n "$WT" ]; then printf '%s%s\n' "$1" "$(flat "$3")"; return 0; fi
   first=1
   printf '%s\n' "$3" | while IFS= read -r l; do
     if [ -n "$first" ]; then printf '%s%s%s\n' "$1" "$l" "$N"; first=""
@@ -366,17 +395,121 @@ pad() {  # pad TEXT WIDTH: printf %-Ns counts bytes, an accent is two
   printf '%s%*s' "$1" "$(( $2 > n ? $2 - n : 0 ))" ""
 }
 
-title() {  # title TEXT [COLOUR]: a new screen (cleared when the questions are on a terminal)
+title() {  # title TEXT [COLOUR]: a new screen; with whiptail, the next window's title
+  if [ -n "$WT" ]; then WT_TITLE="$1"; return 0; fi
   [ -z "${CLEAR:-}" ] || printf '\033[H\033[2J'  # scrollback kept: earlier screens stay above
+  heading "$@"
+}
+
+heading() {  # heading TEXT [COLOUR]
   printf '\n  %s%s%s\n  %s──────────────────────────────────────────────%s\n' "${2:-$B}" "$1" "$N" "$D" "$N"
 }
 
 row() { printf '    %s%s%s %s\n' "$D" "$(pad "$1" 17)" "$N" "$2"; }  # row LABEL VALUE
 
-say() { emit "  $C▸$N " "    " "$(t "$@")"; }
-warn() { emit "  $Y!$N " "    " "$(t "$@")" >&2; }
-die() { emit "  $R✗ $(t error)$N " "    " "$(t "$@")" >&2; exit 1; }
+say() {  # a step (on the steps screen with whiptail), or a note
+  if [ -n "$STEPS" ] && step_screen "$1"; then return 0; fi
+  emit "  $C▸$N $D$(step_number "$1")$N" "    " "$(t "$@")"
+}
+warn() {  # during the steps with whiptail: kept for the final screen
+  if [ -n "$WT" ] && [ -n "$STEPS" ]; then LATE="${LATE:+$LATE
+}$(t "$@")"; return 0; fi
+  emit "  $Y!$N " "    " "$(t "$@")" >&2
+}
+die() {
+  if [ -n "$WT" ]; then  # back to the terminal: the error, after what the steps printed
+    end_wt; printf '\033[H\033[2J'
+    [ -z "$STEPS" ] || tail -n 30 "$BUF" >&2
+  fi
+  emit "  $R✗ $(t error)$N " "    " "$(t "$@")" >&2; exit 1
+}
 line() { emit "  " "  " "$(t "$@")"; }
+
+# --- whiptail: windows for the questions and the steps, on a terminal that has it ---------
+# Everything printed meanwhile goes to $BUF: the next window shows it above its question,
+# the steps' output is shown only on a failure. Without whiptail (--yes, no terminal,
+# HIVORA_UI=text, the tests): the same screens as text.
+WT="" STEPS="" LATE="" WT_TITLE=""
+TTY_OUT="${HIVORA_TTY_OUT:-/dev/tty}"  # where the windows are drawn (tests: a file)
+
+start_wt() {
+  case "${HIVORA_UI:-}" in
+    text) return 0 ;;
+    whiptail) ;;
+    *) [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && command -v whiptail >/dev/null 2>&1 || return 0 ;;
+  esac
+  size="$(stty size <&3 2>/dev/null || true)"
+  rows="${size% *}" cols="${size#* }"
+  matches "$rows $cols" '[0-9]+ [0-9]+' || { rows=24 cols=80; }
+  WT_H=$((rows - 4)); [ "$WT_H" -le 30 ] || WT_H=30
+  WT_W=$((cols - 4)); [ "$WT_W" -le 78 ] || WT_W=78
+  BUF="$(mktemp)"
+  trap 'rm -f "$BUF"' EXIT
+  WT=1
+  colours off  # the windows' text is plain
+  exec 6>&1 7>&2 >>"$BUF" 2>&1
+}
+
+end_wt() {  # back to the terminal for the final screen
+  [ -n "$WT" ] || return 0
+  exec 1>&6 2>&7
+  WT=""
+  colours on
+  [ -z "$DRY" ] || grep '^+ ' "$BUF" >&2 || true  # --dry-run: the commands
+}
+
+wt() {  # wt WHIPTAIL_ARGS: a window on the terminal, the answer on stdout
+  TERM="${WT_TERM:-${TERM:-dumb}}" LC_ALL=C.UTF-8 whiptail --backtitle "Hivora · made by HiidenOPS" \
+    --title " ${WT_TITLE:-Hivora} " --yes-button "$(t wt_yes)" --no-button "$(t wt_no)" \
+    --ok-button "$(t wt_ok)" --cancel-button "$(t wt_cancel)" "$@" 2>&1 >"$TTY_OUT" <&3
+}
+
+wt_text() {  # wt_text QUESTION: what was printed since the last window, then QUESTION
+  before="$(sed '/./,$!d' "$BUF")"; : >"$BUF"
+  if [ -n "$before" ]; then printf '\n%s\n\n%s' "$before" "$1"; else printf '\n%s' "$1"; fi
+}
+
+wt_height() {  # wt_height TEXT EXTRA: the text's lines, as wrapped, plus EXTRA, within the terminal
+  lines="$(printf '%s\n' "$1" | awk -v w=$((WT_W - 6)) '{ n += length($0) ? int((length($0) + w - 1) / w) : 1 } END { print n }')"
+  h=$((lines + $2 + 2))
+  [ "$h" -le "$WT_H" ] || h="$WT_H"
+  printf '%s' "$h"
+}
+
+wt_info() {  # wt_info TEXT: a window that stays while the work goes on
+  # TERM=ansi: an xterm's alternate screen would erase it as soon as whiptail exits.
+  WT_TERM=ansi wt --infobox "$1" "$(wt_height "$1" 4)" "$WT_W" || true
+  WT_TERM=""
+}
+
+step_label() {
+  case "$1" in
+    downloading|starting) t "$1" "$VERSION" ;;
+    creating_network) t creating_network "$ADMIN_NETWORK" ;;
+    *) t "$1" ;;
+  esac
+}
+
+step_number() {  # step_number KEY: "[2/5] " for a step, nothing otherwise
+  i=0
+  for key in $STEPS; do
+    i=$((i + 1))
+    [ "$key" != "$1" ] || { printf '[%s/%s] ' "$i" "$(echo "$STEPS" | wc -w)"; return 0; }
+  done
+}
+
+step_screen() {  # step_screen KEY: with whiptail, the steps done, KEY and the next ones
+  [ -n "$WT" ] && [ -n "$(step_number "$1")" ] || return 1
+  text="$(logo)
+" mark="✓"
+  for key in $STEPS; do
+    if [ "$key" = "$1" ]; then text="$text
+   ▸ $(step_label "$key")"; mark="·"
+    else text="$text
+   $mark $(step_label "$key")"; fi
+  done
+  WT_TITLE="$(t steps_title)" wt_info "$text"
+}
 
 # --- questions (terminal only, never with --yes) -------------------------------------------
 open_tty() {  # one channel for every answer (fd 3): reopening would read the first line again
@@ -389,7 +522,12 @@ open_tty() {  # one channel for every answer (fd 3): reopening would read the fi
   fi
 }
 
-reply() {  # reply PROMPT_KEY [ARGS]: one answer line, in REPLY
+reply() {  # reply PROMPT_KEY [ARGS]: one answer line, in REPLY (1: cancelled in the window)
+  if [ -n "$WT" ]; then
+    text="$(wt_text "$(t "$@")")"
+    REPLY="$(wt --inputbox "$text" "$(wt_height "$text" 7)" "$WT_W" "")" || return 1
+    return 0
+  fi
   printf '  %s?%s %s%s%s' "$C" "$N" "$B" "$(t "$@")" "$N"
   if ! read -r REPLY <&3; then printf '\n'; die no_answer; fi
 }
@@ -398,6 +536,15 @@ ask() {  # ask KEY y|n [ARGS] -> 0 if yes (always yes with --yes)
   key="$1" default="$2"; shift 2
   [ -n "$YES" ] && return 0
   [ -n "$TTY" ] || die need_terminal "$(t "$key" "$@")"
+  if [ -n "$WT" ]; then
+    text="$(wt_text "$(t "$key" "$@")")"
+    if [ "$default" = "y" ]; then
+      wt --yesno "$text" "$(wt_height "$text" 5)" "$WT_W" >/dev/null
+    else
+      wt --defaultno --yesno "$text" "$(wt_height "$text" 5)" "$WT_W" >/dev/null
+    fi
+    return
+  fi
   if [ "$default" = "y" ]; then hint="$(t yes_no)"; else hint="$(t no_yes)"; fi
   printf '  %s?%s %s%s%s %s%s%s ' "$C" "$N" "$B" "$(t "$key" "$@")" "$N" "$D" "$hint" "$N"
   if ! read -r answer <&3; then printf '\n'; die no_answer; fi
@@ -409,13 +556,23 @@ ask() {  # ask KEY y|n [ARGS] -> 0 if yes (always yes with --yes)
 }
 
 confirm_word() {  # confirm_word WORD -> 0 when typed exactly
-  reply type_word "$1"
+  reply type_word "$1" || return 1  # cancelled: back to the menu
   [ "$REPLY" = "$1" ]
 }
 
 choose_lang() {  # screen 0, before any other question
   case "${LANG:-}" in fr*) default=1 ;; *) default=2 ;; esac
-  title "Hivora — installation"
+  if [ -n "$WT" ]; then
+    WT_TITLE="Installation"
+    text="$(logo)
+
+  Langue / Language"
+    REPLY="$(wt --default-item "$default" --menu "$text" "$(wt_height "$text" 8)" "$WT_W" 2 \
+      1 "Français" 2 "English")" || die cancelled
+    if [ "$REPLY" = 1 ]; then UI_LANG="fr"; else UI_LANG="en"; fi
+    return 0
+  fi
+  banner
   printf '\n    %s1)%s Français\n    %s2)%s English\n\n' "$C" "$N" "$C" "$N"
   while :; do
     printf '  %s?%s %sLangue / Language%s %s[%s]%s ' "$C" "$N" "$B" "$N" "$D" "$default" "$N"
@@ -453,22 +610,7 @@ choose_access() {  # screen 1: the access mode (sets ACCESS); $1 = the preselect
   notice=""  # a wrong answer, shown on the redrawn screen
   while :; do
     title "Hivora $VERSION"
-    if [ -n "$LAN_OK" ]; then emit "  $D" "" "$(t machine_private "$ip")"; else emit "  $Y" "" "$(t machine_public "$ip")"; fi
-    printf '\n  %s%s%s\n\n' "$B" "$(t menu_title)" "$N"
-    if [ -n "$LAN_OK" ]; then
-      option 1 "$(t mode_lan)" "$D" "$(t tag_simplest)" "$(t desc_lan "https://$ip:$PORT")"
-      option 2 "$(t mode_vpnlan)" "$G" "$(t tag_recommended)" "$(t desc_vpnlan)"
-      option 3 "$(t mode_vpn)" "$D" "$(t tag_private)" "$(t desc_vpn)"
-      option 4 "$(t mode_public)" "$Y" "$(t tag_not_recommended)" "$(t desc_public)"
-    else
-      option 1 "$(t mode_lan)" "$D" "$(t tag_unavailable)"
-      option 2 "$(t mode_vpnlan)" "$D" "$(t tag_unavailable)"
-      option 3 "$(t mode_vpn)" "$G" "$(t tag_recommended)"
-      option 4 "$(t mode_public)" "$Y" "$(t tag_not_recommended)"
-      printf '\n'; emit "  $Y" "  $Y" "$(t vps_explain "$ip")"; printf '\n'
-    fi
-    [ -z "$notice" ] || { emit "  $Y! " "" "$notice"; printf '\n'; notice=""; }
-    reply your_choice "$default"
+    if [ -n "$WT" ]; then access_window; else access_text; fi
     case "${REPLY:-$default}" in
       1|2) [ -n "$LAN_OK" ] || { notice="$(t unavailable_choice)"; continue; }
            if [ "${REPLY:-$default}" = 1 ]; then ACCESS="lan"; else ACCESS="vpn+lan"; fi ;;
@@ -479,6 +621,44 @@ choose_access() {  # screen 1: the access mode (sets ACCESS); $1 = the preselect
     confirm_choice && return 0
   done
 }
+
+access_text() {  # the menu as text; the answer in REPLY
+  if [ -n "$LAN_OK" ]; then emit "  $D" "" "$(t machine_private "$ip")"; else emit "  $Y" "" "$(t machine_public "$ip")"; fi
+  printf '\n  %s%s%s\n\n' "$B" "$(t menu_title)" "$N"
+  if [ -n "$LAN_OK" ]; then
+    option 1 "$(t mode_lan)" "$D" "$(t tag_simplest)" "$(t desc_lan "https://$ip:$PORT")"
+    option 2 "$(t mode_vpnlan)" "$G" "$(t tag_recommended)" "$(t desc_vpnlan)"
+    option 3 "$(t mode_vpn)" "$D" "$(t tag_private)" "$(t desc_vpn)"
+    option 4 "$(t mode_public)" "$Y" "$(t tag_not_recommended)" "$(t desc_public)"
+  else
+    option 1 "$(t mode_lan)" "$D" "$(t tag_unavailable)"
+    option 2 "$(t mode_vpnlan)" "$D" "$(t tag_unavailable)"
+    option 3 "$(t mode_vpn)" "$G" "$(t tag_recommended)"
+    option 4 "$(t mode_public)" "$Y" "$(t tag_not_recommended)"
+    printf '\n'; emit "  $Y" "  $Y" "$(t vps_explain "$ip")"; printf '\n'
+  fi
+  [ -z "$notice" ] || { emit "  $Y! " "" "$notice"; printf '\n'; notice=""; }
+  reply your_choice "$default"
+}
+
+access_window() {  # the menu in a window; the answer in REPLY
+  [ -z "$notice" ] || { printf '! %s\n\n' "$notice"; notice=""; }
+  if [ -n "$LAN_OK" ]; then
+    t machine_private "$ip"; printf '\n\n'
+    printf '1) %s\n2) %s\n3) %s\n4) %s\n\n' "$(flat "$(t desc_lan "https://$ip:$PORT")")" \
+      "$(flat "$(t desc_vpnlan)")" "$(flat "$(t desc_vpn)")" "$(flat "$(t desc_public)")"
+    tag1="$(t tag_simplest)" tag2="$(t tag_recommended)" tag3="$(t tag_private)"
+  else
+    t machine_public "$ip"; printf '\n\n%s\n\n' "$(flat "$(t vps_explain "$ip")")"
+    tag1="$(t tag_unavailable)" tag2="$tag1" tag3="$(t tag_recommended)"
+  fi
+  text="$(wt_text "$(t menu_title)")"
+  REPLY="$(wt --default-item "$default" --menu "$text" "$(wt_height "$text" 10)" "$WT_W" 4 \
+    1 "$(t mode_lan) — $tag1" 2 "$(t mode_vpnlan) — $tag2" 3 "$(t mode_vpn) — $tag3" \
+    4 "$(t mode_public) — $(t tag_not_recommended)")" || die cancelled
+}
+
+flat() { printf '%s' "$1" | tr '\n' ' ' | tr -s ' '; }  # one line: a window wraps it
 
 option() {  # option N LABEL TAG_COLOUR TAG [DESCRIPTION]: one line of the menu
   printf '    %s%s)%s %s%s%s %s%s%s\n' "$C" "$1" "$N" "$B" "$(pad "$2" 26)" "$N" "$3" "$4" "$N"
@@ -520,7 +700,7 @@ choose_vpn_host() {  # screen 2: the address the VPN clients connect to (sets VP
     printf '\n'; emit "  $Y" "" "$(t addr_not_detected)"; printf '\n'
   fi
   while :; do
-    reply addr_prompt
+    reply addr_prompt || die cancelled
     if ! valid_host "$REPLY"; then line addr_invalid "$REPLY"; continue; fi
     case "$REPLY" in
       *:*) ;;  # an IPv6
@@ -700,8 +880,10 @@ check_docker() {
       run sh -c "curl -fsSL https://get.docker.com | sh"
       return 0
     fi
+    [ -z "$WT" ] || { WT_TITLE="Docker" wt_info "$(wt_text "$(t installing_docker)")"; }
     curl -fsSL https://get.docker.com | sh
     systemctl enable --now docker 2>/dev/null || true
+    [ -z "$WT" ] || : >"$BUF"  # its output: not for the next window
   fi
   if docker version 2>/dev/null | grep -qi podman; then
     die podman
@@ -841,7 +1023,7 @@ network() {  # how the panel is reached: published port, admin VPN network (one 
 
 start() {
   if [ -n "$VPN" ] && [ -z "$NETWORK_EXISTS" ]; then
-    say creating_network "$ADMIN_NETWORK" "$ADMIN_ZONE_SUBNET"
+    say creating_network "$ADMIN_NETWORK"
     run docker network create --driver bridge --subnet "$ADMIN_ZONE_SUBNET" \
       --ip-range "$ADMIN_ZONE_RANGE" --label io.hivora.zone-network=1 "$ADMIN_NETWORK" >/dev/null
   fi
@@ -932,7 +1114,8 @@ write_env() {
 
 summary() {  # the panel first (URL, account), then the VPN as the mode needs it
   if [ "$ACCESS" = "vpn" ]; then url="https://$PANEL_IP:8443"; else url="https://$(display_host):$PORT"; fi
-  title "✓ $(t ready)" "$G"
+  banner
+  heading "✓ $(t ready)" "$G"
   printf '\n'
   row "$(t f_url)" "$C$url$N"
   case "$ADMIN" in
@@ -957,8 +1140,7 @@ summary() {  # the panel first (URL, account), then the VPN as the mode needs it
         emit "  $B" "" "$(t f_vpn_setup)"; line f_through "$PANEL_IP"; line f_qr_panel "$CONTAINER"
       fi
       line f_udp "$VPN_PORT" ;;
-    vpn)  # the only way in: wait for it, then the steps and the QR code, last
-      if [ -n "$ENDPOINT_CHANGED" ]; then wait_admin_vpn "$BEFORE_START"; else wait_admin_vpn ""; fi
+    vpn)  # the only way in (waited for by main): the steps and the QR code, last
       printf '\n'; emit "  $B" "" "$(t f_steps)"
       line f_step1; line f_step2 "$VPN_PORT"; line f_step3 "$DATA/admin.conf"; line f_step4 "$PANEL_IP"
       printf '\n'
@@ -968,6 +1150,7 @@ summary() {  # the panel first (URL, account), then the VPN as the mode needs it
       line f_again "$CONTAINER"; line f_newkeys; line f_fallback ;;
     public) emit "  $R!! " "     $R" "$(t f_public)" ;;
   esac
+  [ -z "$LATE" ] || { printf '\n'; emit "  $Y! " "    $Y" "$LATE"; }  # warned during the steps
   [ -z "${BACKUP:-}" ] || { printf '\n'; line backup_done "$BACKUP"; }  # the steps screen is gone
   printf '\n'; emit "  $D" "  $D" "$(t f_options "$ENV_FILE" "$CONTAINER" "$CONTAINER" "$SRV")"; printf '\n'
 }
@@ -996,6 +1179,7 @@ main() {
   elif [ -n "$TTY" ] && [ -z "$UPDATE" ] && [ ! -f "$ENV_FILE" ] && [ -z "$RESCUE" ]; then
     INTERACTIVE=1
   fi
+  [ -z "$TTY" ] || [ -n "$RESCUE" ] || start_wt  # questions on a terminal: windows
   if [ -n "$INTERACTIVE" ] && [ -z "$OPT_LANG" ] && [ -z "$saved_lang" ]; then choose_lang; fi
   check_platform
   if [ -n "$RESCUE" ]; then
@@ -1012,6 +1196,12 @@ main() {
   recap
   ask continue y || die cancelled
   title "$(t steps_title)"
+  STEPS="downloading"
+  [ -z "$UPDATE" ] || STEPS="$STEPS backing_up"
+  STEPS="$STEPS preparing"
+  [ -z "$VPN" ] || [ -n "$NETWORK_EXISTS" ] || STEPS="$STEPS creating_network"
+  STEPS="$STEPS starting"
+  [ "$ACCESS" != "vpn" ] || [ -n "$DRY" ] || STEPS="$STEPS waiting_vpn"
 
   run mkdir -p "$DATA" "$SRV"
   run chmod 700 "$DATA"
@@ -1028,9 +1218,14 @@ main() {
   start
   write_env
   if [ -n "$DRY" ]; then
+    end_wt
     say dry_done
     return 0
   fi
+  if [ "$ACCESS" = "vpn" ]; then  # the only way in: wait for it, on the steps screen
+    if [ -n "$ENDPOINT_CHANGED" ]; then wait_admin_vpn "$BEFORE_START"; else wait_admin_vpn ""; fi
+  fi
+  end_wt
   summary
 }
 
