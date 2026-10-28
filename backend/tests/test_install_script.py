@@ -9,6 +9,12 @@ import pytest
 
 SCRIPT = Path(__file__).parents[2] / "deploy" / "install.sh"
 PASSWORD = "abcde-fghjk-mnpqr-stuvw"
+RULE = "─" * 46  # under a screen's title
+
+
+def flat(out: str) -> str:
+    """The output with its alignment (spaces, line breaks) folded: the words, in order."""
+    return " ".join(out.split())
 
 FAKE_DOCKER = r"""#!/bin/sh
 echo "docker $*" >> "$FAKE_LOG"
@@ -152,8 +158,8 @@ def test_a_fresh_install_bootstraps_before_the_server(machine: Machine) -> None:
     assert "--network hivora-zone-administration --ip 10.254.254.254" in start
     assert "HIVORA_ADMIN_VPN_PORT=51820" in start and "ADMIN_VPN_HOST" not in start
     assert f"-v {machine.data}:{machine.data}" in start
-    assert f"HIVORA IS READY\n{'=' * 38}\n\nURL:\nhttps://192.168.1.10:8443" in done.stdout
-    assert f"Password:\n{PASSWORD}" in done.stdout
+    assert f"HIVORA IS READY {RULE} URL: https://192.168.1.10:8443" in flat(done.stdout)
+    assert f"Password: {PASSWORD}" in flat(done.stdout)
     assert machine.env()["HIVORA_VERSION"] == '"v1.2.3"'
     assert machine.env()["HIVORA_TIMEZONE"] == '"Europe/Paris"'
     assert (machine.data / "install.env").stat().st_mode & 0o777 == 0o600
@@ -300,7 +306,7 @@ def test_admin_vpn_only_publishes_no_panel_port(machine: Machine) -> None:
     assert "--network hivora-zone-administration --ip 10.254.254.254" in start
     assert "HIVORA_ADMIN_VPN_PORT=51830" in start
     assert "HIVORA_ADMIN_VPN_HOST=vpn.example.org" in start
-    assert "URL:\nhttps://10.254.254.254:8443" in done.stdout  # the only way in
+    assert "URL: https://10.254.254.254:8443" in flat(done.stdout)  # the only way in
     assert "[QR PrivateKey = first]" in done.stdout and "2. Open UDP port 51830" in done.stdout
     assert done.stdout.index("HIVORA IS READY") < done.stdout.index("[QR")  # the QR code last
     env = machine.env()
@@ -440,8 +446,8 @@ def test_a_french_install_on_a_vm(machine: Machine) -> None:
     assert "Cette machine : 192.168.1.10 (réseau privé)" in out and "Votre choix [2]" in out
     assert "Adresse publique détectée pour le VPN :\n    82.64.12.34" in out
     assert "Hivora v1.2.3 va être installé :" in out
-    assert f"HIVORA EST PRÊT\n{'=' * 38}\n\nURL :\nhttps://192.168.1.10:8443" in out
-    assert f"Mot de passe :\n{PASSWORD}" in out
+    assert f"HIVORA EST PRÊT {RULE} URL : https://192.168.1.10:8443" in flat(out)
+    assert f"Mot de passe : {PASSWORD}" in flat(out)
     vpn_line = "VPN d\u2019administration : en préparation"  # French apostrophe
     assert out.index("HIVORA EST PRÊT") < out.index(vpn_line)
     assert "[QR" not in out and "python -m hivora admin-vpn" in out  # no QR code in vpn+lan
@@ -461,7 +467,7 @@ def test_an_english_vpn_only_install_with_a_domain_name(machine: Machine) -> Non
     out = done.stdout
     assert "How will you reach the panel?" in out and "Type vpn to confirm" in out
     assert "IP address or domain name for the VPN" in out and "does not resolve" not in out
-    assert "URL:\nhttps://10.254.254.254:8443" in out
+    assert "URL: https://10.254.254.254:8443" in flat(out)
     assert "VPN access, step by step:" in out and "[QR PrivateKey = first]" in out
     assert out.index("HIVORA IS READY") < out.index("step by step") < out.index("[QR")
     start = machine.changes()[-1]
@@ -543,7 +549,7 @@ def test_a_rerun_asks_nothing_and_keeps_the_language(machine: Machine) -> None:
     assert done.returncode == 0, done.stderr
     unchanged = "Accès : Réseau local uniquement (inchangé ; pour le changer : --reconfigure)"
     assert unchanged in done.stdout
-    assert "Mot de passe :\ninchangé (oublié :" in done.stdout
+    assert "Mot de passe : inchangé (oublié :" in flat(done.stdout)
     # In a terminal, without --yes: only "Continue?" (one answer), never the menu again.
     done = machine.install(env={"FAKE_PORT_BUSY": "1"}, answers="\n")
     assert done.returncode == 0, done.stderr

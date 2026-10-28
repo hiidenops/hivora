@@ -187,7 +187,9 @@ msg_en() {
     f_newkeys) m 'New keys: run the installer again with --rescue-admin' ;;
     f_fallback) m 'Fallback on this machine: run the installer again with --access lan' ;;
     f_public) m 'Panel reachable from the Internet: two-factor authentication will be asked\n   right after your first password change.' ;;
-    f_options) m 'Options kept in %s. Logs: docker logs %s   Uninstall: docker rm -f %s (apps and %s stay)' ;;
+    f_options) m 'Options kept in %s.\nLogs: docker logs %s\nUninstall: docker rm -f %s (apps and %s stay)' ;;
+    error) m 'Error:' ;;
+    steps_title) m 'Installing' ;;
   esac
 }
 
@@ -330,7 +332,9 @@ msg_fr() {
     f_newkeys) m 'Nouvelles clés : relancez l’installation avec --rescue-admin' ;;
     f_fallback) m 'Secours sur cette machine : relancez l’installation avec --access lan' ;;
     f_public) m 'Panel joignable depuis Internet : la double authentification vous sera demandée\n   juste après votre premier changement de mot de passe.' ;;
-    f_options) m 'Options gardées dans %s. Journaux : docker logs %s   Désinstaller : docker rm -f %s (les apps et %s restent)' ;;
+    f_options) m 'Options gardées dans %s.\nJournaux : docker logs %s\nDésinstaller : docker rm -f %s (les apps et %s restent)' ;;
+    error) m 'Erreur :' ;;
+    steps_title) m 'Installation' ;;
   esac
 }
 
@@ -341,10 +345,37 @@ t() {  # t KEY [ARGS]: the message in the chosen language, formatted
   printf -- "$fmt" "$@"  # --: some messages start with an option name
 }
 
-say() { printf '\033[1;33m==>\033[0m %s\n' "$(t "$@")"; }
-warn() { printf '\033[1;31m!!\033[0m %s\n' "$(t "$@")" >&2; }
-die() { printf '\033[1;31mError:\033[0m %s\n' "$(t "$@")" >&2; exit 1; }
-line() { printf '%s\n' "$(t "$@")"; }
+# Colours on a terminal only: a redirected output, NO_COLOR or TERM=dumb get plain text.
+if [ -t 1 ] && [ -t 2 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != "dumb" ]; then
+  B="$(printf '\033[1m')" D="$(printf '\033[2m')" N="$(printf '\033[0m')" R="$(printf '\033[1;31m')"
+  G="$(printf '\033[1;32m')" Y="$(printf '\033[1;33m')" C="$(printf '\033[1;36m')"
+else
+  B="" D="" N="" R="" G="" Y="" C=""
+fi
+
+emit() {  # emit PREFIX INDENT TEXT: the first line after PREFIX, the next ones after INDENT
+  first=1
+  printf '%s\n' "$3" | while IFS= read -r l; do
+    if [ -n "$first" ]; then printf '%s%s%s\n' "$1" "$l" "$N"; first=""
+    else printf '%s%s%s\n' "$2" "${l#"${l%%[! ]*}"}" "$N"; fi  # its own indent dropped
+  done
+}
+
+pad() {  # pad TEXT WIDTH: printf %-Ns counts bytes, an accent is two
+  n="$(printf '%s' "$1" | LC_ALL=C tr -d '\200-\277' | wc -c)"
+  printf '%s%*s' "$1" "$(( $2 > n ? $2 - n : 0 ))" ""
+}
+
+title() {  # title TEXT [COLOUR]: a screen or a section
+  printf '\n  %s%s%s\n  %s──────────────────────────────────────────────%s\n' "${2:-$B}" "$1" "$N" "$D" "$N"
+}
+
+row() { printf '    %s%s%s %s\n' "$D" "$(pad "$1" 17)" "$N" "$2"; }  # row LABEL VALUE
+
+say() { emit "  $C▸$N " "    " "$(t "$@")"; }
+warn() { emit "  $Y!$N " "    " "$(t "$@")" >&2; }
+die() { emit "  $R✗ $(t error)$N " "    " "$(t "$@")" >&2; exit 1; }
+line() { emit "  " "  " "$(t "$@")"; }
 
 # --- questions (terminal only, never with --yes) -------------------------------------------
 open_tty() {  # one channel for every answer (fd 3): reopening would read the first line again
@@ -357,7 +388,7 @@ open_tty() {  # one channel for every answer (fd 3): reopening would read the fi
 }
 
 reply() {  # reply PROMPT_KEY [ARGS]: one answer line, in REPLY
-  printf '  %s' "$(t "$@")"
+  printf '  %s?%s %s%s%s' "$C" "$N" "$B" "$(t "$@")" "$N"
   if ! read -r REPLY <&3; then printf '\n'; die no_answer; fi
 }
 
@@ -366,7 +397,7 @@ ask() {  # ask KEY y|n [ARGS] -> 0 if yes (always yes with --yes)
   [ -n "$YES" ] && return 0
   [ -n "$TTY" ] || die need_terminal "$(t "$key" "$@")"
   if [ "$default" = "y" ]; then hint="$(t yes_no)"; else hint="$(t no_yes)"; fi
-  printf '  %s %s ' "$(t "$key" "$@")" "$hint"
+  printf '  %s?%s %s%s%s %s%s%s ' "$C" "$N" "$B" "$(t "$key" "$@")" "$N" "$D" "$hint" "$N"
   if ! read -r answer <&3; then printf '\n'; die no_answer; fi
   case "$answer" in
     "") [ "$default" = "y" ] ;;
@@ -382,9 +413,10 @@ confirm_word() {  # confirm_word WORD -> 0 when typed exactly
 
 choose_lang() {  # screen 0, before any other question
   case "${LANG:-}" in fr*) default=1 ;; *) default=2 ;; esac
-  printf '\n  Hivora — installation\n\n  1) Français\n  2) English\n\n'
+  title "Hivora — installation"
+  printf '\n    %s1)%s Français\n    %s2)%s English\n\n' "$C" "$N" "$C" "$N"
   while :; do
-    printf '  Langue / Language [%s] : ' "$default"
+    printf '  %s?%s %sLangue / Language%s %s[%s]%s ' "$C" "$N" "$B" "$N" "$D" "$default" "$N"
     if ! read -r REPLY <&3; then printf '\n'; die no_answer; fi
     case "${REPLY:-$default}" in
       1) UI_LANG="fr"; return 0 ;;
@@ -417,23 +449,20 @@ choose_access() {  # screen 1: the access mode (sets ACCESS); $1 = the preselect
   ip="${LAN_IP:-?}"
   case "$1" in lan) default=1 ;; vpn+lan) default=2 ;; vpn) default=3 ;; *) default=4 ;; esac
   while :; do
-    printf '\n  Hivora %s\n\n  ' "$VERSION"
-    if [ -n "$LAN_OK" ]; then t machine_private "$ip"; else t machine_public "$ip"; fi
-    printf '\n\n  %s\n\n' "$(t menu_title)"
+    title "Hivora $VERSION"
+    if [ -n "$LAN_OK" ]; then emit "  $D" "" "$(t machine_private "$ip")"; else emit "  $Y" "" "$(t machine_public "$ip")"; fi
+    printf '\n  %s%s%s\n\n' "$B" "$(t menu_title)" "$N"
     if [ -n "$LAN_OK" ]; then
-      printf '    1) %-48s %s\n       %s\n\n' "$(t mode_lan)" "$(t tag_simplest)" "$(t desc_lan "https://$ip:$PORT")"
-      printf '    2) %-48s %s\n       %s\n\n' "$(t mode_vpnlan)" "$(t tag_recommended)" "$(t desc_vpnlan)"
+      option 1 "$(t mode_lan)" "$D" "$(t tag_simplest)" "$(t desc_lan "https://$ip:$PORT")"
+      option 2 "$(t mode_vpnlan)" "$G" "$(t tag_recommended)" "$(t desc_vpnlan)"
+      option 3 "$(t mode_vpn)" "$D" "$(t tag_private)" "$(t desc_vpn)"
+      option 4 "$(t mode_public)" "$Y" "$(t tag_not_recommended)" "$(t desc_public)"
     else
-      printf '    1) %-30s %s\n' "$(t mode_lan)" "$(t tag_unavailable)"
-      printf '    2) %-30s %s\n' "$(t mode_vpnlan)" "$(t tag_unavailable)"
-    fi
-    if [ -n "$LAN_OK" ]; then tag="$(t tag_private)"; else tag="$(t tag_recommended)"; fi
-    if [ -n "$LAN_OK" ]; then
-      printf '    3) %-48s %s\n       %s\n\n' "$(t mode_vpn)" "$tag" "$(t desc_vpn)"
-      printf '    4) %-48s %s\n       %s\n\n' "$(t mode_public)" "$(t tag_not_recommended)" "$(t desc_public)"
-    else
-      printf '    3) %-30s %s\n' "$(t mode_vpn)" "$tag"
-      printf '    4) %-30s %s\n\n  %s\n\n' "$(t mode_public)" "$(t tag_not_recommended)" "$(t vps_explain "$ip")"
+      option 1 "$(t mode_lan)" "$D" "$(t tag_unavailable)"
+      option 2 "$(t mode_vpnlan)" "$D" "$(t tag_unavailable)"
+      option 3 "$(t mode_vpn)" "$G" "$(t tag_recommended)"
+      option 4 "$(t mode_public)" "$Y" "$(t tag_not_recommended)"
+      printf '\n'; emit "  $Y" "  $Y" "$(t vps_explain "$ip")"; printf '\n'
     fi
     reply your_choice "$default"
     case "${REPLY:-$default}" in
@@ -445,6 +474,11 @@ choose_access() {  # screen 1: the access mode (sets ACCESS); $1 = the preselect
     esac
     confirm_choice && return 0
   done
+}
+
+option() {  # option N LABEL TAG_COLOUR TAG [DESCRIPTION]: one line of the menu
+  printf '    %s%s)%s %s%s%s %s%s%s\n' "$C" "$1" "$N" "$B" "$(pad "$2" 26)" "$N" "$3" "$4" "$N"
+  [ -z "${5:-}" ] || { emit "       $D" "       $D" "$5"; printf '\n'; }
 }
 
 confirm_choice() {  # screen 3: the modes that can lock you out or expose the panel
@@ -473,10 +507,13 @@ choose_vpn_host() {  # screen 2: the address the VPN clients connect to (sets VP
   candidate="${VPN_HOST:-${CUR_HOST:-$detected}}"  # an existing VPN: its current address
   if [ -n "$candidate" ]; then
     if [ "$candidate" = "$detected" ] && [ -z "$CUR_HOST" ]; then title=addr_detected; else title=addr_current; fi
-    printf '\n  %s\n    %s\n\n  %s\n\n' "$(t "$title")" "$candidate" "$(t addr_help "$VPN_PORT")"
+    title VPN
+    printf '\n  %s\n    %s%s%s\n\n' "$(t "$title")" "$C" "$candidate" "$N"
+    emit "  $D" "  $D" "$(t addr_help "$VPN_PORT")"; printf '\n'
     if ask addr_correct y; then VPN_HOST="$candidate"; return 0; fi
   else
-    printf '\n  %s\n\n' "$(t addr_not_detected)"
+    title VPN
+    printf '\n'; emit "  $Y" "" "$(t addr_not_detected)"; printf '\n'
   fi
   while :; do
     reply addr_prompt
@@ -495,7 +532,7 @@ choose_vpn_host() {  # screen 2: the address the VPN clients connect to (sets VP
 }
 
 run() {  # a command that changes something: only shown (on stderr) with --dry-run
-  if [ -n "$DRY" ]; then printf '+ %s\n' "$*" >&2; else "$@"; fi
+  if [ -n "$DRY" ]; then printf '%s+ %s%s\n' "$D" "$*" "$N" >&2; else "$@"; fi
 }
 
 usage() { sed -n '9,26p' "$0" 2>/dev/null || true; exit 2; }
@@ -725,25 +762,27 @@ confirm_public() {  # without the menu (which asked already)
 }
 
 recap() {  # screen 4
-  printf '\n  %s\n' "$(t recap_title "$VERSION")"
-  printf '    %-16s %s\n' "$(t recap_access)" "$(mode_label "$ACCESS")"
+  title "$(t recap_title "$VERSION")"
+  printf '\n'
+  row "$(t recap_access)" "$B$(mode_label "$ACCESS")$N"
   panel=""
   [ -z "$BIND" ] || panel="https://$(display_host):$PORT"
   if [ -n "$VPN" ]; then
+    through="$C""https://$PANEL_IP:8443$N $D$(t recap_through)$N"
     if [ -n "$panel" ]; then
-      printf '    %-16s %s\n    %-16s https://%s:8443 %s\n' "$(t recap_panel)" "$panel" "" "$PANEL_IP" "$(t recap_through)"
+      row "$(t recap_panel)" "$C$panel$N"; row "" "$through"
     else
-      printf '    %-16s https://%s:8443 %s\n' "$(t recap_panel)" "$PANEL_IP" "$(t recap_through)"
+      row "$(t recap_panel)" "$through"
     fi
     was=""
     [ -z "$ENDPOINT_CHANGED" ] || was="$(t recap_was "$OLD_ENDPOINT")"
-    printf '    %-16s %s%s\n' "$(t recap_vpn)" "$(t recap_vpn_line "$VPN_PORT" "${VPN_HOST:-${CUR_HOST:-$(t recap_vpn_auto)}}")" "$was"
+    row "$(t recap_vpn)" "$(t recap_vpn_line "$VPN_PORT" "${VPN_HOST:-${CUR_HOST:-$(t recap_vpn_auto)}}")$was"
   else
-    printf '    %-16s %s\n' "$(t recap_panel)" "$panel"
+    row "$(t recap_panel)" "$C$panel$N"
   fi
-  printf '    %-16s %s\n    %-16s %s\n' "$(t recap_data)" "$DATA" "$(t recap_volumes)" "$SRV"
-  printf '    %-16s %s   PUID/PGID %s/%s\n' "$(t recap_tz)" "$TZ_NAME" "$PUID" "$PGID"
-  [ -z "$UPDATE" ] || printf '\n  %s\n' "$(t recap_update)"
+  row "$(t recap_data)" "$DATA"; row "$(t recap_volumes)" "$SRV"
+  row "$(t recap_tz)" "$TZ_NAME   ${D}PUID/PGID$N $PUID/$PGID"
+  [ -z "$UPDATE" ] || { printf '\n'; emit "  $Y" "  $Y" "$(t recap_update)"; }
   printf '\n'
 }
 
@@ -886,41 +925,43 @@ write_env() {
 
 summary() {  # the panel first (URL, account), then the VPN as the mode needs it
   if [ "$ACCESS" = "vpn" ]; then url="https://$PANEL_IP:8443"; else url="https://$(display_host):$PORT"; fi
-  bar="======================================"
-  printf '\n%s\n%s\n%s\n\n%s\n%s\n\n' "$bar" "$(t ready)" "$bar" "$(t f_url)" "$url"
+  title "✓ $(t ready)" "$G"
+  printf '\n'
+  row "$(t f_url)" "$C$url$N"
   case "$ADMIN" in
     created|secured)
-      printf '%s\n%s\n\n%s\n%s\n\n%s\n\n%s\n' "$(t f_user)" "$ADMIN_USER" "$(t f_password)" \
-        "$ADMIN_PASSWORD" "$bar" "$(t f_once)" ;;
-    *) printf '%s\n%s\n\n%s\n\n' "$(t f_password)" "$(t f_unchanged "$CONTAINER")" "$bar" ;;
+      row "$(t f_user)" "$B$ADMIN_USER$N"
+      row "$(t f_password)" "$Y$ADMIN_PASSWORD$N"
+      printf '\n'; emit "  $Y! " "    $Y" "$(t f_once)" ;;
+    *) row "$(t f_password)" "$D$(t f_unchanged "$CONTAINER")$N" ;;
   esac
-  line f_cert
+  printf '\n'; emit "  $D" "  $D" "$(t f_cert)"
   printf '\n'
   case "$ACCESS" in
     lan) line f_lan_later ;;
     vpn+lan)  # optional: never waited for, never a QR code here (D14)
       if [ -n "$ENDPOINT_CHANGED" ]; then
-        line f_vpn_updating; line f_through "$PANEL_IP"; line f_file "$DATA/admin.conf"
+        emit "  $B" "" "$(t f_vpn_updating)"; line f_through "$PANEL_IP"; line f_file "$DATA/admin.conf"
         line f_qr "$CONTAINER"
       elif [ -f "$DATA/admin.conf" ]; then
-        line f_vpn_available; line f_through "$PANEL_IP"; line f_file "$DATA/admin.conf"
+        emit "  $B" "" "$(t f_vpn_available)"; line f_through "$PANEL_IP"; line f_file "$DATA/admin.conf"
         line f_qr "$CONTAINER"
       else
-        line f_vpn_setup; line f_through "$PANEL_IP"; line f_qr_panel "$CONTAINER"
+        emit "  $B" "" "$(t f_vpn_setup)"; line f_through "$PANEL_IP"; line f_qr_panel "$CONTAINER"
       fi
       line f_udp "$VPN_PORT" ;;
     vpn)  # the only way in: wait for it, then the steps and the QR code, last
       if [ -n "$ENDPOINT_CHANGED" ]; then wait_admin_vpn "$BEFORE_START"; else wait_admin_vpn ""; fi
-      printf '\n%s\n' "$(t f_steps)"
+      printf '\n'; emit "  $B" "" "$(t f_steps)"
       line f_step1; line f_step2 "$VPN_PORT"; line f_step3 "$DATA/admin.conf"; line f_step4 "$PANEL_IP"
       printf '\n'
       if [ -n "${VPN_READY:-}" ]; then
         docker exec "$CONTAINER" python -m hivora admin-vpn | sed 1d
       fi
       line f_again "$CONTAINER"; line f_newkeys; line f_fallback ;;
-    public) printf '\033[1;31m!!\033[0m %s\n' "$(t f_public)" ;;
+    public) emit "  $R!! " "     $R" "$(t f_public)" ;;
   esac
-  printf '\n'; line f_options "$ENV_FILE" "$CONTAINER" "$CONTAINER" "$SRV"; printf '\n'
+  printf '\n'; emit "  $D" "  $D" "$(t f_options "$ENV_FILE" "$CONTAINER" "$CONTAINER" "$SRV")"; printf '\n'
 }
 
 main() {
@@ -962,6 +1003,7 @@ main() {
   confirm_public
   recap
   ask continue y || die cancelled
+  title "$(t steps_title)"
 
   run mkdir -p "$DATA" "$SRV"
   run chmod 700 "$DATA"
