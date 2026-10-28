@@ -289,6 +289,8 @@ export const fr = {
   "topology.png": "Exporter en PNG",
   "topology.json": "Exporter en JSON",
   "topology.noZone": "Sans zone",
+  "topology.panel.help": "Le panel Hivora lui-même (interface et API, un seul conteneur). Il rejoint le réseau de cette zone pour être joignable par le VPN d'administration.",
+  "topology.panel.version": "Version {version}",
   "topology.apps": "{n} app(s)",
   "topology.services": "Services : {services}",
   "topology.openApp": "Ouvrir l'app",

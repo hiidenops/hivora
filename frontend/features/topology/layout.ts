@@ -27,7 +27,8 @@ const ZONES_PER_ROW = 3;
 export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): { nodes: Node[]; edges: Edge[] } {
   const nodes = graph.nodes as GNode[];
   const zones = nodes.filter((n) => n.type === "zone");
-  const apps = nodes.filter((n) => n.type === "app");
+  // The panel (Hivora itself) sits in its zone like an app card.
+  const apps = nodes.filter((n) => n.type === "app" || n.type === "panel");
   const declared = nodes.filter((n) => n.type === "declared");
   const sites = nodes.filter((n) => n.type === "site");
   const sitesOf = (a: GNode) => sites.filter((s) => s.host === a.key);
@@ -79,13 +80,13 @@ export function toFlow(graph: Graph, level: Level, saved: Graph["positions"]): {
       y += rowH + 60;
       rowH = 0;
     }
-    out.push({ id: z.key, type: "zone", position: pos(z.key, x, y), data: { ...z, count: children.length, level, minW: auto.w, minH: auto.h }, style: { width: w, height: h }, zIndex: -1 });
+    out.push({ id: z.key, type: "zone", position: pos(z.key, x, y), data: { ...z, count: children.filter((a) => a.type === "app").length, level, minW: auto.w, minH: auto.h }, style: { width: w, height: h }, zIndex: -1 });
     if (level !== "zones") {
       placed.forEach(({ a, col, top, own, h }) => {
         const left = PAD + col * (APP_W + GAP);
         out.push({
           id: a.key,
-          type: "app",
+          type: a.type,
           parentId: z.key,
           position: pos(a.key, left, HEADER + top),
           data: { ...a, level, zoneColor: z.color, sitePorts: own.map((s) => s.port), hosts: own.length > 0 },

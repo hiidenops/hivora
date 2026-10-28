@@ -8,6 +8,7 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ### Corrigé
 
+- **Topologie** : le panel Hivora lui-même apparaît dans la zone dont il a rejoint le réseau (Administration, dans les modes VPN), avec son port sur le réseau local et son adresse par le VPN.
 - **Topologie** : le schéma suit le thème choisi dans Hivora (clair ou sombre), plus celui du système ; en sombre sur un système clair, ses textes étaient noirs.
 
 ### Modifié

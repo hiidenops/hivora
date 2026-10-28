@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
-import { Globe, House, Router, Shield, ShieldCheck, StickyNote, Monitor } from "lucide-react";
+import { Globe, House, LayoutDashboard, Router, Shield, ShieldCheck, StickyNote, Monitor } from "lucide-react";
 
 import { AppIcon } from "@/components/app-icon";
 import type { AppStatus } from "@/lib/api/client";
@@ -70,6 +70,31 @@ export function AppNode({ data, selected }: NodeProps) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Hivora itself (API and UI, one container), in the zone whose network it joined. */
+export function PanelNode({ data, selected }: NodeProps) {
+  const { t } = useI18n();
+  const d = data as { address: string; ports: { port: number; protocol: string; host_ip: string | null }[]; zoneColor?: string | null };
+  return (
+    <div className={cn("rounded-md border border-l-4 bg-card px-2 py-1.5 shadow-sm", selected && "ring-2 ring-ring")} style={{ borderLeftColor: d.zoneColor ?? "var(--muted-foreground)" }}>
+      {handles}
+      <div className="flex items-center gap-1.5" title={t("topology.panel.help")}>
+        <LayoutDashboard className="size-5 shrink-0 text-primary" />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium">Hivora</span>
+        <span className="size-2 shrink-0 rounded-full bg-ok" />
+      </div>
+      <div className="mt-1 flex flex-wrap gap-0.5">
+        {d.ports.map((p) => (
+          <span key={`${p.host_ip}${p.port}`} className={cn("rounded px-1 font-mono text-[9px] leading-4", EXPOSURE[p.host_ip === "0.0.0.0" ? "public" : "lan"])}>
+            {p.host_ip === "0.0.0.0" ? "WAN " : "LAN "}
+            {p.port}/{p.protocol}
+          </span>
+        ))}
+        <span className={cn("rounded px-1 font-mono text-[9px] leading-4", EXPOSURE.vpn)}>VPN {d.address}</span>
+      </div>
     </div>
   );
 }
@@ -144,4 +169,4 @@ export function DeclaredNode({ data, selected }: NodeProps) {
   );
 }
 
-export const nodeTypes = { zone: ZoneNode, app: AppNode, site: SiteNode, internet: InternetNode, declared: DeclaredNode, firewall: FirewallNode };
+export const nodeTypes = { zone: ZoneNode, app: AppNode, panel: PanelNode, site: SiteNode, internet: InternetNode, declared: DeclaredNode, firewall: FirewallNode };

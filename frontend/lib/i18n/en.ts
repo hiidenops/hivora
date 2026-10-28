@@ -290,6 +290,8 @@ export const en: Record<MessageKey, string> = {
   "topology.png": "Export as PNG",
   "topology.json": "Export as JSON",
   "topology.noZone": "No zone",
+  "topology.panel.help": "The Hivora panel itself (UI and API, one container). It joins this zone's network to be reachable through the admin VPN.",
+  "topology.panel.version": "Version {version}",
   "topology.apps": "{n} app(s)",
   "topology.services": "Services: {services}",
   "topology.openApp": "Open the app",

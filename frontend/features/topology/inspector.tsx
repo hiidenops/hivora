@@ -161,10 +161,17 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
       {node.type === "zone" && (
         <>
           <p className="text-muted-foreground">{t(`topology.mode.${node.network_mode}` as "topology.mode.none")}</p>
-          <p>{t("topology.apps", { n: nodes.filter((n) => n.parent === node.key).length })}</p>
+          <p>{t("topology.apps", { n: nodes.filter((n) => n.parent === node.key && n.type === "app").length })}</p>
           <Button size="sm" variant="outline" asChild>
             <Link href="/zones/">{t("topology.openZones")}</Link>
           </Button>
+        </>
+      )}
+      {node.type === "panel" && (
+        <>
+          <p className="text-muted-foreground">{t("topology.panel.help")}</p>
+          <p>{t("topology.panel.version", { version: String(node.version) })}</p>
+          <p className="font-mono text-xs">https://{String(node.address)}:8443</p>
         </>
       )}
       {node.type === "firewall" && (

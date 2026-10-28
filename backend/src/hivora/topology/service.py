@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hivora import __version__
 from hivora.apps.adoption import Adoption
 from hivora.apps.core import latest_revision
 from hivora.apps.models import Exposure, Origin
@@ -30,6 +31,7 @@ from hivora.zones import NetworkMode, Zone
 INTERNET = "internet"
 FIREWALL = "firewall"
 NO_ZONE = "zone:none"
+PANEL = "panel"
 
 
 @dataclass
@@ -140,6 +142,7 @@ class GraphBuilder:
             graph.nodes.append({"key": NO_ZONE, "type": "zone", "label": None, "slug": None,
                                 "color": None, "network_mode": "none"})  # fmt: skip
 
+        self._panel(graph, by_slug, zone_key)
         app_by_slug = {a.slug: a.id for a in apps}
         behind = {
             slug[1:] for reach in vpn_reach.values() for slug in reach if slug.startswith("@")
@@ -231,6 +234,24 @@ class GraphBuilder:
                 graph.edges.append({"id": e.id, "source": e.source, "target": e.target,
                                     "kind": "declared", "label": e.label})  # fmt: skip
         return graph
+
+    def _panel(self, graph: Graph, by_slug: dict[str, Zone], zone_key: dict[int, str]) -> None:
+        """Hivora itself (API and UI, one container), as Docker sees it: in the zone whose
+        network it joined (Administration, in the VPN modes). Not an app: nothing to manage."""
+        panel = next((c for c in self.store.containers() if c.labels.get("io.hivora.self")
+                      and not c.labels.get("io.hivora.agent")), None)  # fmt: skip
+        if panel is None:
+            return
+        for network, ip in zip(panel.networks, panel.ips, strict=False):
+            zone = by_slug.get(network.removeprefix("hivora-zone-"))
+            if network.startswith("hivora-zone-") and zone:
+                graph.nodes.append({
+                    "key": PANEL, "type": "panel", "parent": zone_key[zone.id], "label": "Hivora",
+                    "version": __version__, "address": ip,
+                    "ports": [{"port": p.host_port, "protocol": p.protocol, "host_ip": p.host_ip}
+                              for p in panel.ports],
+                })  # fmt: skip
+                return
 
 
 def _address_on(store: StateStore, slug: str, network: str) -> str | None:

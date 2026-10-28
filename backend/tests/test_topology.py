@@ -199,3 +199,33 @@ def test_each_hosted_site_is_a_node_linked_from_its_nginx(client: Any) -> None:
     links = [(e["source"], e["target"], e["label"]) for e in graph["edges"] if e["kind"] == "site"]
     assert links == [(app_key, n["key"], f":{n['port']}") for n in sites]
     assert not any(n["host"] == f"app:{plain['app']['id']}" for n in sites)  # hosts no sites
+
+
+def test_the_panel_in_the_zone_whose_network_it_joined(client: Any) -> None:
+    from hivora.docker_gateway.models import ContainerInfo, ContainerState, PublishedPort
+
+    admin(client)
+    body = {"name": "Administration", "color": "#64748b", "network_mode": "shared"}
+    assert client.post(f"{API}/zones", json=body).status_code == 201
+    store = client.app.state.runtime.state.store
+    # The host agent is Hivora's too, but not the panel; the panel on the LAN only: no node.
+    store.upsert(ContainerInfo(id="agent", name="hivora-host-agent", image="hivora",
+                               state=ContainerState.RUNNING,
+                               labels={"io.hivora.self": "true", "io.hivora.agent": "host"},
+                               networks=("hivora-zone-administration",),
+                               ips=("10.254.254.9",)))  # fmt: skip
+    lan = (PublishedPort(8443, "tcp", "192.168.1.10", 8443),)
+    store.upsert(ContainerInfo(id="self", name="hivora", image="hivora", ports=lan,
+                               state=ContainerState.RUNNING, labels={"io.hivora.self": "true"},
+                               networks=("bridge",), ips=("172.17.0.2",)))  # fmt: skip
+    assert "panel" not in by_key(client.get(f"{API}/topology").json())
+    # VPN + LAN: on the Administration zone's network at its fixed address.
+    store.upsert(ContainerInfo(id="self", name="hivora", image="hivora", ports=lan,
+                               state=ContainerState.RUNNING, labels={"io.hivora.self": "true"},
+                               networks=("bridge", "hivora-zone-administration"),
+                               ips=("172.17.0.2", "10.254.254.254")))  # fmt: skip
+    nodes = by_key(client.get(f"{API}/topology").json())
+    panel = nodes["panel"]
+    assert nodes[panel["parent"]]["label"] == "Administration" and panel["label"] == "Hivora"
+    assert panel["address"] == "10.254.254.254"
+    assert panel["ports"] == [{"port": 8443, "protocol": "tcp", "host_ip": "192.168.1.10"}]
