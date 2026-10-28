@@ -436,7 +436,10 @@ start_wt() {
   case "${HIVORA_UI:-}" in
     text) return 0 ;;
     whiptail) ;;
-    *) [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && command -v whiptail >/dev/null 2>&1 || return 0 ;;
+    *) [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && command -v whiptail >/dev/null 2>&1 || return 0
+       # `curl | sudo sh`: sudo (use_pty) leaves the user's terminal line by line when its
+       # input is a pipe; the arrow keys would never reach the window. Text questions work.
+       [ -t 0 ] || [ -z "${SUDO_USER:-}" ] || return 0 ;;
   esac
   size="$(stty size <&3 2>/dev/null || true)"
   rows="${size% *}" cols="${size#* }"
