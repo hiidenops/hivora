@@ -111,7 +111,7 @@ def test_one_request_per_12_hours_and_only_the_user_agent(tmp_path: Path) -> Non
         r = c.get(f"{API}/system/releases").json()
         assert r["enabled"] and r["channel"] == "stable" and r["available"]
         assert r["current"] == __version__ and r["latest"]["version"] == "0.1.0"
-        assert r["newer"] is (__version__ != "0.1.0")
+        assert r["newer"] is newer(__version__, "v0.1.0")  # 0.2.0 installed: not newer
         assert r["command"].endswith('/releases/download/v0.1.0/install.sh)"')
         url, headers = github.calls[0]
         assert url == "https://api.github.com/repos/hiidenops/hivora/releases?per_page=30"
