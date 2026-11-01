@@ -6,6 +6,16 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.0] - 2026-11-01
+
+### Ajouté
+
+- **Catalogue** : un badge « Adapté à Hivora » signale les modèles retravaillés et testés pour le panel (WireGuard, Minecraft, Vaultwarden, MariaDB, PostgreSQL). Un modèle le reçoit avec `metadata.verified: true`.
+
+### Corrigé
+
+- **VPN** : à la première installation, les clients WireGuard ne se connectaient pas. Démarrée sans configuration, l'image supprimait la route par défaut du conteneur, et les réponses aux clients ne repartaient plus ; Hivora la remet avant de monter le tunnel.
+
 ## [0.2.0] - 2026-10-29
 
 ### Ajouté
