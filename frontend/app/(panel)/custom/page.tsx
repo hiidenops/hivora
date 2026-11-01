@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { Plus, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
@@ -19,12 +20,13 @@ import { useI18n } from "@/lib/i18n";
 type Image = components["schemas"]["ImageOut"];
 type Port = components["schemas"]["CustomPortIn"];
 type Env = components["schemas"]["CustomEnvIn"];
+type Used = components["schemas"]["ImageUsedOut"];
 
 const section = "surface grid gap-4 rounded-xl border p-5";
 
 /** Any registry image, as an app Hivora manages like the others. */
 export default function CustomImagePage() {
-  const { t, errorMessage } = useI18n();
+  const { t, lang, errorMessage } = useI18n();
   const { data: zones } = useZones();
   const [ref, setRef] = useState("");
   const [image, setImage] = useState<Image | null>(null);
@@ -49,10 +51,12 @@ export default function CustomImagePage() {
       setBusy(false);
     }
   };
-  const inspect = (e: FormEvent) => {
-    e.preventDefault();
+  const { data: history } = useQuery({ queryKey: ["images", "history"], queryFn: () => api<Used[]>("/apps/images/history") });
+  const inspect = (e?: FormEvent, again?: string) => {
+    e?.preventDefault();
+    if (again) setRef(again);
     void run(async () => {
-      const found = await api<Image>("/apps/images/inspect", { query: { ref } });
+      const found = await api<Image>("/apps/images/inspect", { query: { ref: again ?? ref } });
       setImage(found);
       setName(found.name.split("/").pop() ?? found.name);
       setPorts(found.ports.map((p, i) => ({ ...p, web: i === 0 && p.protocol === "tcp" })));
@@ -98,6 +102,25 @@ export default function CustomImagePage() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">{t("custom.imageHelp")}</p>
+          {!image && (history ?? []).length > 0 && (
+            <div className="grid gap-2 border-t pt-4">
+              <h2 className="text-sm font-medium">{t("custom.history")}</h2>
+              <p className="text-xs text-muted-foreground">{t("custom.historyHelp")}</p>
+              <ul className="divide-y rounded-lg border">
+                {history?.map((h) => (
+                  <li key={h.image} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                    <span className="font-mono">{h.image}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(h.last_used).toLocaleDateString(lang)} · {h.apps.length ? t("custom.usedBy", { apps: h.apps.join(", ") }) : t("custom.unused")}
+                    </span>
+                    <Button type="button" size="sm" variant="outline" className="ml-auto" disabled={busy} onClick={() => inspect(undefined, h.image)}>
+                      {t("custom.reuse")}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {image && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-mono">

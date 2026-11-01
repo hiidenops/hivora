@@ -174,6 +174,24 @@ def test_a_zone_reached_by_a_vpn_publishes_nothing(client: Any) -> None:
     assert cube["behind_vpn"] is True
     assert not any(e["kind"] == "exposed" and e["target"] == cube["key"] for e in graph["edges"])
 
+    # Behind the VPN, the address shown is the app's own on the zone network, with the
+    # port it listens on (Stirling PDF: 8080, published as 8081 elsewhere).
+    from hivora.docker_gateway import ContainerInfo, ContainerState
+
+    pdf = client.post(f"{API}/apps", json={"template": "stirling-pdf", "name": "pdf",
+                                           "inputs": {}, "zone": "prive"}).json()  # fmt: skip
+    assert wait_job(client, pdf["job"]["id"])["status"] == "succeeded"
+    gw.put(ContainerInfo(
+        id="pdf1", name="pdf-server-1", image="s", state=ContainerState.RUNNING,
+        labels={"io.hivora.app": "pdf", "com.docker.compose.service": "server"},
+        networks=("pdf_default", "hivora-zone-prive"), ips=("172.30.0.2", "10.8.1.7"),
+    ), "start")  # fmt: skip
+    deadline = time.monotonic() + 5
+    while "web_vpn" not in (shown := client.get(f"{API}/apps/{pdf['app']['id']}").json()["access"]):
+        assert time.monotonic() < deadline
+        time.sleep(0.05)
+    assert shown == {"web_vpn": "http://10.8.1.7:8080"}
+
     # A zone has one VPN; it keeps its network and cannot go while a VPN reaches it.
     other = client.post(
         f"{API}/apps",

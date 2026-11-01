@@ -1,6 +1,7 @@
 """Application commands. Every mutation is recorded as intent, then run as a job."""
 
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -166,12 +167,34 @@ class AppService:
         for key, value in local.items():
             if access.get(key) != value:
                 access[f"{key}_lan"] = value
+        # The ports really published (what the topology shows): a compose written by hand
+        # may publish another host port than the form's, or none.
+        real = {(svc.name, p.container_port, p.protocol): p.host_port
+                for svc in app.services for p in svc.ports}  # fmt: skip
+        moved: dict[int, int | None] = {}  # the template's host port -> the real one
+        to_container: dict[int, int] = {}
+        # The form's host port -> the container's, as the template maps them (in a VPN zone
+        # nothing is published: the mapping comes from the template as if it were).
+        mapped = compiled if not vpn_zone else compile_template(
+            entry.template, replace(ctx, vpn_only=False), host, form, self.settings.volumes_root,
+            overrides,
+        )  # fmt: skip
+        for svc in mapped.services:
+            for p in svc.ports:
+                if p.host_port:
+                    to_container[p.host_port] = p.container_port
+                    moved[p.host_port] = real.get((svc.name, p.container_port, p.protocol))
+        published = {h for h in real.values() if h}
+        for key, value in list(access.items()):
+            m = re.search(r":(\d{1,5})(?=/|$)", value)
+            if m and (now := moved.get(int(m.group(1)))) and now != int(m.group(1)):
+                access[key] = f"{value[: m.start(1)]}{now}{value[m.end(1) :]}"
         # A port not published has no host address; in a zone a VPN reaches, the app is
-        # reached at its own address on the zone's network, by VPN clients.
-        published = {p.host_port for svc in compiled.services for p in svc.ports if p.host_port}
+        # reached at its own address on the zone's network (the container's port).
+        hostport = re.compile(r"[\w.\-\[\]]+:(\d{1,5})(?=/|$)")
         unpublished = {
-            key: m.group(1) for key, value in access.items()
-            if (m := re.search(r":(\d{1,5})(?:/|$)", value)) and int(m.group(1)) not in published
+            key: value for key, value in access.items()
+            if (m := hostport.search(value)) and int(m.group(1)) not in published
         }  # fmt: skip
         for key in unpublished:
             access.pop(key)
@@ -179,10 +202,13 @@ class AppService:
             ip = next((ip for c in self.state.containers() if self.state.key_of(c) == app.slug
                        for net, ip in zip(c.networks, c.ips, strict=False)
                        if net == zone_network(zone)), None)  # fmt: skip
-            if ip:
-                for key, port in unpublished.items():
+            if ip:  # same address form (http://...), the app's own IP and container port
+                for key, value in unpublished.items():
                     if not key.endswith("_lan"):
-                        access[f"{key}_vpn"] = f"{ip}:{port}"
+                        port = int(hostport.search(value).group(1))  # type: ignore[union-attr]
+                        access[f"{key}_vpn"] = hostport.sub(
+                            f"{ip}:{to_container.get(port, port)}", value, count=1
+                        )
         return access
 
     @staticmethod

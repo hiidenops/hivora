@@ -5,6 +5,7 @@ and the other deployment routes after them, and that order is kept. `deploy` (pa
 is registered by the parent router: FastAPI refuses an empty path in an included router.
 """
 
+from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Query
@@ -97,6 +98,19 @@ async def inspect_image(_: Operator, rt: RuntimeDep, ref: str = Query(max_length
         volumes=info.volumes,
         env=[CustomEnvIn(key=k, value=v) for k, v in info.env.items()],
     )  # fmt: skip
+
+
+class ImageUsedOut(BaseModel):
+    image: str  # name:tag
+    digest: str  # the one pinned the last time
+    last_used: datetime
+    apps: list[str]  # apps that still run it
+
+
+@router.get("/images/history")
+async def image_history(_: Operator, rt: RuntimeDep) -> list[ImageUsedOut]:
+    """Free images deployed so far, newest first: the free image form offers them again."""
+    return [ImageUsedOut(**h) for h in await rt.apps.custom.history()]
 
 
 async def _custom(rt: RuntimeDep, body: CustomIn) -> DeployRequest:

@@ -99,6 +99,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/images/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Image History
+         * @description Free images deployed so far, newest first: the free image form offers them again.
+         */
+        get: operations["image_history_api_v1_apps_images_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/images/inspect": {
         parameters: {
             query?: never;
@@ -3006,6 +3026,20 @@ export interface components {
             /** Volumes */
             volumes: string[];
         };
+        /** ImageUsedOut */
+        ImageUsedOut: {
+            /** Apps */
+            apps: string[];
+            /** Digest */
+            digest: string;
+            /** Image */
+            image: string;
+            /**
+             * Last Used
+             * Format: date-time
+             */
+            last_used: string;
+        };
         /** IntegrationsOut */
         IntegrationsOut: {
             /** Curseforge Api Key Set */
@@ -4499,6 +4533,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CandidateOut"][];
+                };
+            };
+        };
+    };
+    image_history_api_v1_apps_images_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageUsedOut"][];
                 };
             };
         };

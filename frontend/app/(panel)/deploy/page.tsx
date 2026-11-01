@@ -16,7 +16,7 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GeneratedForm, initialValues, type FieldDef, type Values } from "@/features/deploy/generated-form";
 import { ApiError, type Plan } from "@/lib/api/client";
-import { useDeploy, usePlan, useTemplate, useZones } from "@/lib/api/hooks";
+import { useApp, useDeploy, usePlan, useTemplate, useZones } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -282,14 +282,7 @@ function Deploy() {
           </CardHeader>
           <CardContent className="grid gap-4">
             <JobProgress jobId={result.jobId} onFinished={setFinished} />
-            {finished === "succeeded" && plan && Object.keys(plan.access).length > 0 && (
-              <div>
-                <h4 className="mb-2 text-sm font-medium">{t("deploy.access")}</h4>
-                {Object.entries(plan.access).map(([k, v]) => (
-                  <CodeView key={k} code={v} />
-                ))}
-              </div>
-            )}
+            {finished === "succeeded" && <Addresses appId={result.appId} />}
             {finished && (
               <Button asChild className="justify-self-start">
                 <Link href={`/app/?id=${result.appId}`}>{t("deploy.goToApp")}</Link>
@@ -299,6 +292,27 @@ function Deploy() {
         </Card>
       )}
     </>
+  );
+}
+
+/** Where the installed app is reached: its real addresses (the ports really published, its
+ *  address through the VPN), as its page shows them; not the plan's guess. */
+function Addresses({ appId }: { appId: number }) {
+  const { t } = useI18n();
+  const { data: app } = useApp(appId);
+  const entries = Object.entries(app?.access ?? {});
+  if (!entries.length) return null;
+  const where = (key: string) => (key.endsWith("_vpn") ? "vpn" : key.endsWith("_lan") ? "lan" : "direct");
+  return (
+    <div className="grid gap-2">
+      <h4 className="text-sm font-medium">{t("deploy.access")}</h4>
+      {entries.map(([k, v]) => (
+        <div key={k} className="grid gap-1">
+          <span className="text-xs text-muted-foreground">{t(`deploy.address.${where(k)}` as MessageKey)}</span>
+          <CodeView code={v} />
+        </div>
+      ))}
+    </div>
   );
 }
 

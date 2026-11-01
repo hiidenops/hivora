@@ -111,3 +111,23 @@ def test_compiler_rejects_unknown_service() -> None:
     with pytest.raises(ValidationError):
         compile_template(t, AppContext("coffre", "Coffre", 1), HostInfo(), form, Path("/srv"),
                          Overrides.model_validate({"services": {"nope": {"cpus": 1}}}))  # fmt: skip
+
+
+def test_shown_address_follows_the_port_a_hand_written_compose_publishes(client: Any) -> None:
+    """Stirling PDF publishes its 8080 on the form's port (8081 by default); a compose
+    written by hand that publishes 8080 instead: the address shown says 8080 too."""
+    admin(client)
+    body = {"template": "stirling-pdf", "name": "PDF", "inputs": {}}
+    deployed = client.post(f"{API}/apps", json=body).json()
+    assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
+    app_id = deployed["app"]["id"]
+    assert client.get(f"{API}/apps/{app_id}").json()["access"]["web"].endswith(":8081")
+
+    text = client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"]
+    assert "published: '8081'" in text
+    edited = text.replace("published: '8081'", "published: '8080'")
+    job = client.put(f"{API}/apps/{app_id}/compose", json={"compose_yaml": edited}).json()
+    assert wait_job(client, job["id"])["status"] == "succeeded"
+    detail = client.get(f"{API}/apps/{app_id}").json()
+    assert detail["access"]["web"] == "http://192.168.1.10:8080"
+    assert [(p["host_port"], p["container_port"]) for p in detail["ports"]] == [(8080, 8080)]

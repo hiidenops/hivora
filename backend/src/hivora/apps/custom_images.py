@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from hivora.apps.core import DeployRequest, UnsupportedArchitectureError, slugify
+from hivora.apps.models import Application
 from hivora.core.clock import Clock
 from hivora.core.errors import ValidationError
 from hivora.images.registry import ImageInfo, Registry
@@ -66,6 +67,34 @@ class CustomImages:
                     self.catalog.add_custom(text)
                 except TemplateInvalidError:  # pragma: no cover - written by us
                     continue
+
+    async def history(self, limit: int = 30) -> list[dict[str, Any]]:
+        """Free images deployed so far, newest first, one per image and tag (its pinned
+        digest the latest one), with the apps that still run it. Read from their generated
+        templates, kept after the apps are removed."""
+        async with self.sessions() as session:
+            rows = (await session.execute(
+                select(TemplateVersion.id, TemplateVersion.manifest, TemplateVersion.created_at)
+                .where(TemplateVersion.source == CUSTOM_SOURCE)
+                .order_by(TemplateVersion.created_at.desc())
+            )).all()  # fmt: skip
+            users: dict[int, list[str]] = {}
+            for version_id, name in await session.execute(
+                select(Application.template_version_id, Application.name)
+                .where(Application.template_version_id.in_([r[0] for r in rows]))
+            ):  # fmt: skip
+                users.setdefault(version_id, []).append(name)
+        out: dict[str, dict[str, Any]] = {}
+        for version_id, text, created_at in rows:
+            svc: dict[str, Any] = next(
+                iter((yaml.safe_load(text).get("services") or {}).values()), {}
+            )
+            tag, _, digest = str(svc.get("tag", "")).partition("@")
+            image = f"{svc.get('image')}:{tag}"
+            seen = out.setdefault(image, {"image": image, "digest": digest,
+                                          "last_used": created_at, "apps": []})  # fmt: skip
+            seen["apps"] += users.get(version_id, [])
+        return list(out.values())[:limit]
 
     async def inspect_cached(self, ref: str) -> ImageInfo:
         # ponytail: in-memory 10 min cache per image, enough for a page refreshed often

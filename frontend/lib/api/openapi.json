@@ -2063,6 +2063,38 @@
         "title": "ImageOut",
         "type": "object"
       },
+      "ImageUsedOut": {
+        "properties": {
+          "apps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Apps",
+            "type": "array"
+          },
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
+          "image": {
+            "title": "Image",
+            "type": "string"
+          },
+          "last_used": {
+            "format": "date-time",
+            "title": "Last Used",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image",
+          "digest",
+          "last_used",
+          "apps"
+        ],
+        "title": "ImageUsedOut",
+        "type": "object"
+      },
       "IntegrationsOut": {
         "properties": {
           "curseforge_api_key_set": {
@@ -5893,7 +5925,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.3.0"
+    "version": "0.3.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6111,6 +6143,32 @@
           }
         },
         "summary": "Discover",
+        "tags": [
+          "apps"
+        ]
+      }
+    },
+    "/api/v1/apps/images/history": {
+      "get": {
+        "description": "Free images deployed so far, newest first: the free image form offers them again.",
+        "operationId": "image_history_api_v1_apps_images_history_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImageUsedOut"
+                  },
+                  "title": "Response Image History Api V1 Apps Images History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Image History",
         "tags": [
           "apps"
         ]

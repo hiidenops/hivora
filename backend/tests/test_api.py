@@ -520,6 +520,16 @@ def test_free_image_deploys_like_a_template_app(client: TestClient) -> None:
     assert bad.status_code == 422
     assert host_arch() in ("amd64", "arm64")
 
+    # The images used so far, offered again; still listed once the app is removed.
+    history = client.get(f"{API}/apps/images/history").json()
+    assert [(h["image"], h["digest"], h["apps"]) for h in history] == [
+        ("grafana/grafana:12.2.0", "sha256:" + "a" * 64, ["Grafana"])
+    ]
+    assert wait_job(client, client.delete(f"{API}/apps/{app_id}").json()["id"])["status"] == (
+        "succeeded"
+    )
+    assert client.get(f"{API}/apps/images/history").json()[0]["apps"] == []
+
 
 def test_deploy_access_choice_publishes_on_the_internet_or_the_lan_only(
     client: TestClient,
