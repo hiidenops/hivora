@@ -6,6 +6,18 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.2] - 2026-11-01
+
+### Ajouté
+
+- **Image libre** : la page liste les images déjà déployées (la plus récente d'abord, avec les apps qui les utilisent encore) ; « Reprendre » relit l'image dans son registre et pré-remplit le formulaire.
+
+### Corrigé
+
+- **Adresse affichée** : le panel montrait le port du formulaire (par exemple 8081 pour Stirling PDF) même quand le compose en publiait un autre ; il suit maintenant le port réellement publié, comme la topologie.
+- **App derrière un VPN** : son adresse par le VPN donne le port sur lequel elle écoute (8080 pour Stirling PDF), au format complet (`http://10.8.1.7:8080`), et non plus le port qu'elle aurait publié.
+- **Fin du déploiement** : les adresses affichées sont celles de l'app installée (réseau local, Internet, VPN), plus celles calculées avant le déploiement.
+
 ## [0.3.1] - 2026-11-01
 
 ### Modifié
