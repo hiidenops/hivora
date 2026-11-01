@@ -127,6 +127,7 @@ def test_deploy_flow_websocket_and_audit(client: TestClient) -> None:
     admin(client)
     templates = {t["slug"]: t for t in client.get(f"{API}/templates").json()}
     assert templates["vaultwarden"]["compatible"] is True
+    assert templates["vaultwarden"]["verified"] is True and templates["redis"]["verified"] is False
     detail = client.get(f"{API}/templates/minecraft").json()
     assert detail["form"]["basic"][0]["id"] == "eula"
     wg = client.get(f"{API}/templates/wireguard").json()["form"]["basic"][0]

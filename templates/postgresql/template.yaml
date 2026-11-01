@@ -14,6 +14,7 @@ metadata:
     site: https://www.postgresql.org
     doc: https://www.postgresql.org/docs/18/
   maintainer: hivora
+  verified: true
   license: PostgreSQL License (image)
   source: https://hub.docker.com/_/postgres
 requirements:

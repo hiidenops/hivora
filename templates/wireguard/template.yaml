@@ -14,6 +14,7 @@ metadata:
     site: https://www.wireguard.com
     doc: https://docs.linuxserver.io/images/docker-wireguard/
   maintainer: hivora
+  verified: true
   license: GPL-3.0 (image)
   source: https://github.com/linuxserver/docker-wireguard
 requirements:

@@ -625,6 +625,8 @@ export const fr = {
   "catalog.title": "Catalogue",
   "catalog.search": "Rechercher un template",
   "catalog.incompatible": "Incompatible avec ce serveur",
+  "catalog.verified": "Adapté à Hivora",
+  "catalog.verifiedHelp": "Modèle retravaillé et testé pour Hivora",
   "catalog.incompatibleHelp": "Aucune image de ce jeu n'existe pour le processeur de ce serveur (les serveurs Steam n'existent souvent qu'en x86).",
   "catalog.only.amd64": "x86 uniquement",
   "catalog.only.arm64": "ARM uniquement",

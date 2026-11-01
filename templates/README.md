@@ -2,6 +2,8 @@
 
 Templates `hivora/v1` (voir `docs/vision-prd-architecture.md`, section 8). Chaque image est épinglée par digest ; `latest` est interdit.
 
+`metadata.verified: true` : modèle retravaillé et testé pour Hivora, signalé par le badge « Adapté à Hivora » dans le catalogue (aujourd'hui : `wireguard`, `minecraft`, `vaultwarden`, `mariadb`, `postgresql`).
+
 ## Alpha V0.x
 
 Cinq templates multi-architecture (amd64 + arm64), testables sur toute machine :

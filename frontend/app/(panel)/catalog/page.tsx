@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWindow, ArrowLeft, Container, FileCode, Gamepad2 } from "lucide-react";
+import { AppWindow, ArrowLeft, BadgeCheck, Container, FileCode, Gamepad2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
@@ -122,6 +122,11 @@ function AppsCatalog({ kind }: { kind: Kind }) {
                 <div className="font-medium">{tp.name}</div>
                 <div className="font-mono text-xs text-muted-foreground">v{tp.version}</div>
               </div>
+              {tp.verified && (
+                <Badge className="ml-auto gap-1 border-ok/50 text-ok" title={t("catalog.verifiedHelp")}>
+                  <BadgeCheck className="size-3.5" /> {t("catalog.verified")}
+                </Badge>
+              )}
             </div>
             <p className="flex-1 text-sm text-muted-foreground">{l(tp.description)}</p>
             <div className="flex flex-wrap gap-1">

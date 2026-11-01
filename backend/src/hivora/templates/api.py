@@ -30,6 +30,7 @@ class TemplateSummary(BaseModel):
     description: Localized
     compatible: bool  # supports this host's CPU architecture
     arch: list[str]  # architectures the template runs on
+    verified: bool  # adapted and tested for Hivora
 
 
 class TemplateDetail(TemplateSummary):
@@ -57,6 +58,7 @@ def summary(rt: Runtime, entry: CatalogEntry) -> TemplateSummary:
         description=m.description,
         compatible=entry.supports(rt.catalog.host_arch()),
         arch=list(entry.template.requirements.arch),
+        verified=m.verified,
     )
 
 

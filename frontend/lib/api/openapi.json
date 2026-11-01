@@ -4980,6 +4980,10 @@
             "title": "Tags",
             "type": "array"
           },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
           "version": {
             "title": "Version",
             "type": "string"
@@ -4995,6 +4999,7 @@
           "description",
           "compatible",
           "arch",
+          "verified",
           "links",
           "requirements",
           "form",
@@ -5068,6 +5073,10 @@
             "title": "Tags",
             "type": "array"
           },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
           "version": {
             "title": "Version",
             "type": "string"
@@ -5082,7 +5091,8 @@
           "icon_url",
           "description",
           "compatible",
-          "arch"
+          "arch",
+          "verified"
         ],
         "title": "TemplateSummary",
         "type": "object"
@@ -5828,7 +5838,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "openapi": "3.1.0",
   "paths": {

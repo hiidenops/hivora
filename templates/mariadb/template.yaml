@@ -14,6 +14,7 @@ metadata:
     site: https://mariadb.org
     doc: https://mariadb.com/kb/en/documentation/
   maintainer: hivora
+  verified: true
   license: GPL-2.0 (image)
   source: https://hub.docker.com/_/mariadb
 requirements:

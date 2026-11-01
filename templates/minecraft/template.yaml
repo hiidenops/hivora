@@ -15,6 +15,7 @@ metadata:
     site: https://www.minecraft.net
     doc: https://docker-minecraft-server.readthedocs.io
   maintainer: hivora
+  verified: true
   license: Minecraft EULA
   source: https://hub.docker.com/r/itzg/minecraft-server
 requirements:

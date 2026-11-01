@@ -75,6 +75,7 @@ class Metadata(_Strict):
     description: Localized = ""
     links: dict[str, str] = {}
     maintainer: str | None = None
+    verified: bool = False  # adapted and tested for Hivora: badge in the catalog
     license: str | None = None
     source: str | None = None
 

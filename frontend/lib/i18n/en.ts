@@ -626,6 +626,8 @@ export const en: Record<MessageKey, string> = {
   "catalog.title": "Catalog",
   "catalog.search": "Search templates",
   "catalog.incompatible": "Not compatible with this server",
+  "catalog.verified": "Made for Hivora",
+  "catalog.verifiedHelp": "Template reworked and tested for Hivora",
   "catalog.incompatibleHelp": "No image of this game exists for this server's processor (Steam servers are often x86 only).",
   "catalog.only.amd64": "x86 only",
   "catalog.only.arm64": "ARM only",

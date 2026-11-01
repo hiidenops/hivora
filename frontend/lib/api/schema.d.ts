@@ -4026,6 +4026,8 @@ export interface components {
             slug: string;
             /** Tags */
             tags: string[];
+            /** Verified */
+            verified: boolean;
             /** Version */
             version: string;
         };
@@ -4049,6 +4051,8 @@ export interface components {
             slug: string;
             /** Tags */
             tags: string[];
+            /** Verified */
+            verified: boolean;
             /** Version */
             version: string;
         };
