@@ -131,7 +131,11 @@ def test_a_zone_reached_by_a_vpn_publishes_nothing(client: Any) -> None:
     admin(client)
     client.post(f"{API}/zones", json={"name": "Privé", "color": "#65a30d"})
     mc_body = {"template": "minecraft", "name": "cube", "inputs": {"eula": True}, "zone": "prive"}
-    vpn_body = {"template": "wireguard", "name": "vpn", "inputs": {"host": "vpn.example.org"}}
+    vpn_body: dict[str, Any] = {
+        "template": "wireguard",
+        "name": "vpn",
+        "inputs": {"host": "vpn.example.org"},
+    }
     mc = client.post(f"{API}/apps", json=mc_body).json()
     vpn = client.post(f"{API}/apps", json=vpn_body).json()
     for d in (mc, vpn):
