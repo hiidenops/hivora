@@ -66,6 +66,7 @@ from hivora.templates import (
 )
 from hivora.templates.models import TemplateVersion
 from hivora.templates.overrides import Overrides
+from hivora.zones import Zone, zone_network
 
 
 def vars_of_host(host: HostInfo) -> dict[str, Any]:
@@ -147,7 +148,10 @@ class AppService:
         latest = await latest_revision(session, app.id)
         if latest is None:
             return {}
-        ctx = AppContext(slug=app.slug, name=app.name, revision=latest.number)
+        zone = await session.get(Zone, app.zone_id) if app.zone_id else None
+        vpn_zone = zone is not None and zone.slug in await self.planner.vpn_zones(session)
+        ctx = AppContext(slug=app.slug, name=app.name, revision=latest.number,
+                         vpn_only=vpn_zone)  # fmt: skip
         form = FormValues(dict(latest.inputs))
         overrides = Overrides.model_validate(latest.overrides or {})
         host = self.planner.host
@@ -162,8 +166,8 @@ class AppService:
         for key, value in local.items():
             if access.get(key) != value:
                 access[f"{key}_lan"] = value
-        # A port no longer published (advanced settings) has no host address; behind a
-        # VPN, the app is reached at its own address on its network, by VPN clients.
+        # A port not published has no host address; in a zone a VPN reaches, the app is
+        # reached at its own address on the zone's network, by VPN clients.
         published = {p.host_port for svc in compiled.services for p in svc.ports if p.host_port}
         unpublished = {
             key: m.group(1) for key, value in access.items()
@@ -171,10 +175,10 @@ class AppService:
         }  # fmt: skip
         for key in unpublished:
             access.pop(key)
-        if unpublished and await self.planner.vpns_reaching(session, app.slug):
+        if unpublished and vpn_zone:
             ip = next((ip for c in self.state.containers() if self.state.key_of(c) == app.slug
                        for net, ip in zip(c.networks, c.ips, strict=False)
-                       if net == f"{app.slug}_default"), None)  # fmt: skip
+                       if net == zone_network(zone)), None)  # fmt: skip
             if ip:
                 for key, port in unpublished.items():
                     if not key.endswith("_lan"):

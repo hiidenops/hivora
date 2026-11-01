@@ -122,12 +122,15 @@ def test_declared_layer_edges_layout_errors_and_events(client: Any) -> None:
         bus.publish = real_publish
 
 
-def test_put_an_app_behind_the_vpn(client: Any) -> None:
+def test_a_zone_reached_by_a_vpn_publishes_nothing(client: Any) -> None:
+    import time
+
     import yaml
     from helpers import code
 
     admin(client)
-    mc_body = {"template": "minecraft", "name": "cube", "inputs": {"eula": True}}
+    client.post(f"{API}/zones", json={"name": "Privé", "color": "#65a30d"})
+    mc_body = {"template": "minecraft", "name": "cube", "inputs": {"eula": True}, "zone": "prive"}
     vpn_body = {"template": "wireguard", "name": "vpn", "inputs": {"host": "vpn.example.org"}}
     mc = client.post(f"{API}/apps", json=mc_body).json()
     vpn = client.post(f"{API}/apps", json=vpn_body).json()
@@ -135,47 +138,50 @@ def test_put_an_app_behind_the_vpn(client: Any) -> None:
         assert wait_job(client, d["job"]["id"])["status"] == "succeeded"
     mc_id, vpn_id = mc["app"]["id"], vpn["app"]["id"]
 
-    # 1. The game port is no longer published (reachable on Docker networks only).
-    settings = client.get(f"{API}/apps/{mc_id}/settings").json()
-    closed = {"services": {"server": {"publish": {"25565/tcp": "none"}}}}
-    change = {"inputs": settings["values"], "overrides": closed}
-    assert wait_job(client, client.put(f"{API}/apps/{mc_id}/settings", json=change).json()["id"])[
-        "status"] == "succeeded"  # fmt: skip
-    compose = yaml.safe_load(client.get(f"{API}/apps/{mc_id}/compose").json()["compose_yaml"])
-    server = compose["services"]["server"]
-    assert "25565/tcp" in server["expose"] and not any(
-        p["target"] == 25565 for p in server.get("ports", [])
-    )
+    def server() -> dict[str, Any]:
+        text = client.get(f"{API}/apps/{mc_id}/compose").json()["compose_yaml"]
+        return dict(yaml.safe_load(text)["services"]["server"])
 
-    access = client.get(f"{API}/apps/{mc_id}").json()["access"]
-    assert "game" not in access and "game_lan" not in access  # no host address any more
+    assert any(p["target"] == 25565 for p in server().get("ports", []))
 
-    # 2. The VPN joins its network.
-    job = client.put(f"{API}/apps/{vpn_id}/vpn/zones", json={"zones": ["@cube"]}).json()
+    # Apps only: a VPN reaches zones (an "@app" from before is dropped).
+    job = client.put(f"{API}/apps/{vpn_id}/vpn/zones", json={"zones": ["prive", "@cube"]}).json()
     assert wait_job(client, job["id"])["status"] == "succeeded"
-    compose = yaml.safe_load(client.get(f"{API}/apps/{vpn_id}/compose").json()["compose_yaml"])
-    assert compose["networks"]["reach0"] == {"name": "cube_default", "external": True}
+    assert client.get(f"{API}/apps/{vpn_id}/vpn").json()["zones"] == ["prive"]
+    zone = next(z for z in client.get(f"{API}/zones").json() if z["slug"] == "prive")
+    assert (zone["network_mode"], zone["vpn"], zone["subnet"]) == ("shared", "vpn", "10.8.1.0/24")
+    gw = client.app.state.runtime.gateway
+    net = next(n for n in gw.networks if n.name == "hivora-zone-prive")
+    assert net.subnets == ("10.8.1.0/24",)  # its own subnet, next to the VPN's
+
+    # The zone's apps are redeployed: nothing of them is published on the host any more.
+    deadline = time.monotonic() + 10
+    while server().get("ports"):
+        assert time.monotonic() < deadline
+        time.sleep(0.05)
+    assert "25565/tcp" in server()["expose"]
+    assert "game" not in client.get(f"{API}/apps/{mc_id}").json()["access"]
     graph = client.get(f"{API}/topology").json()
-    assert {"source": f"app:{vpn_id}", "target": f"app:{mc_id}", "kind": "vpn",
+    zone_key = next(n["key"] for n in graph["nodes"] if n.get("slug") == "prive")
+    assert {"source": f"app:{vpn_id}", "target": zone_key, "kind": "vpn",
             "label": "VPN"} in graph["edges"]  # fmt: skip
+    assert not any(e["target"] == zone_key and e["source"] == "firewall" for e in graph["edges"])
     cube = next(n for n in graph["nodes"] if n["key"] == f"app:{mc_id}")
     assert cube["behind_vpn"] is True
     assert not any(e["kind"] == "exposed" and e["target"] == cube["key"] for e in graph["edges"])
 
-    # 3. It cannot be removed while the VPN uses its network; detached, it can.
-    refused = client.delete(f"{API}/apps/{mc_id}")
-    assert refused.status_code == 409 and "VPN" in refused.json()["error"]["message"]
-    assert code(client.put(f"{API}/apps/{vpn_id}/vpn/zones",
-                           json={"zones": ["@nope"]})) == "validation_error"  # fmt: skip
-    job = client.put(f"{API}/apps/{vpn_id}/vpn/zones", json={"zones": []}).json()
-    assert wait_job(client, job["id"])["status"] == "succeeded"
-    graph = client.get(f"{API}/topology").json()
-    cube = next(n for n in graph["nodes"] if n["key"] == f"app:{mc_id}")
-    assert {"override": "none", "default": "public"}.items() <= next(
-        p for p in cube["ports"] if p["container"] == 25565
-    ).items()
-    assert any(a["code"] == "unreachable" and a["app"] == "cube" for a in graph["alerts"])
-    assert client.delete(f"{API}/apps/{mc_id}").status_code == 202
+    # A zone has one VPN; it keeps its network and cannot go while a VPN reaches it.
+    other = client.post(
+        f"{API}/apps",
+        json={**vpn_body, "name": "vpn2", "inputs": {**vpn_body["inputs"], "vpn_port": 51821}},
+    )
+    assert wait_job(client, other.json()["job"]["id"])["status"] == "succeeded"
+    taken = client.put(f"{API}/apps/{other.json()['app']['id']}/vpn/zones",
+                       json={"zones": ["prive"]})  # fmt: skip
+    assert taken.status_code == 409 and code(taken) == "vpn_zone_taken"
+    edit = {"name": "Privé", "color": "#65a30d", "network_mode": "none"}
+    assert client.put(f"{API}/zones/prive", json=edit).status_code == 409
+    assert client.delete(f"{API}/zones/prive").status_code == 409
 
 
 def test_each_hosted_site_is_a_node_linked_from_its_nginx(client: Any) -> None:

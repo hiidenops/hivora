@@ -91,6 +91,11 @@ def services_from(compiled: CompiledApp) -> list[Service]:
 SitePorts = Callable[[AsyncSession, str, Overrides], Awaitable[list[ExtraPort]]]
 
 
+def vpn_zone_slugs(value: Any) -> list[str]:
+    """The zones in a VPN's zones field ("@<app>" entries, from before zones only: dropped)."""
+    return [z for z in str(value or "").split(",") if z and not z.startswith("@")]
+
+
 class AppPlanner:
     """Compiles an app's template against its inputs, the host and the running state:
     the plan every deploy and settings change is reviewed and applied from."""
@@ -140,7 +145,8 @@ class AppPlanner:
         app_ctx = AppContext(
             slug=slug, name=name, revision=revision, zone=zone.slug if zone else None,
             zone_network=zone_network(zone),
-            extra_networks=await self.vpn_networks(session, entry, inputs),
+            extra_networks=await self.vpn_networks(session, slug, entry, inputs),
+            vpn_only=zone is not None and zone.slug in await self.vpn_zones(session),
         )  # fmt: skip
         host = self.host
         defaults_ctx = build_context(app_ctx, host, FormValues(), list(entry.template.services))
@@ -193,31 +199,41 @@ class AppPlanner:
         return AppSettings(app, entry, values, sorted(secrets))
 
     async def vpn_networks(
-        self, session: AsyncSession, entry: CatalogEntry, inputs: dict[str, Any]
+        self, session: AsyncSession, slug: str, entry: CatalogEntry, inputs: dict[str, Any]
     ) -> tuple[str, ...]:
-        """A VPN joins the networks of the zones it reaches (only "linked together" zones
-        have one) and of the apps put behind it ("@<app>": that app's default network)."""
+        """A VPN joins the networks of the zones it reaches ("linked together" zones only,
+        each reached by one VPN at most)."""
         vpn = entry.template.vpn
         if not vpn or not vpn.zones_field:
             return ()
+        others = {z: name for z, (s, name) in (await self.vpn_zones(session)).items() if s != slug}
         names = []
-        for slug in (s for s in str(inputs.get(vpn.zones_field) or "").split(",") if s):
-            if slug.startswith("@"):
-                app_slug = slug[1:]
-                if not await session.scalar(
-                    select(Application.id).where(Application.slug == app_slug)
-                ):
-                    raise ValidationError(
-                        "no such app to reach", field=vpn.zones_field, app=app_slug
-                    )
-                names.append(f"{app_slug}_default")
-                continue
-            name = zone_network(await get_zone(session, slug))
+        for zone_slug in vpn_zone_slugs(inputs.get(vpn.zones_field)):
+            if zone_slug in others:
+                raise ValidationError("this zone is already reached by another VPN",
+                                      field=vpn.zones_field, zone=zone_slug,
+                                      vpn=others[zone_slug])  # fmt: skip
+            name = zone_network(await get_zone(session, zone_slug))
             if name is None:
                 raise ValidationError("this zone does not link its apps: no network to reach",
-                                      field=vpn.zones_field, zone=slug)  # fmt: skip
+                                      field=vpn.zones_field, zone=zone_slug)  # fmt: skip
             names.append(name)
         return tuple(names)
+
+    async def vpn_zones(self, session: AsyncSession) -> dict[str, tuple[str, str]]:
+        """Zone slug -> (slug, name) of the VPN app that reaches it."""
+        out: dict[str, tuple[str, str]] = {}
+        for other in await session.scalars(select(Application).order_by(Application.id)):
+            try:
+                entry = await self.entry_of(session, other)
+            except (ConflictError, NotFoundError):
+                continue
+            vpn = entry.template.vpn
+            if vpn and vpn.zones_field:
+                values = (await self.current_settings(session, other.id)).values
+                for z in vpn_zone_slugs(values.get(vpn.zones_field)):
+                    out.setdefault(z, (other.slug, other.name))
+        return out
 
     async def entry_of(self, session: AsyncSession, app: Application) -> CatalogEntry:
         slug = await session.scalar(
@@ -226,21 +242,6 @@ class AppPlanner:
         if slug is None:
             raise ConflictError("this app was not deployed from a template", slug=app.slug)
         return self.catalog.get(slug)
-
-    async def vpns_reaching(self, session: AsyncSession, slug: str) -> list[str]:
-        """Names of the VPN apps that joined this app's network (it is behind them)."""
-        out = []
-        for other in await session.scalars(select(Application)):
-            try:
-                entry = await self.entry_of(session, other)
-            except (ConflictError, NotFoundError):
-                continue
-            vpn = entry.template.vpn
-            if vpn and vpn.zones_field:
-                values = (await self.current_settings(session, other.id)).values
-                if f"@{slug}" in str(values.get(vpn.zones_field) or "").split(","):
-                    out.append(other.name)
-        return out
 
     async def template_version(self, session: AsyncSession, entry: CatalogEntry) -> TemplateVersion:
         meta = entry.template.metadata

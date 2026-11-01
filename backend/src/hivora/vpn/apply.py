@@ -18,7 +18,7 @@ class VpnApplyError(ConflictError):
 
 
 async def zone_subnets(gateway: DockerGateway, vpn: VpnApp) -> dict[str, tuple[str, ...]]:
-    """Subnets of the networks this VPN reaches, by zone slug or "@<app>"."""
+    """Subnets of the networks this VPN reaches, by zone slug."""
     if not vpn.zones:
         return {}
     names = zone_networks(vpn.zones)

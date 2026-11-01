@@ -150,8 +150,12 @@ def test_vpn_clients_and_linked_zones(client: Any, tmp_path: Path) -> None:
     compose = yaml.safe_load(client.get(f"{API}/apps/{app_id}/compose").json()["compose_yaml"])
     assert compose["networks"]["reach0"] == {"name": "hivora-zone-jeux", "external": True}
     assert client.get(f"{API}/apps/{app_id}/vpn").json()["zones"] == ["jeux"]
-    refused = client.put(f"{API}/apps/{app_id}/vpn/zones", json={"zones": ["solo"]})
-    assert refused.status_code == 422
+    # A zone whose apps had no network of their own: linked by the VPN, it gets one.
+    job = client.put(f"{API}/apps/{app_id}/vpn/zones", json={"zones": ["jeux", "solo"]}).json()
+    assert wait_job(client, job["id"])["status"] == "succeeded"
+    zones = {z["slug"]: z for z in client.get(f"{API}/zones").json()}
+    assert (zones["solo"]["network_mode"], zones["solo"]["vpn"]) == ("shared", "vpn")
+    assert (zones["jeux"]["subnet"], zones["solo"]["subnet"]) == ("10.8.1.0/24", "10.8.2.0/24")
 
     # Addressing: a client picks its IP, then a new network renumbers what no longer fits.
     gw.exec_results.clear()

@@ -4,10 +4,12 @@ Pure: no database, no Docker. `VpnApp` is what the tools know of one VPN app.
 """
 
 import ipaddress
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from hivora.apps.planner import vpn_zone_slugs
 from hivora.core.errors import ConflictError, ValidationError
 from hivora.docker_gateway import ContainerInfo
 from hivora.templates.schema import Vpn
@@ -40,7 +42,7 @@ class VpnApp:
 
     @property
     def zones(self) -> list[str]:
-        return [z for z in str(self.values.get(self.spec.zones_field or "") or "").split(",") if z]
+        return vpn_zone_slugs(self.values.get(self.spec.zones_field or ""))
 
     def value(self, field: str | None, default: str = "") -> str:
         return str(self.values.get(field or "") or default)
@@ -83,8 +85,22 @@ def check_address(vpn: VpnApp, address: str, taken: set[str]) -> None:
 
 
 def zone_networks(zones: list[str]) -> dict[str, str]:
-    """Docker network name -> zone slug or "@<app>", for the networks a VPN reaches."""
-    return {(f"{z[1:]}_default" if z.startswith("@") else f"hivora-zone-{z}"): z for z in zones}
+    """Docker network name -> zone slug, for the networks a VPN reaches."""
+    return {f"hivora-zone-{z}": z for z in zones}
+
+
+def zone_subnet(vpn_subnet: str, taken: Iterable[str]) -> str:
+    """A /24 for a zone the VPN reaches: the first free one after the VPN's network
+    (10.8.0.0/24 -> 10.8.1.0/24, then 10.8.2.0/24...), private, overlapping nothing taken."""
+    used = [n for n in map(ipaddress.ip_network, taken) if n.version == 4]
+    start = (int(ipaddress.ip_network(vpn_subnet).broadcast_address) // 256 + 1) * 256
+    for k in range(256):
+        candidate = ipaddress.ip_network((start + k * 256, 24))
+        if not candidate.is_private:
+            break
+        if not any(candidate.overlaps(u) for u in used):
+            return str(candidate)
+    raise VpnNetworkError("no free network next to the VPN's for this zone")
 
 
 def allowed_ips(vpn: VpnApp, routing: str, custom: list[str] | None,

@@ -2,6 +2,7 @@
 removal. Each action records the intent and queues its job."""
 
 from dataclasses import dataclass
+from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -27,7 +28,8 @@ from hivora.core.events import EventBus
 from hivora.crypto.cipher import SecretBox
 from hivora.jobs import Job, JobKind, JobQueue
 from hivora.state import StateStore
-from hivora.templates import Catalog
+from hivora.templates import Catalog, Template
+from hivora.templates.overrides import Overrides, ServiceOverrides
 from hivora.zones import get_zone
 
 
@@ -67,7 +69,16 @@ class Deployer:
         ):
             raise ConflictError("slug already used", slug=slug)
         zone = await get_zone(session, req.zone) if req.zone else None
-        return await self.planner.plan(session, entry, slug, name, zone, req.inputs, revision=1)
+        return await self.planner.plan(
+            session,
+            entry,
+            slug,
+            name,
+            zone,
+            req.inputs,
+            revision=1,
+            overrides=access_overrides(entry.template, req.access),
+        )
 
     async def deploy(self, req: DeployRequest) -> tuple[Application, Job]:
         async with self.sessions() as session, session.begin():
@@ -90,6 +101,7 @@ class Deployer:
             store_secrets(session, self.box, app.id, plan.form.secrets)
             revision = AppRevision(
                 app_id=app.id, number=1, inputs=plan.form.values,
+                overrides=plan.overrides.model_dump(exclude_defaults=True) or None,
                 compose_yaml=plan.compiled.compose_yaml, created_at=self.clock.now(),
                 template_version_id=version.id,
                 status=RevisionStatus.PENDING,
@@ -156,9 +168,6 @@ class Lifecycle:
     async def remove(self, app_id: int, *, remove_data: bool = False) -> Job:
         async with self.sessions() as session, session.begin():
             app = await get_app(session, app_id)
-            if vpns := await self.planner.vpns_reaching(session, app.slug):
-                raise ConflictError("this app is behind a VPN: detach it from the VPN first",
-                                    vpn=", ".join(vpns))  # fmt: skip
             # A tool linked to it would lose its network (it would not start any more).
             if tools := await links.linked_by(session, self.planner.catalog, app.slug):
                 raise links.LinkedAppError("tools are linked to this app: unlink them first",
@@ -182,3 +191,15 @@ class Lifecycle:
             job = self.jobs.add(session, kind, app_id=app.id, app_slug=app.slug)
         self.jobs.wake()
         return job
+
+
+def access_overrides(template: Template, access: Literal["public", "lan"] | None) -> Overrides:
+    """The template's published ports all on the Internet ("public") or the local network
+    ("lan"); its internal ones (and those a form field sets) stay as they are."""
+    if access is None:
+        return Overrides()
+    return Overrides(services={
+        name: ServiceOverrides(publish={f"{p.container}/{p.protocol}": access for p in ports})
+        for name, svc in template.services.items()
+        if (ports := [p for p in svc.ports if p.exposure != "internal" and not p.exposure_field])
+    })  # fmt: skip

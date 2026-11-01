@@ -13,19 +13,22 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hivora.apps.planner import vpn_zone_slugs
 from hivora.apps.queries import app_id_by_slug
 from hivora.apps.service import AppService
 from hivora.core.clock import Clock
-from hivora.core.errors import NotFoundError
+from hivora.core.errors import ConflictError, NotFoundError
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import Purpose, Sealed, SecretBox
 from hivora.docker_gateway import DockerGateway
 from hivora.jobs import Job
 from hivora.vpn import wireguard as wg
 from hivora.vpn.acl import access_of, apply_changes, client_out, is_active
-from hivora.vpn.addressing import VpnApp, VpnFullError, allowed_ips, check_address
+from hivora.vpn.addressing import VpnApp, VpnFullError, allowed_ips, check_address, zone_subnet
 from hivora.vpn.apply import VpnApplyError, bring_up, write_files, zone_subnets
 from hivora.vpn.models import VpnPeer
+from hivora.zones.models import NetworkMode
+from hivora.zones.service import list_zones
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +39,10 @@ ACL = "hivora-acl.sh"
 
 class NotAVpnError(NotFoundError):
     code = "not_a_vpn"
+
+
+class ZoneTakenError(ConflictError):
+    code = "vpn_zone_taken"
 
 
 class VpnClientNotFoundError(NotFoundError):
@@ -308,13 +315,37 @@ class VpnTools:
     async def set_zones(self, app_id: int, zones: list[str]) -> Job:
         """Zones reached through the VPN: the container joins their networks (new revision).
 
+        A zone newly reached gets its apps a network of their own (shared, on a subnet next
+        to the VPN's, except a system zone: its subnet is the installer's) and is redeployed:
+        nothing of it stays published on the host (the compiler, `vpn_only`).
         NAT already covers every interface (PostUp), so nothing else changes.
         """
         vpn = await self._vpn(app_id)
         if not vpn.spec.zones_field:
             raise NotAVpnError("this VPN cannot reach zones")
+        zones = list(dict.fromkeys(vpn_zone_slugs(",".join(zones))))
+        added = [z for z in zones if z not in vpn.zones]
+        taken = [s for n in await self.gateway.list_networks() for s in n.subnets]
+        async with self.sessions() as session, session.begin():
+            others = await self.apps.planner.vpn_zones(session)
+            for slug in added:
+                if slug in others and others[slug][0] != vpn.slug:
+                    raise ZoneTakenError("this zone is already reached by another VPN",
+                                         zone=slug, vpn=others[slug][1])  # fmt: skip
+            all_zones = await list_zones(session)
+            taken += [z.subnet for z in all_zones if z.subnet]
+            taken.append(vpn.network()[0])
+            linked = []
+            for zone in (z for z in all_zones if z.slug in added):
+                zone.network_mode = NetworkMode.SHARED
+                if zone.subnet is None and not zone.is_system:
+                    zone.subnet = zone_subnet(vpn.network()[0], taken)
+                    taken.append(zone.subnet)
+                linked.append(zone.id)
         inputs = {**vpn.values, vpn.spec.zones_field: ",".join(zones)}
         job = await self.apps.revisions.update(app_id, inputs)
+        for zone_id in linked:  # their own network, nothing published any more
+            await self.apps.revisions.redeploy_zone(zone_id)
         self.bus.publish("vpn.zones_changed", app=vpn.slug, zones=zones)
         return job
 

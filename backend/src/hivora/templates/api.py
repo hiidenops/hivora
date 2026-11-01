@@ -1,7 +1,7 @@
 """Catalog routes (/api/v1/templates)."""
 
 import re
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
@@ -14,7 +14,7 @@ from hivora.templates.compiler import AppContext, build_context
 from hivora.templates.expressions import render
 from hivora.templates.forms import FormValues
 from hivora.templates.icons import MEDIA_TYPES
-from hivora.templates.schema import Localized
+from hivora.templates.schema import Localized, Template
 from hivora.web.deps import RuntimeDep, Viewer
 
 router = APIRouter(tags=["templates"])
@@ -40,6 +40,9 @@ class TemplateDetail(TemplateSummary):
     services: list[str]
     manifest: str  # raw YAML, for the advanced mode
     default_zone: str | None  # zone slug the template suggests (pre-selected if it exists)
+    # Where its ports are published by default: "public" (one on the Internet), "lan", or
+    # None (nothing published, or a VPN server: its own port, nothing to choose).
+    default_access: Literal["public", "lan"] | None
 
 
 def icon_url(rt: Runtime, slug: str) -> str | None:
@@ -86,7 +89,16 @@ async def get_template(slug: str, _: Viewer, rt: RuntimeDep) -> TemplateDetail:
         requirements=t.requirements.model_dump(exclude_none=True),
         form=form,
         services=list(t.services), manifest=entry.manifest, default_zone=t.defaults.zone,
+        default_access=default_access(t),
     )  # fmt: skip
+
+
+def default_access(t: Template) -> Literal["public", "lan"] | None:
+    exposures = {p.exposure for svc in t.services.values() for p in svc.ports
+                 if not p.exposure_field}  # fmt: skip
+    if t.vpn is not None:
+        return None
+    return "public" if "public" in exposures else "lan" if "lan" in exposures else None
 
 
 @router.get("/{slug}/icon")

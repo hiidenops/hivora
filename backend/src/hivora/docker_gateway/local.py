@@ -1,5 +1,6 @@
 """DockerGateway over the local Engine API socket, via aiodocker."""
 
+import asyncio
 import json
 import re
 from collections.abc import AsyncGenerator, AsyncIterator
@@ -196,6 +197,7 @@ class LocalDockerGateway(DockerGateway):
     def __init__(self, url: str | None = None) -> None:
         # None lets aiodocker honour DOCKER_HOST, then the default unix socket.
         self._docker = aiodocker.Docker(url=url)
+        self._networks_lock = asyncio.Lock()
 
     async def _get_json(self, path: str, params: dict[str, Any] | None = None) -> Any:
         try:
@@ -211,11 +213,24 @@ class LocalDockerGateway(DockerGateway):
         info = await self._get_json("version")
         return str(info.get("Version", "unknown"))
 
-    async def ensure_network(self, name: str, labels: dict[str, str]) -> bool:
-        if any(n.name == name for n in await self.list_networks()):
-            return False
-        await self._docker.networks.create({"Name": name, "Driver": "bridge", "Labels": labels})
-        return True
+    async def ensure_network(
+        self, name: str, labels: dict[str, str], subnet: str | None = None
+    ) -> bool:
+        # One at a time: the zone's apps redeploy in parallel, only the first recreates it.
+        async with self._networks_lock:
+            current = next((n for n in await self.list_networks() if n.name == name), None)
+            if current and (subnet is None or subnet in current.subnets):
+                return False
+            if current:  # another subnet: its containers leave it, then it is recreated
+                network = await self._docker.networks.get(name)
+                for cid in (await network.show()).get("Containers") or {}:
+                    await network.disconnect({"Container": cid, "Force": True})
+                await network.delete()
+            config: dict[str, Any] = {"Name": name, "Driver": "bridge", "Labels": labels}
+            if subnet:
+                config["IPAM"] = {"Config": [{"Subnet": subnet}]}
+            await self._docker.networks.create(config)
+            return True
 
     async def remove_network(self, name: str) -> bool:
         try:

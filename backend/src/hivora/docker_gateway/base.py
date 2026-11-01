@@ -89,8 +89,13 @@ class DockerGateway(ABC):
     async def list_networks(self) -> list[NetworkInfo]: ...
 
     @abstractmethod
-    async def ensure_network(self, name: str, labels: dict[str, str]) -> bool:
-        """Create a bridge network if missing. True if created."""
+    async def ensure_network(
+        self, name: str, labels: dict[str, str], subnet: str | None = None
+    ) -> bool:
+        """Create a bridge network if missing. True if created.
+
+        ``subnet``: the network must have it; one with another subnet is recreated (its
+        containers disconnected first: each app's next ``up`` joins the new one)."""
 
     @abstractmethod
     async def remove_network(self, name: str) -> bool:

@@ -519,3 +519,26 @@ def test_free_image_deploys_like_a_template_app(client: TestClient) -> None:
     bad = client.post(f"{API}/apps/custom", json={**body, "name": "Bad", "volumes": ["../etc"]})
     assert bad.status_code == 422
     assert host_arch() in ("amd64", "arm64")
+
+
+def test_deploy_access_choice_publishes_on_the_internet_or_the_lan_only(
+    client: TestClient,
+) -> None:
+    admin(client)
+
+    def ports(template: str, access: str | None) -> list[tuple[int, str, str | None]]:
+        inputs = {"eula": True} if template == "minecraft" else {}
+        body = {"template": template, "name": "x", "inputs": inputs, "access": access}
+        plan = client.post(f"{API}/apps/plan", json=body).json()
+        return [(p["container_port"], p["exposure"], p["host_ip"])
+                for p in plan["ports"] if p["host_port"]]  # fmt: skip
+
+    assert ports("minecraft", None) == [(25565, "public", None)]  # the template's choice
+    assert ports("minecraft", "lan") == [(25565, "lan", "192.168.1.10")]
+    assert ports("vaultwarden", None) == [(80, "lan", "192.168.1.10")]
+    assert ports("vaultwarden", "public") == [(80, "public", None)]
+    body = {"template": "vaultwarden", "name": "Coffre", "inputs": {}, "access": "public"}
+    deployed = client.post(f"{API}/apps", json=body).json()
+    assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
+    settings = client.get(f"{API}/apps/{deployed['app']['id']}/settings").json()
+    assert settings["overrides"]["services"]["server"]["publish"] == {"80/tcp": "public"}

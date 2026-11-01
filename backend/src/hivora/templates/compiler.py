@@ -41,6 +41,7 @@ class AppContext:
     zone: str | None = None
     zone_network: str | None = None  # Docker network shared by the zone's apps
     extra_networks: tuple[str, ...] = ()  # other zones' networks (a VPN reaching them)
+    vpn_only: bool = False  # in a zone a VPN reaches: nothing published on the host
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,6 +333,10 @@ def compile_template(
         if (o := overrides.of(name)) is not None:
             ports, volumes, restart = _apply_overrides(svc, o, name, ports, volumes, restart,
                                                        app.slug, volumes_root, host)  # fmt: skip
+        if app.vpn_only and template.vpn is None:  # a VPN server keeps its own port
+            ports = tuple(replace(p, host_port=None, exposure="internal", host_ip=None)
+                          for p in ports)  # fmt: skip
+            _write_ports(svc, ports)
         svc["labels"] = labels
         compose_services[name] = svc
         plans.append(ServicePlan(name, spec.image_ref, spec.role, restart, ports, volumes))

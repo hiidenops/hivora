@@ -32,6 +32,8 @@ class Zone(Base):
         str_enum(NetworkMode), default=NetworkMode.NONE
     )
     docker_network_id: Mapped[str | None] = mapped_column(String(64))
+    # Set when a VPN reaches the zone: its network's subnet, next to the VPN's (None: Docker's).
+    subnet: Mapped[str | None] = mapped_column(String(43))
     sort_order: Mapped[int] = mapped_column(default=0)
     is_system: Mapped[bool] = mapped_column(default=False)
     # Starting the zone: how long an app may take to be healthy before its dependents give up.

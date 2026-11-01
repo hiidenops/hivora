@@ -4,7 +4,7 @@ compose, free images)."""
 import re
 import unicodedata
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,6 +47,7 @@ class DeployRequest:
     inputs: dict[str, Any] = field(default_factory=dict)
     slug: str | None = None
     zone: str | None = None  # zone slug; None: "unclassified"
+    access: Literal["public", "lan"] | None = None  # its ports on the Internet or LAN only
 
 
 def slugify(text: str) -> str:

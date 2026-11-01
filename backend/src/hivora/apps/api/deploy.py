@@ -25,11 +25,19 @@ class DeployIn(BaseModel):
     inputs: dict[str, Any] = {}
     slug: str | None = Field(default=None, max_length=50)
     zone: str | None = None
+    # Its ports published on the Internet or on the local network only (None: the
+    # template's choice). In a zone a VPN reaches, nothing is published.
+    access: Literal["public", "lan"] | None = None
 
 
 def to_request(body: DeployIn) -> DeployRequest:
     return DeployRequest(
-        template=body.template, name=body.name, inputs=body.inputs, slug=body.slug, zone=body.zone
+        template=body.template,
+        name=body.name,
+        inputs=body.inputs,
+        slug=body.slug,
+        zone=body.zone,
+        access=body.access,
     )
 
 

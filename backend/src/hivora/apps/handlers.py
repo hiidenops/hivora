@@ -12,6 +12,7 @@ from hivora.compose_runner import ComposeError, ProgressEvent, ProgressStatus
 from hivora.core.fs import empty_dir, ensure_dir, remove_tree
 from hivora.jobs import JobContext, JobKind
 from hivora.templates.expressions import secret_env_name
+from hivora.zones.service import list_zones, zone_network
 
 
 class _PullProgress:
@@ -159,12 +160,16 @@ class AppJobHandlers:
     async def _zone_network(self, ctx: JobContext, compose_yaml: str) -> None:
         """The zone's shared network is external to the project: create it first."""
         networks = (yaml.safe_load(compose_yaml) or {}).get("networks") or {}
+        async with self.s.sessions() as session:  # a zone reached by a VPN has its own subnet
+            subnets = {zone_network(z): z.subnet for z in await list_zones(session)}
         for net in networks.values():
             if net.get("external") and self.s.gateway is not None:
+                subnet = subnets.get(net["name"])
                 if await self.s.gateway.ensure_network(
-                    net["name"], {"io.hivora.zone-network": "1"}
+                    net["name"], {"io.hivora.zone-network": "1"}, subnet
                 ):
-                    await ctx.log(f"created network {net['name']}")
+                    where = f" ({subnet})" if subnet else ""
+                    await ctx.log(f"created network {net['name']}{where}")
 
     async def _check_platforms(self, ctx: JobContext, images: list[str]) -> None:
         """Refuse early and clearly an image with no build for this machine."""

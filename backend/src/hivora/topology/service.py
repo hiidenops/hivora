@@ -18,7 +18,7 @@ from hivora import __version__
 from hivora.apps.adoption import Adoption
 from hivora.apps.core import latest_revision
 from hivora.apps.models import Exposure, Origin
-from hivora.apps.planner import AppPlanner
+from hivora.apps.planner import AppPlanner, vpn_zone_slugs
 from hivora.apps.queries import apps_with_template
 from hivora.hostfw.service import HostFirewall, listening
 from hivora.sites.views import sites_by_host
@@ -105,8 +105,7 @@ class GraphBuilder:
                     }  # fmt: skip
                 if vpn and vpn.zones_field:
                     values = (await self.planner.current_settings(session, app.id)).values
-                    reached = str(values.get(vpn.zones_field) or "")
-                    vpn_reach[app.id] = [z for z in reached.split(",") if z]
+                    vpn_reach[app.id] = vpn_zone_slugs(values.get(vpn.zones_field))
 
         graph.nodes.append({"key": INTERNET, "type": "internet", "label": "Internet"})
         # The host firewall sits between the Internet and the host (published Docker
@@ -132,9 +131,11 @@ class GraphBuilder:
         graph.edges.append({"source": INTERNET, "target": FIREWALL, "kind": "host", "label": ""})
         zone_key = {z.id: f"zone:{z.id}" for z in zones}
         by_slug = {z.slug: z for z in zones}
+        reached = {slug for reach in vpn_reach.values() for slug in reach}
         for z in zones:
-            graph.edges.append({"source": FIREWALL, "target": zone_key[z.id], "kind": "host",
-                                "label": ""})  # fmt: skip
+            if z.slug not in reached:  # a VPN zone: only its VPN leads there, not the host
+                graph.edges.append({"source": FIREWALL, "target": zone_key[z.id], "kind": "host",
+                                    "label": ""})  # fmt: skip
             graph.nodes.append({"key": zone_key[z.id], "type": "zone", "label": z.name,
                                 "slug": z.slug, "color": z.color,
                                 "network_mode": z.network_mode.value})  # fmt: skip
@@ -143,10 +144,9 @@ class GraphBuilder:
                                 "color": None, "network_mode": "none"})  # fmt: skip
 
         self._panel(graph, by_slug, zone_key)
-        app_by_slug = {a.slug: a.id for a in apps}
-        behind = {
-            slug[1:] for reach in vpn_reach.values() for slug in reach if slug.startswith("@")
-        }
+        zone_of = {z.id: z for z in zones}
+        behind = {a.slug for a in apps if a.id not in vpn_reach and a.zone_id in zone_of
+                  and zone_of[a.zone_id].slug in reached}  # fmt: skip
         for app in apps:
             key = f"app:{app.id}"
             template = templates.get(app.id)
@@ -172,8 +172,9 @@ class GraphBuilder:
                 "slug": app.slug, "status": status, "icon_url": icon, "template": template,
                 "origin": app.origin.value, "services": [s.name for s in app.services],
                 "ports": ports, "vpn": app.id in vpn_reach, "behind_vpn": app.slug in behind,
-                "vpn_address": _address_on(self.store, app.slug, f"{app.slug}_default")
-                if app.slug in behind else None,
+                "vpn_address": _address_on(self.store, app.slug,
+                                           f"hivora-zone-{zone_of[app.zone_id].slug}")
+                if app.slug in behind and app.zone_id else None,
             })  # fmt: skip
             # The sites this nginx hosts: a node each, next to it (what a reverse proxy will
             # point at later), linked from the nginx.
@@ -215,9 +216,6 @@ class GraphBuilder:
             for slug in vpn_reach.get(app.id, []):
                 if slug in by_slug:
                     graph.edges.append({"source": key, "target": zone_key[by_slug[slug].id],
-                                        "kind": "vpn", "label": "VPN"})  # fmt: skip
-                elif slug.startswith("@") and slug[1:] in app_by_slug:
-                    graph.edges.append({"source": key, "target": f"app:{app_by_slug[slug[1:]]}",
                                         "kind": "vpn", "label": "VPN"})  # fmt: skip
 
         unmanaged = len(self.store.unmanaged()) + len(self.adoption.candidates())
