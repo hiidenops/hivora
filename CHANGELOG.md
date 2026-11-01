@@ -6,6 +6,17 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Modifié
+
+- **Accès d'une app** : au déploiement, trois choix clairs, « Publié sur Internet », « Réseau local » (seulement l'IP locale de la machine) ou « Par un VPN ». La liste des zones suit le choix.
+- **VPN et zones** : un VPN dessert des zones, plus des apps isolées (une app placée seule derrière un VPN ne l'est plus : mettez-la dans une zone desservie ; ses ports fermés à la main restent fermés). Une zone n'est desservie que par un VPN ; elle passe d'elle-même en réseau « reliées entre elles », reçoit son propre réseau à côté de celui du VPN (par exemple `10.8.1.0/24`), et **aucune de ses apps ne publie de port** sur la machine : elles ne sont joignables que par les clients du VPN. Avant d'enregistrer, la carte VPN liste les ports qui vont se fermer. Les interrupteurs des zones de la carte VPN ne sont plus grisés sans explication.
+- **Topologie** : une zone desservie par un VPN n'est plus reliée au pare-feu de l'hôte, seulement à son VPN ; tirer un lien d'un VPN vers une app explique qu'il faut passer par une zone.
+- **Tableau de bord** : une pastille « VPN » sur le titre des zones desservies.
+
+### À savoir avant de mettre à jour
+
+- En mode d'accès « VPN » ou « VPN + LAN », la zone Administration est desservie par le VPN d'administration : à leur prochain déploiement, les apps qui y sont ne publient plus de port. Une app qui doit rester joignable sur le réseau local (par exemple AdGuard Home pour le DNS) est à déplacer dans une autre zone.
+
 ## [0.3.0] - 2026-11-01
 
 ### Ajouté

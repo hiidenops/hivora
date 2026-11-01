@@ -206,6 +206,8 @@ function Canvas() {
     if (link.kind === "changes") for (const change of link.changes) onChange(change);
     else if (link.kind === "noEffect") window.alert(t("topology.noEffect"));
     else if (link.kind === "nothingClosed") window.alert(t("topology.nothingClosed", { app: link.app }));
+    else if (link.kind === "vpnZoneOnly") window.alert(t("topology.vpnZoneOnly", { app: link.app }));
+    else if (link.kind === "vpnZoneNoPublish") window.alert(t("topology.vpnZoneNoPublish", { app: link.app }));
     else void api("/topology/edges", { method: "POST", body: { source: c.source, target: c.target, label: "" } }).then(refresh);
   };
   const apply = async () => {
@@ -268,7 +270,7 @@ function Canvas() {
             if (data?.kind === "vpn") {
               const [vpn, target] = [gnode(e.source), gnode(e.target)];
               if (vpn && target && window.confirm(t("topology.detachConfirm")))
-                onChange({ kind: "reach", vpnId: Number(vpn.id), vpn: String(vpn.label), target: target.type === "app" ? `@${target.slug}` : String(target.slug), targetLabel: String(target.label), on: false });
+                onChange({ kind: "reach", vpnId: Number(vpn.id), vpn: String(vpn.label), target: String(target.slug), targetLabel: String(target.label), on: false });
               return;
             }
             if (data?.declaredId && window.confirm(t("topology.deleteLink"))) void api(`/topology/edges/${data.declaredId}`, { method: "DELETE" }).then(refresh);

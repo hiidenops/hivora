@@ -119,6 +119,17 @@ function ClientSettings({ appId, client, vpn, zones, onSaved }: { appId: number;
   );
 }
 
+type GraphNode = { key: string; type: string; slug?: string; parent?: string; label?: string; vpn?: boolean; ports?: { port: number; protocol: string; exposure: string }[] };
+
+/** The published ports that linking these zones to a VPN closes ("cube 25565/tcp"). */
+async function closedPorts(zones: string[]): Promise<string[]> {
+  const { nodes } = await api<{ nodes: GraphNode[] }>("/topology");
+  const keys = new Set(nodes.filter((n) => n.type === "zone" && n.slug && zones.includes(n.slug)).map((n) => n.key));
+  return nodes
+    .filter((n) => n.type === "app" && !n.vpn && n.parent && keys.has(n.parent))
+    .flatMap((n) => (n.ports ?? []).filter((p) => p.exposure !== "internal").map((p) => `${n.label} : ${p.port}/${p.protocol}`));
+}
+
 /** Clients of the WireGuard server and the zones it reaches: Hivora writes its config. */
 export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) => void }) {
   const { t, lang, errorMessage } = useI18n();
@@ -141,6 +152,7 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
       onJob(job.id);
       setPicked(null);
       void refresh();
+      void qc.invalidateQueries({ queryKey: keys.zones }); // network, subnet, served by
     },
   });
   const add = (e: FormEvent) => {
@@ -264,23 +276,46 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
           <fieldset className="grid gap-2">
             <legend className="mb-1 font-medium">{t("vpn.zones")}</legend>
             <p className="text-sm text-muted-foreground">{t("vpn.zonesHelp")}</p>
-            <div className="flex flex-wrap gap-3">
+            <div className="grid gap-2">
               {zones?.map((z) => {
-                const linked = z.network_mode === "shared";
+                // A zone has one VPN: one another VPN reaches is shown, not offered.
+                const other = z.vpn && !data.zones.includes(z.slug) ? z.vpn : null;
                 return (
-                  <label key={z.slug} className="flex items-center gap-2 text-sm" title={linked ? undefined : t("vpn.zoneNotLinked")}>
+                  <label key={z.slug} className="flex flex-wrap items-center gap-2 text-sm">
                     <Switch
-                      disabled={!linked}
+                      disabled={Boolean(other)}
                       checked={reached.includes(z.slug)}
                       onChange={(e) => setPicked(e.target.checked ? [...reached, z.slug] : reached.filter((s) => s !== z.slug))}
                     />
                     <span className="size-2.5 rounded-full" style={{ background: z.color }} /> {z.name}
+                    <span className="text-xs text-muted-foreground">
+                      {other
+                        ? t("vpn.zoneTaken", { vpn: other })
+                        : reached.includes(z.slug)
+                          ? z.subnet
+                            ? t("vpn.zoneReachedAt", { subnet: z.subnet })
+                            : t("vpn.zoneReached")
+                          : t("vpn.zoneApps", { n: z.apps })}
+                    </span>
                   </label>
                 );
               })}
             </div>
+            {zones?.length === 0 && <p className="text-sm text-muted-foreground">{t("vpn.noZone")}</p>}
             {picked && (
-              <Button className="justify-self-start" disabled={saveZones.isPending} onClick={() => window.confirm(t("vpn.zonesConfirm")) && saveZones.mutate(picked)}>
+              <Button
+                className="justify-self-start"
+                disabled={saveZones.isPending}
+                onClick={async () => {
+                  const added = picked.filter((z) => !data.zones.includes(z));
+                  const ports = added.length ? await closedPorts(added) : [];
+                  const names = (zones ?? []).filter((z) => added.includes(z.slug)).map((z) => z.name).join(", ");
+                  const text = added.length
+                    ? [t("vpn.zonesConfirmAdd", { zones: names }), ports.length ? t("vpn.zonesConfirmPorts", { ports: ports.join("\n") }) : t("vpn.zonesConfirmNoPort")].join("\n\n")
+                    : t("vpn.zonesConfirm");
+                  if (window.confirm(text)) saveZones.mutate(picked);
+                }}
+              >
                 {t("common.save")}
               </Button>
             )}

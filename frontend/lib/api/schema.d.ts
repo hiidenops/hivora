@@ -2787,6 +2787,8 @@ export interface components {
         };
         /** DeployIn */
         DeployIn: {
+            /** Access */
+            access?: ("public" | "lan") | null;
             /**
              * Inputs
              * @default {}
@@ -3996,6 +3998,8 @@ export interface components {
             category: string;
             /** Compatible */
             compatible: boolean;
+            /** Default Access */
+            default_access: ("public" | "lan") | null;
             /** Default Zone */
             default_zone: string | null;
             /** Description */
@@ -4279,6 +4283,10 @@ export interface components {
             network_mode: components["schemas"]["NetworkMode"];
             /** Slug */
             slug: string;
+            /** Subnet */
+            subnet: string | null;
+            /** Vpn */
+            vpn: string | null;
         };
         /** ZonesIn */
         ZonesIn: {

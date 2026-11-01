@@ -56,10 +56,11 @@ export function ZoneDialog({ zone, trigger }: { zone?: Zone; trigger: ReactNode 
           </fieldset>
           <fieldset className="grid gap-2">
             <legend className="mb-2 text-sm font-medium">{t("zones.network")}</legend>
+            {zone?.vpn && <Alert tone="info">{t("zones.vpnReached", { vpn: zone.vpn, subnet: zone.subnet ?? "—" })}</Alert>}
             {MODES.map((m) => (
-              <label key={m} className={cn("surface grid cursor-pointer gap-0.5 rounded-lg border p-3 text-sm", mode === m && "border-primary")}>
+              <label key={m} className={cn("surface grid cursor-pointer gap-0.5 rounded-lg border p-3 text-sm", mode === m && "border-primary", zone?.vpn && "opacity-60")}>
                 <span className="flex items-center gap-2 font-medium">
-                  <input type="radio" name="network" value={m} checked={mode === m} onChange={() => setMode(m)} />
+                  <input type="radio" name="network" value={m} checked={mode === m} disabled={Boolean(zone?.vpn)} onChange={() => setMode(m)} />
                   {t(`zones.mode.${m}` as MessageKey)}
                 </span>
                 <span className="pl-6 text-muted-foreground">{t(`zones.mode.${m}.help` as MessageKey)}</span>

@@ -35,12 +35,11 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
     },
   });
   const nodes = graph.nodes as GNode[];
-  const vpns = nodes.filter((n) => n.type === "app" && n.vpn && n.key !== node.key);
   const reached = (graph.edges as { source: string; target: string; kind: string }[])
     .filter((e) => e.kind === "vpn" && e.source === node.key)
     .map((e) => {
       const target = nodes.find((n) => n.key === e.target);
-      return { target: target?.type === "app" ? `@${target.slug}` : String(target?.slug ?? ""), label: String(target?.label ?? "") };
+      return { target: String(target?.slug ?? ""), label: String(target?.label ?? "") };
     });
   const exposed = (graph.edges as { source: string; target: string; kind: string; label?: string }[]).filter((e) => e.kind === "exposed");
   return (
@@ -69,7 +68,7 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
               return (
                 <li key={`${p.service}${p.port}${p.protocol}`} className="flex items-center gap-2">
                   <span className="font-mono">{p.port}/{p.protocol}</span>
-                  {canEdit ? (
+                  {canEdit && !node.behind_vpn ? (
                     <select
                       aria-label={t("topology.exposureOf", { port: key })}
                       className="h-7 rounded border bg-card px-1 text-xs"
@@ -88,25 +87,6 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
               );
             })}
           </ul>
-          {canEdit && !node.behind_vpn && vpns.length > 0 && (
-            <div className="grid gap-1">
-              <p className="text-xs text-muted-foreground">{t("topology.behindHelp")}</p>
-              {vpns.map((v) => (
-                <Button
-                  key={v.key}
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    onChange({ kind: "reach", vpnId: Number(v.id), vpn: String(v.label), target: `@${node.slug}`, targetLabel: String(node.label), on: true });
-                    for (const p of (node.ports as Port[]).filter((x) => x.exposure === "public"))
-                      onChange({ kind: "expose", appId: Number(node.id), app: String(node.label), service: p.service, port: `${p.container}/${p.protocol}`, exposure: "none" });
-                  }}
-                >
-                  {t("topology.putBehind", { vpn: String(v.label) })}
-                </Button>
-              ))}
-            </div>
-          )}
           {canEdit && Boolean(node.vpn) && reached.length > 0 && (
             <div className="grid gap-1">
               <p className="text-xs font-medium">{t("topology.reached")}</p>

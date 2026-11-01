@@ -1484,6 +1484,21 @@
       },
       "DeployIn": {
         "properties": {
+          "access": {
+            "anyOf": [
+              {
+                "enum": [
+                  "public",
+                  "lan"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access"
+          },
           "inputs": {
             "additionalProperties": true,
             "default": {},
@@ -4895,6 +4910,21 @@
             "title": "Compatible",
             "type": "boolean"
           },
+          "default_access": {
+            "anyOf": [
+              {
+                "enum": [
+                  "public",
+                  "lan"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Access"
+          },
           "default_zone": {
             "anyOf": [
               {
@@ -5005,7 +5035,8 @@
           "form",
           "services",
           "manifest",
-          "default_zone"
+          "default_zone",
+          "default_access"
         ],
         "title": "TemplateDetail",
         "type": "object"
@@ -5731,6 +5762,28 @@
           "slug": {
             "title": "Slug",
             "type": "string"
+          },
+          "subnet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subnet"
+          },
+          "vpn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vpn"
           }
         },
         "required": [
@@ -5741,7 +5794,9 @@
           "icon",
           "network_mode",
           "is_system",
-          "apps"
+          "apps",
+          "vpn",
+          "subnet"
         ],
         "title": "ZoneOut",
         "type": "object"
@@ -5838,7 +5893,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "openapi": "3.1.0",
   "paths": {

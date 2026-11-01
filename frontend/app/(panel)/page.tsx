@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpCircle } from "lucide-react";
+import { ArrowUpCircle, ShieldCheck } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -133,7 +133,7 @@ export default function DashboardPage() {
 /** A zone's title over its apps, its shortcuts right beside its name: start, stop, restart
  *  the zone in its order, and its start order. */
 function ZoneHeading({ zone, operator }: { zone: Zone; operator: boolean }) {
-  const { errorMessage } = useI18n();
+  const { t, errorMessage } = useI18n();
   const { run, error } = useZoneActions(zone);
   return (
     <div className="mb-3 grid gap-2">
@@ -142,6 +142,11 @@ function ZoneHeading({ zone, operator }: { zone: Zone; operator: boolean }) {
           <span className="size-2.5 rounded-full" style={{ background: zone.color }} />
           {zone.name}
         </h2>
+        {zone.vpn && (
+          <span className="flex items-center gap-1 rounded-full bg-ok/10 px-2 py-0.5 text-xs text-ok" title={t("zones.vpnBadgeHelp")}>
+            <ShieldCheck className="size-3.5" /> {t("zones.vpnBadge", { vpn: zone.vpn })}
+          </span>
+        )}
         {operator && <ZoneActionButtons zone={zone} run={run} compact />}
         <StartOrderButton zone={zone} />
       </div>
