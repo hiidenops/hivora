@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from hivora.docker_gateway import ContainerInfo, ContainerState
+from hivora.docker_gateway import ContainerInfo, ContainerState, NetworkInfo
 from hivora.vpn import wireguard as wg
 
 
@@ -104,11 +104,17 @@ def test_vpn_clients_and_linked_zones(client: Any, tmp_path: Path) -> None:
         return await real_exec(cid, cmd, user)
 
     gw.exec_run = exec_while_writing
+    # First start without a config: the image dropped the default route, put it back.
+    gw.networks.append(
+        NetworkInfo("n1", "vpn_default", "bridge", False, subnets=("172.31.0.0/16",))
+    )
     laptop = client.post(
         f"{API}/apps/{app_id}/vpn/clients",
         json={"name": "laptop", "allowed_ips": ["192.168.1.0/24"]},
     ).json()["id"]
     assert gw.exec_calls[-1][:2] == ["sh", "-c"] and "wg syncconf wg0" in gw.exec_calls[-1][2]
+    restore = "ip -4 route show default | grep -q . || ip route add default via 172.31.0.1; "
+    assert f"else {restore}wg-quick up" in gw.exec_calls[-1][2]
     gw.exec_run = real_exec
     assert writes == ["sh"]
     cfg = client.get(f"{API}/apps/{app_id}/vpn/clients/{laptop}/config").text

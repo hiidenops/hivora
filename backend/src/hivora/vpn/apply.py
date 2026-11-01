@@ -50,13 +50,22 @@ async def bring_up(gateway: DockerGateway, vpn: VpnApp, address: str) -> None:
     # ponytail: the old network's NAT rule stays until the container restarts (harmless)
     i, c = s.interface, vpn.config
     inet = f"inet {address}/{ipaddress.ip_network(subnet).prefixlen} "
+    # The image deletes the default route when it starts without a config (first start:
+    # Hivora writes wg0.conf after `up`), so clients' handshakes get no answer: restore it.
+    # ponytail: gateway = first address of the compose default network (Docker's auto IPAM)
+    restore = ""
+    nets = {n.name: n.subnets for n in await gateway.list_networks()}
+    if v4 := [n for n in nets.get(f"{vpn.slug}_default", ())
+              if ipaddress.ip_network(n).version == 4]:  # fmt: skip
+        gw = ipaddress.ip_network(v4[0])[1]
+        restore = f"ip -4 route show default | grep -q . || ip route add default via {gw}; "
     code, out = await gateway.exec_run(vpn.container.id, ["sh", "-c", (
         f"if wg show {i} >/dev/null 2>&1; then"
         f" if ip -4 -o addr show {i} | grep -qF '{inet}'; then"
         f" wg-quick strip {c} > /tmp/{i}.conf && wg syncconf {i} /tmp/{i}.conf"
         f" && sh {vpn.acl};"
         f" else ip link del {i} && wg-quick up {c}; fi;"
-        f" else wg-quick up {c}; fi"
+        f" else {restore}wg-quick up {c}; fi"
     )])  # fmt: skip
     if code != 0:
         raise VpnApplyError("WireGuard refused the configuration", output=out[-500:])
