@@ -6,6 +6,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.1] - 2026-11-01
+
 ### Modifié
 
 - **Accès d'une app** : au déploiement, trois choix clairs, « Publié sur Internet », « Réseau local » (seulement l'IP locale de la machine) ou « Par un VPN ». La liste des zones suit le choix.
