@@ -35,3 +35,6 @@ graphify-out/
 
 # Local Claude Code prompt history export (personal, never versioned)
 history.txt
+
+# Assistant instructions: kept locally, never published
+CLAUDE.md
