@@ -6,6 +6,17 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.5] - 2026-11-02
+
+### Ajouté
+
+- **Mise à jour depuis le panel** : un bouton « Mettre à jour » dans la carte Mises à jour de la page Système (admin, code TOTP si la double authentification est active). Il télécharge l'image de la release, vérifie que son digest est celui publié, puis un petit conteneur `hivora-updater` arrête le panel, le sauvegarde, prépare la base et recrée `hivora` avec exactement les mêmes options. Si la nouvelle version ne démarre pas, il revient tout seul à l'ancienne et à la base d'avant. La page se recharge d'elle-même sur la nouvelle version. Le bouton ne fait que monter de version ; l'installeur reste le moyen de revenir en arrière ou de changer d'options.
+- **Installeur** : `--no-self-update` retire ce bouton (`HIVORA_SELF_UPDATE` dans `install.env`) ; `--self-update` le remet.
+
+### Notes
+
+- Le bouton sert à partir de la version suivante : passer à la 0.3.5 se fait encore avec la commande de l'installeur.
+
 ## [0.3.4] - 2026-11-02
 
 ### Ajouté
