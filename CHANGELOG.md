@@ -6,6 +6,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.4] - 2026-11-02
+
+### Ajouté
+
+- **Zones** : à la création d'une zone, on choisit son VPN : aucun, un VPN existant (il dessert la zone aussitôt), ou un nouveau serveur WireGuard. Dans ce dernier cas, le formulaire de déploiement s'ouvre, prérempli (« VPN <zone> »), et le VPN déployé dessert la zone. Une zone desservie par un VPN relie toujours ses apps entre elles.
+
 ## [0.3.3] - 2026-11-02
 
 ### Ajouté
