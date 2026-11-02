@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # The games of the catalog (install.env, HIVORA_GAMES; never stored). Off: hidden from
     # the catalog and refused to new deploys; game apps already there keep running.
     games: bool = True
+    # The "Update" button (install.env, HIVORA_SELF_UPDATE; never stored). Off: only the
+    # installer's command is shown (system.self_update).
+    self_update: bool = True
     # The admin VPN (vpn modes, vpn.admin): address and UDP port its clients connect to.
     # No host: the public address, else the LAN one.
     admin_vpn_host: str | None = None

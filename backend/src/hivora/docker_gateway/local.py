@@ -25,6 +25,7 @@ from hivora.docker_gateway.models import (
     PublishedPort,
     StatsSample,
 )
+from hivora.docker_gateway.self_update import SelfDocker
 
 _EXIT_CODE = re.compile(r"^Exited \((-?\d+)\)")
 _HEALTH_IN_STATUS = (
@@ -280,6 +281,9 @@ class LocalDockerGateway(DockerGateway):
             return False
         await container.delete(force=True)
         return True
+
+    def self_docker(self) -> SelfDocker:
+        return SelfDocker(self._docker)
 
     async def architecture(self) -> str:
         return str((await self._get_json("info")).get("Architecture", ""))

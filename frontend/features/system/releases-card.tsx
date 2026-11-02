@@ -12,11 +12,12 @@ import { useReleases } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 
 import { updateState } from "./releases";
+import { UpdateButton } from "./update-button";
 
 const TONE = { newer: "bg-info/15 text-info", upToDate: "bg-ok/15 text-ok" } as const;
 
-/** Settings → Updates (admins): the installed and the available version, its notes, the
- * command to update (the update itself is the installer: a button comes with M13). */
+/** System → Updates (admins): the installed and the available version, its notes, the
+ * Update button (M13) and the installer's command. */
 export function ReleasesCard() {
   const { t, lang } = useI18n();
   const qc = useQueryClient();
@@ -69,9 +70,10 @@ export function ReleasesCard() {
                 <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-md border bg-muted p-3 text-xs">{latest.notes}</pre>
               </details>
             )}
+            {data.self_update && <UpdateButton tag={latest.tag} version={latest.version} current={data.current} />}
             {data.command && (
               <div className="grid gap-1">
-                <span className="text-muted-foreground">{t("releases.command")}</span>
+                <span className="text-muted-foreground">{t(data.self_update ? "releases.commandOr" : "releases.command")}</span>
                 <CodeView code={data.command} />
               </div>
             )}

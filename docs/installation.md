@@ -88,6 +88,7 @@ sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/dow
 | `--vpn-host HOST` | l'adresse à laquelle se connectent les clients VPN (par défaut : l'IP publique) |
 | `--vpn-port N` | le port UDP du VPN d'administration (51820) |
 | `--no-games` | aucun jeu dans le catalogue (ni affiché, ni installable) ; `--games` les remet |
+| `--no-self-update` | pas de bouton « Mettre à jour » dans le panel (mise à jour par ce script seulement) ; `--self-update` le remet |
 | `--rescue-admin` | de nouvelles clés pour le client du VPN d'administration (voir [VPN d'administration](admin-vpn.md)) |
 | `--data DIR` | les données du panel (`/opt/hivora/data`) |
 | `--srv DIR` | les volumes des applications (`/srv/hivora`) |

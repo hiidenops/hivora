@@ -8,6 +8,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from hivora import __version__
+from hivora.apps.api.common import JobRef, job_ref
+from hivora.core.errors import PermissionDeniedError
 from hivora.system.releases import Channel
 from hivora.system.secrets import SecretSetting
 from hivora.system.status import Level, SystemStatus, worst
@@ -92,7 +94,8 @@ class ReleasesOut(BaseModel):
     current_notes: str | None  # the installed version's CHANGELOG.md section
     latest: ReleaseOut | None
     newer: bool
-    command: str | None  # the release's installer, to copy (the update itself: M13)
+    command: str | None  # the release's installer, to copy
+    self_update: bool  # the Update button (HIVORA_SELF_UPDATE on, the release has its digest)
     checked_at: datetime | None
     error: str | None  # offline, rate_limited, not_found, unavailable
 
@@ -105,7 +108,38 @@ class ReleasePrefsIn(BaseModel):
 @router.get("/releases")
 async def releases(_: Admin, rt: RuntimeDep, refresh: bool = False) -> ReleasesOut:
     """The latest version of the channel (GitHub Releases, cached 12 h; nothing when off)."""
-    return ReleasesOut(**await rt.releases.view(refresh=refresh))
+    view = await rt.releases.view(refresh=refresh)
+    can = bool(view["newer"] and (view["latest"] or {}).get("digest"))
+    can = can and await rt.self_update.available()
+    return ReleasesOut(**view, self_update=can)
+
+
+class TotpRequiredError(PermissionDeniedError):
+    code = "totp_required"
+
+
+class CodeIn(BaseModel):
+    code: str = Field(min_length=6, max_length=20)
+
+
+class UpdateIn(BaseModel):
+    tag: str = Field(max_length=40)
+
+
+@router.post("/confirm", status_code=204)
+async def confirm(body: CodeIn, principal: Admin, rt: RuntimeDep) -> None:
+    """A TOTP code for the next minutes of this session (the Update button)."""
+    await rt.auth.confirm_console(principal.user_id, principal.session_id, body.code)
+
+
+@router.post("/update", status_code=202)
+async def update(body: UpdateIn, principal: Admin, rt: RuntimeDep) -> JobRef:
+    """Replace Hivora with the latest release (job self_update): admin and a recent TOTP."""
+    if not rt.auth.recently_confirmed(principal.session_id, principal.totp_enabled):
+        raise TotpRequiredError("confirm with a TOTP code first")
+    job = await rt.self_update.request(body.tag)
+    rt.bus.publish("system.update_requested", target=body.tag, job=job.id)
+    return job_ref(job)
 
 
 @router.put("/releases/settings", status_code=204)

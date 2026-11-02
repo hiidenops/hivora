@@ -111,9 +111,14 @@ class JobQueue:
         self._wakeup = asyncio.Event()
         self._tasks: list[asyncio.Task[None]] = []
         self._stopping = False
+        self._kept: set[int] = set()  # running elsewhere (the self-update): recover() skips
 
     def register(self, kind: JobKind, handler: Handler) -> None:
         self._handlers[kind] = handler
+
+    def keep(self, job_id: int) -> None:
+        """A job another process finishes (the self-update): left running by recover()."""
+        self._kept.add(job_id)
 
     # --- producer side ----------------------------------------------------
     def add(
@@ -210,6 +215,8 @@ class JobQueue:
                 select(Job).where(Job.status == JobStatus.RUNNING)
             )).all()  # fmt: skip
             for job in stale:
+                if job.id in self._kept:
+                    continue
                 if job.kind in self._resumable:
                     job.status = JobStatus.QUEUED
                     job.log += "[resumed after restart]\n"

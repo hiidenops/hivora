@@ -29,6 +29,7 @@ RETRY = timedelta(hours=1)  # after a failure
 REFRESH = timedelta(minutes=1)  # "check now", at most once a minute
 NOTES_MAX = 20_000
 TAG = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?$")
+DIGEST = re.compile(r"digest `(sha256:[0-9a-f]{64})`")
 GITHUB = re.compile(r"^https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?/?$")
 
 # (status, JSON) of a GET with these headers; raises when the network fails.
@@ -49,6 +50,12 @@ def pick_latest(releases: list[dict[str, Any]], channel: str) -> dict[str, Any] 
     found = [r for r in releases if not r.get("draft") and parse_version(r.get("tag_name", ""))
              and (channel == "pre" or not r.get("prerelease"))]  # fmt: skip
     return max(found, key=lambda r: parse_version(r["tag_name"]) or (0,), default=None)
+
+
+def release_digest(notes: str | None) -> str | None:
+    """The image digest a GitHub Release of Hivora publishes in its notes (self-update)."""
+    m = DIGEST.search(notes or "")
+    return m.group(1) if m else None
 
 
 def newer(current: str, latest: str) -> bool:
@@ -128,7 +135,8 @@ class ReleaseChecker:
             out["latest"] = {"tag": tag, "version": tag.lstrip("v"),
                              "date": latest.get("published_at"), "url": latest.get("html_url"),
                              "notes": plain_notes(latest.get("body")),
-                             "prerelease": bool(latest.get("prerelease"))}  # fmt: skip
+                             "prerelease": bool(latest.get("prerelease")),
+                             "digest": release_digest(latest.get("body"))}  # fmt: skip
             out["newer"] = newer(__version__, tag)
             out["command"] = update_command(repo, tag)
         return out

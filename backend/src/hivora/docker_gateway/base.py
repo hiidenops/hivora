@@ -7,9 +7,13 @@ without touching the other modules.
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, AsyncIterator
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from hivora.core.errors import HivoraError, NotFoundError
 from hivora.docker_gateway.models import ContainerInfo, DockerEvent, NetworkInfo, StatsSample
+
+if TYPE_CHECKING:
+    from hivora.docker_gateway.self_update import SelfDocker  # aiodocker: lazy
 
 
 class DockerUnavailableError(HivoraError):
@@ -32,6 +36,10 @@ class ExecSession(ABC):
 
     @abstractmethod
     async def resize(self, rows: int, cols: int) -> None: ...
+
+    def self_docker(self) -> "SelfDocker | None":
+        """The Docker calls of the self-update (Hivora's own container), None without them."""
+        return None
 
     @abstractmethod
     async def close(self) -> None: ...
@@ -118,6 +126,10 @@ class DockerGateway(ABC):
     @abstractmethod
     async def image_platforms(self, ref: str) -> list[str] | None:
         """Architectures the registry offers for ``ref`` (e.g. ``["amd64"]``), None if unknown."""
+
+    def self_docker(self) -> "SelfDocker | None":
+        """The Docker calls of the self-update (Hivora's own container), None without them."""
+        return None
 
     @abstractmethod
     async def close(self) -> None: ...

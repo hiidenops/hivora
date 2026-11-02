@@ -730,3 +730,14 @@ def test_the_games_without_questions(machine: Machine) -> None:
     assert "HIVORA_GAMES=off" in machine.changes()[-1]
     machine.install("--yes", "--games")
     assert "HIVORA_GAMES=on" in machine.changes()[-1] and machine.env()["HIVORA_GAMES"] == '"on"'
+
+
+def test_the_update_button_turned_off_and_back_on(machine: Machine) -> None:
+    done = machine.install("--yes", "--version", "v1.2.3", "--no-self-update")
+    assert done.returncode == 0, done.stderr
+    assert "HIVORA_SELF_UPDATE=off" in machine.changes()[-1]
+    assert machine.env()["HIVORA_SELF_UPDATE"] == '"off"'
+    assert machine.install("--yes").returncode == 0  # a re-run keeps it off
+    assert "HIVORA_SELF_UPDATE=off" in machine.changes()[-1]
+    machine.install("--yes", "--self-update")
+    assert "HIVORA_SELF_UPDATE=on" in machine.changes()[-1]

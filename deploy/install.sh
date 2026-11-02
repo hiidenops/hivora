@@ -20,6 +20,7 @@
 #   --vpn-port N      UDP port of the admin VPN (51820)
 #   --rescue-admin    new keys for the admin VPN client, then show its QR code
 #   --no-games        no game in the catalog (asked on a new install); --games: back on
+#   --no-self-update  no Update button in the panel (this script only); --self-update: back on
 #   --data DIR        panel data (/opt/hivora/data)   --srv DIR   app volumes (/srv/hivora)
 #   --i-understand    confirm --access public with --yes
 #
@@ -203,6 +204,7 @@ msg_en() {
     games_on) m 'in the catalog' ;;
     games_off) m 'turned off (no game in the catalog)' ;;
     bad_games) m 'invalid HIVORA_GAMES in install.env: %s (on or off)' ;;
+    bad_self_update) m 'invalid HIVORA_SELF_UPDATE in install.env: %s (on or off)' ;;
   esac
 }
 
@@ -360,6 +362,7 @@ msg_fr() {
     games_on) m 'dans le catalogue' ;;
     games_off) m 'désactivés (aucun jeu dans le catalogue)' ;;
     bad_games) m 'HIVORA_GAMES invalide dans install.env : %s (on ou off)' ;;
+    bad_self_update) m 'HIVORA_SELF_UPDATE invalide dans install.env : %s (on ou off)' ;;
   esac
 }
 
@@ -743,7 +746,7 @@ usage() { sed -n '9,27p' "$0" 2>/dev/null || true; exit 2; }
 parse_args() {
   YES="" DRY="" UNDERSTAND="" RESCUE="" RECONFIGURE=""
   OPT_VERSION="" OPT_IMAGE="" OPT_ACCESS="" OPT_PORT="" OPT_BIND="" OPT_DATA="" OPT_SRV=""
-  OPT_VPN_HOST="" OPT_VPN_PORT="" OPT_LANG="" OPT_GAMES=""
+  OPT_VPN_HOST="" OPT_VPN_PORT="" OPT_LANG="" OPT_GAMES="" OPT_SELF_UPDATE=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --yes|-y) YES=1 ;;
@@ -753,6 +756,8 @@ parse_args() {
       --reconfigure) RECONFIGURE=1 ;;
       --no-games) OPT_GAMES="off" ;;
       --games) OPT_GAMES="on" ;;
+      --no-self-update) OPT_SELF_UPDATE="off" ;;
+      --self-update) OPT_SELF_UPDATE="on" ;;
       --version|--image|--access|--port|--bind|--data|--srv|--vpn-host|--vpn-port|--lang)
         [ $# -ge 2 ] || die needs_value "$1"
         case "$1" in
@@ -851,6 +856,8 @@ resolve() {  # command line, then install.env (or the questions), then detection
   GAMES="${OPT_GAMES:-$(env_value HIVORA_GAMES)}"; GAMES="${GAMES:-on}"
   case "$GAMES" in on|off) ;; *) die bad_games "$GAMES" ;; esac
   if [ -n "$INTERACTIVE" ] && [ -z "$OPT_GAMES" ]; then choose_games; fi
+  SELF_UPDATE="${OPT_SELF_UPDATE:-$(env_value HIVORA_SELF_UPDATE)}"; SELF_UPDATE="${SELF_UPDATE:-on}"
+  case "$SELF_UPDATE" in on|off) ;; *) die bad_self_update "$SELF_UPDATE" ;; esac
 }
 
 choose_games() {  # the games in the catalog, or none (a school, a work place)
@@ -1066,6 +1073,7 @@ start() {
     $(mounts) \
     -e "HIVORA_HOST_LAN_IP=$LAN_IP" -e "HIVORA_TIMEZONE=$TZ_NAME" \
     -e "HIVORA_PUID=$PUID" -e "HIVORA_PGID=$PGID" -e "HIVORA_ACCESS=$ACCESS" -e "HIVORA_GAMES=$GAMES" \
+    -e "HIVORA_SELF_UPDATE=$SELF_UPDATE" \
     --label io.hivora.self=true \
     "$IMAGE:$VERSION" >/dev/null
   [ -z "$DRY" ] || return 0
@@ -1130,7 +1138,7 @@ write_env() {
     umask 077
     {
       echo "# Written by the Hivora installer: its options, read again when it is re-run."
-      for key in VERSION IMAGE ACCESS PORT LAN_IP TIMEZONE PUID PGID DATA SRV VPN_HOST VPN_PORT LANG GAMES; do
+      for key in VERSION IMAGE ACCESS PORT LAN_IP TIMEZONE PUID PGID DATA SRV VPN_HOST VPN_PORT LANG GAMES SELF_UPDATE; do
         case "$key" in
           TIMEZONE) value="$TZ_NAME" ;;
           LANG) value="$UI_LANG" ;;

@@ -33,6 +33,7 @@ class JobKind(StrEnum):
     HOST_FIREWALL = "host_firewall"  # the blocked addresses applied to the host
     HOST_ROUTE = "host_route"  # the static routes applied to the host
     ZONE_ACTION = "zone_action"  # a zone started, stopped or restarted in dependency order
+    SELF_UPDATE = "self_update"  # Hivora replaced by a newer release (hivora-updater, M13)
 
 
 class JobStatus(StrEnum):

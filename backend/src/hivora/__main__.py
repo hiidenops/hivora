@@ -11,7 +11,8 @@ the server starts); `python -m hivora reset-admin-password [user]`: a new random
 `python -m hivora reset-totp [user]`: two-factor authentication off (lost phone);
 `python -m hivora rescue-admin`: new keys for the admin VPN client at the next start.
 They print KEY=value lines. `python -m hivora admin-vpn`: the path of admin.conf
-(ADMIN_CONF=...), then its QR code.
+(ADMIN_CONF=...), then its QR code. `python -m hivora self-update`: the updater's fixed steps
+(in the hivora-updater container the Update button starts; system.self_update).
 """
 
 import ipaddress
@@ -85,6 +86,24 @@ def command(settings: Settings, args: list[str]) -> None:
         if args == ["backup-self"]:
             print(backup_panel(settings.data_dir))
             return
+        if args == ["self-update"]:
+            import asyncio
+
+            from hivora.docker_gateway.self_update import SelfDocker
+            from hivora.system.self_update import run_updater
+
+            async def update() -> str:
+                docker = SelfDocker()
+                try:
+                    return str((await run_updater(settings, docker))["status"])
+                finally:
+                    await docker.close()
+
+            status = asyncio.run(update())
+            print(f"STATUS={status}")
+            if status != "succeeded":
+                sys.exit(1)
+            return
         if args == ["admin-vpn"]:
             path = settings.data_dir / "admin.conf"
             print(f"ADMIN_CONF={path}\n{terminal_qr(path.read_text())}", end="")
@@ -101,7 +120,7 @@ def command(settings: Settings, args: list[str]) -> None:
             sys.exit(
                 "usage: python -m hivora "
                 "[backup-self | bootstrap | reset-admin-password [user] | reset-totp [user]"
-                " | rescue-admin | admin-vpn]"
+                " | rescue-admin | admin-vpn | self-update]"
             )
     except (SchemaTooNewError, NotFoundError, FileNotFoundError) as error:
         sys.exit(f"error: {error}")

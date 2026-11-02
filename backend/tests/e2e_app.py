@@ -107,7 +107,7 @@ def demo(runtime: Runtime, gateway: FakeDockerGateway) -> None:
     runtime.releases.fetch = no_release
     backups = runtime.settings.data_dir / "backups" / "_hivora"
     backups.mkdir(parents=True, exist_ok=True)
-    (backups / "panel-demo-r0022.tar.gz").write_bytes(b"")
+    (backups / "panel-demo-r0023.tar.gz").write_bytes(b"")
 
 
 async def fake_github(url: str, headers: dict[str, str]) -> tuple[int, Any]:

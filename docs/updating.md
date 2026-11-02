@@ -12,7 +12,25 @@ n'est alors faite).
 L'historique de toutes les versions est dans [`CHANGELOG.md`](../CHANGELOG.md) et sur la
 page [GitHub Releases](https://github.com/hiidenops/hivora/releases).
 
-## Mettre à jour
+## Mettre à jour depuis le panel
+
+Quand une version plus récente existe, la carte **Mises à jour** a un bouton **Mettre à
+jour** (admin, avec un code TOTP si la double authentification est active). Il attend que
+les autres tâches soient finies, puis :
+
+1. télécharge l'image de la release et vérifie que son digest est celui publié dans la
+   release (sinon rien ne change) ;
+2. lance un petit conteneur `hivora-updater` qui arrête `hivora`, sauvegarde le panel,
+   prépare la base pour la nouvelle version, puis recrée `hivora` avec exactement les mêmes
+   options (seule l'image change ; `install.env` n'est pas modifié) ;
+3. attend que la nouvelle version réponde. Sinon il revient tout seul à l'ancienne version
+   et à la base d'avant, et la tâche dit pourquoi.
+
+Le panel est injoignable une minute environ ; vos applications continuent de tourner. Le
+bouton ne fait que monter de version : pour revenir en arrière ou changer d'options, utilisez
+l'installeur. Il se désactive avec `--no-self-update` (voir [l'installation](installation.md)).
+
+## Mettre à jour avec l'installeur
 
 Lancez l'installeur de la nouvelle release sur la machine (la carte affiche la commande
 exacte) :

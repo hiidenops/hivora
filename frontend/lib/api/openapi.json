@@ -2375,7 +2375,8 @@
           "host_package",
           "host_firewall",
           "host_route",
-          "zone_action"
+          "zone_action",
+          "self_update"
         ],
         "title": "JobKind",
         "type": "string"
@@ -3455,6 +3456,10 @@
           "newer": {
             "title": "Newer",
             "type": "boolean"
+          },
+          "self_update": {
+            "title": "Self Update",
+            "type": "boolean"
           }
         },
         "required": [
@@ -3466,6 +3471,7 @@
           "latest",
           "newer",
           "command",
+          "self_update",
           "checked_at",
           "error"
         ],
@@ -5235,6 +5241,20 @@
         "title": "UfwIn",
         "type": "object"
       },
+      "UpdateIn": {
+        "properties": {
+          "tag": {
+            "maxLength": 40,
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag"
+        ],
+        "title": "UpdateIn",
+        "type": "object"
+      },
       "UpdatePlanOut": {
         "properties": {
           "access": {
@@ -5922,6 +5942,21 @@
         "title": "CodeIn",
         "type": "object"
       },
+      "hivora__system__api__CodeIn": {
+        "properties": {
+          "code": {
+            "maxLength": 20,
+            "minLength": 6,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "CodeIn",
+        "type": "object"
+      },
       "hivora__zones__api__ZoneIn": {
         "properties": {
           "color": {
@@ -5950,7 +5985,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.3.3"
+    "version": "0.3.4"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -11122,6 +11157,41 @@
         ]
       }
     },
+    "/api/v1/system/confirm": {
+      "post": {
+        "description": "A TOTP code for the next minutes of this session (the Update button).",
+        "operationId": "confirm_api_v1_system_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/hivora__system__api__CodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm",
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/api/v1/system/health": {
       "get": {
         "description": "Public: used by the container healthcheck and the login page.",
@@ -11371,6 +11441,48 @@
           }
         },
         "summary": "Status",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/update": {
+      "post": {
+        "description": "Replace Hivora with the latest release (job self_update): admin and a recent TOTP.",
+        "operationId": "update_api_v1_system_update_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update",
         "tags": [
           "system"
         ]

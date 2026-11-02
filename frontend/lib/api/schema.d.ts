@@ -1825,6 +1825,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm
+         * @description A TOTP code for the next minutes of this session (the Update button).
+         */
+        post: operations["confirm_api_v1_system_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -1964,6 +1984,26 @@ export interface paths {
         get: operations["status_api_v1_system_status_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update
+         * @description Replace Hivora with the latest release (job self_update): admin and a recent TOTP.
+         */
+        post: operations["update_api_v1_system_update_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3131,7 +3171,7 @@ export interface components {
          * JobKind
          * @enum {string}
          */
-        JobKind: "deploy" | "update" | "remove" | "pull" | "start" | "stop" | "restart" | "rollback" | "adopt" | "convert" | "move_zone" | "world_import" | "world_delete" | "backup" | "backup_restore" | "site_content" | "site_file" | "site_config" | "host_package" | "host_firewall" | "host_route" | "zone_action";
+        JobKind: "deploy" | "update" | "remove" | "pull" | "start" | "stop" | "restart" | "rollback" | "adopt" | "convert" | "move_zone" | "world_import" | "world_delete" | "backup" | "backup_restore" | "site_content" | "site_file" | "site_config" | "host_package" | "host_firewall" | "host_route" | "zone_action" | "self_update";
         /** JobOut */
         JobOut: {
             /** App Id */
@@ -3482,6 +3522,8 @@ export interface components {
             latest: components["schemas"]["ReleaseOut"] | null;
             /** Newer */
             newer: boolean;
+            /** Self Update */
+            self_update: boolean;
         };
         /** RemovalPlanOut */
         RemovalPlanOut: {
@@ -4135,6 +4177,11 @@ export interface components {
              */
             keep_ssh: boolean;
         };
+        /** UpdateIn */
+        UpdateIn: {
+            /** Tag */
+            tag: string;
+        };
         /** UpdatePlanOut */
         UpdatePlanOut: {
             /** Access */
@@ -4361,6 +4408,11 @@ export interface components {
         };
         /** CodeIn */
         hivora__hostfw__api__CodeIn: {
+            /** Code */
+            code: string;
+        };
+        /** CodeIn */
+        hivora__system__api__CodeIn: {
             /** Code */
             code: string;
         };
@@ -7939,6 +7991,37 @@ export interface operations {
             };
         };
     };
+    confirm_api_v1_system_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["hivora__system__api__CodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_v1_system_health_get: {
         parameters: {
             query?: never;
@@ -8141,6 +8224,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_api_v1_system_update_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
                 };
             };
             /** @description Validation Error */
