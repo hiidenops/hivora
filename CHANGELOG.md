@@ -6,6 +6,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.3] - 2026-11-02
+
 ### Ajouté
 
 - **Icône** : la tête du chat, mascotte de Hivora (celui de l'étagère, en bas de la navigation), sur fond miel, dans l'onglet du navigateur et les favoris.
