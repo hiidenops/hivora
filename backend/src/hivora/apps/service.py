@@ -140,8 +140,12 @@ class AppService:
         ]  # fmt: skip
         return app, entry, running[0] if running else None
 
-    async def access_of(self, session: AsyncSession, app: Application) -> dict[str, str]:
-        """Connection addresses (web / game) for the latest revision's inputs."""
+    async def access_of(
+        self, session: AsyncSession, app: Application,
+        vpn_zones: dict[str, tuple[str, str]] | None = None,
+    ) -> dict[str, str]:  # fmt: skip
+        """Connection addresses (web / game) for the latest revision's inputs.
+        ``vpn_zones``: the planner's, when the caller already has it (a whole list)."""
         try:
             entry = await self.planner.entry_of(session, app)
         except (ConflictError, NotFoundError):
@@ -150,7 +154,9 @@ class AppService:
         if latest is None:
             return {}
         zone = await session.get(Zone, app.zone_id) if app.zone_id else None
-        vpn_zone = zone is not None and zone.slug in await self.planner.vpn_zones(session)
+        if vpn_zones is None:
+            vpn_zones = await self.planner.vpn_zones(session)
+        vpn_zone = zone is not None and zone.slug in vpn_zones
         ctx = AppContext(slug=app.slug, name=app.name, revision=latest.number,
                          vpn_only=vpn_zone)  # fmt: skip
         form = FormValues(dict(latest.inputs))

@@ -9,7 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import { useLiveStatus } from "@/lib/realtime";
 import { cn } from "@/lib/utils";
 
-type Port = { port: number; protocol: string; exposure: string; service: string };
+type Port = { port: number; container: number; protocol: string; exposure: string; service: string };
 const EXPOSURE = { public: "bg-danger/15 text-danger", lan: "bg-info/15 text-info", vpn: "bg-ok/15 text-ok", internal: "bg-muted text-muted-foreground" } as Record<string, string>;
 
 const handles = (
@@ -45,11 +45,14 @@ const DOT: Record<AppStatus, string> = { healthy: "bg-ok", starting: "bg-info an
 
 export function AppNode({ data, selected }: NodeProps) {
   const { t } = useI18n();
-  const d = data as { label: string; slug: string; status: AppStatus; icon_url: string | null; ports: Port[]; level: string; vpn: boolean; zoneColor?: string | null; sitePorts?: (number | null)[]; hosts?: boolean };
+  const d = data as { label: string; slug: string; status: AppStatus; icon_url: string | null; ports: Port[]; level: string; vpn: boolean; zoneColor?: string | null; sitePorts?: (number | null)[]; hosts?: boolean; behind_vpn?: boolean; vpn_address?: string | null };
   const status = useLiveStatus(d.slug, d.status);
   // Published ports always show (how the app is reached); internal ones only at "all"; the
   // ports of the sites it hosts show on their own cards.
-  const ports = (d.level === "all" ? d.ports : d.ports.filter((p) => p.exposure !== "internal")).filter((p) => !d.sitePorts?.includes(p.port));
+  // In a zone a VPN serves, nothing is published: its address on the zone network and the
+  // app's own ports are how VPN clients reach it (as the panel's card shows its address).
+  const viaVpn = Boolean(d.behind_vpn);
+  const ports = (d.level === "all" || viaVpn ? d.ports : d.ports.filter((p) => p.exposure !== "internal")).filter((p) => !d.sitePorts?.includes(p.port));
   return (
     <div className={cn("rounded-md border border-l-4 bg-card px-2 py-1.5 shadow-sm", selected && "ring-2 ring-ring", status === "error" && "border-danger")} style={{ borderLeftColor: d.zoneColor ?? "var(--muted-foreground)" }}>
       {handles}
@@ -60,12 +63,21 @@ export function AppNode({ data, selected }: NodeProps) {
         <span className="min-w-0 flex-1 truncate text-xs font-medium">{d.label}</span>
         <span className={cn("size-2 shrink-0 rounded-full", DOT[status])} aria-label={t(`status.${status}`)} />
       </div>
-      {ports.length > 0 && (
+      {(ports.length > 0 || viaVpn) && (
         <div className="mt-1 flex flex-wrap gap-0.5">
+          {viaVpn && (
+            <span title={t("topology.behindVpn")} className={cn("rounded px-1 font-mono text-[9px] leading-4", EXPOSURE.vpn)}>
+              VPN{d.vpn_address ? ` ${d.vpn_address}` : ""}
+            </span>
+          )}
           {ports.map((p) => (
-            <span key={`${p.service}${p.port}${p.protocol}`} title={t(`topology.exposure.${p.exposure}` as "topology.exposure.lan")} className={cn("rounded px-1 font-mono text-[9px] leading-4", EXPOSURE[p.exposure])}>
+            <span
+              key={`${p.service}${p.port}${p.protocol}`}
+              title={viaVpn ? t("topology.behindVpn") : t(`topology.exposure.${p.exposure}` as "topology.exposure.lan")}
+              className={cn("rounded px-1 font-mono text-[9px] leading-4", EXPOSURE[viaVpn ? "vpn" : p.exposure])}
+            >
               {p.exposure === "lan" ? "LAN " : p.exposure === "public" ? "WAN " : ""}
-              {p.port}/{p.protocol}
+              {viaVpn ? p.container : p.port}/{p.protocol}
             </span>
           ))}
         </div>

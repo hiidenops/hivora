@@ -14,6 +14,8 @@ test("vpn zones: link a zone from the VPN card, deploy into it through the VPN",
   await done(vpn.job.id);
 
   await page.goto(`/app/?id=${vpn.app.id}`);
+  await expect(page.getByRole("heading", { name: "Tunnel" })).toBeVisible();
+  await expect(page.getByText(/Pour jouer depuis Internet/)).toHaveCount(0); // a VPN, not a game
   const zone = page.getByRole("group", { name: "Zones accessibles par le VPN" }).locator("label", { hasText: "Coffre-fort" });
   await expect(zone).toContainText("0 app(s)");
   await zone.getByRole("switch").check();

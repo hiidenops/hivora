@@ -75,7 +75,7 @@ function ChangeDialog({ open, onOpenChange, title, plan, apply, onJob }: {
             </Button>
             <Button
               variant={p?.reset ? "destructive" : undefined}
-              disabled={!p || p.conflicts.length > 0 || run.isPending || (!!p.reset && !confirm)}
+              loading={run.isPending} disabled={!p || p.conflicts.length > 0 || run.isPending || (!!p.reset && !confirm)}
               onClick={() => run.mutate()}
             >
               {p?.reset ? t("edit.resetApply") : t("edit.apply")}

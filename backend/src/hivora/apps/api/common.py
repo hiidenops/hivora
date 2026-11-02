@@ -67,6 +67,8 @@ class AppOut(BaseModel):
     hosting: bool  # a web server that hosts sites (/apps/{id}/sites)
     created_at: datetime
     update: AppUpdateOut | None = None  # a newer version known (the list only); None: none
+    # Its web addresses (the list only): web, web_lan, web_vpn, as the app's page shows them.
+    web: dict[str, str] = {}
 
 
 class DeployOut(BaseModel):

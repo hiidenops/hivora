@@ -2,10 +2,10 @@
 
 ## Savoir qu'une nouvelle version existe
 
-**Paramètres → Mises à jour** affiche la version installée, le canal (Stable ou
+**Système → Mises à jour** (bouton en bas de la navigation) affiche la version installée, le canal (Stable ou
 Pré-versions), la dernière version publiée avec ses notes, et la commande de mise à jour.
-Une pastille bleue sur **Paramètres** signale qu'une version plus récente existe. La
-vérification lit les GitHub Releases du projet au plus toutes les 12 heures et n'envoie rien
+Une pastille bleue sur le bouton **Système** signale qu'une version plus récente existe. La
+vérification lit les GitHub Releases du projet au plus toutes les 20 minutes et n'envoie rien
 d'autre qu'un en-tête `User-Agent` ; elle se désactive dans la même carte (aucune requête
 n'est alors faite).
 

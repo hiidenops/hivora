@@ -2,7 +2,7 @@
 
 ## Premier coup d'œil
 
-- **Paramètres → Santé du panel** : base, espace disque, Docker, tâches, sauvegarde du
+- **Système → Santé du panel** : base, espace disque, Docker, tâches, sauvegarde du
   panel, exposition, certificat et VPN d'administration, chacun avec son état.
 - Les journaux du panel :
   ```sh

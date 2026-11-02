@@ -52,7 +52,7 @@ export function PasswordForm({ onDone }: { onDone?: () => void }) {
       {mismatch && <Alert tone="danger">{t("password.mismatch")}</Alert>}
       {change.error && <Alert tone="danger">{errorMessage(change.error)}</Alert>}
       {change.isSuccess && <Alert>{t("password.changed")}</Alert>}
-      <Button type="submit" disabled={change.isPending}>
+      <Button type="submit" loading={change.isPending} disabled={change.isPending}>
         {t("common.save")}
       </Button>
     </form>

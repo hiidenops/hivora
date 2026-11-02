@@ -68,7 +68,7 @@ export function TotpCard({ onContinue }: { onContinue?: () => void } = {}) {
         </div>
       )}
       {!me?.totp_enabled && !enrollment && (
-        <Button className="justify-self-start" onClick={() => enroll.mutate()} disabled={enroll.isPending}>
+        <Button className="justify-self-start" onClick={() => enroll.mutate()} loading={enroll.isPending} disabled={enroll.isPending}>
           {t("settings.totp.enable")}
         </Button>
       )}
@@ -90,7 +90,7 @@ export function TotpCard({ onContinue }: { onContinue?: () => void } = {}) {
           <code className="break-all font-mono text-xs">{enrollment.secret}</code>
           <Label htmlFor="totp-code">{t("settings.totp.code")}</Label>
           <Input id="totp-code" name="code" inputMode="numeric" autoComplete="one-time-code" className="w-40 font-mono" required />
-          <Button type="submit" className="justify-self-start" disabled={confirm.isPending}>
+          <Button type="submit" className="justify-self-start" loading={confirm.isPending} disabled={confirm.isPending}>
             {t("settings.totp.verify")}
           </Button>
         </form>
@@ -107,7 +107,7 @@ export function TotpCard({ onContinue }: { onContinue?: () => void } = {}) {
             <Label htmlFor="totp-password">{t("settings.totp.passwordToDisable")}</Label>
             <Input id="totp-password" name="password" type="password" autoComplete="current-password" required />
           </div>
-          <Button type="submit" variant="outline" disabled={disable.isPending}>
+          <Button type="submit" variant="outline" loading={disable.isPending} disabled={disable.isPending}>
             {t("settings.totp.disable")}
           </Button>
         </form>

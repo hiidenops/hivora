@@ -96,7 +96,7 @@ export function ReleasesCard() {
             </Select>
           </span>
           {data.enabled && data.available && (
-            <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
+            <Button variant="outline" size="sm" loading={refresh.isPending} disabled={refresh.isPending} onClick={() => refresh.mutate()}>
               {refresh.isPending ? t("status.checking") : t("releases.checkNow")}
             </Button>
           )}

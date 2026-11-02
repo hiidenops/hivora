@@ -91,7 +91,7 @@ export function FileEditor({ base, path, exists, canEdit, onJob, onDirty }: {
       {save.error && !conflict && <Alert tone="danger">{errorMessage(save.error)}</Alert>}
       {canEdit && (
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" disabled={!dirty || save.isPending} onClick={() => setState({ ...state, draft: state.original })}>
+          <Button variant="ghost" loading={save.isPending} disabled={!dirty || save.isPending} onClick={() => setState({ ...state, draft: state.original })}>
             {t("sites.revert")}
           </Button>
           <Button disabled={!canSave} onClick={submit}>

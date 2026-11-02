@@ -341,6 +341,14 @@
             "title": "Vpn",
             "type": "boolean"
           },
+          "web": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Web",
+            "type": "object"
+          },
           "zone_id": {
             "anyOf": [
               {
@@ -448,6 +456,14 @@
                 "type": "null"
               }
             ]
+          },
+          "web": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Web",
+            "type": "object"
           },
           "zone_id": {
             "anyOf": [
@@ -5925,7 +5941,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.3.1"
+    "version": "0.3.2"
   },
   "openapi": "3.1.0",
   "paths": {

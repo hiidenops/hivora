@@ -73,10 +73,10 @@ export function ComposeEditor({ appId, initial, onJob, onClose }: { appId: numbe
         <Button variant="outline" onClick={onClose}>
           {t("compose.cancel")}
         </Button>
-        <Button variant="outline" disabled={check.isPending} onClick={() => check.mutate()}>
+        <Button variant="outline" loading={check.isPending} disabled={check.isPending} onClick={() => check.mutate()}>
           {t("compose.check")}
         </Button>
-        <Button disabled={!ready || apply.isPending} onClick={() => apply.mutate()}>
+        <Button loading={apply.isPending} disabled={!ready || apply.isPending} onClick={() => apply.mutate()}>
           {t("compose.apply")}
         </Button>
       </div>

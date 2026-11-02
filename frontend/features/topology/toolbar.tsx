@@ -134,7 +134,7 @@ export function Toolbar({ level, tooBig, onLevel, mode, onMode, canEdit, pending
         >
           <KindSelect value={kind} onChange={setKind} />
           <Input className="h-9 w-64" required maxLength={120} placeholder={t("topology.labelPlaceholder")} value={label} onChange={(e) => setLabel(e.target.value)} aria-label={t("topology.label")} />
-          <Button size="sm" type="submit" disabled={add.isPending}>
+          <Button size="sm" type="submit" loading={add.isPending} disabled={add.isPending}>
             {t("topology.addButton")}
           </Button>
           <p className="w-full text-xs text-muted-foreground">{t("topology.addHelp")}</p>

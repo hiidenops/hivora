@@ -139,7 +139,7 @@ function Edit() {
               <Link href={`/app/?id=${id}`}>{t("common.cancel")}</Link>
             </Button>
             <Button
-              disabled={plan.isPending}
+              loading={plan.isPending} disabled={plan.isPending}
               onClick={() =>
                 plan.mutate({ inputs: values, overrides: cleaned() }, {
                   onSuccess: (p) => {
@@ -209,7 +209,7 @@ function Edit() {
               </Button>
               <Button
                 variant={review.reset ? "destructive" : undefined}
-                disabled={review.conflicts.length > 0 || apply.isPending || (!!review.reset && !confirmReset)}
+                loading={apply.isPending} disabled={review.conflicts.length > 0 || apply.isPending || (!!review.reset && !confirmReset)}
                 onClick={() =>
                   apply.mutate({ inputs: values, resetData: !!review.reset && confirmReset, overrides: cleaned() }, {
                     onSuccess: (job) => {

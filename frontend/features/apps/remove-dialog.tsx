@@ -74,7 +74,7 @@ export function RemoveDialog({ id, name, onJob, open: shown, onOpenChange }: {
               </Button>
               <Button
                 variant="destructive"
-                disabled={remove.isPending}
+                loading={remove.isPending} disabled={remove.isPending}
                 onClick={() =>
                   remove.mutate(
                     { id, removeData },

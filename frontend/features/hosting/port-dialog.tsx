@@ -75,7 +75,7 @@ export function PortDialog({ appId, site, open, onOpenChange, onJob }: {
           </div>
           <PortError error={change.error ?? plan.error} onUse={(p) => changed(String(p))} />
           {plan.data && <RestartNotice plan={plan.data} />}
-          <Button type="submit" className="justify-self-end" disabled={plan.isPending || change.isPending || !port || Number(port) === site.port}>
+          <Button type="submit" className="justify-self-end" loading={plan.isPending || change.isPending} disabled={plan.isPending || change.isPending || !port || Number(port) === site.port}>
             {plan.data ? t("hosting.portConfirm") : t("hosting.check")}
           </Button>
         </form>

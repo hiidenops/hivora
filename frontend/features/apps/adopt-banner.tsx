@@ -43,7 +43,7 @@ function CandidateRow({ c, onDone }: { c: Candidate; onDone: () => void }) {
             </option>
           ))}
         </select>
-        <Button size="sm" disabled={adopt.isPending} onClick={() => adopt.mutate()}>
+        <Button size="sm" loading={adopt.isPending} disabled={adopt.isPending} onClick={() => adopt.mutate()}>
           {t("adopt.button")}
         </Button>
       </div>

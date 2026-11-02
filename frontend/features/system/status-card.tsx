@@ -85,7 +85,7 @@ export function StatusCard() {
         </ul>
         {deep.error && <Alert tone="danger">{String(deep.error)}</Alert>}
         <div>
-          <Button variant="outline" size="sm" disabled={deep.isPending} onClick={() => deep.mutate()}>
+          <Button variant="outline" size="sm" loading={deep.isPending} disabled={deep.isPending} onClick={() => deep.mutate()}>
             {deep.isPending ? t("status.checking") : t("status.deep")}
           </Button>
         </div>

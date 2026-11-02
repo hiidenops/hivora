@@ -45,7 +45,7 @@ test("README screenshots", async ({ page }) => {
   await page.waitForTimeout(2500); // icons
   await page.screenshot({ path: `${OUT}/catalog.png` });
 
-  await page.goto("/settings/");
+  await page.goto("/system/");
   const heading = page.getByRole("heading", { name: "Santé du panel" });
   await heading.waitFor();
   await page.waitForTimeout(1500); // the cards' entrance animation

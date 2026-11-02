@@ -2429,6 +2429,13 @@ export interface components {
             volumes: string[];
             /** Vpn */
             vpn: boolean;
+            /**
+             * Web
+             * @default {}
+             */
+            web: {
+                [key: string]: string;
+            };
             /** Zone Id */
             zone_id: number | null;
         };
@@ -2458,6 +2465,13 @@ export interface components {
             /** Template */
             template: string | null;
             update?: components["schemas"]["AppUpdateOut"] | null;
+            /**
+             * Web
+             * @default {}
+             */
+            web: {
+                [key: string]: string;
+            };
             /** Zone Id */
             zone_id: number | null;
         };

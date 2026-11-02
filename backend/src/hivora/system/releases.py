@@ -1,7 +1,7 @@
 """Available versions (M12-7): the GitHub Releases of the source repository, read only.
 
 On by default (D6), off in Settings: then no request at all. At most one request per
-12 hours (one per hour after a failure), kept in memory; nothing sent but the
+20 minutes (one per hour after a failure), kept in memory; nothing sent but the
 ``User-Agent``. Offline: the panel says so quietly, nothing breaks. Remote notes are
 shown as plain text (nothing third-party is loaded); the installed version's notes come
 from the CHANGELOG.md shipped in the image.
@@ -24,7 +24,7 @@ from hivora.db.models import Setting
 Channel = Literal["stable", "pre"]
 PREFS = "system.releases"  # {"enabled": bool, "channel": "stable" | "pre"}
 DEFAULTS: dict[str, Any] = {"enabled": True, "channel": "stable"}
-FRESH = timedelta(hours=12)
+FRESH = timedelta(minutes=20)  # the panel asks on every navigation click
 RETRY = timedelta(hours=1)  # after a failure
 REFRESH = timedelta(minutes=1)  # "check now", at most once a minute
 NOTES_MAX = 20_000

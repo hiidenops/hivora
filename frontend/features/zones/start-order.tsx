@@ -150,7 +150,7 @@ export function StartOrder({ slug }: { slug: string }) {
 
       {editable && edit && (
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => save.mutate(edit)} disabled={save.isPending}>
+          <Button onClick={() => save.mutate(edit)} loading={save.isPending} disabled={save.isPending}>
             {t("common.save")}
           </Button>
           <Button variant="ghost" onClick={() => (setEdit(null), setLoop(null))}>

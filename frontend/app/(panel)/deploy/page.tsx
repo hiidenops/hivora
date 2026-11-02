@@ -184,7 +184,7 @@ function Deploy() {
             </details>
           )}
           {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
-          <Button className="justify-self-start" onClick={review} disabled={planMutation.isPending || (access === "vpn" && !zone)}>
+          <Button className="justify-self-start" onClick={review} loading={planMutation.isPending} disabled={planMutation.isPending || (access === "vpn" && !zone)}>
             {t("deploy.preview")}
           </Button>
         </div>
@@ -251,7 +251,7 @@ function Deploy() {
                   {t("common.back")}
                 </Button>
                 <Button
-                  disabled={plan.conflicts.length > 0 || deploy.isPending}
+                  loading={deploy.isPending} disabled={plan.conflicts.length > 0 || deploy.isPending}
                   onClick={() =>
                     deploy.mutate(body(), {
                       onSuccess: (r) => {

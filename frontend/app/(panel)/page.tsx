@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpCircle, ShieldCheck } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, ShieldCheck } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -20,18 +20,37 @@ import { useApps, useZones } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 import { useLiveStatus } from "@/lib/realtime";
 
+/** The web address to open from here: through the VPN when that is the only way; the public
+ *  one when the panel itself is reached on that host; otherwise the local network's. */
+function webAddress(web: Record<string, string>): string | undefined {
+  if (web.web_vpn && !web.web && !web.web_lan) return web.web_vpn;
+  const here = typeof window === "undefined" ? "" : window.location.hostname;
+  if (web.web && here && new URL(web.web).hostname === here) return web.web;
+  return web.web_lan ?? web.web ?? web.web_vpn;
+}
+
 function AppTile({ app }: { app: App }) {
   const { t } = useI18n();
   const status = useLiveStatus(app.slug, app.status);
+  const url = webAddress(app.web ?? {});
   return (
     <Card className="card-interactive flex flex-col gap-3 p-4">
-      <Link href={`/app/?id=${app.id}`} className="flex items-center gap-3">
-        <AppIcon src={app.icon_url} name={app.name} />
-        <span className="min-w-0">
-          <span className="block truncate font-medium">{app.name}</span>
-          <span className="block truncate font-mono text-xs text-muted-foreground">{app.slug}</span>
-        </span>
-      </Link>
+      <div className="flex items-center gap-3">
+        <Link href={`/app/?id=${app.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+          <AppIcon src={app.icon_url} name={app.name} />
+          <span className="min-w-0">
+            <span className="block truncate font-medium">{app.name}</span>
+            <span className="block truncate font-mono text-xs text-muted-foreground">{app.slug}</span>
+          </span>
+        </Link>
+        {url && status !== "stopped" && status !== "missing" && (
+          <Button asChild size="sm" className="shrink-0">
+            <a href={url} target="_blank" rel="noopener noreferrer" title={url} aria-label={t("dashboard.openApp", { name: app.name })}>
+              <ExternalLink /> {t("dashboard.open")}
+            </a>
+          </Button>
+        )}
+      </div>
       <div className="flex items-center justify-between">
         <span className="flex flex-wrap items-center gap-1.5">
           <StatusBadge status={status} drift={app.drift} />

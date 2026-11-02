@@ -1,11 +1,11 @@
 "use client";
 
-import { Activity, Ban, Boxes, BrickWall, Globe, LayoutDashboard, LayoutGrid, LogOut, Network, Route, Settings, Share2, ShieldBan, ShieldCheck, Users } from "lucide-react";
+import { Activity, Ban, Boxes, BrickWall, Globe, LayoutDashboard, LayoutGrid, LogOut, Network, Route, Server, Settings, Share2, ShieldBan, ShieldCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment, createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Switch } from "@/components/ui/input";
 import { SystemAlerts, needsAttention } from "@/features/system/system-alerts";
@@ -95,13 +95,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   });
   const totpSetup = probe.error instanceof ApiError && probe.error.code === "totp_setup_required";
   const held = !!me && !me.totp_enabled && (probe.isPending || totpSetup);
-  // Admins: the System checks (the Settings dot, the exposure banner), once the panel is open.
+  // Admins: the System checks (the System button dot, the exposure banner), once the panel is open.
   const ready = !!me && !me.must_change_password && (me.totp_enabled || probe.isSuccess);
   const { data: status } = useSystemStatus(ready && me?.role === "admin");
   const { data: releases } = useReleases(ready && me?.role === "admin");
   // Health first (orange, red); otherwise a newer version (blue).
   const attention = needsAttention(status) ?? (releases?.newer ? "update" : null);
   const logout = useLogout();
+  const qc = useQueryClient();
+  // Every click in the navigation asks the server again for the available version (it reads
+  // GitHub at most every 20 minutes): a new release shows on the System button soon.
+  const checkUpdates = () => {
+    if (me?.role === "admin") void qc.invalidateQueries({ queryKey: ["system-releases"] });
+  };
+  const systemActive = pathname.startsWith("/system/");
   const [advanced, setAdvancedState] = useState(false);
 
   useEffect(() => setAdvancedState(readPref("advanced") === "1"), []);
@@ -147,6 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <Fragment key={n.href}>
                       <Link
                         href={n.href}
+                        onClick={checkUpdates}
                         className={cn(
                           "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-[background-color,color,box-shadow,translate] duration-200 ease-(--ease-out)",
                           active
@@ -155,14 +163,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                         )}
                       >
                         <n.icon className="size-4 shrink-0" /> {t(n.label)}
-                        {n.href === "/settings/" && attention && (
-                          <span
-                            role="img"
-                            aria-label={t(DOT[attention].label)}
-                            title={t(DOT[attention].label)}
-                            className={cn("ml-auto size-2 shrink-0 rounded-full", DOT[attention].color)}
-                          />
-                        )}
                       </Link>
                       {active && n.sub && (
                         <div className="ml-4 hidden flex-col gap-0.5 border-l pl-2 md:flex">
@@ -170,6 +170,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                             <Link
                               key={e.href}
                               href={e.href}
+                              onClick={checkUpdates}
                               aria-current={pathname === e.href ? "page" : undefined}
                               className={cn(
                                 "flex items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors",
@@ -184,9 +185,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                     </Fragment>
                   );
                 })}
+                <SystemLink className="md:hidden" active={systemActive} attention={attention} onClick={checkUpdates} />
               </nav>
               <div className="mt-auto hidden flex-col gap-3 px-2 pt-6 md:flex">
                 <ShelfCat />
+                <SystemLink className="-mx-2" active={systemActive} attention={attention} onClick={checkUpdates} />
                 <label className="flex items-center gap-2 text-sm">
                   <Switch checked={advanced} onChange={(e) => session.setAdvanced(e.target.checked)} />
                   {t("nav.advanced")}
@@ -222,5 +225,33 @@ export function PageHeader({ title, actions }: { title: ReactNode; actions?: Rea
       <h1 className="text-2xl font-semibold">{title}</h1>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
+  );
+}
+
+/** The panel itself (version, health, updates): at the bottom of the navigation, with the
+ *  dot that says something needs a look (health first, then a newer version). */
+function SystemLink({ active, attention, onClick, className }: { active: boolean; attention: keyof typeof DOT | null; onClick: () => void; className?: string }) {
+  const { t } = useI18n();
+  return (
+    <Link
+      href="/system/"
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-colors",
+        active ? "surface font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        className,
+      )}
+    >
+      <Server className="size-4 shrink-0" /> {t("nav.system")}
+      {attention && (
+        <span
+          role="img"
+          aria-label={t(DOT[attention].label)}
+          title={t(DOT[attention].label)}
+          className={cn("ml-auto size-2 shrink-0 rounded-full", DOT[attention].color)}
+        />
+      )}
+    </Link>
   );
 }

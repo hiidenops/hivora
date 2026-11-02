@@ -98,7 +98,7 @@ function TaskForm({ appId, initial, id, services, hasConsole, timezone, onDone }
         <Button type="button" size="sm" variant="outline" onClick={onDone}>
           {t("common.cancel")}
         </Button>
-        <Button type="submit" size="sm" disabled={save.isPending}>
+        <Button type="submit" size="sm" loading={save.isPending} disabled={save.isPending}>
           {t("common.save")}
         </Button>
       </div>
@@ -160,7 +160,7 @@ export function TasksCard({ appId }: { appId: number }) {
                   {task.action === "command" && <code className="ml-1 font-mono">{task.command}</code>}
                 </span>
                 <span className="ml-auto flex gap-1">
-                  <Button size="sm" variant="ghost" title={t("tasks.runNow")} aria-label={t("tasks.runNow")} disabled={act.isPending} onClick={() => act.mutate(() => api(`/apps/${appId}/tasks/${task.id}/run`, { method: "POST" }))}>
+                  <Button size="sm" variant="ghost" title={t("tasks.runNow")} aria-label={t("tasks.runNow")} loading={act.isPending} disabled={act.isPending} onClick={() => act.mutate(() => api(`/apps/${appId}/tasks/${task.id}/run`, { method: "POST" }))}>
                     <Play />
                   </Button>
                   <Button size="sm" variant="ghost" title={t("tasks.edit")} aria-label={t("tasks.edit")} onClick={() => setEditing(task.id)}>

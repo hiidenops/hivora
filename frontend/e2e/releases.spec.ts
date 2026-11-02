@@ -2,10 +2,16 @@ import { expect, test } from "@playwright/test";
 
 import { signIn, signInViewer } from "./helpers";
 
-// Settings → Updates: GitHub Releases as e2e_app fakes them (v9.1.0 stable, v9.2.0-rc.1).
+// System → Updates: GitHub Releases as e2e_app fakes them (v9.1.0 stable, v9.2.0-rc.1).
 test("releases: the newer version, its notes and command, the channel", async ({ page, browser }) => {
   await signIn(page);
-  await page.goto("/settings/");
+  // The System button at the bottom of the navigation; every navigation click asks the
+  // server for the available version again.
+  await page.goto("/");
+  const asked = page.waitForRequest((r) => r.url().endsWith("/api/v1/system/releases") && r.method() === "GET");
+  await page.getByRole("link", { name: "Système" }).first().click();
+  await asked;
+  await expect(page).toHaveURL(/\/system\/$/);
   const card = page; // the texts below are the Updates card's own
   await expect(card.getByRole("heading", { name: "Mises à jour" })).toBeVisible();
   await expect(card.getByText("Canal :").first()).toBeVisible();
@@ -33,7 +39,7 @@ test("releases: the newer version, its notes and command, the channel", async ({
   await card.getByLabel("Canal :").selectOption("stable"); // as other tests expect it
 
   const viewer = await signInViewer(page, browser, "releases-viewer");
-  await viewer.goto("/settings/");
-  await expect(viewer.getByRole("heading", { name: "Système" })).toBeVisible();
+  await viewer.goto("/system/");
+  await expect(viewer.getByRole("heading", { name: "Système" }).first()).toBeVisible();
   await expect(viewer.getByRole("heading", { name: "Mises à jour" })).toHaveCount(0);
 });

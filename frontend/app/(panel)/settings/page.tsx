@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -13,14 +12,10 @@ import { Switch, Label, Select } from "@/components/ui/input";
 import { IntegrationsCard, PublicAddressCard } from "@/features/account/integrations-card";
 import { PasswordForm } from "@/features/account/password-form";
 import { TotpCard } from "@/features/account/totp-card";
-import { SourceLink } from "@/features/system/source-link";
 import { api } from "@/lib/api/client";
-import { useLogout, useMySessions, useSystemInfo } from "@/lib/api/hooks";
+import { useLogout, useMySessions } from "@/lib/api/hooks";
 import { LANGS, useI18n, type Lang, type MessageKey } from "@/lib/i18n";
 import { readPref, writePref } from "@/lib/prefs";
-
-const StatusCard = dynamic(() => import("@/features/system/status-card").then((m) => m.StatusCard));
-const ReleasesCard = dynamic(() => import("@/features/system/releases-card").then((m) => m.ReleasesCard));
 
 function Sessions() {
   const { t, lang } = useI18n();
@@ -57,7 +52,6 @@ export default function SettingsPage() {
   const { advanced, setAdvanced, can } = useSession();
   const router = useRouter();
   const logout = useLogout();
-  const { data: system } = useSystemInfo();
   const [theme, setTheme] = useState("system");
   useEffect(() => setTheme(readPref("theme") ?? "system"), []);
 
@@ -148,32 +142,6 @@ export default function SettingsPage() {
             <Sessions />
           </CardContent>
         </Card>
-        {system && (
-          <Card className="xl:col-span-2">
-            <CardHeader>
-              <CardTitle>{t("settings.system")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="grid gap-3 text-sm sm:grid-cols-3">
-                {(
-                  [
-                    ["settings.system.version", system.version],
-                    ["settings.system.docker", system.docker_version ?? "—"],
-                    ["settings.system.arch", `${t(`arch.${system.arch}` as MessageKey)} (${system.arch})`],
-                  ] as const
-                ).map(([k, v]) => (
-                  <div key={k}>
-                    <dt className="text-muted-foreground">{t(k)}</dt>
-                    <dd className="font-mono">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-              <SourceLink className="mt-4" />
-            </CardContent>
-          </Card>
-        )}
-        {can("admin") && <StatusCard />}
-        {can("admin") && <ReleasesCard />}
       </div>
     </>
   );

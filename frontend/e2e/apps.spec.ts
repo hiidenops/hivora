@@ -20,7 +20,7 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await expect(page.getByText("En direct")).toBeVisible();
   await expectPointerCursors(page);
   // Hovering the menu never makes it scroll (Windows shows real scrollbars).
-  for (const link of await page.locator("aside nav a").all()) {
+  for (const link of await page.locator("aside a:visible").all()) {
     await link.hover();
     const scrolls = await page.locator("aside, aside *").evaluateAll((els) =>
       els.filter((e) => {

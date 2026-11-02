@@ -25,7 +25,7 @@ export function ConfigStatus({ appId, host, always, onJob }: {
   const failed = host.config?.status === "failed";
   const applying = host.config?.status === "queued" || host.config?.status === "running";
   const again = can("operator") && !host.upgrade_required && (
-    <Button size="sm" variant="outline" disabled={reapply.isPending || applying} onClick={() => reapply.mutate(undefined, { onSuccess: (job) => onJob(job.id) })}>
+    <Button size="sm" variant="outline" loading={reapply.isPending} disabled={reapply.isPending || applying} onClick={() => reapply.mutate(undefined, { onSuccess: (job) => onJob(job.id) })}>
       <RefreshCw /> {t("hosting.reapply")}
     </Button>
   );

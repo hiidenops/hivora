@@ -94,7 +94,7 @@ function ZoneCard({ zone: z, apps, operator, remove }: { zone: Zone; apps: App[]
                 variant="ghost"
                 size="icon"
                 aria-label={t("action.remove")}
-                disabled={remove.isPending || z.apps > 0}
+                loading={remove.isPending} disabled={remove.isPending || z.apps > 0}
                 title={z.apps > 0 ? t("zones.notEmpty") : t("action.remove")}
                 onClick={() => window.confirm(t("zones.deleteConfirm", { name: z.name })) && remove.mutate(z.slug)}
               >

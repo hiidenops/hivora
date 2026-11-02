@@ -49,11 +49,11 @@ export function IntegrationsCard() {
           onChange={(e) => setKey(e.target.value)}
           placeholder={data?.curseforge_api_key_set ? t("edit.secretKept") : ""}
         />
-        <Button type="submit" disabled={!key || save.isPending}>
+        <Button type="submit" loading={save.isPending} disabled={!key || save.isPending}>
           {t("common.save")}
         </Button>
         {data?.curseforge_api_key_set && (
-          <Button type="button" variant="outline" disabled={save.isPending} onClick={() => save.mutate("")}>
+          <Button type="button" variant="outline" loading={save.isPending} disabled={save.isPending} onClick={() => save.mutate("")}>
             {t("settings.curseforge.remove")}
           </Button>
         )}
@@ -108,11 +108,11 @@ export function PublicAddressCard() {
           onChange={(e) => setAddress(e.target.value)}
           placeholder={data?.detected_public_ip ?? "mc.example.org"}
         />
-        <Button type="submit" disabled={address === null || save.isPending}>
+        <Button type="submit" loading={save.isPending} disabled={address === null || save.isPending}>
           {t("common.save")}
         </Button>
         {data?.public_address && (
-          <Button type="button" variant="outline" disabled={save.isPending} onClick={() => save.mutate("")}>
+          <Button type="button" variant="outline" loading={save.isPending} disabled={save.isPending} onClick={() => save.mutate("")}>
             {t("settings.publicAddress.auto")}
           </Button>
         )}

@@ -67,7 +67,7 @@ function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
             <p className="text-xs text-muted-foreground">{t("users.temporaryHint")}</p>
           </div>
           {create.error && <Alert tone="danger">{errorMessage(create.error)}</Alert>}
-          <Button type="submit" disabled={create.isPending}>
+          <Button type="submit" loading={create.isPending} disabled={create.isPending}>
             {t("users.add")}
           </Button>
         </form>
@@ -96,7 +96,7 @@ function ResetPasswordDialog({ user, onClose }: { user: User | null; onClose: ()
             <p className="text-xs text-muted-foreground">{t("users.temporaryHint")}</p>
           </div>
           {reset.error && <Alert tone="danger">{errorMessage(reset.error)}</Alert>}
-          <Button type="submit" disabled={reset.isPending}>
+          <Button type="submit" loading={reset.isPending} disabled={reset.isPending}>
             {t("common.save")}
           </Button>
         </form>

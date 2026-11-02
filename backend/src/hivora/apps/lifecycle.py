@@ -26,7 +26,7 @@ from hivora.core.config import Settings
 from hivora.core.errors import ConflictError
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import SecretBox
-from hivora.jobs import Job, JobKind, JobQueue
+from hivora.jobs import Job, JobKind, JobQueue, JobStatus
 from hivora.state import StateStore
 from hivora.templates import Catalog, Template
 from hivora.templates.overrides import Overrides, ServiceOverrides
@@ -188,6 +188,14 @@ class Lifecycle:
             if app.current_revision_id is None and app.origin is not Origin.ADOPTED:
                 raise ConflictError("app has never been deployed", slug=app.slug)
             app.desired_state = desired
+            # Clicked again before the first one ended (double click, two tabs): that job.
+            same = await session.scalar(
+                select(Job).where(Job.app_id == app.id, Job.kind == kind,
+                                  Job.status.in_((JobStatus.QUEUED, JobStatus.RUNNING)))
+                .order_by(Job.id.desc()).limit(1)
+            )  # fmt: skip
+            if same is not None:
+                return same
             job = self.jobs.add(session, kind, app_id=app.id, app_slug=app.slug)
         self.jobs.wake()
         return job

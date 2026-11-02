@@ -287,32 +287,35 @@ label:has(> span > input:not(:disabled)) {
     box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-lg);
   }
 }
-/* Buttons: rise on hover, press down on click (--btn is the face colour). */
+/* Buttons: flat faces, a crisp edge, no glow; they settle (1px) when pressed rather than
+   float on hover. --btn is the face colour. */
 @utility btn-3d {
-  transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out),
-    background-color 200ms var(--ease-out), border-color 200ms var(--ease-out), filter 200ms var(--ease-out);
-  &:hover { transform: translateY(-1px); }
-  &:active { transform: translateY(1px) scale(0.985); transition-duration: 70ms; }
+  transition: background-color 160ms var(--ease-out), border-color 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out), color 160ms var(--ease-out), transform 90ms var(--ease-out);
+  &:active { transform: translateY(1px); }
 }
-/* Solid (primary, destructive): gradient face, inner light, coloured glow. */
+/* Solid (primary, destructive): the colour itself, edged a shade deeper, a little more depth
+   at the bottom (like honey pooling); hover deepens the colour. */
 @utility btn-solid {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--btn), white 20%), var(--btn) 55%,
-    color-mix(in srgb, var(--btn), black 8%));
-  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.4), inset 0 -1px 0 oklch(0 0 0 / 0.14),
-    0 1px 2px var(--shadow-color), 0 4px 10px -4px color-mix(in oklch, var(--btn), transparent 40%);
-  &:hover {
-    filter: saturate(1.1) brightness(1.03);
-    box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.45), inset 0 -1px 0 oklch(0 0 0 / 0.14),
-      0 2px 4px var(--shadow-color), 0 10px 22px -8px color-mix(in oklch, var(--btn), transparent 25%);
+  background-color: var(--btn);
+  border: 1px solid color-mix(in oklch, var(--btn), black 11%);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22), inset 0 -2px 0 color-mix(in oklch, var(--btn), black 8%),
+    0 1px 2px var(--shadow-color);
+  &:hover { background-color: color-mix(in oklch, var(--btn), black 7%); }
+  &:active {
+    background-color: color-mix(in oklch, var(--btn), black 11%);
+    box-shadow: inset 0 1px 2px oklch(0 0 0 / 0.2);
   }
-  &:active { box-shadow: inset 0 2px 5px oklch(0 0 0 / 0.22), 0 1px 1px var(--shadow-color); }
 }
-/* Outline: a raised card-coloured key. */
+/* Outline: the card's colour, a clean border, a hairline shadow; hover tints it. */
 @utility btn-raised {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--card), white 35%), var(--card));
-  box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-xs);
-  &:hover { border-color: color-mix(in oklch, var(--primary), var(--input) 55%); box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-md); }
-  &:active { box-shadow: inset 0 1px 3px var(--shadow-color); }
+  background-color: var(--card);
+  box-shadow: 0 1px 2px var(--shadow-color);
+  &:hover {
+    background-color: color-mix(in oklch, var(--card), var(--foreground) 4%);
+    border-color: color-mix(in oklch, var(--input), var(--foreground) 14%);
+  }
+  &:active { box-shadow: inset 0 1px 2px var(--shadow-color); }
 }
 /* Text fields sit slightly into the page; focus shows a soft honey halo. */
 @utility field {

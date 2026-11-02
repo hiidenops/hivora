@@ -78,7 +78,7 @@ export default function LoginPage() {
               </div>
             )}
             {error && <Alert tone="danger">{errorMessage(error)}</Alert>}
-            <Button type="submit" disabled={login.isPending}>
+            <Button type="submit" loading={login.isPending} disabled={login.isPending}>
               {t("login.submit")}
             </Button>
             {health?.first_start && <p className="text-xs text-muted-foreground">{t("login.defaultHint")}</p>}

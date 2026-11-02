@@ -47,7 +47,7 @@ function ScheduleForm({ appId, initial, timezone, onSaved }: { appId: number; in
       <label className="flex items-center gap-2 text-sm">
         <Switch checked={s.stop} onChange={(e) => set({ stop: e.target.checked })} /> {t("backups.stop")}
       </label>
-      <Button type="submit" size="sm" variant="outline" className="justify-self-start" disabled={save.isPending}>
+      <Button type="submit" size="sm" variant="outline" className="justify-self-start" loading={save.isPending} disabled={save.isPending}>
         <Save /> {t("common.save")}
       </Button>
       {save.error && <Alert tone="danger">{errorMessage(save.error)}</Alert>}
@@ -94,7 +94,7 @@ export function BackupsCard({ appId, onJob }: { appId: number; onJob: (id: numbe
             <>
               <p className="text-sm text-muted-foreground">{t("backups.help", { volumes: data.volumes.join(", ") })}</p>
               <ScheduleForm key={JSON.stringify(data.schedule)} appId={appId} initial={data.schedule} timezone={data.timezone} onSaved={refresh} />
-              <Button className="justify-self-start" disabled={act.isPending} onClick={() => act.mutate(() => api<JobRef>(`/apps/${appId}/backups`, { method: "POST" }))}>
+              <Button className="justify-self-start" loading={act.isPending} disabled={act.isPending} onClick={() => act.mutate(() => api<JobRef>(`/apps/${appId}/backups`, { method: "POST" }))}>
                 <Archive /> {t("backups.now")}
               </Button>
             </>

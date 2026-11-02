@@ -10,7 +10,7 @@ test("system: health for admins, source code for everyone", async ({ page, brows
   await expect(source).toHaveAttribute("target", "_blank");
 
   await signIn(page);
-  await page.goto("/settings/");
+  await page.goto("/system/");
   await expect(page.getByRole("heading", { name: "Santé du panel" })).toBeVisible();
   await expect(page.getByText("Mode d'accès :")).toBeVisible();
   await expect(page.getByText("Réseau local uniquement")).toBeVisible();
@@ -22,12 +22,12 @@ test("system: health for admins, source code for everyone", async ({ page, brows
   await expect(page.getByText(/vérification : ok/)).toBeVisible();
   await expect(page.getByRole("link", { name: /Code source/ })).toBeVisible();
   await expect(page.getByRole("alert").filter({ hasText: "publié sur toutes les adresses" })).toHaveCount(0);
-  // No panel backup yet: "needs a look", the dot on Settings.
+  // No panel backup yet: "needs a look", the dot on the System button.
   await expect(page.getByRole("img", { name: "Santé du panel : à vérifier" })).toBeVisible();
 
   const viewer = await signInViewer(page, browser, "system-viewer");
-  await viewer.goto("/settings/");
-  await expect(viewer.getByRole("heading", { name: "Système" })).toBeVisible();
+  await viewer.goto("/system/");
+  await expect(viewer.getByRole("heading", { name: "Système" }).first()).toBeVisible();
   await expect(viewer.getByRole("heading", { name: "Santé du panel" })).toHaveCount(0);
   await expect(viewer.getByRole("img", { name: /Santé du panel/ })).toHaveCount(0); // no dot
 });

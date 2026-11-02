@@ -187,7 +187,7 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
           <KindSelect value={kind} onChange={setKind} />
           <Input value={label} maxLength={120} required onChange={(e) => setLabel(e.target.value)} aria-label={t("topology.label")} />
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={save.isPending}>
+            <Button type="submit" size="sm" loading={save.isPending} disabled={save.isPending}>
               {t("common.save")}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => window.confirm(t("topology.deleteConfirm")) && remove.mutate()} aria-label={t("topology.delete")}>

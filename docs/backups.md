@@ -12,7 +12,7 @@ chiffre les secrets de vos applications) et ses options de lancement (`install.e
   ```sh
   sudo docker exec hivora python -m hivora backup-self
   ```
-- **Paramètres → Santé du panel** affiche la date de la dernière archive.
+- **Système → Santé du panel** affiche la date de la dernière archive.
 
 Gardez une copie de ces archives ailleurs : sans `secret.key`, les secrets de vos
 applications ne peuvent plus être lus.

@@ -104,7 +104,7 @@ export function AddSiteDialog({ appId, disabled }: { appId: number; disabled: bo
           )}
           <PortError error={error} onUse={(p) => changed(setPort)(String(p))} />
           {plan.data && <RestartNotice plan={plan.data} />}
-          <Button type="submit" className="justify-self-end" disabled={plan.isPending || add.isPending || !name.trim() || !port}>
+          <Button type="submit" className="justify-self-end" loading={plan.isPending || add.isPending} disabled={plan.isPending || add.isPending || !name.trim() || !port}>
             {plan.data ? t("hosting.addConfirm") : t("hosting.check")}
           </Button>
         </form>

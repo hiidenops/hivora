@@ -153,7 +153,14 @@ async def list_apps(_: Viewer, rt: RuntimeDep) -> list[AppOut]:
     async with rt.sessions() as session:
         rows = await apps_with_template(session)
         updates = await rt.apps.revisions.updates(session)
-        return [app_out(rt, app, template, updates.get(app.id)) for app, template in rows]
+        vpn_zones = await rt.apps.planner.vpn_zones(session)
+        out = []
+        for app, template in rows:
+            row = app_out(rt, app, template, updates.get(app.id))
+            access = await rt.apps.access_of(session, app, vpn_zones)
+            row.web = {k: v for k, v in access.items() if k.startswith("web")}
+            out.append(row)
+        return out
 
 
 @router.get("/{app_id}")

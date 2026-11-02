@@ -56,7 +56,7 @@ export function HostedSitesCard({ appId, template, hosting, title: name, onJob }
         <CardContent className="grid justify-items-start gap-3">
           <p className="text-sm text-muted-foreground">{t("hosting.notHost", { server, folder: known.folder })}</p>
           {operator && (
-            <Button size="sm" disabled={enable.isPending} onClick={() => enable.mutate(undefined)}>
+            <Button size="sm" loading={enable.isPending} disabled={enable.isPending} onClick={() => enable.mutate(undefined)}>
               {t("hosting.enable")}
             </Button>
           )}

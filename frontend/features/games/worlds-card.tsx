@@ -85,7 +85,7 @@ function ImportForm({ appId, onJob }: { appId: number; onJob: (id: number) => vo
               disabled={send.isPending}
             />
           </div>
-          <Button type="submit" size="sm" disabled={send.isPending}>
+          <Button type="submit" size="sm" loading={send.isPending} disabled={send.isPending}>
             {t("worlds.import")}
           </Button>
         </div>
@@ -166,7 +166,7 @@ export function WorldsCard({
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={act.isPending}
+                        loading={act.isPending} disabled={act.isPending}
                         onClick={() => window.confirm(t("worlds.activateConfirm", { name: w.name })) && act.mutate({ name: w.name, remove: false })}
                       >
                         <Play /> {t("worlds.activate")}
@@ -186,7 +186,7 @@ export function WorldsCard({
                       <Button
                         size="sm"
                         variant="ghost"
-                        disabled={act.isPending}
+                        loading={act.isPending} disabled={act.isPending}
                         aria-label={t("worlds.delete", { name: w.name })}
                         title={t("worlds.delete", { name: w.name })}
                         onClick={() => window.confirm(t("worlds.deleteConfirm", { name: w.name })) && act.mutate({ name: w.name, remove: true })}

@@ -100,7 +100,7 @@ function HostedSiteDetail() {
             <Button
               size="sm"
               variant="outline"
-              disabled={create.isPending}
+              loading={create.isPending} disabled={create.isPending}
               onClick={() =>
                 create.mutate({ path: "index.html", content: starterPage(site.name), base_sha256: null }, { onSuccess: (job) => follow(job.id) })
               }

@@ -165,6 +165,18 @@ async def test_stop_start_record_intent(env: Env) -> None:
         assert (await session.get_one(Application, app.id)).desired_state is DesiredState.RUNNING
 
 
+async def test_clicked_again_before_it_ends_is_the_same_job(env: Env) -> None:
+    app, job = await env.service.deployer.deploy(DeployRequest("vaultwarden", "vw"))
+    await run(env, job)
+    first = await env.service.lifecycle.restart(app.id)
+    again = await env.service.lifecycle.restart(app.id)  # still queued or running
+    assert again.id == first.id
+    assert (await run(env, first)).status is JobStatus.SUCCEEDED
+    later = await env.service.lifecycle.restart(app.id)  # once it ended: a new one
+    assert later.id != first.id
+    await run(env, later)
+
+
 @pytest.mark.parametrize("remove_data", [False, True])
 async def test_remove(env: Env, remove_data: bool) -> None:
     app, job = await env.service.deployer.deploy(DeployRequest("vaultwarden", "vw"))

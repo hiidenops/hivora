@@ -69,7 +69,7 @@ export function ZoneDialog({ zone, trigger }: { zone?: Zone; trigger: ReactNode 
             {zone && mode !== zone.network_mode && apps > 0 && <Alert tone="warn">{t("zones.redeploy", { n: apps })}</Alert>}
           </fieldset>
           {save.error && <Alert tone="danger">{errorMessage(save.error)}</Alert>}
-          <Button type="submit" className="justify-self-end" disabled={save.isPending || !name.trim()}>
+          <Button type="submit" className="justify-self-end" loading={save.isPending} disabled={save.isPending || !name.trim()}>
             {t(zone ? "common.save" : "zones.create")}
           </Button>
         </form>

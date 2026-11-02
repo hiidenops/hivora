@@ -28,7 +28,7 @@ function ClearButton({ path, confirmKey, queryKey }: { path: string; confirmKey:
     <Button
       variant="outline"
       size="sm"
-      disabled={clear.isPending}
+      loading={clear.isPending} disabled={clear.isPending}
       onClick={() => window.confirm(t(confirmKey)) && clear.mutate()}
     >
       <Trash2 /> {t("activity.clear")}

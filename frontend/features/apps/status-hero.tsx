@@ -73,8 +73,9 @@ export function StatusHero({ app, status }: { app: AppDetail; status: AppStatus 
   const viaVpn = !app.access.game && !app.access.web ? (app.access.game_vpn ?? app.access.web_vpn) : undefined;
   const address = app.access.game ?? app.access.web ?? viaVpn;
   const lan = app.access.game ? app.access.game_lan : app.access.web_lan;
-  // Reaching a public port from the Internet needs a port forward on the router.
-  const forwarded = app.ports.filter((p) => p.exposure === "public" && p.host_port).map((p) => p.host_port);
+  // Reaching a public port from the Internet needs a port forward on the router ("to play":
+  // not said for a VPN server, whose port is the VPN's own).
+  const forwarded = app.vpn ? [] : app.ports.filter((p) => p.exposure === "public" && p.host_port).map((p) => p.host_port);
 
   return (
     <Card className="animate-enter overflow-hidden lg:col-span-2">

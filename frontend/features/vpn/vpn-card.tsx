@@ -110,7 +110,7 @@ function ClientSettings({ appId, client, vpn, zones, onSaved }: { appId: number;
         {routing === "custom" && (
           <Input aria-label={t("vpn.allowedIps")} className="h-8 font-mono text-xs" placeholder="192.168.1.0/24, 10.8.0.0/24" value={custom} required onChange={(e) => setCustom(e.target.value)} />
         )}
-        <Button type="submit" size="sm" className="justify-self-start" disabled={save.isPending}>
+        <Button type="submit" size="sm" className="justify-self-start" loading={save.isPending} disabled={save.isPending}>
           {t("common.save")}
         </Button>
         {save.error && <Alert tone="danger">{errorMessage(save.error)}</Alert>}
@@ -181,7 +181,7 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
           <>
             <form onSubmit={add} className="flex flex-wrap gap-2">
               <Input aria-label={t("vpn.clientName")} className="w-56" placeholder={t("vpn.clientName")} value={name} maxLength={32} pattern="[A-Za-z0-9 _.\-]+" required onChange={(e) => setName(e.target.value)} />
-              <Button type="submit" disabled={act.isPending}>
+              <Button type="submit" loading={act.isPending} disabled={act.isPending}>
                 <Plus /> {t("vpn.addClient")}
               </Button>
             </form>
@@ -305,7 +305,7 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
             {picked && (
               <Button
                 className="justify-self-start"
-                disabled={saveZones.isPending}
+                loading={saveZones.isPending} disabled={saveZones.isPending}
                 onClick={async () => {
                   const added = picked.filter((z) => !data.zones.includes(z));
                   const ports = added.length ? await closedPorts(added) : [];

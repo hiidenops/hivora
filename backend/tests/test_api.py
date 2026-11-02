@@ -552,3 +552,6 @@ def test_deploy_access_choice_publishes_on_the_internet_or_the_lan_only(
     assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
     settings = client.get(f"{API}/apps/{deployed['app']['id']}/settings").json()
     assert settings["overrides"]["services"]["server"]["publish"] == {"80/tcp": "public"}
+    listed = next(a for a in client.get(f"{API}/apps").json() if a["name"] == "Coffre")
+    detail = client.get(f"{API}/apps/{deployed['app']['id']}").json()["access"]
+    assert listed["web"] == {k: v for k, v in detail.items() if k.startswith("web")} != {}

@@ -118,12 +118,12 @@ def test_one_request_per_12_hours_and_only_the_user_agent(tmp_path: Path) -> Non
         assert headers == {"User-Agent": f"Hivora/{__version__}",
                            "Accept": "application/vnd.github+json"}  # fmt: skip
         c.get(f"{API}/system/releases")
-        clock_of(c).advance(timedelta(hours=11))
+        clock_of(c).advance(timedelta(minutes=19))
         c.get(f"{API}/system/releases")
         assert len(github.calls) == 1  # cached
-        clock_of(c).advance(timedelta(hours=2))
+        clock_of(c).advance(timedelta(minutes=2))
         c.get(f"{API}/system/releases")
-        assert len(github.calls) == 2  # 13 hours later
+        assert len(github.calls) == 2  # 21 minutes later
 
 
 def test_offline_is_quiet_and_retried_after_an_hour(tmp_path: Path) -> None:

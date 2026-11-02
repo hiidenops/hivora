@@ -6,6 +6,21 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+
+- **Icône** : la tête du chat, mascotte de Hivora (celui de l'étagère, en bas de la navigation), sur fond miel, dans l'onglet du navigateur et les favoris.
+- **Tableau de bord** : un bouton « Ouvrir » sur chaque app qui a une adresse web, vers l'adresse adaptée (réseau local, Internet ou VPN).
+
+- **Chargement des boutons** : un bouton dont l'action tourne affiche un indicateur et attend ; un second clic ne fait rien. Démarrer, arrêter et redémarrer restent en attente jusqu'à la fin de la tâche, et le panel ne crée pas une seconde tâche identique pour une app tant que la première n'est pas finie (double clic, deux onglets).
+
+### Modifié
+
+- **Boutons** : un style plus sobre dans les deux thèmes (couleur pleine, bord net, plus de dégradé brillant ni de halo ; ils s'enfoncent au clic au lieu de se soulever), et un anneau de focus visible au clavier.
+- **Page Système** : les cartes Système, Santé du panel et Mises à jour quittent Paramètres pour une page à elles, ouverte par le bouton « Système » en bas de la barre de navigation. La pastille (santé à vérifier, nouvelle version) est sur ce bouton.
+- **VPN** : la fiche d'un serveur VPN n'affiche plus « Pour jouer depuis Internet, pensez à ouvrir le port… ».
+- **Topologie** : la carte d'une app d'une zone VPN montre, comme celle du panel, son adresse par le VPN (« VPN 10.8.1.7 ») et les ports joignables par lui.
+- **Mises à jour** : chaque clic dans la barre de navigation redemande au panel s'il existe une nouvelle version ; le panel interroge GitHub au plus toutes les 20 minutes (au lieu de 12 heures).
+
 ## [0.3.2] - 2026-11-01
 
 ### Ajouté

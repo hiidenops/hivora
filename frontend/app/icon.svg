@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Hivora's mascot, the cat of the sidebar shelf: its head, on honey. -->
+  <rect width="64" height="64" rx="16" fill="#df911a"/>
+  <g fill="#2a211b" stroke="#2a211b" stroke-width="3" stroke-linejoin="round">
+    <polygon points="13,33 16,8 30,21"/>
+    <polygon points="51,33 48,8 34,21"/>
+  </g>
+  <ellipse cx="32" cy="37" rx="20" ry="17" fill="#2a211b"/>
+  <g fill="#f3c560">
+    <ellipse cx="24" cy="35" rx="3.6" ry="4.6"/>
+    <ellipse cx="40" cy="35" rx="3.6" ry="4.6"/>
+    <path d="M29.5 43 H34.5 L32 46 Z"/>
+  </g>
+</svg>

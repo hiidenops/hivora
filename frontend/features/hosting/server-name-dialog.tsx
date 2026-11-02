@@ -56,7 +56,7 @@ export function ServerNameDialog({ appId, site, open, onOpenChange, onJob }: {
           </div>
           <p className="text-sm text-muted-foreground">{t("hosting.noRestart", { server })}</p>
           {save.error && <Alert tone="danger">{errorMessage(save.error)}</Alert>}
-          <Button type="submit" className="justify-self-end" disabled={save.isPending || next === site.server_name}>
+          <Button type="submit" className="justify-self-end" loading={save.isPending} disabled={save.isPending || next === site.server_name}>
             {t("common.save")}
           </Button>
         </form>
