@@ -38,3 +38,27 @@ test("vpn zones: link a zone from the VPN card, deploy into it through the VPN",
   await expect(page.getByText("Ce que Hivora va faire")).toBeVisible();
   await expect(page.getByText(/→ 80\/tcp/)).toHaveCount(0); // nothing published
 });
+
+// A new zone may come with its own VPN: the zone dialog sends to the WireGuard form, and the
+// VPN deployed from there serves the zone.
+test("vpn zones: create a zone with a new VPN that serves it", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/zones/");
+  await page.getByRole("button", { name: "Nouvelle zone" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Nom", { exact: true }).fill("Famille");
+  await dialog.getByRole("radio", { name: /Créer un VPN pour cette zone/ }).check();
+  await expect(dialog.getByRole("radio", { name: /Reliées entre elles/ })).toBeChecked();
+  await dialog.getByRole("button", { name: "Créer et déployer le VPN" }).click();
+
+  await expect(page).toHaveURL(/template=wireguard&vpn_zone=famille/);
+  await page.goto(`${page.url()}&vpn_port=51872&host=vpn.example.org`); // a port no other test uses
+  await expect(page.getByText("Ce VPN desservira la zone « Famille »")).toBeVisible();
+  await expect(page.getByLabel("Nom de l'application")).toHaveValue("VPN Famille");
+  await page.getByRole("button", { name: "Vérifier" }).click();
+  await page.getByRole("button", { name: "Déployer", exact: true }).click();
+  await expect(page.getByText("Application en ligne")).toBeVisible({ timeout: 20_000 });
+  const zones = await (await page.request.get("/api/v1/zones")).json();
+  const famille = zones.find((z: { slug: string }) => z.slug === "famille");
+  expect([famille.vpn, famille.network_mode]).toEqual(["VPN Famille", "shared"]);
+});

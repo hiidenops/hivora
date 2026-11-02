@@ -203,3 +203,18 @@ def test_vpn_clients_and_linked_zones(client: Any, tmp_path: Path) -> None:
     client.put(f"{API}/apps/{app_id}/vpn/clients/{laptop}", json={"enabled": True})
     row = client.get(f"{API}/apps/{app_id}/vpn").json()["clients"][0]
     assert row["active"] is True and row["expires_at"] is None  # re-enabled by hand
+
+
+def test_a_vpn_deployed_for_a_new_zone_serves_it(client: Any) -> None:
+    from helpers import API, admin, wait_job
+
+    admin(client)
+    client.post(f"{API}/zones", json={"name": "Maison", "color": "#d97706"})
+    body = {"template": "wireguard", "name": "vpn maison", "inputs": {"host": "vpn.example.org"},
+            "vpn_zones": ["maison"]}  # fmt: skip
+    deployed = client.post(f"{API}/apps", json=body).json()
+    assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
+    zone = next(z for z in client.get(f"{API}/zones").json() if z["slug"] == "maison")
+    served = (zone["vpn"], zone["network_mode"], zone["subnet"])
+    assert served == ("vpn maison", "shared", "10.8.1.0/24")
+    assert client.get(f"{API}/apps/{deployed['app']['id']}/vpn").json()["zones"] == ["maison"]

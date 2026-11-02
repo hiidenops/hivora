@@ -29,6 +29,8 @@ class DeployIn(BaseModel):
     # Its ports published on the Internet or on the local network only (None: the
     # template's choice). In a zone a VPN reaches, nothing is published.
     access: Literal["public", "lan"] | None = None
+    # A VPN deployed for these zones (zone dialog, "new VPN"): linked once deployed.
+    vpn_zones: list[str] = Field(default=[], max_length=50)
 
 
 def to_request(body: DeployIn) -> DeployRequest:
@@ -138,4 +140,6 @@ async def deploy_custom(body: CustomIn, _: Operator, rt: RuntimeDep) -> DeployOu
 
 async def deploy(body: DeployIn, _: Operator, rt: RuntimeDep) -> DeployOut:
     app, job = await rt.apps.deployer.deploy(to_request(body))
+    if body.vpn_zones:  # queued after the deploy (one lock per app)
+        await rt.vpn.set_zones(app.id, body.vpn_zones)
     return DeployOut(app=app_out(rt, app, body.template), job=job_ref(job))

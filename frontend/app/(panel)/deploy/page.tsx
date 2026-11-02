@@ -28,6 +28,7 @@ function Deploy() {
   const { advanced } = useSession();
   const params = useSearchParams();
   const slug = params.get("template") ?? "";
+  const vpnFor = params.get("vpn_zone"); // a VPN deployed for this zone (zone dialog)
   const { data: template, error: loadError } = useTemplate(slug);
   const { data: zones } = useZones();
   const planMutation = usePlan();
@@ -88,6 +89,7 @@ function Deploy() {
     inputs: values,
     zone: zone || null,
     access: chosen && chosen !== template?.default_access ? chosen : null,
+    vpn_zones: vpnFor ? [vpnFor] : [],
   });
   const setValue = (id: string, value: unknown) => setValues((v) => ({ ...v, [id]: value }));
   const review = () =>
@@ -120,6 +122,7 @@ function Deploy() {
       />
       {step === "form" && (
         <div className="grid gap-4">
+          {vpnFor && <Alert tone="info">{t("deploy.vpnFor", { zone: zones?.find((z) => z.slug === vpnFor)?.name ?? vpnFor })}</Alert>}
           <div className="grid gap-4 rounded-lg border surface p-4 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="app-name">{t("deploy.name")}</Label>

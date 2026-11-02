@@ -2836,6 +2836,11 @@ export interface components {
             slug?: string | null;
             /** Template */
             template: string;
+            /**
+             * Vpn Zones
+             * @default []
+             */
+            vpn_zones: string[];
             /** Zone */
             zone?: string | null;
         };
