@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 import { adminApi, deployNginx, signIn } from "./helpers";
+import { HOST, TOPOLOGY_PORT } from "./host";
+
+// A server of its own: the canvas shows these tests' apps only (fitted, readable).
+test.use({ baseURL: `http://${HOST}:${TOPOLOGY_PORT}` });
 
 type Graph = { nodes: { type: string; label?: string; kind?: string; host?: string }[] };
 

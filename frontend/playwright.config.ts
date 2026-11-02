@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-import { HOST, PORT, PUBLIC_PORT, VPN_PORT } from "./e2e/host";
+import { HOST, PORT, PUBLIC_PORT, TOPOLOGY_PORT, VPN_PORT } from "./e2e/host";
 
 const DATA = "/tmp/hivora-e2e";
 
@@ -31,10 +31,11 @@ export default defineConfig({
   use: { baseURL: `http://${HOST}:${PORT}`, locale: "fr-FR", trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   // The second one is a public panel (public-totp.spec.ts only), the third one has the
-  // admin VPN (admin-vpn.spec.ts only).
+  // admin VPN (admin-vpn.spec.ts only), the fourth one the topology (topology.spec.ts only).
   webServer: [
     server(PORT, DATA),
     server(PUBLIC_PORT, `${DATA}-public`, "HIVORA_ACCESS=public "),
     server(VPN_PORT, `${DATA}-vpn`, "HIVORA_ACCESS=vpn "),
+    server(TOPOLOGY_PORT, `${DATA}-topology`),
   ],
 });

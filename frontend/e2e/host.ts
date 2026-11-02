@@ -12,3 +12,6 @@ export const PORT = 18500;
 export const PUBLIC_PORT = 18501;
 // A third one, reached through the admin VPN (HIVORA_ACCESS=vpn): admin-vpn.spec.ts.
 export const VPN_PORT = 18502;
+// A fourth one for the topology (topology.spec.ts): its own apps only, so the canvas is not
+// zoomed out by every other file's apps (its gestures land where they aim).
+export const TOPOLOGY_PORT = 18503;
