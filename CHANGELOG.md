@@ -6,6 +6,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.8] - 2026-11-03
+
 ### Ajouté
 
 - **TeamSpeak 3** : nouveau modèle (image officielle, x86 uniquement) avec son propre panneau sur la page de l'app. Hivora parle au serveur par sa ServerQuery, sans jamais publier son port. On y voit les connectés (pseudo, adresse, pays), qu'on peut expulser ou bannir, la liste des bans, l'historique des connexions, et on y règle le nom, le message de bienvenue, le nombre de places et le mot de passe du serveur. « Message à tous » écrit à tout le serveur. « Générer une nouvelle clé » crée une clé admin (droits Server Admin), affichée une seule fois, et supprime les anciennes pas encore utilisées. Mot de passe et clé admin : admin et code TOTP récent.
