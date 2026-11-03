@@ -4,7 +4,7 @@ import platform
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from hivora import __version__
@@ -111,9 +111,11 @@ class WhatsNewOut(BaseModel):
 
 
 @router.get("/whats-new")
-async def whats_new(_: Viewer, rt: RuntimeDep) -> WhatsNewOut:
-    """What the installed version brings, for everyone (the pop-up after an update)."""
-    return WhatsNewOut(version=__version__, notes=rt.releases.local_notes())
+async def whats_new(_: Viewer, rt: RuntimeDep,
+                    since: str | None = Query(None, max_length=40)) -> WhatsNewOut:  # fmt: skip
+    """What the installed version brings, for everyone (the pop-up after an update); with
+    ``since``, the version this browser saw last: every version's notes after it."""
+    return WhatsNewOut(version=__version__, notes=rt.releases.local_notes(since))
 
 
 @router.get("/releases")

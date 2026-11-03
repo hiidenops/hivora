@@ -214,6 +214,10 @@ def test_the_installed_versions_notes_and_admins_only(tmp_path: Path) -> None:
                                     json={"enabled": False, "channel": "stable"})):  # fmt: skip
                     assert r.status_code == 403 and code(r) == "insufficient_role", role
                 assert other.get(f"{API}/system/whats-new").json() == news  # theirs too
+        # Seen an older version: its notes and every one after it (here at least the current).
+        since = c.get(f"{API}/system/whats-new", params={"since": "0.0.1"}).json()["notes"]
+        assert since.startswith(f"## {__version__}\n\n") and "## 0.3.5" in since
+        assert c.get(f"{API}/system/whats-new", params={"since": "garbage"}).json() == news
 
 
 def test_changing_the_settings_is_audited(tmp_path: Path) -> None:
@@ -256,3 +260,13 @@ def test_other_answers(tmp_path: Path, status: int) -> None:
         admin(c)
         error = c.get(f"{API}/system/releases").json()["error"]
         assert error == ("not_found" if status == 404 else "unavailable")
+
+
+def test_the_notes_of_every_version_since_the_one_seen() -> None:
+    from hivora.system.releases import changelog_since
+
+    text = ("## [Non publié]\n\n- soon\n\n## [0.4.0] - 2026-12-01\n\n- four\n\n"
+            "## [0.3.7] - 2026-11-04\n\n- seven\n\n## [0.3.6] - 2026-11-03\n\n- six\n")  # fmt: skip
+    assert changelog_since(text, "0.3.5", "0.3.7") == "## 0.3.7\n\n- seven\n\n## 0.3.6\n\n- six"
+    assert changelog_since(text, "0.3.6", "0.4.0") == "## 0.4.0\n\n- four\n\n## 0.3.7\n\n- seven"
+    assert changelog_since(text, "0.4.0", "0.4.0") is None

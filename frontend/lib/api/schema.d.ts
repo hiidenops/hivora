@@ -2092,6 +2092,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/whats-new": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whats New
+         * @description What the installed version brings, for everyone (the pop-up after an update); with
+         *     ``since``, the version this browser saw last: every version's notes after it.
+         */
+        get: operations["whats_new_api_v1_system_whats_new_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/templates": {
         parameters: {
             query?: never;
@@ -4456,6 +4477,13 @@ export interface components {
             subnet: string;
             /** Zones */
             zones: string[];
+        };
+        /** WhatsNewOut */
+        WhatsNewOut: {
+            /** Notes */
+            notes: string | null;
+            /** Version */
+            version: string;
         };
         /** WorldIn */
         WorldIn: {
@@ -8479,6 +8507,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    whats_new_api_v1_system_whats_new_get: {
+        parameters: {
+            query?: {
+                since?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WhatsNewOut"];
                 };
             };
             /** @description Validation Error */

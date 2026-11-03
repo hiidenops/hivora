@@ -5847,6 +5847,31 @@
         "title": "VpnOut",
         "type": "object"
       },
+      "WhatsNewOut": {
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "notes"
+        ],
+        "title": "WhatsNewOut",
+        "type": "object"
+      },
       "WorldIn": {
         "properties": {
           "name": {
@@ -6113,7 +6138,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.3.5"
+    "version": "0.3.6"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -11718,6 +11743,57 @@
           }
         },
         "summary": "Update",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/whats-new": {
+      "get": {
+        "description": "What the installed version brings, for everyone (the pop-up after an update); with\n``since``, the version this browser saw last: every version's notes after it.",
+        "operationId": "whats_new_api_v1_system_whats_new_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatsNewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Whats New",
         "tags": [
           "system"
         ]

@@ -75,6 +75,16 @@ def changelog_section(text: str, version: str) -> str | None:
     return m.group(1).strip() if m and m.group(1).strip() else None
 
 
+def changelog_since(text: str, since: str, current: str) -> str | None:
+    """Every CHANGELOG.md section after ``since`` up to ``current``, newest first, each under
+    a ``## X.Y.Z`` title (what a panel updated over several versions brings)."""
+    parts = [f"## {v}\n\n{notes}"
+             for v in re.findall(r"^## \[(\d[^\]]*)\]", text, re.M)
+             if newer(since, v) and not newer(current, v)
+             and (notes := changelog_section(text, v))]  # fmt: skip
+    return "\n\n".join(parts) or None
+
+
 def repo_of(source_url: str) -> str | None:
     """owner/repo of a GitHub source URL; anything else: no check (said so in the panel)."""
     m = GITHUB.match(source_url.strip())
@@ -165,8 +175,13 @@ class ReleaseChecker:
                                404: "not_found"}.get(status, "unavailable")  # fmt: skip
             return self._releases
 
-    def local_notes(self) -> str | None:
+    def local_notes(self, since: str | None = None) -> str | None:
+        """The installed version's notes; with ``since`` (the version seen last), every
+        version's after it."""
         try:
-            return changelog_section(self.settings.changelog_path.read_text(), __version__)
+            text = self.settings.changelog_path.read_text()
         except OSError:
             return None
+        if since and newer(since, __version__):
+            return changelog_since(text, since, __version__)
+        return changelog_section(text, __version__)

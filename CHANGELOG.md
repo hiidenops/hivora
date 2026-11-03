@@ -6,6 +6,12 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+
+- **Nouveautés** : après plusieurs mises à jour d'un coup, la fenêtre des nouveautés montre les notes de toutes les versions depuis la dernière vue dans ce navigateur, la plus récente d'abord.
+- **Activité** : les tâches et le journal d'audit affichent 10 lignes par défaut, puis 20, 50 ou tout (500 tâches, 1 000 entrées du journal au plus) selon le choix « Afficher ».
+- **Topologie** : dans le panneau d'une app, chaque port a un bouton qui copie l'adresse complète `IP:port` (l'IP du conteneur et le port du conteneur).
+
 ## [0.3.6] - 2026-11-03
 
 ### Ajouté

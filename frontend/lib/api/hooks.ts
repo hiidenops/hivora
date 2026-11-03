@@ -231,10 +231,11 @@ export function useMoveZone(appId: number) {
   });
 }
 
-export const useJobs = (appId?: number) =>
+export const useJobs = (appId?: number, limit = 30) =>
   useQuery({
-    queryKey: appId ? [...keys.jobs, { appId }] : keys.jobs,
-    queryFn: () => api<Job[]>("/jobs", { query: { limit: "30", ...(appId ? { app_id: String(appId) } : {}) } }),
+    queryKey: [...keys.jobs, { appId, limit }],
+    placeholderData: (previous) => previous, // another limit: the rows stay until the new ones come
+    queryFn: () => api<Job[]>("/jobs", { query: { limit: String(limit), ...(appId ? { app_id: String(appId) } : {}) } }),
   });
 export const useJob = (id: number | null) =>
   useQuery({ queryKey: keys.job(id ?? 0), queryFn: () => api<JobDetail>(`/jobs/${id}`), enabled: !!id });
@@ -289,7 +290,12 @@ export const userApi = {
   revokeSessions: (id: number) => api<void>(`/users/${id}/sessions`, { method: "DELETE" }),
 };
 
-export const useAudit = () => useQuery({ queryKey: keys.audit, queryFn: () => api<AuditEntry[]>("/audit") });
+export const useAudit = (limit = 100) =>
+  useQuery({
+    queryKey: [...keys.audit, limit],
+    queryFn: () => api<AuditEntry[]>("/audit", { query: { limit: String(limit) } }),
+    placeholderData: (previous) => previous,
+  });
 export const useMySessions = () =>
   useQuery({ queryKey: ["sessions"], queryFn: () => api<SessionInfo[]>("/auth/sessions") });
 

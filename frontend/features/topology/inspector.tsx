@@ -28,7 +28,6 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
   const { t } = useI18n();
   const { can } = useSession();
   const apps = useApps();
-  const { copy, bubble } = useCopy();
   const web = node.type === "app" ? webAddress(apps.data?.find((a) => a.id === node.id)?.web ?? {}) : undefined;
   const [label, setLabel] = useState(String(node.label ?? ""));
   const [kind, setKind] = useState(String(node.kind ?? "note"));
@@ -89,6 +88,7 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
                   ) : (
                     <span>({t(`topology.exposure.${p.exposure}` as "topology.exposure.lan")})</span>
                   )}
+                  {node.address ? <CopyText text={`${String(node.address)}:${p.container}`} label={t("topology.copyAddress", { address: `${String(node.address)}:${p.container}` })} className="ml-auto" /> : null}
                 </li>
               );
             })}
@@ -119,14 +119,7 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
                 </a>
               </Button>
             )}
-            {node.address ? (
-              <span className="relative">
-                {bubble}
-                <Button size="sm" variant="outline" onClick={() => void copy(String(node.address))} title={t("topology.copyIp")} aria-label={t("topology.copyIp")}>
-                  <Copy /> <span className="font-mono">{String(node.address)}</span>
-                </Button>
-              </span>
-            ) : null}
+            {node.address ? <CopyText text={String(node.address)} label={t("topology.copyIp")} shown /> : null}
           </div>
         </>
       )}
@@ -222,5 +215,18 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
         </form>
       )}
     </aside>
+  );
+}
+
+/** Copies ``text`` (an IP, or IP:port), its own "copied" bubble; ``shown``: the text on it. */
+function CopyText({ text, label, shown = false, className }: { text: string; label: string; shown?: boolean; className?: string }) {
+  const { copy, bubble } = useCopy();
+  return (
+    <span className={`relative ${className ?? ""}`}>
+      {bubble}
+      <Button size="sm" variant={shown ? "outline" : "ghost"} className={shown ? undefined : "h-7 px-2"} onClick={() => void copy(text)} title={label} aria-label={label}>
+        <Copy /> {shown && <span className="font-mono">{text}</span>}
+      </Button>
+    </span>
   );
 }

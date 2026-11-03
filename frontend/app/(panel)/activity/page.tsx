@@ -8,6 +8,7 @@ import { PageHeader, useSession } from "@/components/app-shell";
 import { JobProgress } from "@/components/job-progress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select } from "@/components/ui/input";
 import { TBody, THead, Table, Td, Th, Tr } from "@/components/ui/table";
 import { HostCharts } from "@/features/activity/host-charts";
 import { JobList } from "@/features/apps/job-list";
@@ -15,6 +16,25 @@ import { api } from "@/lib/api/client";
 import { keys, useAudit, useJobs } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+// How many rows each list shows; "all": the server's most (jobs 500, audit 1000).
+const COUNTS = [10, 20, 50] as const;
+const ALL = { jobs: 500, audit: 1000 };
+
+function CountSelect({ value, all, onChange, label }: { value: number; all: number; onChange: (n: number) => void; label: string }) {
+  const { t } = useI18n();
+  return (
+    <label className="flex items-center gap-2 text-sm font-normal text-muted-foreground">
+      {t("activity.show")}
+      <Select aria-label={label} className="h-8 w-auto py-0 text-sm" value={value} onChange={(e) => onChange(Number(e.target.value))}>
+        {COUNTS.map((n) => (
+          <option key={n} value={n}>{n}</option>
+        ))}
+        <option value={all}>{t("activity.all")}</option>
+      </Select>
+    </label>
+  );
+}
 
 /** Admin-only "clear" button with a confirmation. */
 function ClearButton({ path, confirmKey, queryKey }: { path: string; confirmKey: MessageKey; queryKey: readonly string[] }) {
@@ -36,9 +56,9 @@ function ClearButton({ path, confirmKey, queryKey }: { path: string; confirmKey:
   );
 }
 
-function AuditTable() {
+function AuditTable({ limit }: { limit: number }) {
   const { t, lang } = useI18n();
-  const { data: entries } = useAudit();
+  const { data: entries } = useAudit(limit);
   return (
     <Table>
       <THead>
@@ -71,7 +91,9 @@ function AuditTable() {
 export default function ActivityPage() {
   const { t } = useI18n();
   const { can } = useSession();
-  const { data: jobs } = useJobs();
+  const [jobCount, setJobCount] = useState(10);
+  const [auditCount, setAuditCount] = useState(10);
+  const { data: jobs } = useJobs(undefined, jobCount);
   const [selected, setSelected] = useState<number | null>(null);
 
   return (
@@ -84,7 +106,10 @@ export default function ActivityPage() {
         <Card>
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle>{t("activity.jobs")}</CardTitle>
-            {can("admin") && <ClearButton path="/jobs" confirmKey="activity.clearJobsConfirm" queryKey={keys.jobs} />}
+            <span className="flex flex-wrap items-center gap-3">
+              <CountSelect value={jobCount} all={ALL.jobs} onChange={setJobCount} label={t("activity.showJobs")} />
+              {can("admin") && <ClearButton path="/jobs" confirmKey="activity.clearJobsConfirm" queryKey={keys.jobs} />}
+            </span>
           </CardHeader>
           <CardContent className="grid gap-4">
             {selected && <JobProgress key={selected} jobId={selected} />}
@@ -95,10 +120,13 @@ export default function ActivityPage() {
           <Card>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle>{t("activity.audit")}</CardTitle>
-              <ClearButton path="/audit" confirmKey="activity.clearAuditConfirm" queryKey={keys.audit} />
+              <span className="flex flex-wrap items-center gap-3">
+                <CountSelect value={auditCount} all={ALL.audit} onChange={setAuditCount} label={t("activity.showAudit")} />
+                <ClearButton path="/audit" confirmKey="activity.clearAuditConfirm" queryKey={keys.audit} />
+              </span>
             </CardHeader>
             <CardContent>
-              <AuditTable />
+              <AuditTable limit={auditCount} />
             </CardContent>
           </Card>
         )}

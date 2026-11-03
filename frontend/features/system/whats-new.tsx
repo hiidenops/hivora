@@ -9,13 +9,16 @@ import { readPref, writePref } from "@/lib/prefs";
 
 import { NotesDialog } from "./notes-dialog";
 
-/** Once per version and browser: what the installed version brings (the first visit, or
- *  the first one after an update). Closed: not shown again until the next version. */
+/** Once per version and browser: what the installed version brings (the first visit), or
+ *  everything since the version seen last (the first visit after one or more updates).
+ *  Closed: not shown again until the next version. */
 export function WhatsNew() {
   const { t } = useI18n();
+  // The version this browser saw last: the notes of every version since (several updates).
+  const [since] = useState(() => readPref("whatsNew"));
   const { data } = useQuery({
-    queryKey: ["system-whats-new"],
-    queryFn: () => api<{ version: string; notes: string | null }>("/system/whats-new"),
+    queryKey: ["system-whats-new", since],
+    queryFn: () => api<{ version: string; notes: string | null }>("/system/whats-new", { query: since ? { since } : {} }),
     staleTime: Infinity,
   });
   const [open, setOpen] = useState(false);
@@ -30,7 +33,7 @@ export function WhatsNew() {
         setOpen(o);
         if (!o) writePref("whatsNew", data.version);
       }}
-      title={t("whatsNew.title", { version: data.version })}
+      title={since && since !== data.version && data.notes.startsWith("## ") ? t("whatsNew.since", { since, version: data.version }) : t("whatsNew.title", { version: data.version })}
       notes={data.notes}
       done={t("whatsNew.done")}
     />

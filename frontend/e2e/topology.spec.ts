@@ -43,6 +43,20 @@ test("topology: graph, inspector, declared element, prepared change, JSON export
   await inspector.getByRole("button", { name: "Fermer" }).click();
   await expect(inspector).toBeHidden();
 
+  // Its addresses to copy: the IP, and IP:port per port (the fake Docker gives no IP: added).
+  await page.route("**/api/v1/topology", async (route) => {
+    const body = await (await route.fetch()).json();
+    for (const n of body.nodes) if (n.type === "app") n.address = "10.9.0.4";
+    await route.fulfill({ json: body });
+  });
+  await page.reload();
+  await node("Carto").click();
+  await expect(inspector.getByRole("button", { name: "Copier l'adresse IP" })).toHaveText("10.9.0.4");
+  await inspector.getByRole("button", { name: "Copier 10.9.0.4:80" }).click();
+  await expect(inspector.getByText("Texte copié !")).toBeVisible();
+  await page.unroute("**/api/v1/topology");
+  await inspector.getByRole("button", { name: "Fermer" }).click();
+
   // A declared element: added, changed, removed (the API agrees each time).
   await page.getByRole("button", { name: "Ajouter un élément" }).click();
   await page.getByLabel("Type", { exact: true }).selectOption("router");
