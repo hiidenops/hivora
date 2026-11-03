@@ -28,6 +28,8 @@ export default defineConfig({
   // order (apps.spec.ts first: its first-start test needs the fresh instance).
   workers: 1,
   retries: process.env.CI ? 1 : 0,
+  // On GitHub, each failure also becomes an annotation of the run (readable without logs).
+  reporter: process.env.GITHUB_ACTIONS ? [["github"], ["dot"]] : "list",
   use: { baseURL: `http://${HOST}:${PORT}`, locale: "fr-FR", trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   // The second one is a public panel (public-totp.spec.ts only), the third one has the
