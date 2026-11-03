@@ -42,8 +42,11 @@ def test_public_domains_through_the_https_proxy(client: Any) -> None:
     vpn = {"template": "wireguard", "name": "vpn", "inputs": {"host": "vpn.example.org"},
            "vpn_zones": ["jeux"]}  # fmt: skip
     ids = {}
-    for name, body in (("vpn", vpn), ("site", {"template": "nginx", "name": "site", "zone": "web"}),
-                       ("cache", {"template": "nginx", "name": "cache", "zone": "jeux"})):
+    for name, body in (
+        ("vpn", vpn),
+        ("site", {"template": "nginx", "name": "site", "zone": "web"}),
+        ("cache", {"template": "nginx", "name": "cache", "zone": "jeux"}),
+    ):
         r = client.post(f"{API}/apps", json=body).json()
         assert wait_job(client, r["job"]["id"])["status"] == "succeeded"
         ids[name] = r["app"]["id"]
