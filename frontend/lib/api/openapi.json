@@ -260,6 +260,11 @@
             "title": "Origin",
             "type": "string"
           },
+          "players": {
+            "default": false,
+            "title": "Players",
+            "type": "boolean"
+          },
           "ports": {
             "items": {
               "$ref": "#/components/schemas/PortOut"
@@ -428,6 +433,11 @@
           "origin": {
             "title": "Origin",
             "type": "string"
+          },
+          "players": {
+            "default": false,
+            "title": "Players",
+            "type": "boolean"
           },
           "slug": {
             "title": "Slug",
@@ -5351,6 +5361,496 @@
         "title": "TotpEnrollOut",
         "type": "object"
       },
+      "TsAdminKeyOut": {
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "created",
+          "description"
+        ],
+        "title": "TsAdminKeyOut",
+        "type": "object"
+      },
+      "TsBanIn": {
+        "properties": {
+          "clid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clid"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "maxLength": 45,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "minutes": {
+            "default": 0,
+            "maximum": 525600.0,
+            "minimum": 0.0,
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "reason": {
+            "default": "",
+            "maxLength": 80,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "title": "TsBanIn",
+        "type": "object"
+      },
+      "TsBanOut": {
+        "properties": {
+          "by": {
+            "title": "By",
+            "type": "string"
+          },
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "duration_s": {
+            "title": "Duration S",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uid"
+          }
+        },
+        "required": [
+          "id",
+          "ip",
+          "name",
+          "uid",
+          "reason",
+          "created",
+          "duration_s",
+          "by"
+        ],
+        "title": "TsBanOut",
+        "type": "object"
+      },
+      "TsClientOut": {
+        "properties": {
+          "clid": {
+            "title": "Clid",
+            "type": "integer"
+          },
+          "connected_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connected At"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "idle_s": {
+            "title": "Idle S",
+            "type": "integer"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clid",
+          "name",
+          "ip",
+          "country",
+          "connected_at",
+          "idle_s"
+        ],
+        "title": "TsClientOut",
+        "type": "object"
+      },
+      "TsInfoOut": {
+        "properties": {
+          "log_clients": {
+            "title": "Log Clients",
+            "type": "boolean"
+          },
+          "max_clients": {
+            "title": "Max Clients",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "online": {
+            "title": "Online",
+            "type": "integer"
+          },
+          "password": {
+            "title": "Password",
+            "type": "boolean"
+          },
+          "uptime_s": {
+            "title": "Uptime S",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "welcome": {
+            "title": "Welcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "welcome",
+          "max_clients",
+          "online",
+          "version",
+          "uptime_s",
+          "password",
+          "log_clients"
+        ],
+        "title": "TsInfoOut",
+        "type": "object"
+      },
+      "TsJailIn": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TsJailSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "TsJailIn",
+        "type": "object"
+      },
+      "TsJailOut": {
+        "properties": {
+          "agent": {
+            "title": "Agent",
+            "type": "boolean"
+          },
+          "banned": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Banned",
+            "type": "array"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "jail": {
+            "title": "Jail",
+            "type": "string"
+          },
+          "matched": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/TsJailSettings"
+          }
+        },
+        "required": [
+          "agent",
+          "enabled",
+          "settings",
+          "banned",
+          "failed",
+          "jail"
+        ],
+        "title": "TsJailOut",
+        "type": "object"
+      },
+      "TsJailSettings": {
+        "properties": {
+          "bantime": {
+            "maxLength": 12,
+            "title": "Bantime",
+            "type": "string"
+          },
+          "findtime": {
+            "maxLength": 12,
+            "title": "Findtime",
+            "type": "string"
+          },
+          "maxretry": {
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Maxretry",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "maxretry",
+          "findtime",
+          "bantime"
+        ],
+        "title": "TsJailSettings",
+        "type": "object"
+      },
+      "TsKickIn": {
+        "properties": {
+          "reason": {
+            "default": "",
+            "maxLength": 80,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "title": "TsKickIn",
+        "type": "object"
+      },
+      "TsLogEntryOut": {
+        "properties": {
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "ts": {
+            "title": "Ts",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "event",
+          "name",
+          "ip",
+          "reason"
+        ],
+        "title": "TsLogEntryOut",
+        "type": "object"
+      },
+      "TsMessageIn": {
+        "properties": {
+          "text": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "TsMessageIn",
+        "type": "object"
+      },
+      "TsNewKeyOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "TsNewKeyOut",
+        "type": "object"
+      },
+      "TsPasswordIn": {
+        "properties": {
+          "password": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "title": "TsPasswordIn",
+        "type": "object"
+      },
+      "TsSettingsIn": {
+        "properties": {
+          "log_clients": {
+            "default": true,
+            "title": "Log Clients",
+            "type": "boolean"
+          },
+          "max_clients": {
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Max Clients",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "welcome": {
+            "default": "",
+            "maxLength": 1024,
+            "title": "Welcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "max_clients"
+        ],
+        "title": "TsSettingsIn",
+        "type": "object"
+      },
+      "TsUnbanIn": {
+        "properties": {
+          "ip": {
+            "maxLength": 45,
+            "title": "Ip",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ip"
+        ],
+        "title": "TsUnbanIn",
+        "type": "object"
+      },
       "UfwIn": {
         "properties": {
           "enabled": {
@@ -6138,7 +6638,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.3.6"
+    "version": "0.3.7"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -9254,6 +9754,678 @@
         "summary": "Run Now",
         "tags": [
           "tasks"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak": {
+      "get": {
+        "operationId": "info_api_v1_apps__app_id__teamspeak_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TsInfoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Info",
+        "tags": [
+          "teamspeak"
+        ]
+      },
+      "put": {
+        "operationId": "edit_api_v1_apps__app_id__teamspeak_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TsSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit",
+        "tags": [
+          "teamspeak"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak/admin-keys": {
+      "get": {
+        "operationId": "admin_keys_api_v1_apps__app_id__teamspeak_admin_keys_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TsAdminKeyOut"
+                  },
+                  "title": "Response Admin Keys Api V1 Apps  App Id  Teamspeak Admin Keys Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Keys",
+        "tags": [
+          "teamspeak"
+        ]
+      },
+      "post": {
+        "description": "A new admin key, the unused ones deleted (admin and a recent TOTP).",
+        "operationId": "renew_admin_key_api_v1_apps__app_id__teamspeak_admin_keys_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TsNewKeyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Renew Admin Key",
+        "tags": [
+          "teamspeak"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak/bans": {
+      "get": {
+        "operationId": "bans_api_v1_apps__app_id__teamspeak_bans_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TsBanOut"
+                  },
+                  "title": "Response Bans Api V1 Apps  App Id  Teamspeak Bans Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bans",
+        "tags": [
+          "teamspeak"
+        ]
+      },
+      "post": {
+        "operationId": "ban_api_v1_apps__app_id__teamspeak_bans_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TsBanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ban",
+        "tags": [
+          "teamspeak"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak/bans/{ban_id}": {
+      "delete": {
+        "operationId": "unban_api_v1_apps__app_id__teamspeak_bans__ban_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ban_id",
+            "required": true,
+            "schema": {
+              "title": "Ban Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unban",
+        "tags": [
+          "teamspeak"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak/clients": {
+      "get": {
+        "operationId": "clients_api_v1_apps__app_id__teamspeak_clients_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TsClientOut"
+                  },
+                  "title": "Response Clients Api V1 Apps  App Id  Teamspeak Clients Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clients",
+        "tags": [
+          "teamspeak"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak/clients/{clid}/kick": {
+      "post": {
+        "operationId": "kick_api_v1_apps__app_id__teamspeak_clients__clid__kick_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "clid",
+            "required": true,
+            "schema": {
+              "title": "Clid",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TsKickIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Kick",
+        "tags": [
+          "teamspeak"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak/history": {
+      "get": {
+        "operationId": "history_api_v1_apps__app_id__teamspeak_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TsLogEntryOut"
+                  },
+                  "title": "Response History Api V1 Apps  App Id  Teamspeak History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "History",
+        "tags": [
+          "teamspeak"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak/jail": {
+      "get": {
+        "operationId": "jail_api_v1_apps__app_id__teamspeak_jail_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TsJailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Jail",
+        "tags": [
+          "teamspeak"
+        ]
+      },
+      "put": {
+        "operationId": "set_jail_api_v1_apps__app_id__teamspeak_jail_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TsJailIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Jail",
+        "tags": [
+          "teamspeak"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak/jail/unban": {
+      "post": {
+        "operationId": "jail_unban_api_v1_apps__app_id__teamspeak_jail_unban_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TsUnbanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Jail Unban",
+        "tags": [
+          "teamspeak"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak/message": {
+      "post": {
+        "operationId": "message_api_v1_apps__app_id__teamspeak_message_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TsMessageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Message",
+        "tags": [
+          "teamspeak"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/teamspeak/password": {
+      "put": {
+        "description": "The server password (admin and a recent TOTP).",
+        "operationId": "password_api_v1_apps__app_id__teamspeak_password_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TsPasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Password",
+        "tags": [
+          "teamspeak"
         ]
       }
     },

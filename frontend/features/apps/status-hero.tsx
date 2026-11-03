@@ -7,10 +7,10 @@ import { AppIcon } from "@/components/app-icon";
 import { useCopy } from "@/components/copy";
 import { Card } from "@/components/ui/card";
 import type { AppDetail, AppStatus } from "@/lib/api/client";
+import { usePlayers } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-import { usePlayers } from "../games/game-panel";
 
 const TONE: Record<AppStatus, string> = {
   healthy: "bg-ok/15 text-ok ring-ok/30",

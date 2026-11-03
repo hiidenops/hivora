@@ -6,6 +6,16 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+
+- **TeamSpeak 3** : nouveau modèle (image officielle, x86 uniquement) avec son propre panneau sur la page de l'app. Hivora parle au serveur par sa ServerQuery, sans jamais publier son port. On y voit les connectés (pseudo, adresse, pays), qu'on peut expulser ou bannir, la liste des bans, l'historique des connexions, et on y règle le nom, le message de bienvenue, le nombre de places et le mot de passe du serveur. « Message à tous » écrit à tout le serveur. « Générer une nouvelle clé » crée une clé admin (droits Server Admin), affichée une seule fois, et supprime les anciennes pas encore utilisées. Mot de passe et clé admin : admin et code TOTP récent.
+- **TeamSpeak 3, protection fail2ban** : avec l'agent hôte, une jail par serveur bloque sur la machine (chaîne `DOCKER-USER`) les adresses qui ratent trop de connexions ServerQuery, d'après le journal du serveur ; échecs, durée et blocage réglables, adresses bloquées listées et débloquables.
+- **Tableau de bord** : la tuile d'un serveur de jeu qui tourne affiche le nombre de connectés.
+
+### Corrigé
+
+- **Audit** : les demandes de mise à jour des paquets et de redémarrage de l'hôte sont maintenant notées dans le journal d'audit.
+
 ## [0.3.7] - 2026-11-03
 
 ### Ajouté

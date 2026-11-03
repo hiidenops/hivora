@@ -354,12 +354,17 @@ class GamePlayers(_Strict):
     """Who is online: a command run in the main service, or a Steam A2S query."""
 
     command: list[str] | None = None  # e.g. ["rcon-cli", "list"]
-    # Parser of the command output: Minecraft's `list`, or CSV (header, then one row per player).
-    format: Literal["minecraft", "csv"] | None = None
+    # Parser of the command output: Minecraft's `list`, or CSV (header, then one row per player);
+    # teamspeak: no command, the clients come from the server's ServerQuery (hivora.teamspeak).
+    format: Literal["minecraft", "csv", "teamspeak"] | None = None
     a2s_port: int | None = None  # container port answering A2S (must be published)
 
     @model_validator(mode="after")
     def _check(self) -> "GamePlayers":
+        if self.format == "teamspeak":
+            if self.command or self.a2s_port:
+                raise ValueError("players: format teamspeak takes no command nor a2s_port")
+            return self
         if bool(self.command) == bool(self.a2s_port) or bool(self.command) != bool(self.format):
             raise ValueError("players: either command + format, or a2s_port")
         return self

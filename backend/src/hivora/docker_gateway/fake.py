@@ -1,7 +1,7 @@
 """In-memory DockerGateway for tests and UI development without Docker."""
 
 import asyncio
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from dataclasses import replace
 from datetime import datetime
 
@@ -46,6 +46,9 @@ class FakeDockerGateway(DockerGateway):
         # exec_run answers: command (joined by spaces) -> (exit code, output)
         self.exec_results: dict[str, tuple[int, str]] = {}
         self.exec_calls: list[list[str]] = []
+        self.exec_stdin: list[bytes] = []  # what exec_run was fed, in order
+        # Answers exec_run calls fed stdin (a ServerQuery session...): (cmd, stdin) -> answer.
+        self.exec_handler: Callable[[list[str], bytes], tuple[int, str]] | None = None
         self.stats: dict[str, StatsSample] = {}  # stats_once answers, zeros by default
         self.arch = "x86_64"
         self.platforms: dict[str, list[str]] = {}  # image ref -> architectures (unknown if absent)
@@ -147,10 +150,15 @@ class FakeDockerGateway(DockerGateway):
         return session
 
     async def exec_run(
-        self, container_id: str, cmd: list[str], user: str | None = None
-    ) -> tuple[int, str]:
+        self, container_id: str, cmd: list[str], user: str | None = None,
+        stdin: bytes | None = None,
+    ) -> tuple[int, str]:  # fmt: skip
         await self.get_container(container_id)
         self.exec_calls.append(cmd)
+        if stdin is not None:
+            self.exec_stdin.append(stdin)
+            if self.exec_handler:
+                return self.exec_handler(cmd, stdin)
         return self.exec_results.get(" ".join(cmd), (0, ""))
 
     async def ensure_agent(self, name: str, image: str, labels: dict[str, str]) -> str:

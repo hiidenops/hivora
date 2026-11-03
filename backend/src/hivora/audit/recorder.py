@@ -28,6 +28,8 @@ AUDITED_PREFIXES = (
     "console.",
     "settings.",
     "game.",
+    "teamspeak.",
+    "host.",
     "site.",
 )
 _FAILED = {"auth.login_failed"}

@@ -15,6 +15,7 @@ import {
   type JobRef,
   type Me,
   type Plan,
+  type Players,
   type RemovalPlan,
   type Revision,
   type Role,
@@ -317,5 +318,15 @@ export function useUpdateSettings(id: number) {
       invalidateAppPanels(qc, id);
       return qc.invalidateQueries({ queryKey: keys.app(id) }); // awaited, as before
     },
+  });
+}
+
+/** Players online, polled every 15 s while the server runs (shared cache key). */
+export function usePlayers(appId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: [...keys.game(appId), "players"],
+    queryFn: () => api<Players>(`/apps/${appId}/game/players`),
+    refetchInterval: enabled ? 15_000 : false,
+    enabled,
   });
 }

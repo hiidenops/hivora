@@ -175,6 +175,14 @@ class GameTools:
             raise GameFeatureMissingError("this game does not report its players")
         if srv.container is None:
             return Players(False, None, None, [])
+        if spec.format == "teamspeak":
+            from hivora.teamspeak.service import TeamSpeak
+
+            ts = TeamSpeak(
+                sessions=self.sessions, apps=self.apps, gateway=self.gateway, bus=self.bus
+            )
+            info, clients = await ts.info(app_id), await ts.clients(app_id)
+            return Players(True, len(clients), info["max_clients"], [c.name for c in clients])
         if spec.command:
             out = await self._run(srv, spec.command)
             if spec.format == "csv":

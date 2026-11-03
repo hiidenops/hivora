@@ -44,6 +44,7 @@ from hivora.system.releases import ReleaseChecker
 from hivora.system.secrets import SecretSettings
 from hivora.system.self_update import SelfUpdate
 from hivora.tasks.service import TaskTools, run_scheduler
+from hivora.teamspeak.jail import TeamSpeakJails, forget_removed
 from hivora.templates import Catalog
 from hivora.templates.icons import IconCache
 from hivora.vpn.admin import AdminVpn, follow_admin_client
@@ -239,6 +240,17 @@ class Runtime:
             asyncio.create_task(run_scheduler(self.tasks), name="task-scheduler"),
             asyncio.create_task(check_images(self.apps.custom), name="free-image-updates"),
             asyncio.create_task(follow_admin_client(self.admin_vpn, self.bus), name="admin-conf"),
+            asyncio.create_task(
+                forget_removed(
+                    TeamSpeakJails(
+                        sessions=self.sessions,
+                        fw=self.hostfw,
+                        bus=self.bus,
+                        volumes_root=self.settings.volumes_root,
+                    )
+                ),
+                name="teamspeak-jails",
+            ),
         ]
         await self.blocking.reapply()  # the host may have rebooted: its rules are gone
         await self.static_routes.reapply()  # and its static routes

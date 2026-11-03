@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpCircle, ExternalLink, ShieldCheck } from "lucide-react";
+import { ArrowUpCircle, ExternalLink, ShieldCheck, Users } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -16,10 +16,23 @@ import { TileSkeletons } from "@/components/ui/skeleton";
 import { AppActions } from "@/features/apps/app-actions";
 import { StartOrderButton, ZoneActionButtons, useZoneActions } from "@/features/zones/zone-actions";
 import type { App, Zone } from "@/lib/api/client";
-import { useApps, useZones } from "@/lib/api/hooks";
+import { useApps, usePlayers, useZones } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 import { webAddress } from "@/lib/utils";
 import { useLiveStatus } from "@/lib/realtime";
+
+/** "3 / 32 online" on a running game's tile (polled with the app page's players). */
+function OnlineBadge({ appId }: { appId: number }) {
+  const { t } = useI18n();
+  const { data } = usePlayers(appId, true);
+  if (!data?.running || data.online === null) return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
+      <Users className="size-3.5" />
+      {t("mc.online", { online: data.online, max: data.max ?? "?" })}
+    </span>
+  );
+}
 
 function AppTile({ app }: { app: App }) {
   const { t } = useI18n();
@@ -46,6 +59,7 @@ function AppTile({ app }: { app: App }) {
       <div className="flex items-center justify-between">
         <span className="flex flex-wrap items-center gap-1.5">
           <StatusBadge status={status} drift={app.drift} />
+          {app.players && ["healthy", "degraded"].includes(status) && <OnlineBadge appId={app.id} />}
           {app.update && (
             <Link
               href={`/app/?id=${app.id}`}

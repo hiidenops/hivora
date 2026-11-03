@@ -159,6 +159,7 @@ async def list_apps(_: Viewer, rt: RuntimeDep) -> list[AppOut]:
             row = app_out(rt, app, template, updates.get(app.id))
             access = await rt.apps.access_of(session, app, vpn_zones)
             row.web = {k: v for k, v in access.items() if k.startswith("web")}
+            row.players = bool((caps := game_caps(rt, template)) and caps.players)
             out.append(row)
         return out
 

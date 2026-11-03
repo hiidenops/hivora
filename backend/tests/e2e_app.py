@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from fake_teamspeak import FakeTeamSpeak
 from fastapi import FastAPI
 
 from hivora.core.config import Settings
@@ -36,7 +37,7 @@ def fake_ip(gateway: FakeDockerGateway) -> None:
     real = gateway.exec_run
 
     async def exec_run(
-        container_id: str, cmd: list[str], user: str | None = None
+        container_id: str, cmd: list[str], user: str | None = None, stdin: bytes | None = None
     ) -> tuple[int, str]:
         argv = cmd[len(HOST) :]
         if argv == ["ip", "-j", "route"]:
@@ -54,7 +55,7 @@ def fake_ip(gateway: FakeDockerGateway) -> None:
                        "Inst tzdata [2024b-0] (2025b-0 Debian:12.12/stable [all])\n")  # fmt: skip
         if argv == hu.UNIT_SHOW:
             return 0, "SubState=exited\nResult=success\nExecMainStatus=0\n"
-        return await real(container_id, cmd, user)
+        return await real(container_id, cmd, user, stdin)
 
     gateway.exec_run = exec_run  # type: ignore[method-assign]
 
@@ -62,6 +63,7 @@ def fake_ip(gateway: FakeDockerGateway) -> None:
 def app() -> FastAPI:
     gateway = FakeDockerGateway()
     fake_ip(gateway)
+    FakeTeamSpeak().install(gateway)  # any TeamSpeak app's ServerQuery
     runtime = Runtime.build(
         Settings(changelog_path=Path(__file__).parents[2] / "CHANGELOG.md"),  # the notes pop-up
         gateway=gateway,

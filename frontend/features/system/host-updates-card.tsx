@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { TotpForm } from "@/components/totp-form";
 import { ApiError, api, type JobRef } from "@/lib/api/client";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 
@@ -64,27 +65,6 @@ function useHostJob(path: string, onEnd: (status: string, error: string | null) 
     return () => window.clearInterval(timer);
   }, [job, onEnd]);
   return { start, totp, running: job !== null || start.isPending };
-}
-
-function TotpForm({ onCode, pending }: { onCode: (code: string) => void; pending: boolean }) {
-  const { t } = useI18n();
-  const [code, setCode] = useState("");
-  return (
-    <form
-      className="surface flex flex-wrap items-end gap-2 rounded-md border p-3 text-sm"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onCode(code);
-        setCode("");
-      }}
-    >
-      <p className="w-full">{t("releases.totp")}</p>
-      <Input aria-label={t("releases.totp")} className="w-40 font-mono" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(e) => setCode(e.target.value)} />
-      <Button type="submit" size="sm" loading={pending}>
-        {t("settings.totp.verify")}
-      </Button>
-    </form>
-  );
 }
 
 /** System → the host's packages (apt) and its reboot, through the host agent: one line of

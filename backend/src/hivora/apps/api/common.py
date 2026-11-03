@@ -69,6 +69,7 @@ class AppOut(BaseModel):
     update: AppUpdateOut | None = None  # a newer version known (the list only); None: none
     # Its web addresses (the list only): web, web_lan, web_vpn, as the app's page shows them.
     web: dict[str, str] = {}
+    players: bool = False  # it reports who is online (/apps/{id}/game/players; the list only)
 
 
 class DeployOut(BaseModel):

@@ -1,0 +1,77 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: teamspeak
+  name: TeamSpeak 3
+  version: 1.0.0
+  category: games
+  tags: [teamspeak, voice, chat]
+  icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/teamspeak.svg" }
+  description:
+    fr: "Serveur vocal TeamSpeak 3 (image officielle), géré depuis Hivora : clé admin, connectés, bans, mot de passe. x86 uniquement."
+    en: "TeamSpeak 3 voice server (official image), managed from Hivora: admin key, clients, bans, password. x86 only."
+  links:
+    site: https://www.teamspeak.com
+    doc: https://hub.docker.com/_/teamspeak
+  maintainer: hivora
+  verified: true
+  license: TeamSpeak license (free, 32 slots)
+  source: https://hub.docker.com/_/teamspeak
+requirements:
+  arch: [amd64]  # TeamSpeak 3 servers only exist for x86
+  memory: { min: 128Mi, recommended: 256Mi }
+  disk: { min: 200Mi }
+form:
+  basic:
+    - id: eula
+      label:
+        fr: J'accepte la licence du serveur TeamSpeak (https://www.teamspeak.com/en/features/licensing/)
+        en: I accept the TeamSpeak server license (https://www.teamspeak.com/en/features/licensing/)
+      type: boolean
+      required: true
+  advanced:
+    - id: voice_port
+      group: { fr: Réseau, en: Network }
+      label: { fr: Port vocal (UDP), en: Voice port (UDP) }
+      type: port
+      default: 9987
+    - id: query_password
+      group: { fr: Avancé, en: Advanced }
+      label: { fr: Mot de passe ServerQuery (serveradmin), en: ServerQuery password (serveradmin) }
+      type: secret
+      required: true
+      generate: { length: 24 }
+      help:
+        fr: Utilisé par Hivora pour gérer le serveur. Le port ServerQuery n'est jamais publié.
+        en: Used by Hivora to manage the server. The ServerQuery port is never published.
+services:
+  server:
+    role: main
+    image: teamspeak
+    tag: "3.13.8@sha256:4833e67ffe7ecaaef63241be145f65720ee6a927a2c83029a7fa762c902dd3b2"
+    env:
+      TS3SERVER_LICENSE: accept
+      TS3SERVER_SERVERADMIN_PASSWORD: "{{ secret.query_password }}"
+      TS3SERVER_LOG_APPEND: "1"  # one log file per server: the fail2ban jail reads it
+    env_if: { TS3SERVER_LICENSE: eula }
+    ports:
+      - { container: 9987, host: "{{ form.voice_port }}", protocol: udp, purpose: game, exposure: public }
+      # File transfers (avatars, files): the server tells clients its own port, so the same here.
+      - { container: 30033, protocol: tcp, purpose: other, exposure: public }
+    volumes:
+      - { name: data, target: /var/ts3server, backup: true }
+access:
+  game: "{{ host.public_ip }}:{{ form.voice_port }}"
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+game:
+  players: { format: teamspeak }
+logs:
+  hide:
+    - "token="  # the first admin key: Hivora's TeamSpeak card makes new ones
+    - "query client (dis)?connected 'serveradmin'"  # Hivora's own ServerQuery sessions
+defaults:
+  zone: gaming
+  restart: unless-stopped

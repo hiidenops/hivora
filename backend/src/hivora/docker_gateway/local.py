@@ -351,17 +351,21 @@ class LocalDockerGateway(DockerGateway):
         return LocalExecSession(exec_, stream)
 
     async def exec_run(
-        self, container_id: str, cmd: list[str], user: str | None = None
-    ) -> tuple[int, str]:
+        self, container_id: str, cmd: list[str], user: str | None = None,
+        stdin: bytes | None = None,
+    ) -> tuple[int, str]:  # fmt: skip
         container = self._docker.containers.container(container_id)
         try:
-            exec_ = await container.exec(cmd, stdout=True, stderr=True, tty=False, user=user or "")
+            exec_ = await container.exec(cmd, stdout=True, stderr=True, tty=False, user=user or "",
+                                         stdin=stdin is not None)  # fmt: skip
         except aiodocker.DockerError as exc:
             if exc.status == 404:
                 raise ContainerNotFoundError(container_id) from exc
             raise
         stream = exec_.start(timeout=None, detach=False)
         await stream._init()  # see open_exec: start once, explicitly
+        if stdin is not None:
+            await stream.write_in(stdin)  # the command reads up to its own end line: no EOF needed
         chunks: list[bytes] = []
         try:  # callers bound the duration with asyncio.timeout
             while (message := await stream.read_out()) is not None:

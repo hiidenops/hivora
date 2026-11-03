@@ -27,6 +27,7 @@ from hivora.runtime import Runtime
 from hivora.sites.hosted_api import router as hosted_sites_router
 from hivora.system.api import router as system_router
 from hivora.tasks.api import router as tasks_router
+from hivora.teamspeak.api import router as teamspeak_router
 from hivora.templates.api import router as templates_router
 from hivora.topology.api import router as topology_router
 from hivora.vpn.api import router as vpn_router
@@ -71,6 +72,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
         app.include_router(router, prefix=f"{API_PREFIX}{prefix}")
     app.include_router(python_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(game_router, prefix=f"{API_PREFIX}/apps")
+    app.include_router(teamspeak_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(vpn_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(logs_router, prefix=f"{API_PREFIX}/apps")
     app.include_router(backups_router, prefix=f"{API_PREFIX}/apps")

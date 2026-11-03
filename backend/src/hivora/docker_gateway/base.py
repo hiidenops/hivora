@@ -86,9 +86,11 @@ class DockerGateway(ABC):
 
     @abstractmethod
     async def exec_run(
-        self, container_id: str, cmd: list[str], user: str | None = None
-    ) -> tuple[int, str]:
-        """Run ``cmd`` (no TTY, no shell), as ``user`` ("uid:gid") if given.
+        self, container_id: str, cmd: list[str], user: str | None = None,
+        stdin: bytes | None = None,
+    ) -> tuple[int, str]:  # fmt: skip
+        """Run ``cmd`` (no TTY, no shell), as ``user`` ("uid:gid") if given, fed ``stdin``
+        (data that must not show in the command line, so not in Docker's events).
 
         Returns (exit code, stdout+stderr).
         """

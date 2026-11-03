@@ -1008,6 +1008,203 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/{app_id}/teamspeak": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Info */
+        get: operations["info_api_v1_apps__app_id__teamspeak_get"];
+        /** Edit */
+        put: operations["edit_api_v1_apps__app_id__teamspeak_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/teamspeak/admin-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Keys */
+        get: operations["admin_keys_api_v1_apps__app_id__teamspeak_admin_keys_get"];
+        put?: never;
+        /**
+         * Renew Admin Key
+         * @description A new admin key, the unused ones deleted (admin and a recent TOTP).
+         */
+        post: operations["renew_admin_key_api_v1_apps__app_id__teamspeak_admin_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/teamspeak/bans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bans */
+        get: operations["bans_api_v1_apps__app_id__teamspeak_bans_get"];
+        put?: never;
+        /** Ban */
+        post: operations["ban_api_v1_apps__app_id__teamspeak_bans_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/teamspeak/bans/{ban_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unban */
+        delete: operations["unban_api_v1_apps__app_id__teamspeak_bans__ban_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/teamspeak/clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Clients */
+        get: operations["clients_api_v1_apps__app_id__teamspeak_clients_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/teamspeak/clients/{clid}/kick": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kick */
+        post: operations["kick_api_v1_apps__app_id__teamspeak_clients__clid__kick_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/teamspeak/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** History */
+        get: operations["history_api_v1_apps__app_id__teamspeak_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/teamspeak/jail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jail */
+        get: operations["jail_api_v1_apps__app_id__teamspeak_jail_get"];
+        /** Set Jail */
+        put: operations["set_jail_api_v1_apps__app_id__teamspeak_jail_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/teamspeak/jail/unban": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Jail Unban */
+        post: operations["jail_unban_api_v1_apps__app_id__teamspeak_jail_unban_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/teamspeak/message": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Message */
+        post: operations["message_api_v1_apps__app_id__teamspeak_message_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/teamspeak/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Password
+         * @description The server password (admin and a recent TOTP).
+         */
+        put: operations["password_api_v1_apps__app_id__teamspeak_password_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{app_id}/upgrade": {
         parameters: {
             query?: never;
@@ -2549,6 +2746,11 @@ export interface components {
             name: string;
             /** Origin */
             origin: string;
+            /**
+             * Players
+             * @default false
+             */
+            players: boolean;
             /** Ports */
             ports: components["schemas"]["PortOut"][];
             /**
@@ -2602,6 +2804,11 @@ export interface components {
             name: string;
             /** Origin */
             origin: string;
+            /**
+             * Players
+             * @default false
+             */
+            players: boolean;
             /** Slug */
             slug: string;
             status: components["schemas"]["AppStatus"];
@@ -4309,6 +4516,175 @@ export interface components {
             secret: string;
             /** Uri */
             uri: string;
+        };
+        /** TsAdminKeyOut */
+        TsAdminKeyOut: {
+            /** Created */
+            created: number;
+            /** Description */
+            description: string;
+        };
+        /** TsBanIn */
+        TsBanIn: {
+            /** Clid */
+            clid?: number | null;
+            /** Ip */
+            ip?: string | null;
+            /**
+             * Minutes
+             * @default 0
+             */
+            minutes: number;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /** TsBanOut */
+        TsBanOut: {
+            /** By */
+            by: string;
+            /** Created */
+            created: number;
+            /** Duration S */
+            duration_s: number;
+            /** Id */
+            id: number;
+            /** Ip */
+            ip: string | null;
+            /** Name */
+            name: string | null;
+            /** Reason */
+            reason: string;
+            /** Uid */
+            uid: string | null;
+        };
+        /** TsClientOut */
+        TsClientOut: {
+            /** Clid */
+            clid: number;
+            /** Connected At */
+            connected_at: number | null;
+            /** Country */
+            country: string | null;
+            /** Idle S */
+            idle_s: number;
+            /** Ip */
+            ip: string | null;
+            /** Name */
+            name: string;
+        };
+        /** TsInfoOut */
+        TsInfoOut: {
+            /** Log Clients */
+            log_clients: boolean;
+            /** Max Clients */
+            max_clients: number;
+            /** Name */
+            name: string;
+            /** Online */
+            online: number;
+            /** Password */
+            password: boolean;
+            /** Uptime S */
+            uptime_s: number;
+            /** Version */
+            version: string;
+            /** Welcome */
+            welcome: string;
+        };
+        /** TsJailIn */
+        TsJailIn: {
+            /** Enabled */
+            enabled: boolean;
+            settings?: components["schemas"]["TsJailSettings"] | null;
+        };
+        /** TsJailOut */
+        TsJailOut: {
+            /** Agent */
+            agent: boolean;
+            /** Banned */
+            banned: string[];
+            /** Enabled */
+            enabled: boolean;
+            /** Failed */
+            failed: number;
+            /** Jail */
+            jail: string;
+            /** Matched */
+            matched?: number | null;
+            settings: components["schemas"]["TsJailSettings"];
+        };
+        /** TsJailSettings */
+        TsJailSettings: {
+            /** Bantime */
+            bantime: string;
+            /** Findtime */
+            findtime: string;
+            /** Maxretry */
+            maxretry: number;
+        };
+        /** TsKickIn */
+        TsKickIn: {
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /** TsLogEntryOut */
+        TsLogEntryOut: {
+            /** Event */
+            event: string;
+            /** Ip */
+            ip: string | null;
+            /** Name */
+            name: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Ts */
+            ts: string;
+        };
+        /** TsMessageIn */
+        TsMessageIn: {
+            /** Text */
+            text: string;
+        };
+        /** TsNewKeyOut */
+        TsNewKeyOut: {
+            /** Key */
+            key: string;
+        };
+        /** TsPasswordIn */
+        TsPasswordIn: {
+            /**
+             * Password
+             * @default
+             */
+            password: string;
+        };
+        /** TsSettingsIn */
+        TsSettingsIn: {
+            /**
+             * Log Clients
+             * @default true
+             */
+            log_clients: boolean;
+            /** Max Clients */
+            max_clients: number;
+            /** Name */
+            name: string;
+            /**
+             * Welcome
+             * @default
+             */
+            welcome: string;
+        };
+        /** TsUnbanIn */
+        TsUnbanIn: {
+            /** Ip */
+            ip: string;
         };
         /** UfwIn */
         UfwIn: {
@@ -6645,6 +7021,485 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RunOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    info_api_v1_apps__app_id__teamspeak_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TsInfoOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_api_v1_apps__app_id__teamspeak_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TsSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_keys_api_v1_apps__app_id__teamspeak_admin_keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TsAdminKeyOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    renew_admin_key_api_v1_apps__app_id__teamspeak_admin_keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TsNewKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bans_api_v1_apps__app_id__teamspeak_bans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TsBanOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ban_api_v1_apps__app_id__teamspeak_bans_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TsBanIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unban_api_v1_apps__app_id__teamspeak_bans__ban_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                ban_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clients_api_v1_apps__app_id__teamspeak_clients_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TsClientOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kick_api_v1_apps__app_id__teamspeak_clients__clid__kick_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                clid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TsKickIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    history_api_v1_apps__app_id__teamspeak_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TsLogEntryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    jail_api_v1_apps__app_id__teamspeak_jail_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TsJailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_jail_api_v1_apps__app_id__teamspeak_jail_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TsJailIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    jail_unban_api_v1_apps__app_id__teamspeak_jail_unban_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TsUnbanIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    message_api_v1_apps__app_id__teamspeak_message_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TsMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_api_v1_apps__app_id__teamspeak_password_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TsPasswordIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
