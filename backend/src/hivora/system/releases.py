@@ -122,7 +122,7 @@ class ReleaseChecker:
         prefs = await self.prefs()
         repo = repo_of(self.settings.source_url)
         out: dict[str, Any] = {**prefs, "available": repo is not None, "current": __version__,
-                               "current_notes": self._local_notes(), "latest": None,
+                               "current_notes": self.local_notes(), "latest": None,
                                "newer": False, "command": None, "checked_at": None,
                                "error": None}  # fmt: skip
         if not prefs["enabled"] or repo is None:
@@ -165,7 +165,7 @@ class ReleaseChecker:
                                404: "not_found"}.get(status, "unavailable")  # fmt: skip
             return self._releases
 
-    def _local_notes(self) -> str | None:
+    def local_notes(self) -> str | None:
         try:
             return changelog_section(self.settings.changelog_path.read_text(), __version__)
         except OSError:

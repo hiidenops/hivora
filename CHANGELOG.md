@@ -6,6 +6,22 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+
+- **Nouveautés** : à la première visite après une mise à jour (et à la toute première), une fenêtre montre les nouveautés de la version installée. Une fois fermée, elle ne revient plus jusqu'à la version suivante (retenu par navigateur).
+- **Système de l'hôte** : une carte de la page Système, par l'agent hôte, pour les paquets de la machine. Elle vérifie toutes les 6 h (ou sur « Vérifier ») les paquets à mettre à jour, dont ceux de sécurité, et si un redémarrage est nécessaire. « Mettre à jour les paquets » lance `apt-get upgrade` (jamais `full-upgrade`) ; la mise à jour continue même si elle redémarre Docker. « Redémarrer » liste les apps, les arrête proprement dans l'ordre des zones, redémarre la machine, puis Hivora les relance dans l'ordre à son retour. Admin et code TOTP récent, Debian et Ubuntu.
+- **Topologie** : le panneau d'une app propose « Ouvrir dans le tableau de bord », « Ouvrir sur le web » (quand elle a une adresse web) et la copie de son adresse IP.
+- **Panneaux latéraux** (compose, détails avancés, sauvegardes, logs…) : leur bord gauche se tire pour les élargir ou les réduire ; la largeur est retenue pour chaque panneau, un double clic revient à la largeur par défaut.
+
+### Modifié
+
+- **Notes de version** (page Système) : elles s'ouvrent dans une fenêtre, mises en forme (titres, listes, gras, code), au lieu d'un texte brut déroulant.
+- **Boutons** : les derniers boutons qui lançaient une action sans indicateur (tâches planifiées, clients VPN, sauvegardes, utilisateurs, sessions, déconnexion) attendent la fin de l'action ; un second clic ne fait rien.
+
+### Corrigé
+
+- **Zones** : en créant une zone avec un nouveau VPN, le formulaire de déploiement du VPN propose cette zone, et non plus Administration.
+
 ## [0.3.5] - 2026-11-02
 
 ### Ajouté

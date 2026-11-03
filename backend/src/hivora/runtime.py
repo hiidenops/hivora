@@ -37,6 +37,7 @@ from hivora.sites.files import SiteFiles
 from hivora.sites.hosting import SiteHosting
 from hivora.sites.ports import site_ports
 from hivora.state import StateService
+from hivora.system.host_updates import HostUpdates
 from hivora.system.panel_backup import backup_panel
 from hivora.system.public_address import PublicAddress
 from hivora.system.releases import ReleaseChecker
@@ -102,6 +103,7 @@ class Runtime:
     admin_vpn: AdminVpn
     releases: ReleaseChecker
     self_update: SelfUpdate
+    host_updates: HostUpdates
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
     consoles: "ConsoleManager" = field(init=False)
@@ -202,13 +204,17 @@ class Runtime:
         self_update = SelfUpdate(settings=settings, sessions=sessions, jobs=jobs, releases=releases,
                                  bus=bus, clock=clock, docker=gateway.self_docker)  # fmt: skip
         self_update.register()  # the self_update job
+        host_updates = HostUpdates(fw=hostfw, sessions=sessions, jobs=jobs,
+                                   zone_actions=zone_actions, store=state.store, bus=bus,
+                                   clock=clock, data_dir=settings.data_dir)  # fmt: skip
+        host_updates.register()  # the host_upgrade and host_reboot jobs
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
                    public_address, AppMetrics(gateway, state.store, bus), backups,
                    sites, site_files, site_config, site_hosting, tasks, vpn, hostfw,
                    blocking, static_routes, zone_actions, admin_vpn,
-                   releases, self_update)  # fmt: skip
+                   releases, self_update, host_updates)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
@@ -238,6 +244,7 @@ class Runtime:
         await self.static_routes.reapply()  # and its static routes
         await self.self_update.settle()  # an update that restarted Hivora: its job ends here
         await self.jobs.start()
+        await self.host_updates.start()  # the host's packages, checked every 6 h
         # The vpn modes: the admin VPN needs the job queue running (its deploy is a job).
         self._vpn_tasks.append(asyncio.create_task(self.admin_vpn.ensure(), name="admin-vpn"))
 
@@ -256,6 +263,7 @@ class Runtime:
             if task:
                 task.cancel()
         await self.self_update.stop()
+        await self.host_updates.stop()
         await self.jobs.stop()
         await self.metrics.stop()
         await self.public_address.stop()

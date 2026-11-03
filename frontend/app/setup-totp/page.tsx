@@ -39,6 +39,7 @@ export default function SetupTotpPage() {
           <Button
             variant="ghost"
             className="justify-self-start"
+            loading={logout.isPending}
             onClick={() => logout.mutate(undefined, { onSettled: () => router.replace("/login/") })}
           >
             {t("nav.logout")}

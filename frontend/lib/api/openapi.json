@@ -1876,6 +1876,34 @@
         "title": "Health",
         "type": "object"
       },
+      "HostPackageOut": {
+        "properties": {
+          "candidate": {
+            "title": "Candidate",
+            "type": "string"
+          },
+          "current": {
+            "title": "Current",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "security": {
+            "title": "Security",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "current",
+          "candidate",
+          "security"
+        ],
+        "title": "HostPackageOut",
+        "type": "object"
+      },
       "HostSampleOut": {
         "properties": {
           "cpu_percent": {
@@ -1912,6 +1940,57 @@
           "net_tx_bps"
         ],
         "title": "HostSampleOut",
+        "type": "object"
+      },
+      "HostUpdatesOut": {
+        "properties": {
+          "agent": {
+            "title": "Agent",
+            "type": "boolean"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "packages": {
+            "items": {
+              "$ref": "#/components/schemas/HostPackageOut"
+            },
+            "title": "Packages",
+            "type": "array"
+          },
+          "reboot": {
+            "title": "Reboot",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "agent",
+          "checked_at",
+          "packages",
+          "reboot",
+          "error"
+        ],
+        "title": "HostUpdatesOut",
         "type": "object"
       },
       "HostedSiteIn": {
@@ -2376,7 +2455,9 @@
           "host_firewall",
           "host_route",
           "zone_action",
-          "self_update"
+          "self_update",
+          "host_upgrade",
+          "host_reboot"
         ],
         "title": "JobKind",
         "type": "string"
@@ -3284,6 +3365,53 @@
           "mounts"
         ],
         "title": "ProjectIn",
+        "type": "object"
+      },
+      "RebootAppOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug"
+        ],
+        "title": "RebootAppOut",
+        "type": "object"
+      },
+      "RebootPlanOut": {
+        "properties": {
+          "apps": {
+            "items": {
+              "$ref": "#/components/schemas/RebootAppOut"
+            },
+            "title": "Apps",
+            "type": "array"
+          },
+          "others": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Others",
+            "type": "array"
+          }
+        },
+        "required": [
+          "apps",
+          "others"
+        ],
+        "title": "RebootPlanOut",
         "type": "object"
       },
       "RecoveryCodesOut": {
@@ -5985,7 +6113,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.3.4"
+    "version": "0.3.5"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -11209,6 +11337,113 @@
           }
         },
         "summary": "Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/host/reboot": {
+      "get": {
+        "operationId": "reboot_plan_api_v1_system_host_reboot_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebootPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reboot Plan",
+        "tags": [
+          "system"
+        ]
+      },
+      "post": {
+        "description": "Stop the apps, reboot the host, start them again (job host_reboot): admin and a\nrecent TOTP.",
+        "operationId": "reboot_host_api_v1_system_host_reboot_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reboot Host",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/host/updates": {
+      "get": {
+        "description": "The last check of the host's packages (apt), every 6 h while the host agent is on.",
+        "operationId": "host_updates_api_v1_system_host_updates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostUpdatesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Host Updates",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/host/updates/check": {
+      "post": {
+        "description": "apt-get update then a simulated upgrade, now (the package lists only change).",
+        "operationId": "check_host_updates_api_v1_system_host_updates_check_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostUpdatesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Check Host Updates",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/system/host/upgrade": {
+      "post": {
+        "description": "apt-get upgrade on the host (job host_upgrade): admin and a recent TOTP.",
+        "operationId": "upgrade_host_api_v1_system_host_upgrade_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Upgrade Host",
         "tags": [
           "system"
         ]

@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 
 import { PASSWORD } from "./helpers";
 import { HOST, PUBLIC_PORT } from "./host";

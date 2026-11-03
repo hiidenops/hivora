@@ -1865,6 +1865,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/system/host/reboot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reboot Plan */
+        get: operations["reboot_plan_api_v1_system_host_reboot_get"];
+        put?: never;
+        /**
+         * Reboot Host
+         * @description Stop the apps, reboot the host, start them again (job host_reboot): admin and a
+         *     recent TOTP.
+         */
+        post: operations["reboot_host_api_v1_system_host_reboot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/host/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Host Updates
+         * @description The last check of the host's packages (apt), every 6 h while the host agent is on.
+         */
+        get: operations["host_updates_api_v1_system_host_updates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/host/updates/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Host Updates
+         * @description apt-get update then a simulated upgrade, now (the package lists only change).
+         */
+        post: operations["check_host_updates_api_v1_system_host_updates_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/system/host/upgrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upgrade Host
+         * @description apt-get upgrade on the host (job host_upgrade): admin and a recent TOTP.
+         */
+        post: operations["upgrade_host_api_v1_system_host_upgrade_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/info": {
         parameters: {
             query?: never;
@@ -3021,6 +3103,17 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** HostPackageOut */
+        HostPackageOut: {
+            /** Candidate */
+            candidate: string;
+            /** Current */
+            current: string;
+            /** Name */
+            name: string;
+            /** Security */
+            security: boolean;
+        };
         /** HostSampleOut */
         HostSampleOut: {
             /** Cpu Percent */
@@ -3035,6 +3128,19 @@ export interface components {
             net_tx_bps: number;
             /** Ts */
             ts: number;
+        };
+        /** HostUpdatesOut */
+        HostUpdatesOut: {
+            /** Agent */
+            agent: boolean;
+            /** Checked At */
+            checked_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Packages */
+            packages: components["schemas"]["HostPackageOut"][];
+            /** Reboot */
+            reboot: boolean;
         };
         /** HostedSiteIn */
         HostedSiteIn: {
@@ -3171,7 +3277,7 @@ export interface components {
          * JobKind
          * @enum {string}
          */
-        JobKind: "deploy" | "update" | "remove" | "pull" | "start" | "stop" | "restart" | "rollback" | "adopt" | "convert" | "move_zone" | "world_import" | "world_delete" | "backup" | "backup_restore" | "site_content" | "site_file" | "site_config" | "host_package" | "host_firewall" | "host_route" | "zone_action" | "self_update";
+        JobKind: "deploy" | "update" | "remove" | "pull" | "start" | "stop" | "restart" | "rollback" | "adopt" | "convert" | "move_zone" | "world_import" | "world_delete" | "backup" | "backup_restore" | "site_content" | "site_file" | "site_config" | "host_package" | "host_firewall" | "host_route" | "zone_action" | "self_update" | "host_upgrade" | "host_reboot";
         /** JobOut */
         JobOut: {
             /** App Id */
@@ -3467,6 +3573,22 @@ export interface components {
             workdir: string;
             /** Zone */
             zone?: string | null;
+        };
+        /** RebootAppOut */
+        RebootAppOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+        };
+        /** RebootPlanOut */
+        RebootPlanOut: {
+            /** Apps */
+            apps: components["schemas"]["RebootAppOut"][];
+            /** Others */
+            others: string[];
         };
         /** RecoveryCodesOut */
         RecoveryCodesOut: {
@@ -8038,6 +8160,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    reboot_plan_api_v1_system_host_reboot_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RebootPlanOut"];
+                };
+            };
+        };
+    };
+    reboot_host_api_v1_system_host_reboot_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+        };
+    };
+    host_updates_api_v1_system_host_updates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostUpdatesOut"];
+                };
+            };
+        };
+    };
+    check_host_updates_api_v1_system_host_updates_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostUpdatesOut"];
+                };
+            };
+        };
+    };
+    upgrade_host_api_v1_system_host_upgrade_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
                 };
             };
         };

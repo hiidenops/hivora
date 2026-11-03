@@ -18,6 +18,7 @@ from hivora.docker_gateway.fake import FakeDockerGateway
 from hivora.hostfw.service import HOST
 from hivora.main import create_app
 from hivora.runtime import Runtime
+from hivora.system import host_updates as hu
 
 FAKE_COMPOSE = [sys.executable, str(Path(__file__).parent / "fake_compose.py")]
 # The host's routing table as the agent would read it: a LAN, a Docker bridge, the default
@@ -48,6 +49,11 @@ def fake_ip(gateway: FakeDockerGateway) -> None:
         if argv[:3] == ["ip", "route", "del"]:
             marked.pop(argv[3], None)
             return 0, ""
+        if argv == hu.SIMULATE:  # the host's packages: two upgrades, one a security fix
+            return 0, ("Inst openssl [3.0.15-1] (3.0.17-1 Debian-Security:12/stable-security)\n"
+                       "Inst tzdata [2024b-0] (2025b-0 Debian:12.12/stable [all])\n")  # fmt: skip
+        if argv == hu.UNIT_SHOW:
+            return 0, "SubState=exited\nResult=success\nExecMainStatus=0\n"
         return await real(container_id, cmd, user)
 
     gateway.exec_run = exec_run  # type: ignore[method-assign]
@@ -57,7 +63,7 @@ def app() -> FastAPI:
     gateway = FakeDockerGateway()
     fake_ip(gateway)
     runtime = Runtime.build(
-        Settings(),
+        Settings(changelog_path=Path(__file__).parents[2] / "CHANGELOG.md"),  # the notes pop-up
         gateway=gateway,
         compose_cmd=FAKE_COMPOSE,
         compose_env={"FAKE_COMPOSE_MODE": "ok"},
@@ -107,7 +113,7 @@ def demo(runtime: Runtime, gateway: FakeDockerGateway) -> None:
     runtime.releases.fetch = no_release
     backups = runtime.settings.data_dir / "backups" / "_hivora"
     backups.mkdir(parents=True, exist_ok=True)
-    (backups / "panel-demo-r0023.tar.gz").write_bytes(b"")
+    (backups / "panel-demo-r0024.tar.gz").write_bytes(b"")
 
 
 async def fake_github(url: str, headers: dict[str, str]) -> tuple[int, Any]:

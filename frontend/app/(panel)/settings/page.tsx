@@ -37,7 +37,7 @@ function Sessions() {
           {s.current ? (
             <span className="text-xs font-medium">{t("settings.sessions.current")}</span>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => revoke.mutate(s.id)}>
+            <Button variant="outline" size="sm" loading={revoke.isPending && revoke.variables === s.id} disabled={revoke.isPending} onClick={() => revoke.mutate(s.id)}>
               {t("settings.sessions.revoke")}
             </Button>
           )}
@@ -60,7 +60,7 @@ export default function SettingsPage() {
       <PageHeader
         title={t("settings.title")}
         actions={
-          <Button variant="outline" onClick={() => logout.mutate(undefined, { onSettled: () => router.replace("/login/") })}>
+          <Button variant="outline" loading={logout.isPending} onClick={() => logout.mutate(undefined, { onSettled: () => router.replace("/login/") })}>
             {t("nav.logout")}
           </Button>
         }

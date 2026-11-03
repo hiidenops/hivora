@@ -10,6 +10,7 @@ import { useI18n, type MessageKey } from "@/lib/i18n";
 
 const StatusCard = dynamic(() => import("@/features/system/status-card").then((m) => m.StatusCard));
 const ReleasesCard = dynamic(() => import("@/features/system/releases-card").then((m) => m.ReleasesCard));
+const HostUpdatesCard = dynamic(() => import("@/features/system/host-updates-card").then((m) => m.HostUpdatesCard));
 
 /** The panel itself: its version and machine, its health, its updates (the last two for
  *  admins). Reached from the button at the bottom of the navigation, which carries the dot. */
@@ -22,6 +23,7 @@ export default function SystemPage() {
       <PageHeader title={t("nav.system")} />
       <div className="stagger grid items-start gap-4 xl:grid-cols-2">
         {can("admin") && <ReleasesCard />}
+        {can("admin") && <HostUpdatesCard />}
         {can("admin") && <StatusCard />}
         {system && (
           <Card className="xl:col-span-2">

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 
 import { adminApi, deployNginx, expectPointerCursors, signIn, signInViewer } from "./helpers";
 

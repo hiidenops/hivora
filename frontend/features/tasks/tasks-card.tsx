@@ -149,6 +149,7 @@ export function TasksCard({ appId }: { appId: number }) {
                 <Switch
                   aria-label={t("tasks.enable", { name: task.name })}
                   checked={task.enabled}
+                  disabled={act.isPending}
                   onChange={(e) => {
                     const enabled = e.target.checked;
                     act.mutate(() => api(`/apps/${appId}/tasks/${task.id}`, { method: "PUT", body: { ...task, enabled } }));
@@ -166,7 +167,7 @@ export function TasksCard({ appId }: { appId: number }) {
                   <Button size="sm" variant="ghost" title={t("tasks.edit")} aria-label={t("tasks.edit")} onClick={() => setEditing(task.id)}>
                     <Pencil />
                   </Button>
-                  <Button size="sm" variant="ghost" title={t("tasks.delete")} aria-label={t("tasks.delete")} onClick={() => window.confirm(t("tasks.deleteConfirm", { name: task.name })) && act.mutate(() => api(`/apps/${appId}/tasks/${task.id}`, { method: "DELETE" }))}>
+                  <Button size="sm" variant="ghost" title={t("tasks.delete")} aria-label={t("tasks.delete")} loading={act.isPending} onClick={() => window.confirm(t("tasks.deleteConfirm", { name: task.name })) && act.mutate(() => api(`/apps/${appId}/tasks/${task.id}`, { method: "DELETE" }))}>
                     <Trash2 className="text-danger" />
                   </Button>
                 </span>

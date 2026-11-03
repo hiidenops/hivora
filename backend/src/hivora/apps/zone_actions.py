@@ -31,10 +31,12 @@ from hivora.jobs import Job, JobContext, JobKind, JobQueue
 from hivora.jobs.models import JobStatus
 from hivora.jobs.queries import get_job
 from hivora.state import AppStatus, StateStore
+from hivora.zones.models import Zone
 from hivora.zones.service import get_zone
 
 Action = Literal["start", "stop", "restart"]
 POLL_S = 0.5
+DEFAULT_TIMEOUT_S = 120  # apps without a zone
 RUNNING = frozenset({AppStatus.HEALTHY})
 DOWN = frozenset({AppStatus.STOPPED, AppStatus.MISSING})
 _DONE = (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.INTERRUPTED)
@@ -135,6 +137,21 @@ class ZoneActions:
         self.bus.publish("zone.action_done", target=slug, action=action, problems=len(problems))
         if problems:
             raise ZoneActionFailedError("; ".join(problems)[-500:], zone=slug)
+
+    async def apps_in_order(self, ctx: JobContext, ids: list[int],
+                            how: Literal["start", "stop"]) -> list[str]:  # fmt: skip
+        """Start or stop these apps (any zones) in their zones' dependency order, waiting for
+        each one like a zone action (the longest zone timeout); the problems met."""
+        async with self.sessions() as session:
+            rows = (await session.scalars(select(Application).where(Application.id.in_(ids)))).all()
+            apps = {a.id: a.slug for a in rows}
+            deps = await _dependencies(session, list(apps))
+            zones = {a.zone_id for a in rows if a.zone_id}
+            limits = [z.start_timeout_s for z in (await session.scalars(
+                select(Zone).where(Zone.id.in_(zones)))).all()]  # fmt: skip
+        limit_s = max(limits, default=DEFAULT_TIMEOUT_S)
+        order = deps if how == "start" else [(d, a) for a, d in deps]
+        return await self._waves(ctx, apps, order, how, limit_s)
 
     async def _waves(self, ctx: JobContext, apps: dict[int, str],
                      deps: list[start_order.Dependency], how: Literal["start", "stop"],

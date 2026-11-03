@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 
 import { adminApi, deployNginx, openAppMenu, signIn } from "./helpers";
 
@@ -56,4 +56,27 @@ test("code editor: a long text field of the deploy form, typed and completed fro
   const values = (await (await page.request.get(`/api/v1/apps/${id}/settings`)).json()).values;
   expect(values.custom_properties).toContain("motd=Bonjour");
   expect(values.custom_properties).toContain("force-gamemode=false");
+});
+
+test("side panel: its left edge drags to any width, kept when it opens again", async ({ page }) => {
+  await signIn(page);
+  const id = (await deployNginx(page, "Largeur", 8393)).app.id;
+  await page.goto(`/app/?id=${id}`);
+  await page.getByText("Mode avancé", { exact: true }).click();
+  await openAppMenu(page, "Détails avancés");
+  const panel = page.getByRole("dialog");
+  const before = (await panel.boundingBox())!.width;
+  const edge = (await panel.getByRole("separator").boundingBox())!;
+  await page.mouse.move(edge.x + edge.width / 2, edge.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(edge.x - 200, edge.y + 220, { steps: 5 });
+  await page.mouse.up();
+  const wider = (await panel.boundingBox())!.width;
+  expect(wider).toBeGreaterThan(before + 150);
+
+  await page.keyboard.press("Escape");
+  await openAppMenu(page, "Détails avancés");
+  expect(Math.abs((await panel.boundingBox())!.width - wider)).toBeLessThan(2);
+  await panel.getByRole("separator").dblclick(); // back to the default width
+  await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(Math.round(before));
 });

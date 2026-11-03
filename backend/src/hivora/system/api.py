@@ -105,6 +105,17 @@ class ReleasePrefsIn(BaseModel):
     channel: Channel
 
 
+class WhatsNewOut(BaseModel):
+    version: str
+    notes: str | None  # its CHANGELOG.md section (Markdown), shown once per version
+
+
+@router.get("/whats-new")
+async def whats_new(_: Viewer, rt: RuntimeDep) -> WhatsNewOut:
+    """What the installed version brings, for everyone (the pop-up after an update)."""
+    return WhatsNewOut(version=__version__, notes=rt.releases.local_notes())
+
+
 @router.get("/releases")
 async def releases(_: Admin, rt: RuntimeDep, refresh: bool = False) -> ReleasesOut:
     """The latest version of the channel (GitHub Releases, cached 12 h; nothing when off)."""
@@ -180,3 +191,76 @@ class AddressIn(BaseModel):
 async def set_public_address(body: AddressIn, _: Admin, rt: RuntimeDep) -> None:
     await rt.public_address.set_manual(body.address.strip() or None)
     rt.bus.publish("settings.public_address_updated", target=body.address.strip() or "auto")
+
+
+# --- the host's packages and reboot (system.host_updates, through the host agent) ----------
+class HostPackageOut(BaseModel):
+    name: str
+    current: str
+    candidate: str
+    security: bool
+
+
+class HostUpdatesOut(BaseModel):
+    agent: bool  # off: nothing is checked, the buttons are off
+    checked_at: datetime | None
+    packages: list[HostPackageOut]
+    reboot: bool  # the host asks for a reboot
+    error: str | None
+
+
+class RebootAppOut(BaseModel):
+    id: int
+    name: str
+    slug: str
+
+
+class RebootPlanOut(BaseModel):
+    apps: list[RebootAppOut]  # stopped by Hivora, started again once it is back
+    others: list[str]  # other containers: stopped by Docker, back by their restart policy
+
+
+def _host_view(rt: Any, agent: bool) -> HostUpdatesOut:
+    return HostUpdatesOut(agent=agent, **rt.host_updates.view)
+
+
+def _fresh_totp(principal: Any, rt: Any) -> None:
+    if not rt.auth.recently_confirmed(principal.session_id, principal.totp_enabled):
+        raise TotpRequiredError("confirm with a TOTP code first")
+
+
+@router.get("/host/updates")
+async def host_updates(_: Admin, rt: RuntimeDep) -> HostUpdatesOut:
+    """The last check of the host's packages (apt), every 6 h while the host agent is on."""
+    return _host_view(rt, await rt.hostfw.agent_enabled())
+
+
+@router.post("/host/updates/check")
+async def check_host_updates(_: Admin, rt: RuntimeDep) -> HostUpdatesOut:
+    """apt-get update then a simulated upgrade, now (the package lists only change)."""
+    await rt.host_updates.check()
+    return _host_view(rt, True)
+
+
+@router.post("/host/upgrade", status_code=202)
+async def upgrade_host(principal: Admin, rt: RuntimeDep) -> JobRef:
+    """apt-get upgrade on the host (job host_upgrade): admin and a recent TOTP."""
+    _fresh_totp(principal, rt)
+    job = await rt.host_updates.request_upgrade()
+    rt.bus.publish("host.upgrade_requested", job=job.id)
+    return job_ref(job)
+
+
+@router.get("/host/reboot")
+async def reboot_plan(_: Admin, rt: RuntimeDep) -> RebootPlanOut:
+    return RebootPlanOut.model_validate(await rt.host_updates.reboot_plan())
+
+
+@router.post("/host/reboot", status_code=202)
+async def reboot_host(principal: Admin, rt: RuntimeDep) -> JobRef:
+    """Stop the apps, reboot the host, start them again (job host_reboot): admin and a
+    recent TOTP."""
+    _fresh_totp(principal, rt)
+    job = await rt.host_updates.request_reboot()
+    rt.bus.publish("host.reboot_requested", job=job.id)
+    return job_ref(job)

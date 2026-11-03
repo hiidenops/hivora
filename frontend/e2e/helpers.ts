@@ -1,5 +1,7 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 
+import { seenWhatsNew } from "./test";
+
 // What every e2e file shares. Each file runs alone too: `signIn` sets the admin's password
 // if no test did yet (only the first-start test needs a fresh instance, as `npm run e2e`
 // always gives it).
@@ -54,7 +56,9 @@ export async function signInViewer(page: Page, browser: Browser, username: strin
   await page.request.post("/api/v1/users", {
     headers, data: { username, role: "viewer", password: "temporary-pass-1" },
   }); // prettier-ignore
-  const viewer = await browser.newPage();
+  const context = await browser.newContext();
+  await seenWhatsNew(context);
+  const viewer = await context.newPage();
   await viewer.goto("/login/");
   await viewer.getByLabel("Identifiant", { exact: true }).fill(username);
   await viewer.getByLabel("Mot de passe", { exact: true }).fill("temporary-pass-1");

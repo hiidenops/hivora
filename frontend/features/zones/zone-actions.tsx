@@ -93,7 +93,7 @@ export function StartOrderButton({ zone, steps = false, className }: { zone: Zon
       </button>
       <Sheet open={open} onOpenChange={setOpen}>
         {open && (
-          <SheetContent title={t("zones.order.title", { name: zone.name })} icon={<ListOrdered className="size-5" />} closeLabel={t("common.close")}>
+          <SheetContent title={t("zones.order.title", { name: zone.name })} icon={<ListOrdered className="size-5" />} closeLabel={t("common.close")} resizeLabel={t("common.resize")} widthKey="zoneOrder">
             <StartOrder slug={zone.slug} />
           </SheetContent>
         )}

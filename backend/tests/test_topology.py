@@ -193,6 +193,7 @@ def test_a_zone_reached_by_a_vpn_publishes_nothing(client: Any) -> None:
     assert shown == {"web_vpn": "http://10.8.1.7:8080"}
     node = next(n for n in client.get(f"{API}/topology").json()["nodes"] if n.get("slug") == "pdf")
     assert (node["behind_vpn"], node["vpn_address"]) == (True, "10.8.1.7")  # its card's pill
+    assert node["address"] == "10.8.1.7"  # its zone's, not pdf_default's
 
     # A zone has one VPN; it keeps its network and cannot go while a VPN reaches it.
     other = client.post(

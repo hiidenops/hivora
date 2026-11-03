@@ -18,16 +18,8 @@ import { StartOrderButton, ZoneActionButtons, useZoneActions } from "@/features/
 import type { App, Zone } from "@/lib/api/client";
 import { useApps, useZones } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
+import { webAddress } from "@/lib/utils";
 import { useLiveStatus } from "@/lib/realtime";
-
-/** The web address to open from here: through the VPN when that is the only way; the public
- *  one when the panel itself is reached on that host; otherwise the local network's. */
-function webAddress(web: Record<string, string>): string | undefined {
-  if (web.web_vpn && !web.web && !web.web_lan) return web.web_vpn;
-  const here = typeof window === "undefined" ? "" : window.location.hostname;
-  if (web.web && here && new URL(web.web).hostname === here) return web.web;
-  return web.web_lan ?? web.web ?? web.web_vpn;
-}
 
 function AppTile({ app }: { app: App }) {
   const { t } = useI18n();

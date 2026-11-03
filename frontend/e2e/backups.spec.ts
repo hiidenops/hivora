@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 
 import { deployNginx, openAppMenu, signIn } from "./helpers";
 

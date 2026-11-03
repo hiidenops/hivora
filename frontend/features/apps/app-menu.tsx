@@ -128,6 +128,8 @@ export function AppMenu({ app, running, onJob, onRemoving }: {
             title={t(current.label)}
             icon={<current.icon className="size-5" />}
             closeLabel={t("common.close")}
+            resizeLabel={t("common.resize")}
+            widthKey={section}
             className={section === "logsConsole" ? "sm:max-w-[min(110rem,96vw)]" : undefined} // side by side: wide
           >
             <Unfolded.Provider value>{body[section]}</Unfolded.Provider>

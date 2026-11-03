@@ -200,6 +200,8 @@ def test_the_installed_versions_notes_and_admins_only(tmp_path: Path) -> None:
         body = c.get(f"{API}/system/releases").json()
         changelog = (Path(__file__).parents[2] / "CHANGELOG.md").read_text()
         assert body["current_notes"] == changelog_section(changelog, __version__)
+        news = c.get(f"{API}/system/whats-new").json()  # the same notes, for every account
+        assert news == {"version": __version__, "notes": body["current_notes"]}
         for role in ("viewer", "operator"):
             c.post(f"{API}/users", json={"username": role, "password": f"{role}-pass-1",
                                          "role": role})  # fmt: skip
@@ -211,6 +213,7 @@ def test_the_installed_versions_notes_and_admins_only(tmp_path: Path) -> None:
                           other.put(f"{API}/system/releases/settings",
                                     json={"enabled": False, "channel": "stable"})):  # fmt: skip
                     assert r.status_code == 403 and code(r) == "insufficient_role", role
+                assert other.get(f"{API}/system/whats-new").json() == news  # theirs too
 
 
 def test_changing_the_settings_is_audited(tmp_path: Path) -> None:

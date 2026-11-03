@@ -48,15 +48,16 @@ function Deploy() {
   const [result, setResult] = useState<{ appId: number; jobId: number } | null>(null);
   const [finished, setFinished] = useState<string | null>(null);
 
-  // The zone the template suggests (e.g. Administration for a VPN), when it exists; a zone a
-  // VPN reaches only goes with "through the VPN".
+  // The zone the template suggests (e.g. Administration for a VPN), when it exists, or the
+  // zone this VPN is deployed for (zone dialog); a zone a VPN reaches only goes with
+  // "through the VPN".
   useEffect(() => {
     if (!template || !zones) return;
-    const suggested = zones.find((z) => z.slug === template.default_zone);
+    const suggested = zones.find((z) => z.slug === (vpnFor ?? template.default_zone));
     const initial: Access | null = template.default_access ? (suggested?.vpn ? "vpn" : template.default_access) : null;
     setAccess((a) => a ?? initial);
     if (suggested && (!suggested.vpn || initial === "vpn" || !template.default_access)) setZone((z) => z || suggested.slug);
-  }, [template, zones]);
+  }, [template, zones, vpnFor]);
   const vpnZones = (zones ?? []).filter((z) => z.vpn);
   const offered = access === null ? (zones ?? []) : (zones ?? []).filter((z) => Boolean(z.vpn) === (access === "vpn"));
   const pick = (a: Access) => {

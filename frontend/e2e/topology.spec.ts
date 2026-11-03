@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./test";
 
 import { adminApi, deployNginx, signIn } from "./helpers";
 import { HOST, TOPOLOGY_PORT } from "./host";
@@ -38,7 +38,8 @@ test("topology: graph, inspector, declared element, prepared change, JSON export
   const inspector = page.locator("aside").filter({ has: page.getByRole("heading", { name: "Carto" }) });
   await expect(inspector).toBeVisible();
   await expect(inspector.getByLabel("Exposition de 80/tcp")).toHaveValue("lan");
-  await expect(inspector.getByRole("link", { name: "Ouvrir l'app" })).toHaveAttribute("href", `/app/?id=${carto}`);
+  await expect(inspector.getByRole("link", { name: "Ouvrir dans le tableau de bord" })).toHaveAttribute("href", `/app/?id=${carto}`);
+  await expect(inspector.getByRole("link", { name: "Ouvrir sur le web" })).toHaveAttribute("href", /:8340/);
   await inspector.getByRole("button", { name: "Fermer" }).click();
   await expect(inspector).toBeHidden();
 

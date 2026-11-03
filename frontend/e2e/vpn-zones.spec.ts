@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 
 import { adminApi, signIn } from "./helpers";
 
@@ -55,6 +55,7 @@ test("vpn zones: create a zone with a new VPN that serves it", async ({ page }) 
   await page.goto(`${page.url()}&vpn_port=51872&host=vpn.example.org`); // a port no other test uses
   await expect(page.getByText("Ce VPN desservira la zone « Famille »")).toBeVisible();
   await expect(page.getByLabel("Nom de l'application")).toHaveValue("VPN Famille");
+  await expect(page.getByLabel("Zone", { exact: true })).toHaveValue("famille"); // not Administration
   await page.getByRole("button", { name: "Vérifier" }).click();
   await page.getByRole("button", { name: "Déployer", exact: true }).click();
   await expect(page.getByText("Application en ligne")).toBeVisible({ timeout: 20_000 });

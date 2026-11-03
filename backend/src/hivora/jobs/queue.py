@@ -97,7 +97,9 @@ class JobQueue:
         *,
         clock: Clock | None = None,
         workers: int = 2,
-        resumable: frozenset[JobKind] = frozenset({JobKind.DEPLOY}),
+        resumable: frozenset[JobKind] = frozenset(
+            {JobKind.DEPLOY, JobKind.HOST_UPGRADE, JobKind.HOST_REBOOT}
+        ),
     ) -> None:
         self.sessions = sessions
         self.bus = bus

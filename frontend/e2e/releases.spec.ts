@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 
 import { signIn, signInViewer } from "./helpers";
 
@@ -18,8 +18,12 @@ test("releases: the newer version, its notes and command, the channel", async ({
   await expect(card.getByText("Stable", { exact: true }).first()).toBeVisible();
   await expect(card.getByText("Nouvelle version 9.1.0 disponible")).toBeVisible();
   await expect(card.getByRole("link", { name: "Voir la release" })).toHaveAttribute("href", /releases\/tag\/v9\.1\.0$/);
-  await card.getByText("Notes de la version 9.1.0").click();
-  await expect(card.getByText("- Tout ce qui manquait.")).toBeVisible();
+  await card.getByRole("button", { name: "Notes de la version 9.1.0" }).click();
+  const notes = page.getByRole("dialog", { name: "Notes de la version 9.1.0" });
+  await expect(notes.getByRole("listitem")).toHaveText("Tout ce qui manquait."); // Markdown, not "- …"
+  await expect(notes.getByText("Ajouté", { exact: true })).toBeVisible(); // "### " gone
+  await notes.getByRole("button", { name: "Fermer" }).last().click();
+  await expect(notes).toBeHidden();
   await expect(card.getByText('sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/download/v9.1.0/install.sh)"')).toBeVisible();
   await card.getByRole("button", { name: "Copier" }).click();
   await expect(card.getByRole("button", { name: "Copié" })).toBeVisible();

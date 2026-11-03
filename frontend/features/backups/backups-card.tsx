@@ -122,6 +122,7 @@ export function BackupsCard({ appId, onJob }: { appId: number; onJob: (id: numbe
                           variant="ghost"
                           title={t("backups.restore")}
                           aria-label={t("backups.restore")}
+                          loading={act.isPending}
                           onClick={() => window.confirm(t("backups.restoreConfirm", { when: new Date(b.created_at).toLocaleString(lang) })) && act.mutate(() => api<JobRef>(`/apps/${appId}/backups/${b.id}/restore`, { method: "POST" }))}
                         >
                           <RotateCcw />
@@ -133,6 +134,7 @@ export function BackupsCard({ appId, onJob }: { appId: number; onJob: (id: numbe
                       variant="ghost"
                       title={t("backups.delete")}
                       aria-label={t("backups.delete")}
+                      loading={act.isPending}
                       onClick={() => window.confirm(t("backups.deleteConfirm")) && act.mutate(() => api(`/apps/${appId}/backups/${b.id}`, { method: "DELETE" }))}
                     >
                       <Trash2 className="text-danger" />

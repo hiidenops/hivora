@@ -1,17 +1,20 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { ExternalLink, Eye, Settings2, Trash2, X } from "lucide-react";
+import { Copy, ExternalLink, Eye, LayoutDashboard, Settings2, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { useSession } from "@/components/app-shell";
+import { useCopy } from "@/components/copy";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppStatus } from "@/lib/api/client";
 import { api } from "@/lib/api/client";
+import { useApps } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
+import { webAddress } from "@/lib/utils";
 
 import type { Change } from "./changes";
 import type { GNode, Graph, Port } from "./layout";
@@ -24,6 +27,9 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
 }) {
   const { t } = useI18n();
   const { can } = useSession();
+  const apps = useApps();
+  const { copy, bubble } = useCopy();
+  const web = node.type === "app" ? webAddress(apps.data?.find((a) => a.id === node.id)?.web ?? {}) : undefined;
   const [label, setLabel] = useState(String(node.label ?? ""));
   const [kind, setKind] = useState(String(node.kind ?? "note"));
   const save = useMutation({ mutationFn: () => api(`/topology/nodes/${node.id}`, { method: "PUT", body: { kind, label } }), onSuccess: onChanged });
@@ -100,9 +106,28 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
               ))}
             </div>
           )}
-          <Button size="sm" asChild>
-            <Link href={`/app/?id=${node.id}`}>{t("topology.openApp")}</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" asChild>
+              <Link href={`/app/?id=${node.id}`}>
+                <LayoutDashboard /> {t("topology.openApp")}
+              </Link>
+            </Button>
+            {web && node.status !== "stopped" && node.status !== "missing" && (
+              <Button size="sm" variant="outline" asChild>
+                <a href={web} target="_blank" rel="noopener noreferrer" title={web}>
+                  <ExternalLink /> {t("topology.openWeb")}
+                </a>
+              </Button>
+            )}
+            {node.address ? (
+              <span className="relative">
+                {bubble}
+                <Button size="sm" variant="outline" onClick={() => void copy(String(node.address))} title={t("topology.copyIp")} aria-label={t("topology.copyIp")}>
+                  <Copy /> <span className="font-mono">{String(node.address)}</span>
+                </Button>
+              </span>
+            ) : null}
+          </div>
         </>
       )}
       {node.type === "site" && (
@@ -190,7 +215,7 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
             <Button type="submit" size="sm" loading={save.isPending} disabled={save.isPending}>
               {t("common.save")}
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => window.confirm(t("topology.deleteConfirm")) && remove.mutate()} aria-label={t("topology.delete")}>
+            <Button type="button" size="sm" variant="ghost" loading={remove.isPending} onClick={() => window.confirm(t("topology.deleteConfirm")) && remove.mutate()} aria-label={t("topology.delete")}>
               <Trash2 className="text-danger" />
             </Button>
           </div>

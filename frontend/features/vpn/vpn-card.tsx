@@ -195,7 +195,7 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
                       <Switch
                         aria-label={t("vpn.enabled", { name: c.name })}
                         checked={c.active}
-                        disabled={c.protected}
+                        disabled={c.protected || act.isPending}
                         onChange={(e) => {
                           const enabled = e.target.checked; // read now: React restores the controlled input before the mutation runs
                           act.mutate(() => api(`/apps/${appId}/vpn/clients/${c.id}`, { method: "PUT", body: { enabled } }));
@@ -246,6 +246,7 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
                           variant="ghost"
                           aria-label={t("vpn.renew", { name: c.name })}
                           title={t("vpn.renew", { name: c.name })}
+                          loading={act.isPending}
                           onClick={() => window.confirm(t("vpn.renewConfirm", { name: c.name })) && act.mutate(() => api(`/apps/${appId}/vpn/clients/${c.id}/renew`, { method: "POST" }))}
                         >
                           <KeyRound />
@@ -256,6 +257,7 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
                             variant="ghost"
                             aria-label={t("vpn.delete", { name: c.name })}
                             title={t("vpn.delete", { name: c.name })}
+                            loading={act.isPending}
                             onClick={() => window.confirm(t("vpn.deleteConfirm", { name: c.name })) && act.mutate(() => api(`/apps/${appId}/vpn/clients/${c.id}`, { method: "DELETE" }))}
                           >
                             <Trash2 className="text-danger" />

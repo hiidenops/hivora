@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, ScrollText } from "lucide-react";
+import { useState } from "react";
 
 import { CodeView } from "@/components/code-view";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { api, type Releases } from "@/lib/api/client";
 import { useReleases } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 
+import { NotesDialog } from "./notes-dialog";
 import { updateState } from "./releases";
 import { UpdateButton } from "./update-button";
 
@@ -22,6 +24,7 @@ export function ReleasesCard() {
   const { t, lang } = useI18n();
   const qc = useQueryClient();
   const { data } = useReleases(true);
+  const [notes, setNotes] = useState<{ title: string; notes: string } | null>(null);
   const refresh = useMutation({
     mutationFn: () => api<Releases>("/system/releases?refresh=true"),
     onSuccess: (fresh) => qc.setQueryData(["system-releases"], fresh),
@@ -65,10 +68,9 @@ export function ReleasesCard() {
               )}
             </p>
             {latest.notes && (
-              <details>
-                <summary className="cursor-pointer text-muted-foreground">{t("releases.notes", { version: latest.version })}</summary>
-                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-md border bg-muted p-3 text-xs">{latest.notes}</pre>
-              </details>
+              <Button variant="outline" size="sm" className="justify-self-start" onClick={() => setNotes({ title: t("releases.notes", { version: latest.version }), notes: latest.notes ?? "" })}>
+                <ScrollText /> {t("releases.notes", { version: latest.version })}
+              </Button>
             )}
             {data.self_update && <UpdateButton tag={latest.tag} version={latest.version} current={data.current} />}
             {data.command && (
@@ -80,11 +82,11 @@ export function ReleasesCard() {
           </div>
         )}
         {data.current_notes && (
-          <details>
-            <summary className="cursor-pointer text-muted-foreground">{t("releases.currentNotes", { version: data.current })}</summary>
-            <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-md border bg-muted p-3 text-xs">{data.current_notes}</pre>
-          </details>
+          <Button variant="ghost" size="sm" className="justify-self-start" onClick={() => setNotes({ title: t("releases.currentNotes", { version: data.current }), notes: data.current_notes ?? "" })}>
+            <ScrollText /> {t("releases.currentNotes", { version: data.current })}
+          </Button>
         )}
+        {notes && <NotesDialog open onOpenChange={(o) => !o && setNotes(null)} title={notes.title} notes={notes.notes} />}
         <div className="flex flex-wrap items-center gap-4 border-t pt-4">
           <label className="flex items-center gap-2">
             <Switch checked={data.enabled} disabled={save.isPending} onChange={(e) => save.mutate({ enabled: e.target.checked, channel: data.channel })} />

@@ -34,6 +34,8 @@ class JobKind(StrEnum):
     HOST_ROUTE = "host_route"  # the static routes applied to the host
     ZONE_ACTION = "zone_action"  # a zone started, stopped or restarted in dependency order
     SELF_UPDATE = "self_update"  # Hivora replaced by a newer release (hivora-updater, M13)
+    HOST_UPGRADE = "host_upgrade"  # apt-get upgrade on the host (system.host_updates)
+    HOST_REBOOT = "host_reboot"  # apps stopped, host rebooted, apps started again
 
 
 class JobStatus(StrEnum):

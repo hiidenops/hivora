@@ -23,10 +23,10 @@ import { useI18n } from "@/lib/i18n";
 
 const ROLES: Role[] = ["admin", "operator", "viewer"];
 
-function RoleSelect({ value, onChange, id }: { value: Role; onChange: (r: Role) => void; id?: string }) {
+function RoleSelect({ value, onChange, id, disabled }: { value: Role; onChange: (r: Role) => void; id?: string; disabled?: boolean }) {
   const { t } = useI18n();
   return (
-    <Select id={id} value={value} onChange={(e) => onChange(e.target.value as Role)}>
+    <Select id={id} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as Role)}>
       {ROLES.map((r) => (
         <option key={r} value={r}>
           {t(`role.${r}`)}
@@ -115,6 +115,7 @@ export default function UsersPage() {
   const remove = useUserMutation(userApi.remove);
   const resetTotp = useUserMutation(userApi.resetTotp);
   const revoke = useUserMutation(userApi.revokeSessions);
+  const busy = update.isPending || remove.isPending || resetTotp.isPending || revoke.isPending;
   const error = update.error ?? remove.error ?? resetTotp.error ?? revoke.error;
 
   if (!can("admin")) return <Alert tone="danger">{t("error.insufficient_role")}</Alert>;
@@ -151,7 +152,7 @@ export default function UsersPage() {
                 </span>
               </Td>
               <Td>
-                <RoleSelect value={u.role} onChange={(role) => update.mutate({ id: u.id, role })} />
+                <RoleSelect value={u.role} disabled={busy} onChange={(role) => update.mutate({ id: u.id, role })} />
               </Td>
               <Td className="text-xs text-muted-foreground">
                 {u.last_login_at ? new Date(u.last_login_at).toLocaleString(lang) : t("users.never")}
@@ -159,7 +160,7 @@ export default function UsersPage() {
               <Td className="py-1 text-right">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label={t("users.actions", { name: u.username })}>
+                    <Button variant="ghost" size="icon" loading={busy} aria-label={t("users.actions", { name: u.username })}>
                       <MoreHorizontal />
                     </Button>
                   </DropdownMenuTrigger>

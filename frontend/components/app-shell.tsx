@@ -1,6 +1,7 @@
 "use client";
 
 import { Activity, Ban, Boxes, BrickWall, Globe, LayoutDashboard, LayoutGrid, LogOut, Network, Route, Server, Settings, Share2, ShieldBan, ShieldCheck, Users } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment, createContext, useContext, useEffect, useState, type ReactNode } from "react";
@@ -19,6 +20,9 @@ import { cn } from "@/lib/utils";
 import { Brand } from "./brand";
 import { JobToasts } from "./job-toasts";
 import { ShelfCat } from "./shelf-cat";
+
+// Loaded once the panel is open: the notes pop-up of a new version.
+const WhatsNew = dynamic(() => import("@/features/system/whats-new").then((m) => m.WhatsNew), { ssr: false });
 
 const LEVEL: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
 
@@ -141,6 +145,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <RealtimeProvider enabled>
         {/* Above <main>, keyed by page: a job's pop-up stays when the page changes. */}
         <JobToasts>
+          <WhatsNew />
           <div className="flex min-h-screen flex-col md:flex-row">
             <aside className="relative z-10 flex shrink-0 flex-col gap-1 border-b bg-sidebar p-3 shadow-md md:sticky md:top-0 md:h-screen md:w-56 md:overflow-x-hidden md:overflow-y-auto md:border-b-0 md:border-r">
               <Link href="/" aria-label={t("app.name")} className="mb-4 rounded-md px-2 py-3">
@@ -201,6 +206,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     className="text-muted-foreground hover:text-foreground"
                     aria-label={t("nav.logout")}
                     title={t("nav.logout")}
+                    disabled={logout.isPending}
                     onClick={() => logout.mutate(undefined, { onSettled: () => router.replace("/login/") })}
                   >
                     <LogOut className="size-4" />

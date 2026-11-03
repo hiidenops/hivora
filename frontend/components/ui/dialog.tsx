@@ -17,7 +17,7 @@ export function DialogContent({
   children,
   closeLabel,
   ...props
-}: ComponentProps<typeof D.Content> & { title: ReactNode; description?: ReactNode; closeLabel: string }) {
+}: Omit<ComponentProps<typeof D.Content>, "title"> & { title: ReactNode; description?: ReactNode; closeLabel: string }) {
   return (
     <D.Portal>
       <D.Overlay className="animate-overlay fixed inset-0 z-40 bg-black/40" />
@@ -29,7 +29,7 @@ export function DialogContent({
         {...props}
       >
         <div className="flex items-start justify-between gap-4">
-          <div className="grid gap-1">
+          <div className="grid min-w-0 flex-1 gap-1">
             <D.Title className="text-lg font-semibold">{title}</D.Title>
             {description && <D.Description className="text-sm text-muted-foreground">{description}</D.Description>}
           </div>

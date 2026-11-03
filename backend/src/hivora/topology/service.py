@@ -175,6 +175,10 @@ class GraphBuilder:
                 "vpn_address": _address_on(self.store, app.slug,
                                            f"hivora-zone-{zone_of[app.zone_id].slug}")
                 if app.slug in behind and app.zone_id else None,
+                # the one to copy: on its zone's network, else on its first one
+                "address": (app.zone_id in zone_of and _address_on(
+                    self.store, app.slug, f"hivora-zone-{zone_of[app.zone_id].slug}"))
+                    or _address_on(self.store, app.slug, None),
             })  # fmt: skip
             # The sites this nginx hosts: a node each, next to it (what a reverse proxy will
             # point at later), linked from the nginx.
@@ -252,11 +256,12 @@ class GraphBuilder:
                 return
 
 
-def _address_on(store: StateStore, slug: str, network: str) -> str | None:
-    """The app's main container address on one Docker network (what VPN clients use)."""
+def _address_on(store: StateStore, slug: str, network: str | None) -> str | None:
+    """The app's main container address on one Docker network (what VPN clients use);
+    ``None``: on its first network that has one."""
     for c in store.containers():
-        if store.key_of(c) == slug and network in c.networks:
+        if store.key_of(c) == slug:
             ips = dict(zip(c.networks, c.ips, strict=False))
-            if ip := ips.get(network):
+            if ip := ips.get(network) if network else next((i for i in c.ips if i), None):
                 return ip
     return None
