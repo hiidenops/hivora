@@ -16,6 +16,7 @@ import { GamePanel } from "@/features/games/game-panel";
 import { hostsSites } from "@/features/hosting/server";
 
 // Only VPN apps need it: loaded on demand (page budget).
+const ProxyCard = dynamic(() => import("@/features/proxy/domains").then((m) => m.ProxyCard));
 const VpnCard = dynamic(() => import("@/features/vpn/vpn-card").then((m) => m.VpnCard));
 const UpgradeBanner = dynamic(() => import("@/features/apps/change-dialog").then((m) => m.UpgradeBanner));
 const DatabaseCard = dynamic(() => import("@/features/apps/database-card").then((m) => m.DatabaseCard));
@@ -98,6 +99,7 @@ function AppDetail() {
           />
         )}
         {app.vpn && can("operator") && <VpnCard appId={app.id} onJob={setActiveJob} />}
+        {app.template === "caddy" && can("operator") && <ProxyCard />}
       </div>
     </>
   );

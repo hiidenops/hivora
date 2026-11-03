@@ -7,12 +7,16 @@ app's volume and applies it live by exec (`wg syncconf`): no API, no web UI.
 import asyncio
 import ipaddress
 import logging
+import os
 from contextlib import suppress
 from typing import Any
 
+import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hivora.apps.core import latest_revision
+from hivora.apps.models import Application
 from hivora.apps.planner import vpn_zone_slugs
 from hivora.apps.queries import app_id_by_slug
 from hivora.apps.service import AppService
@@ -22,17 +26,20 @@ from hivora.core.events import EventBus
 from hivora.crypto.cipher import Purpose, Sealed, SecretBox
 from hivora.docker_gateway import DockerGateway
 from hivora.jobs import Job
+from hivora.vpn import dns
 from hivora.vpn import wireguard as wg
 from hivora.vpn.acl import access_of, apply_changes, client_out, is_active
 from hivora.vpn.addressing import VpnApp, VpnFullError, allowed_ips, check_address, zone_subnet
 from hivora.vpn.apply import VpnApplyError, bring_up, write_files, zone_subnets
-from hivora.vpn.models import VpnPeer
-from hivora.zones.models import NetworkMode
+from hivora.vpn.models import VpnDnsRecord, VpnPeer
+from hivora.zones.models import NetworkMode, Zone
 from hivora.zones.service import list_zones
 
 logger = logging.getLogger(__name__)
 
 ACL = "hivora-acl.sh"
+COREFILE = "coredns/Corefile"  # in the config volume: the image's CoreDNS reads it
+RESTART_DNS = ["s6-svc", "-r", "/run/service/svc-coredns"]
 
 # ponytail: one lock for every VPN (peer changes are rare); per-app locks if that ever matters
 
@@ -47,6 +54,18 @@ class ZoneTakenError(ConflictError):
 
 class VpnClientNotFoundError(NotFoundError):
     code = "vpn_client_not_found"
+
+
+class DnsRecordNotFoundError(NotFoundError):
+    code = "vpn_dns_record_not_found"
+
+
+class DnsNameTakenError(ConflictError):
+    code = "vpn_dns_name_taken"
+
+
+class DnsTargetError(ConflictError):
+    code = "vpn_dns_bad_target"
 
 
 def _context(app_id: int, public_key: str) -> str:
@@ -76,12 +95,15 @@ class VpnTools:
             if entry is None or spec is None:
                 raise NotAVpnError("this app is not a managed VPN", slug=app.slug)
             values = (await self.apps.planner.current_settings(session, app_id)).values
+            rev = await latest_revision(session, app_id)
         main = entry.template.services[entry.template.main_service]
         target = next(v.target for v in main.volumes if v.name == spec.volume)
         volume = self.apps.volumes_dir(app.slug) / spec.volume
         root = target.rstrip("/")
         return VpnApp(app.id, app.slug, spec, container, values, volume / spec.config,
-                    f"{root}/{spec.config}", volume / ACL, f"{root}/{ACL}")  # fmt: skip
+                      f"{root}/{spec.config}", volume / ACL, f"{root}/{ACL}",
+                      volume / COREFILE, _runs_dns(rev.compose_yaml if rev else "",
+                                                   entry.template.main_service))  # fmt: skip
 
     def _seal(self, app_id: int, private: str, public: str) -> Sealed:
         return self.box.seal(Purpose.VPN, private, _context(app_id, public))
@@ -157,8 +179,61 @@ class VpnTools:
         """
         async with self.sessions() as session, session.begin():
             address = await self._write(session, vpn, if_changed=if_changed)
+            dns_changed = await self._write_dns(session, vpn)
         if address is not None:
             await bring_up(self.gateway, vpn, address)
+        if dns_changed and vpn.local_dns and vpn.container is not None:
+            code, out = await self.gateway.exec_run(vpn.container.id, RESTART_DNS)
+            if code != 0:
+                logger.warning(
+                    "VPN local DNS not restarted", extra={"app": vpn.slug, "output": out[-300:]}
+                )
+
+    async def _records(self, session: AsyncSession, vpn: VpnApp) -> list[dict[str, Any]]:
+        rows = await session.execute(
+            select(VpnDnsRecord, Application.slug, Application.name)
+            .outerjoin(Application, Application.id == VpnDnsRecord.target_app_id)
+            .where(VpnDnsRecord.vpn_app_id == vpn.app_id).order_by(VpnDnsRecord.name)
+        )  # fmt: skip
+        return [{"id": r.id, "name": r.name, "ip": r.ip, "app_id": r.target_app_id,
+                 "app_slug": slug, "app_name": name} for r, slug, name in rows]  # fmt: skip
+
+    async def _targets(self, session: AsyncSession, vpn: VpnApp) -> dict[int, dict[str, Any]]:
+        """Apps of the zones the VPN reaches, by id: their main container's Docker name."""
+        out = {}
+        rows = await session.execute(
+            select(Application, Zone.slug).join(Zone, Zone.id == Application.zone_id)
+            .where(Zone.slug.in_(vpn.zones), Application.id != vpn.app_id)
+            .order_by(Application.name)
+        )  # fmt: skip
+        for app, zone in rows:
+            try:
+                entry = await self.apps.planner.entry_of(session, app)
+            except (ConflictError, NotFoundError):
+                continue  # no template: its main service is unknown
+            out[app.id] = {"id": app.id, "name": app.name, "zone": zone,
+                           "container": f"{app.slug}-{entry.template.main_service}-1"}  # fmt: skip
+        return out
+
+    async def _write_dns(self, session: AsyncSession, vpn: VpnApp) -> bool:
+        """Write the local DNS's Corefile; False when it is as is (or the VPN has none)."""
+        if vpn.host_dns is None:
+            return False
+        targets = await self._targets(session, vpn)
+        records = [dns.Record(r["name"], ip=r["ip"],
+                              container=targets.get(r["app_id"] or 0, {}).get("container"))
+                   for r in await self._records(session, vpn)]  # fmt: skip
+        text = dns.corefile(records, vpn.value(vpn.spec.dns_field))
+        with suppress(OSError):
+            if vpn.host_dns.read_text() == text:
+                return False
+        vpn.host_dns.parent.mkdir(parents=True, exist_ok=True)
+        tmp = vpn.host_dns.with_suffix(".tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        tmp.replace(vpn.host_dns)
+        return True
 
     async def _write(self, session: AsyncSession, vpn: VpnApp, *, if_changed: bool) -> str | None:
         """Write wg0.conf and the access script; the server address to apply, if running."""
@@ -299,7 +374,7 @@ class VpnTools:
                       if peer.routing == "access" else None)  # fmt: skip
             allowed = allowed_ips(vpn, peer.routing, peer.allowed_ips, access)
             text = wg.client_conf(
-                self._private(peer), peer.address, vpn.value(vpn.spec.dns_field),
+                self._private(peer), peer.address, vpn.client_dns,
                 server.public_key, vpn.endpoint, allowed, self._psk(peer),
             )  # fmt: skip
         if not quiet:
@@ -311,6 +386,59 @@ class VpnTools:
 
         text = await self.configuration(app_id, cid)
         return str(segno.make(text, error="l").svg_inline(scale=4, border=2))
+
+    async def dns_overview(self, app_id: int) -> dict[str, Any]:
+        vpn = await self._vpn(app_id)
+        async with self.sessions() as session:
+            targets = await self._targets(session, vpn)
+            records = await self._records(session, vpn)
+        return {"enabled": vpn.local_dns, "server": vpn.network()[1], "records": records,
+                "targets": [{k: t[k] for k in ("id", "name", "zone")}
+                            for t in targets.values()]}  # fmt: skip
+
+    async def dns_create(self, app_id: int, name: str, ip: str | None,
+                         target_app_id: int | None) -> int:  # fmt: skip
+        """A name for an IP, or for an app of the zones the VPN reaches (exactly one)."""
+        vpn = await self._vpn(app_id)
+        name = dns.check_name(name)
+        if (ip is None) == (target_app_id is None):
+            raise DnsTargetError("give an IP or an app")
+        if ip is not None:
+            try:
+                ip = str(ipaddress.ip_address(ip.strip()))
+            except ValueError:
+                raise DnsTargetError("invalid IP address", field="ip") from None
+        async with self._lock:
+            async with self.sessions() as session, session.begin():
+                if target_app_id is not None and \
+                        target_app_id not in await self._targets(session, vpn):  # fmt: skip
+                    raise DnsTargetError("this app is not in a zone the VPN reaches",
+                                         field="app_id")  # fmt: skip
+                if await session.scalar(
+                    select(VpnDnsRecord.id).where(
+                        VpnDnsRecord.vpn_app_id == vpn.app_id, VpnDnsRecord.name == name
+                    )
+                ):
+                    raise DnsNameTakenError("this name already exists", field="name")
+                record = VpnDnsRecord(vpn_app_id=vpn.app_id, name=name, ip=ip,
+                                      target_app_id=target_app_id)  # fmt: skip
+                session.add(record)
+                await session.flush()
+            await self._sync(vpn)
+        self.bus.publish("vpn.dns_created", app=vpn.slug, target=name)
+        return record.id
+
+    async def dns_delete(self, app_id: int, rid: int) -> None:
+        vpn = await self._vpn(app_id)
+        async with self._lock:
+            async with self.sessions() as session, session.begin():
+                record = await session.get(VpnDnsRecord, rid)
+                if record is None or record.vpn_app_id != vpn.app_id:
+                    raise DnsRecordNotFoundError("unknown DNS name", id=rid)
+                name = record.name
+                await session.delete(record)
+            await self._sync(vpn)
+        self.bus.publish("vpn.dns_deleted", app=vpn.slug, target=name)
 
     async def set_zones(self, app_id: int, zones: list[str]) -> Job:
         """Zones reached through the VPN: the container joins their networks (new revision).
@@ -384,3 +512,12 @@ async def expire_clients(vpn: VpnTools, every: float = 60) -> None:
                 vpn.bus.publish("vpn.client_expired", app_id=p.app_id, target=p.name)
         except Exception:
             logger.exception("VPN expiry check failed")
+
+
+def _runs_dns(compose_yaml: str, main: str) -> bool:
+    """The deployed revision starts the image's CoreDNS (template 2.4.0 on)."""
+    try:
+        env = yaml.safe_load(compose_yaml)["services"][main].get("environment") or {}
+    except (yaml.YAMLError, KeyError, TypeError, AttributeError):
+        return False
+    return isinstance(env, dict) and str(env.get("USE_COREDNS", "")).lower() == "true"

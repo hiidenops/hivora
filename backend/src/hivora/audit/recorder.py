@@ -23,6 +23,7 @@ AUDITED_PREFIXES = (
     "hostfw.",
     "zone.",
     "vpn.",
+    "proxy.",
     "job.finished",
     "jobs.cleared",
     "console.",

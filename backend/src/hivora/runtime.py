@@ -31,6 +31,7 @@ from hivora.hostfw.static_routes import StaticRoutes
 from hivora.jobs import JobQueue
 from hivora.metrics.apps import AppMetrics
 from hivora.metrics.host import HostMetrics
+from hivora.proxy.service import ProxyTools, follow_apps
 from hivora.sites import SiteContent
 from hivora.sites.config import SiteConfig
 from hivora.sites.files import SiteFiles
@@ -105,6 +106,7 @@ class Runtime:
     releases: ReleaseChecker
     self_update: SelfUpdate
     host_updates: HostUpdates
+    proxy: ProxyTools
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
     consoles: "ConsoleManager" = field(init=False)
@@ -209,13 +211,15 @@ class Runtime:
                                    zone_actions=zone_actions, store=state.store, bus=bus,
                                    clock=clock, data_dir=settings.data_dir)  # fmt: skip
         host_updates.register()  # the host_upgrade and host_reboot jobs
+        proxy = ProxyTools(sessions=sessions, apps=apps, bus=bus, clock=clock, gateway=gateway,
+                           public_ip=public_address.current)  # fmt: skip
         return cls(settings, clock, bus, engine, sessions, box, catalog, gateway, state, runner,
                    jobs, apps, auth, audit, icons, HostMetrics(bus), secrets,
                    ModpackCatalog(settings.data_dir / "icons" / "modpacks"),
                    public_address, AppMetrics(gateway, state.store, bus), backups,
                    sites, site_files, site_config, site_hosting, tasks, vpn, hostfw,
                    blocking, static_routes, zone_actions, admin_vpn,
-                   releases, self_update, host_updates)  # fmt: skip
+                   releases, self_update, host_updates, proxy)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
@@ -236,6 +240,7 @@ class Runtime:
         await self.state.start()
         self._vpn_tasks = [
             asyncio.create_task(follow_deploys(self.vpn), name="vpn-follow"),
+            asyncio.create_task(follow_apps(self.proxy), name="proxy-follow"),
             asyncio.create_task(expire_clients(self.vpn), name="vpn-expiry"),
             asyncio.create_task(run_scheduler(self.tasks), name="task-scheduler"),
             asyncio.create_task(check_images(self.apps.custom), name="free-image-updates"),

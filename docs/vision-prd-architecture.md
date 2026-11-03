@@ -395,7 +395,7 @@ Le backend est un monolithe modulaire : 16 modules V1 à frontières nettes, dé
 | `system` | Infos hôte, version, mise à jour d'Hivora (pull + recréation par un conteneur éphémère), diagnostics | docker_gateway | V1 |
 | `updates` | Comparaison des digests distants, planification, rollback | apps, jobs | V2 |
 | `backups` | Sauvegarde de volumes via conteneur éphémère (tar + zstd), base, destinations, restauration | apps, jobs | V2 |
-| `proxy` | Pilotage d'un Caddy managé (routes, certificats) | apps, zones | V2 |
+| `proxy` | Pilotage d'un Caddy managé (routes, certificats) | apps, zones | V2 (fait sur demande le 03/11/2026 : domaines publics HTTPS ; noms locaux par le DNS du VPN) |
 | `games` | Catalogue de modpacks (Modrinth, CurseForge), joueurs connectés, liste blanche et admins Minecraft (V1, avancé) ; requête Steam/A2S, planning de redémarrage, annonces avant arrêt | apps, docker_gateway | V1 (partiel) / V2 |
 | `notify` | Canaux de notification et règles | core | V2 |
 | `agent_hub` | Connexion et routage vers les agents distants | tous | V4 |

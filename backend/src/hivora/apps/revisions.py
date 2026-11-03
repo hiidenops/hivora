@@ -37,6 +37,7 @@ from hivora.templates.catalog import (
 )
 from hivora.templates.models import TemplateVersion
 from hivora.templates.overrides import Overrides
+from hivora.templates.schema import Template
 from hivora.zones import Zone, get_zone
 
 
@@ -104,6 +105,9 @@ class Revisions:
         zone = await session.get(Zone, app.zone_id) if app.zone_id else None
         if overrides is None:  # unchanged: the latest revision's advanced settings
             overrides = Overrides.model_validate(latest.overrides or {}) if latest else None
+        if overrides is not None and latest is not None:
+            overrides = follow_ports(entry.template, overrides, latest.inputs,
+                                     {**latest.inputs, **inputs})  # fmt: skip
         plan = await self.planner.plan(session, entry, app.slug, app.name, zone, {**inputs, **kept},
                                 revision=number, overrides=overrides)  # fmt: skip
         previous = latest.compose_yaml if latest else ""
@@ -306,3 +310,25 @@ class Revisions:
                 values = (await self.planner.current_settings(session, app_id)).values
             jobs.append(await self.update(app_id, values))
         return jobs
+
+
+def follow_ports(
+    template: Template, overrides: Overrides, before: dict[str, Any], after: dict[str, Any]
+) -> Overrides:
+    """A container port set by a form field keeps its advanced exposure ("25565/tcp":
+    "lan") when the field changes. Invalid values: left to the form's validation."""
+    try:
+        old, new = template.with_defaults(before), template.with_defaults(after)
+        moved = {
+            (name, f"{p.container_in(old)}/{p.protocol}"): f"{p.container_in(new)}/{p.protocol}"
+            for name, svc in template.services.items() for p in svc.ports
+            if isinstance(p.container, str)
+        }  # fmt: skip
+    except (KeyError, TypeError, ValueError):
+        return overrides
+    return Overrides(services={
+        name: o.model_copy(update={"publish": {
+            moved.get((name, k), k): v for k, v in o.publish.items()
+        }})
+        for name, o in overrides.services.items()
+    })  # fmt: skip

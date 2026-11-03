@@ -5,7 +5,7 @@ Unknown keys are rejected so that typos fail loudly at load time, and every
 """
 
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -167,14 +167,27 @@ class Form(_Strict):
         return [*self.basic, *self.advanced]
 
 
+PORT_FIELD = re.compile(r"^\{\{ form\.([a-z][a-z0-9_]*) \}\}$")
+
+
 class PortSpec(_Strict):
-    container: Annotated[int, Field(ge=1, le=65535)]
+    # Or a port field of the form ("{{ form.game_port }}"): the app listens on the port
+    # picked there, published at the same number (one port, the same everywhere, VPN too).
+    container: (
+        Annotated[int, Field(ge=1, le=65535)] | Annotated[str, Field(pattern=PORT_FIELD.pattern)]
+    )
     host: int | str | None = None  # None: same as container; may be an expression
     protocol: Literal["tcp", "udp"] = "tcp"
     purpose: Literal["web", "game", "rcon", "query", "other"] = "other"
     exposure: Exposure = "lan"
     # A select field of the form (internal / lan / public) that sets the exposure instead.
     exposure_field: Annotated[str, Field(pattern=FIELD_ID)] | None = None
+
+    def container_in(self, form: Mapping[str, Any]) -> int:
+        """The container's port for these form values."""
+        if isinstance(self.container, int):
+            return self.container
+        return int(form[PORT_FIELD.fullmatch(self.container).group(1)])  # type: ignore[union-attr]
 
 
 class VolumeSpec(_Strict):
@@ -418,6 +431,18 @@ class Vpn(_Strict):
     zones_field: str | None = None  # form field: zone slugs whose networks the VPN joins
 
 
+class Proxy(_Strict):
+    """A Caddy Hivora drives: it writes the sites file and reloads it by exec. Caddy gets
+    and renews the certificates itself (Let's Encrypt, HTTP challenge on ports 80/443)."""
+
+    provider: Literal["caddy"]
+    volume: str  # main-service volume where Hivora writes the sites file
+    sites: str = "sites.caddy"  # its name in that volume (imported by the main config)
+    config: str = "/etc/caddy/Caddyfile"  # main config inside the container (reloaded)
+    data_volume: str  # main-service volume holding Caddy's data (the certificates)
+    zones_field: str  # form field: zone slugs whose networks the proxy joins
+
+
 class Game(_Strict):
     # Server console: command run (with a TTY) in the main service, e.g. ["rcon-cli"].
     console: list[str] | None = None
@@ -461,11 +486,16 @@ class Template(_Strict):
     update: Update | None = None
     game: Game | None = None
     vpn: Vpn | None = None
+    proxy: Proxy | None = None
     logs: Logs = Logs()
     defaults: Defaults = Defaults()
     # Form fields highlighted on the app page (e.g. server type, version, memory).
     summary: list[str] = []
     connection: Connection | None = None  # how a linked tool reaches this app
+
+    def with_defaults(self, inputs: Mapping[str, Any]) -> dict[str, Any]:
+        """The form's values with the fields' defaults for those not given."""
+        return {**{f.id: f.default for f in self.form.fields}, **inputs}
 
     @property
     def main_service(self) -> str:
@@ -525,6 +555,12 @@ class Template(_Strict):
             if unknown := set(svc.env_if.values()) - set(fields):
                 raise ValueError(f"service {name!r}: env_if: unknown fields {sorted(unknown)}")
             for port in svc.ports:
+                if isinstance(port.container, str):
+                    m = PORT_FIELD.fullmatch(port.container)
+                    field = fields.get(m.group(1)) if m else None
+                    if field is None or field.type != "port" or port.host is not None:
+                        raise ValueError(f"service {name!r}: container port from a form field "
+                                         "needs a port field and no host")  # fmt: skip
                 if (ref := port.exposure_field) is None:
                     continue
                 field = fields.get(ref)

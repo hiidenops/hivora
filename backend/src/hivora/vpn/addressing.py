@@ -39,6 +39,8 @@ class VpnApp:
     config: str  # the same file inside the container
     host_acl: Path  # the access-rights script on the host
     acl: str  # the same file inside the container
+    host_dns: Path | None = None  # the local DNS's Corefile on the host
+    local_dns: bool = False  # the deployed revision runs it (USE_COREDNS)
 
     @property
     def zones(self) -> list[str]:
@@ -46,6 +48,11 @@ class VpnApp:
 
     def value(self, field: str | None, default: str = "") -> str:
         return str(self.values.get(field or "") or default)
+
+    @property
+    def client_dns(self) -> str:
+        """DNS given to clients: the VPN server itself when it runs the local DNS."""
+        return self.network()[1] if self.local_dns else self.value(self.spec.dns_field)
 
     def network(self) -> tuple[str, str]:
         """(subnet, server address) from the advanced settings, validated."""

@@ -2,7 +2,7 @@
 removal. Each action records the intent and queues its job."""
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -77,7 +77,7 @@ class Deployer:
             zone,
             req.inputs,
             revision=1,
-            overrides=access_overrides(entry.template, req.access),
+            overrides=access_overrides(entry.template, req.access, req.inputs),
         )
 
     async def deploy(self, req: DeployRequest) -> tuple[Application, Job]:
@@ -201,13 +201,18 @@ class Lifecycle:
         return job
 
 
-def access_overrides(template: Template, access: Literal["public", "lan"] | None) -> Overrides:
+def access_overrides(
+    template: Template, access: Literal["public", "lan"] | None, inputs: dict[str, Any]
+) -> Overrides:
     """The template's published ports all on the Internet ("public") or the local network
     ("lan"); its internal ones (and those a form field sets) stay as they are."""
     if access is None:
         return Overrides()
+    form = template.with_defaults(inputs)
     return Overrides(services={
-        name: ServiceOverrides(publish={f"{p.container}/{p.protocol}": access for p in ports})
+        name: ServiceOverrides(
+            publish={f"{p.container_in(form)}/{p.protocol}": access for p in ports}
+        )
         for name, svc in template.services.items()
         if (ports := [p for p in svc.ports if p.exposure != "internal" and not p.exposure_field])
     })  # fmt: skip

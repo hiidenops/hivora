@@ -119,7 +119,7 @@ def test_vpn_clients_and_linked_zones(client: Any, tmp_path: Path) -> None:
     assert writes == ["sh"]
     cfg = client.get(f"{API}/apps/{app_id}/vpn/clients/{laptop}/config").text
     assert "Endpoint = vpn.example.org:51820" in cfg and "AllowedIPs = 192.168.1.0/24" in cfg
-    assert "Address = 10.8.0.3/32" in cfg and "DNS = 1.1.1.1,9.9.9.9" in cfg
+    assert "Address = 10.8.0.3/32" in cfg and "DNS = 10.8.0.1\n" in cfg  # the VPN's own DNS
     psk = next(line for line in cfg.splitlines() if line.startswith("PresharedKey = "))
     assert len(psk.split(" = ")[1]) == 44 and psk in conf.read_text()  # both ends agree
     qr = client.get(f"{API}/apps/{app_id}/vpn/clients/{laptop}/qrcode")
@@ -218,3 +218,50 @@ def test_a_vpn_deployed_for_a_new_zone_serves_it(client: Any) -> None:
     served = (zone["vpn"], zone["network_mode"], zone["subnet"])
     assert served == ("vpn maison", "shared", "10.8.1.0/24")
     assert client.get(f"{API}/apps/{deployed['app']['id']}/vpn").json()["zones"] == ["maison"]
+
+
+def test_vpn_local_dns_names(client: Any) -> None:
+    """Names of the VPN: to an IP, or to an app of its zones (its container, through Docker)."""
+    from helpers import API, admin, code, wait_job
+
+    admin(client)
+    client.post(f"{API}/zones", json={"name": "Jeux", "color": "#d97706"})
+    body = {"template": "wireguard", "name": "vpn", "inputs": {"host": "vpn.example.org"},
+            "vpn_zones": ["jeux"]}  # fmt: skip
+    deployed = client.post(f"{API}/apps", json=body).json()
+    assert wait_job(client, deployed["job"]["id"])["status"] == "succeeded"
+    vpn_id = deployed["app"]["id"]
+    ids = []
+    for name, zone in (("web", "jeux"), ("ailleurs", None)):
+        app = client.post(f"{API}/apps", json={"template": "nginx", "name": name, "zone": zone})
+        assert wait_job(client, app.json()["job"]["id"])["status"] == "succeeded"
+        ids.append(app.json()["app"]["id"])
+    web, other = ids
+    dns = client.get(f"{API}/apps/{vpn_id}/vpn/dns").json()
+    assert (dns["enabled"], dns["server"]) == (True, "10.8.0.1")
+    assert [t["id"] for t in dns["targets"]] == [web]  # only the apps of its zones
+
+    url = f"{API}/apps/{vpn_id}/vpn/dns"
+    assert client.post(url, json={"name": "Web.Local", "app_id": web}).status_code == 201
+    assert client.post(url, json={"name": "nas.local", "ip": "192.168.1.20"}).status_code == 201
+    for bad, status, err in (
+        ({"name": "web.local", "ip": "192.168.1.21"}, 409, "vpn_dns_name_taken"),
+        ({"name": "x.local", "app_id": other}, 409, "vpn_dns_bad_target"),
+        ({"name": "x.local", "ip": "999.1.1.1"}, 409, "vpn_dns_bad_target"),
+        ({"name": "x.local"}, 409, "vpn_dns_bad_target"),
+        ({"name": "x local; }", "ip": "1.2.3.4"}, 422, "vpn_dns_bad_name"),
+    ):
+        r = client.post(url, json=bad)
+        assert (r.status_code, code(r)) == (status, err), bad
+    records = client.get(url).json()["records"]
+    assert [(r["name"], r["ip"], r["app_name"]) for r in records] == [
+        ("nas.local", "192.168.1.20", None), ("web.local", None, "web")]  # fmt: skip
+
+    runtime = client.app.state.runtime
+    corefile = runtime.settings.volumes_root / "vpn" / "config" / "coredns" / "Corefile"
+    text = corefile.read_text()
+    assert "        192.168.1.20 nas.local\n" in text
+    assert "    forward . /etc/resolv.conf\n" in text  # Internet: the machine's DNS
+    assert "rewrite continue name exact web.local. web-server-1. answer auto" in text
+    assert client.delete(f"{url}/{records[0]['id']}").status_code == 204
+    assert "nas.local" not in corefile.read_text()

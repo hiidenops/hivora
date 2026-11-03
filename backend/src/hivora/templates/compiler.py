@@ -141,19 +141,20 @@ def _host_ip(exposure: Exposure, host: HostInfo, where: str) -> str | None:
 
 
 def _plan_port(svc: str, spec: PortSpec, ctx: dict[str, Any], host: HostInfo) -> PortPlan:
-    where = f"{svc}:{spec.container}/{spec.protocol}"
+    container = spec.container_in(ctx["form"])
+    where = f"{svc}:{container}/{spec.protocol}"
     host_port: int | None = None
     picked = ctx["form"].get(spec.exposure_field) if spec.exposure_field else None
     exposure: Exposure = picked or spec.exposure
     if exposure != "internal":
         raw = render(spec.host, ctx) if isinstance(spec.host, str) else spec.host
         try:
-            host_port = int(raw) if raw is not None else spec.container
+            host_port = int(raw) if raw is not None else container
         except (TypeError, ValueError):
             raise ValidationError("invalid host port", port=where) from None
     return PortPlan(
         service=svc,
-        container_port=spec.container,
+        container_port=container,
         host_port=host_port,
         protocol=spec.protocol,
         purpose=spec.purpose,

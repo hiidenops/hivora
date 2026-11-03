@@ -93,7 +93,7 @@ class GraphBuilder:
                 if spec:  # a port set by a form field: the exposure picked there
                     chosen = latest.inputs if latest else {}
                     template_ports[app.id] = {
-                        (name, p.container, p.protocol):
+                        (name, p.container_in(spec.with_defaults(chosen)), p.protocol):
                             chosen.get(p.exposure_field or "") or p.exposure
                         for name, svc in spec.services.items() for p in svc.ports
                     }  # fmt: skip

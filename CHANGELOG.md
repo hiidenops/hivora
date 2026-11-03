@@ -6,6 +6,17 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+
+- **Domaines publics en HTTPS** : un proxy HTTPS (Caddy, nouveau modèle « Proxy HTTPS ») publie vos apps web sous votre nom de domaine, avec un certificat Let's Encrypt obtenu et renouvelé tout seul. Dans la topologie, cliquez sur une zone : sa fiche liste les noms de ses apps et permet d'en lier un nouveau en une ligne (nom + app). Zone derrière un VPN : un nom local (`minecraft.local`) ; sinon : un domaine public, le proxy s'installe depuis la même fiche s'il manque. La page du proxy montre chaque domaine, son certificat (validité, émetteur), où pointe son DNS et pourquoi Let's Encrypt l'a refusé. Il faut faire pointer le domaine vers l'IP publique de la machine et rediriger les ports 80 et 443 de la box.
+- **DNS local du VPN** : chaque VPN WireGuard a maintenant son propre DNS. Dans la topologie, cliquez sur le VPN puis « DNS » pour donner un nom (ex. `minecraft.local`) à une app de ses zones ou à une adresse IP ; les clients du VPN y accèdent par ce nom. Une app suit son conteneur, même si son IP change. Les autres noms passent par le DNS réglé dans « DNS pour Internet » (vide : celui de la machine), le web marche donc toujours. Modèle WireGuard 2.4.0 : sur un VPN déjà installé, l'appliquer avec « Voir et mettre à jour », puis retélécharger la configuration des clients (leur DNS devient l'adresse du VPN). Les iPhone et Mac réservent `.local` au réseau local : préférez `.lan` ou `.home.arpa` s'ils ne le résolvent pas.
+
+### Corrigé
+
+- **Projet Python, code non monté** : un projet packagé (`pyproject.toml`, code copié par le Dockerfile) dont le compose ne monte que des dossiers de données se déploie maintenant : le code est placé dans `/app`. Avant, le déploiement échouait avec une erreur 500. Si les dépendances ne sont dans aucun dossier monté, le formulaire le dit (erreur 422) au lieu d'échouer.
+- **Projet Python, dossier personnel** : quand le Dockerfile crée un utilisateur (`USER`, `useradd --home-dir`) ou fixe `ENV HOME`, l'analyse propose la variable `HOME` vers ce dossier. Hivora lance le code en root : sans elle, le programme écrivait dans `/root` au lieu des volumes du compose (par ex. `/home/app/.state`), et ces données disparaissaient à chaque mise à jour. Un projet déjà déployé n'est pas modifié : pour en profiter, déployez-le à nouveau depuis son .zip.
+- **Minecraft, port de jeu** : le serveur écoute maintenant sur le port choisi dans « Port de jeu », pas seulement la machine. C'est le même numéro partout : sur la machine, sur le réseau local, à travers le VPN et dans l'adresse affichée (avant, à travers le VPN, il fallait toujours 25565). Si le port avait été réservé au réseau local ou fermé dans les réglages avancés, il le reste quand on le change. Modèle 1.14.0 : sur un serveur déjà installé, l'appliquer avec « Voir et mettre à jour » sur la page de l'app.
+
 ## [0.3.8] - 2026-11-03
 
 ### Ajouté

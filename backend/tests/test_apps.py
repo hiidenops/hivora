@@ -360,3 +360,22 @@ async def test_deploy_refuses_an_image_without_a_build_for_this_machine(env: Env
     done = await run(env, job)
     assert done.status is JobStatus.SUCCEEDED, done.error
     assert f"{host_arch()} build available" in done.log
+
+
+async def test_minecraft_listens_on_the_port_chosen(env: Env) -> None:
+    """One port, the same inside and outside: changing it moves both, its LAN exposure too."""
+    app, job = await env.service.deployer.deploy(
+        DeployRequest("minecraft", "mc", {"eula": True}, access="lan")
+    )
+    assert (await run(env, job)).status is JobStatus.SUCCEEDED
+    async with env.sessions() as session:
+        values = (await env.service.planner.current_settings(session, app.id)).values
+        upd = await env.service.revisions.plan_update(
+            session, app.id, {**values, "game_port": 25570}
+        )
+    svc = upd.plan.compiled.compose["services"]["server"]
+    assert svc["environment"]["SERVER_PORT"] == "25570"
+    assert svc["ports"] == [
+        {"target": 25570, "published": "25570", "protocol": "tcp", "host_ip": "192.168.1.10"}
+    ]
+    assert upd.plan.overrides.services["server"].publish == {"25570/tcp": "lan"}

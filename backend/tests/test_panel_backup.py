@@ -74,7 +74,7 @@ def test_the_archive_holds_the_database_the_key_and_the_launch_options(tmp_path:
         assert sorted(tar.getnames()) == ["hivora.db", "secret.key"]
     (data / "install.env").write_text("HIVORA_ACCESS=vpn+lan\n")
     path = backup_panel(data)
-    assert path.parent == data / "backups" / "_hivora" and "-r0024" in path.name
+    assert path.parent == data / "backups" / "_hivora" and "-r0026" in path.name
     assert path.stat().st_mode & 0o777 == 0o600
     assert path.parent.stat().st_mode & 0o777 == 0o700
     out = tmp_path / "out"

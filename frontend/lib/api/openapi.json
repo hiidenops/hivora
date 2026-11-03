@@ -1604,6 +1604,168 @@
         "title": "DesiredState",
         "type": "string"
       },
+      "DnsOut": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/DnsRecordOut"
+            },
+            "title": "Records",
+            "type": "array"
+          },
+          "server": {
+            "title": "Server",
+            "type": "string"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/DnsTargetOut"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "enabled",
+          "server",
+          "records",
+          "targets"
+        ],
+        "title": "DnsOut",
+        "type": "object"
+      },
+      "DnsRecordIn": {
+        "description": "A name for an IP, or for an app of the VPN's zones (exactly one of them).",
+        "properties": {
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "maxLength": 45,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "name": {
+            "maxLength": 253,
+            "minLength": 3,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DnsRecordIn",
+        "type": "object"
+      },
+      "DnsRecordOut": {
+        "properties": {
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id"
+          },
+          "app_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Name"
+          },
+          "app_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Slug"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "ip",
+          "app_id",
+          "app_slug",
+          "app_name"
+        ],
+        "title": "DnsRecordOut",
+        "type": "object"
+      },
+      "DnsTargetOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "zone": {
+            "title": "Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "zone"
+        ],
+        "title": "DnsTargetOut",
+        "type": "object"
+      },
       "DoneOut": {
         "properties": {
           "output": {
@@ -3377,6 +3539,64 @@
         "title": "ProjectIn",
         "type": "object"
       },
+      "ProxyOut": {
+        "properties": {
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id"
+          },
+          "installed": {
+            "title": "Installed",
+            "type": "boolean"
+          },
+          "public_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Ip"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/RouteOut"
+            },
+            "title": "Routes",
+            "type": "array"
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetOut"
+            },
+            "title": "Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "installed",
+          "app_id",
+          "running",
+          "public_ip",
+          "routes",
+          "targets"
+        ],
+        "title": "ProxyOut",
+        "type": "object"
+      },
       "RebootAppOut": {
         "properties": {
           "id": {
@@ -3776,6 +3996,151 @@
         ],
         "title": "Role",
         "type": "string"
+      },
+      "RouteCreatedOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job"
+          }
+        },
+        "required": [
+          "id",
+          "job"
+        ],
+        "title": "RouteCreatedOut",
+        "type": "object"
+      },
+      "RouteIn": {
+        "properties": {
+          "app_id": {
+            "title": "App Id",
+            "type": "integer"
+          },
+          "domain": {
+            "maxLength": 253,
+            "minLength": 3,
+            "title": "Domain",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "app_id"
+        ],
+        "title": "RouteIn",
+        "type": "object"
+      },
+      "RouteOut": {
+        "properties": {
+          "app_id": {
+            "title": "App Id",
+            "type": "integer"
+          },
+          "app_name": {
+            "title": "App Name",
+            "type": "string"
+          },
+          "dns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dns",
+            "type": "array"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "points_here": {
+            "title": "Points Here",
+            "type": "boolean"
+          },
+          "served": {
+            "title": "Served",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone"
+          }
+        },
+        "required": [
+          "id",
+          "domain",
+          "app_id",
+          "app_name",
+          "zone",
+          "served",
+          "status",
+          "error",
+          "expires_at",
+          "issuer",
+          "dns",
+          "points_here"
+        ],
+        "title": "RouteOut",
+        "type": "object"
       },
       "RuleIn": {
         "properties": {
@@ -4816,6 +5181,29 @@
           "games"
         ],
         "title": "SystemInfo",
+        "type": "object"
+      },
+      "TargetOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "zone": {
+            "title": "Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "zone"
+        ],
+        "title": "TargetOut",
         "type": "object"
       },
       "TaskIn": {
@@ -6638,7 +7026,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.3.7"
+    "version": "0.3.8"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -10913,6 +11301,146 @@
         ]
       }
     },
+    "/api/v1/apps/{app_id}/vpn/dns": {
+      "get": {
+        "operationId": "dns_api_v1_apps__app_id__vpn_dns_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DnsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dns",
+        "tags": [
+          "vpn"
+        ]
+      },
+      "post": {
+        "operationId": "dns_create_api_v1_apps__app_id__vpn_dns_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DnsRecordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Dns Create Api V1 Apps  App Id  Vpn Dns Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dns Create",
+        "tags": [
+          "vpn"
+        ]
+      }
+    },
+    "/api/v1/apps/{app_id}/vpn/dns/{rid}": {
+      "delete": {
+        "operationId": "dns_delete_api_v1_apps__app_id__vpn_dns__rid__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dns Delete",
+        "tags": [
+          "vpn"
+        ]
+      }
+    },
     "/api/v1/apps/{app_id}/vpn/zones": {
       "put": {
         "description": "Join these zones' networks (new revision); clients then reach their apps.",
@@ -12479,6 +13007,103 @@
         "summary": "Steam Branches",
         "tags": [
           "options"
+        ]
+      }
+    },
+    "/api/v1/proxy": {
+      "get": {
+        "operationId": "overview_api_v1_proxy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProxyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Overview",
+        "tags": [
+          "proxy"
+        ]
+      }
+    },
+    "/api/v1/proxy/routes": {
+      "post": {
+        "operationId": "create_api_v1_proxy_routes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "proxy"
+        ]
+      }
+    },
+    "/api/v1/proxy/routes/{rid}": {
+      "delete": {
+        "operationId": "delete_api_v1_proxy_routes__rid__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete",
+        "tags": [
+          "proxy"
         ]
       }
     },

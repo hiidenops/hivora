@@ -69,6 +69,25 @@ services:
 }
 
 
+# A packaged project: its code copied into the image, the compose mounting data only,
+# a user of its own whose home holds the state (reported by a user, v0.3.8).
+PACKAGED = {
+    "pyproject.toml": '[project]\nname = "app"\n[project.scripts]\napp = "app:main"\n',
+    "src/app/__init__.py": "def main():\n    print('hello')\n",
+    "Dockerfile": (
+        "FROM python:3.13-slim\nRUN useradd --create-home --home-dir /home/app app\n"
+        "COPY pyproject.toml ./\nCOPY src ./src\nRUN pip install .\nUSER app\n"
+        'WORKDIR /data\nCMD ["app"]\n'
+    ),
+    "docker-compose.yml": (
+        "services:\n  app:\n    build: .\n    volumes:\n"
+        "      - ./state:/home/app/.state\n      - ./data:/data\n"
+    ),
+    "state/.keep": "",
+    "data/.keep": "",
+}
+
+
 def make_zip(files: dict[str, str]) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
@@ -156,3 +175,36 @@ def test_deploy_a_python_project_then_send_new_code(client: Any) -> None:
 
     bad = client.post(f"{API}/apps/python/analyze", content=b"not a zip")
     assert bad.status_code == 422 and code(bad) == "invalid_project"
+
+
+def test_packaged_project_with_data_mounts_only(tmp_path: Path) -> None:
+    from hivora.pyapps.analyze import Mount, container_path
+    from hivora.pyapps.service import InvalidProjectError, ProjectSpec, check, start_script
+
+    a = analyze_bytes(tmp_path, PACKAGED)
+    assert [(m.source, m.target, m.data) for m in a.mounts] == [
+        ("state", "/home/app/.state", True), ("data", "/data", True), ("", "/app", False),
+    ]  # fmt: skip
+    assert a.requirements == "." and container_path(a.mounts, ".") == "/app"
+    home = next(e for e in a.env if e.key == "HOME")
+    assert home.value == "/home/app" and not home.secret  # the compose's paths hold again
+    spec = ProjectSpec(a.name, a.python, a.requirements, a.workdir, a.entry, a.mounts,
+                       [{"key": e.key, "value": e.value} for e in a.env], [], [])  # fmt: skip
+    check(spec)
+    script = start_script(spec)
+    assert "pip install -q /app\ncd /data\nexec app" in script
+
+    # Nothing mounted holds the dependencies (edited by hand): a clear 422, not a 500.
+    spec.mounts = [Mount("state", "/home/app/.state", True)]
+    with pytest.raises(InvalidProjectError):
+        check(spec)
+
+    # ENV HOME wins over the user's home; no USER, no HOME.
+    files = {**PACKAGED, "Dockerfile": PACKAGED["Dockerfile"] + "ENV HOME=/srv/state\n"}
+    assert next(e.value for e in analyze_bytes(tmp_path, files).env if e.key == "HOME") \
+        == "/srv/state"  # fmt: skip
+    files = {**PACKAGED, "Dockerfile": 'FROM python:3.13-slim\nCMD ["app"]\n'}
+    assert all(e.key != "HOME" for e in analyze_bytes(tmp_path, files).env)
+    files = {**PACKAGED, "Dockerfile": 'FROM python:3.13-slim\nUSER bot\nCMD ["app"]\n'}
+    assert next(e.value for e in analyze_bytes(tmp_path, files).env if e.key == "HOME") \
+        == "/home/bot"  # fmt: skip

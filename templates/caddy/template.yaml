@@ -1,0 +1,71 @@
+apiVersion: hivora/v1
+kind: Template
+metadata:
+  slug: caddy
+  name: Proxy HTTPS (Caddy)
+  version: 1.0.0
+  category: network
+  tags: [proxy, https, domain, certificate, letsencrypt]
+  icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/caddy.svg" }
+  description:
+    fr: Publie vos apps web sur Internet sous votre nom de domaine, en HTTPS, avec des certificats Let's Encrypt obtenus et renouvelés tout seuls. Les domaines se gèrent depuis la topologie.
+    en: Publishes your web apps on the Internet under your domain name, over HTTPS, with Let's Encrypt certificates obtained and renewed on their own. Domains are managed from the topology.
+  links:
+    site: https://caddyserver.com
+    doc: https://caddyserver.com/docs/automatic-https
+  maintainer: hivora
+  verified: true
+  license: Apache-2.0 (image)
+  source: https://hub.docker.com/_/caddy
+requirements:
+  arch: [amd64, arm64]
+  memory: { min: 32Mi, recommended: 64Mi }
+  disk: { min: 50Mi }
+form:
+  basic: []
+  advanced:
+    - id: proxy_zones
+      group: { fr: Zones servies, en: Zones served }
+      label: { fr: Zones des apps publiées, en: Zones of the published apps }
+      type: string
+      pattern: "[a-z0-9,_-]{0,1000}"
+      help:
+        fr: "Réglé par Hivora quand un domaine est donné à une app d'une zone : le proxy rejoint son réseau."
+        en: Set by Hivora when a domain is given to an app of a zone; the proxy joins its network.
+services:
+  server:
+    role: main
+    image: caddy
+    tag: "2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d"
+    track: minor
+    env:
+      TZ: "{{ host.timezone }}"
+    # Let's Encrypt checks the domain over port 80 (or 443): both open on the router,
+    # forwarded to this machine.
+    ports:
+      - { container: 80, host: 80, purpose: web, exposure: public }
+      - { container: 443, host: 443, purpose: web, exposure: public }
+    files:
+      - target: /etc/caddy/Caddyfile
+        content: |
+          # Managed by Hivora (caddy template 1.0.0): do not edit.
+          # The domains: sites.caddy, written by Hivora from its database.
+          {
+              admin localhost:2019
+          }
+          import /etc/caddy/hivora/*.caddy
+    volumes:
+      - { name: conf, target: /etc/caddy/hivora }
+      - { name: data, target: /data, backup: true }
+      - { name: config, target: /config }
+proxy:
+  provider: caddy
+  volume: conf
+  data_volume: data
+  zones_field: proxy_zones
+backup:
+  volumes: [data]
+update:
+  strategy: manual
+defaults:
+  restart: unless-stopped

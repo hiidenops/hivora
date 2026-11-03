@@ -1352,6 +1352,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apps/{app_id}/vpn/dns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dns */
+        get: operations["dns_api_v1_apps__app_id__vpn_dns_get"];
+        put?: never;
+        /** Dns Create */
+        post: operations["dns_create_api_v1_apps__app_id__vpn_dns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps/{app_id}/vpn/dns/{rid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Dns Delete */
+        delete: operations["dns_delete_api_v1_apps__app_id__vpn_dns__rid__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps/{app_id}/vpn/zones": {
         parameters: {
             query?: never;
@@ -2017,6 +2052,57 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proxy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Overview */
+        get: operations["overview_api_v1_proxy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proxy/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create */
+        post: operations["create_api_v1_proxy_routes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/proxy/routes/{rid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete */
+        delete: operations["delete_api_v1_proxy_routes__rid__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3204,6 +3290,53 @@ export interface components {
          * @enum {string}
          */
         DesiredState: "running" | "stopped";
+        /** DnsOut */
+        DnsOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Records */
+            records: components["schemas"]["DnsRecordOut"][];
+            /** Server */
+            server: string;
+            /** Targets */
+            targets: components["schemas"]["DnsTargetOut"][];
+        };
+        /**
+         * DnsRecordIn
+         * @description A name for an IP, or for an app of the VPN's zones (exactly one of them).
+         */
+        DnsRecordIn: {
+            /** App Id */
+            app_id?: number | null;
+            /** Ip */
+            ip?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** DnsRecordOut */
+        DnsRecordOut: {
+            /** App Id */
+            app_id: number | null;
+            /** App Name */
+            app_name: string | null;
+            /** App Slug */
+            app_slug: string | null;
+            /** Id */
+            id: number;
+            /** Ip */
+            ip: string | null;
+            /** Name */
+            name: string;
+        };
+        /** DnsTargetOut */
+        DnsTargetOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Zone */
+            zone: string;
+        };
         /** DoneOut */
         DoneOut: {
             /** Output */
@@ -3802,6 +3935,21 @@ export interface components {
             /** Zone */
             zone?: string | null;
         };
+        /** ProxyOut */
+        ProxyOut: {
+            /** App Id */
+            app_id: number | null;
+            /** Installed */
+            installed: boolean;
+            /** Public Ip */
+            public_ip: string | null;
+            /** Routes */
+            routes: components["schemas"]["RouteOut"][];
+            /** Running */
+            running: boolean;
+            /** Targets */
+            targets: components["schemas"]["TargetOut"][];
+        };
         /** RebootAppOut */
         RebootAppOut: {
             /** Id */
@@ -3930,6 +4078,47 @@ export interface components {
          * @enum {string}
          */
         Role: "viewer" | "operator" | "admin";
+        /** RouteCreatedOut */
+        RouteCreatedOut: {
+            /** Id */
+            id: number;
+            /** Job */
+            job: number | null;
+        };
+        /** RouteIn */
+        RouteIn: {
+            /** App Id */
+            app_id: number;
+            /** Domain */
+            domain: string;
+        };
+        /** RouteOut */
+        RouteOut: {
+            /** App Id */
+            app_id: number;
+            /** App Name */
+            app_name: string;
+            /** Dns */
+            dns: string[];
+            /** Domain */
+            domain: string;
+            /** Error */
+            error: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Id */
+            id: number;
+            /** Issuer */
+            issuer: string | null;
+            /** Points Here */
+            points_here: boolean;
+            /** Served */
+            served: boolean;
+            /** Status */
+            status: string;
+            /** Zone */
+            zone: string | null;
+        };
         /** RuleIn */
         RuleIn: {
             /**
@@ -4305,6 +4494,15 @@ export interface components {
             python: string;
             /** Version */
             version: string;
+        };
+        /** TargetOut */
+        TargetOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Zone */
+            zone: string;
         };
         /** TaskIn */
         TaskIn: {
@@ -7839,6 +8037,104 @@ export interface operations {
             };
         };
     };
+    dns_api_v1_apps__app_id__vpn_dns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DnsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dns_create_api_v1_apps__app_id__vpn_dns_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DnsRecordIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dns_delete_api_v1_apps__app_id__vpn_dns__rid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                rid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     zones_api_v1_apps__app_id__vpn_zones_put: {
         parameters: {
             query?: never;
@@ -8984,6 +9280,88 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["OptionOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    overview_api_v1_proxy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProxyOut"];
+                };
+            };
+        };
+    };
+    create_api_v1_proxy_routes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RouteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_api_v1_proxy_routes__rid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

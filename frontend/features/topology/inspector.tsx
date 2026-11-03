@@ -15,6 +15,8 @@ import { api } from "@/lib/api/client";
 import { useApps } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 import { webAddress } from "@/lib/utils";
+import { ZoneNames } from "@/features/proxy/domains";
+import { DnsDialog } from "@/features/vpn/dns-dialog";
 
 import type { Change } from "./changes";
 import type { GNode, Graph, Port } from "./layout";
@@ -120,6 +122,7 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
               </Button>
             )}
             {node.address ? <CopyText text={String(node.address)} label={t("topology.copyIp")} shown /> : null}
+            {canEdit && Boolean(node.vpn) && <DnsDialog appId={Number(node.id)} vpnName={String(node.label)} />}
           </div>
         </>
       )}
@@ -163,6 +166,7 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
           <Button size="sm" variant="outline" asChild>
             <Link href="/zones/">{t("topology.openZones")}</Link>
           </Button>
+          {canEdit && node.slug ? <ZoneNames zone={String(node.slug)} vpnId={vpnOfZone(graph, node.key)} /> : null}
         </>
       )}
       {node.type === "panel" && (
@@ -216,6 +220,13 @@ export function Inspector({ node, graph, onClose, canEdit, onChanged, changes, o
       )}
     </aside>
   );
+}
+
+/** The VPN app reaching this zone (its node id), if any. */
+function vpnOfZone(graph: Graph, zoneKey: string): number | null {
+  const edge = (graph.edges as { source: string; target: string; kind: string }[]).find((e) => e.kind === "vpn" && e.target === zoneKey);
+  const vpn = edge && (graph.nodes as GNode[]).find((n) => n.key === edge.source);
+  return vpn ? Number(vpn.id) : null;
 }
 
 /** Copies ``text`` (an IP, or IP:port), its own "copied" bubble; ``shown``: the text on it. */

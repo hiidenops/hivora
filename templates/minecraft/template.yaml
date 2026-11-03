@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.13.0
+  version: 1.14.0
   category: games
   tags: [minecraft, java, sandbox]
   icon:
@@ -309,13 +309,16 @@ services:
       SEED: "{{ form.seed }}"
       LEVEL: "{{ form.level }}"
       CUSTOM_SERVER_PROPERTIES: "{{ form.custom_properties }}"
+      SERVER_PORT: "{{ form.game_port }}"
       ENABLE_RCON: "TRUE"
       RCON_PASSWORD: "{{ secret.rcon_password }}"
       TZ: "{{ host.timezone }}"
       UID: "{{ host.puid }}"
       GID: "{{ host.pgid }}"
     ports:
-      - { container: 25565, host: "{{ form.game_port }}", purpose: game, exposure: public }
+      # The server listens on the port chosen (SERVER_PORT): the same number on the host,
+      # on the LAN and through the VPN.
+      - { container: "{{ form.game_port }}", purpose: game, exposure: public }
       - { container: 25575, purpose: rcon, exposure: internal }
     volumes:
       - { name: data, target: /data, backup: true,

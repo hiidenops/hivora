@@ -35,3 +35,19 @@ class VpnPeer(Base):
     # Preshared key (extra symmetric layer), sealed like the private key; clients only.
     psk_nonce: Mapped[bytes | None] = mapped_column(LargeBinary)
     psk: Mapped[bytes | None] = mapped_column(LargeBinary)
+
+
+class VpnDnsRecord(Base):
+    """A name the VPN's own DNS answers: an IP, or an app of its zones (its main container,
+    resolved live through Docker's DNS: a redeploy that changes its IP changes nothing)."""
+
+    __tablename__ = "vpn_dns_record"
+    __table_args__ = (UniqueConstraint("vpn_app_id", "name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vpn_app_id: Mapped[int] = mapped_column(ForeignKey("application.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(253))  # e.g. minecraft.local
+    ip: Mapped[str | None] = mapped_column(String(45))
+    target_app_id: Mapped[int | None] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )

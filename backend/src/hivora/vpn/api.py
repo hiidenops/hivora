@@ -158,3 +158,48 @@ async def zones(app_id: int, body: ZonesIn, _: Operator, rt: RuntimeDep) -> JobR
     """Join these zones' networks (new revision); clients then reach their apps."""
     job = await rt.vpn.set_zones(app_id, body.zones)
     return JobRefOut(id=job.id, kind=job.kind.value, status=job.status.value)
+
+
+class DnsRecordOut(BaseModel):
+    id: int
+    name: str
+    ip: str | None
+    app_id: int | None
+    app_slug: str | None
+    app_name: str | None
+
+
+class DnsTargetOut(BaseModel):
+    id: int
+    name: str
+    zone: str
+
+
+class DnsOut(BaseModel):
+    enabled: bool  # the deployed revision runs the local DNS (else: update the VPN)
+    server: str  # the DNS clients use: the VPN server's address
+    records: list[DnsRecordOut]
+    targets: list[DnsTargetOut]  # apps of the zones the VPN reaches
+
+
+class DnsRecordIn(BaseModel):
+    """A name for an IP, or for an app of the VPN's zones (exactly one of them)."""
+
+    name: str = Field(min_length=3, max_length=253)
+    ip: str | None = Field(default=None, max_length=45)
+    app_id: int | None = None
+
+
+@router.get("/{app_id}/vpn/dns")
+async def dns(app_id: int, _: Operator, rt: RuntimeDep) -> DnsOut:
+    return DnsOut(**await rt.vpn.dns_overview(app_id))
+
+
+@router.post("/{app_id}/vpn/dns", status_code=201)
+async def dns_create(app_id: int, body: DnsRecordIn, _: Operator, rt: RuntimeDep) -> dict[str, int]:
+    return {"id": await rt.vpn.dns_create(app_id, body.name, body.ip, body.app_id)}
+
+
+@router.delete("/{app_id}/vpn/dns/{rid}", status_code=204)
+async def dns_delete(app_id: int, rid: int, _: Operator, rt: RuntimeDep) -> None:
+    await rt.vpn.dns_delete(app_id, rid)

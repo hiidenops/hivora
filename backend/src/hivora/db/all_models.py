@@ -11,6 +11,7 @@ import hivora.backups.models
 import hivora.db.models
 import hivora.hostfw.models
 import hivora.jobs.models
+import hivora.proxy.models
 import hivora.sites.models
 import hivora.tasks.models
 import hivora.templates.models

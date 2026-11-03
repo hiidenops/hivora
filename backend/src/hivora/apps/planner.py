@@ -3,6 +3,7 @@ plan every deploy and settings change is reviewed and applied from (``AppPlanner
 the service rows a compiled app gives (``services_from``)."""
 
 from collections.abc import Awaitable, Callable
+from contextlib import suppress
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -145,9 +146,13 @@ class AppPlanner:
         app_ctx = AppContext(
             slug=slug, name=name, revision=revision, zone=zone.slug if zone else None,
             zone_network=zone_network(zone),
-            extra_networks=await self.vpn_networks(session, slug, entry, inputs),
+            extra_networks=(*await self.vpn_networks(session, slug, entry, inputs),
+                            *await self.proxy_networks(session, entry, inputs)),
             vpn_only=zone is not None and zone.slug in await self.vpn_zones(session),
         )  # fmt: skip
+        if entry.template.proxy and app_ctx.vpn_only:
+            raise ValidationError("the HTTPS proxy cannot be in a zone behind a VPN",
+                                  field="zone")  # fmt: skip
         host = self.host
         defaults_ctx = build_context(app_ctx, host, FormValues(), list(entry.template.services))
         form = validate_inputs(entry.template, inputs, defaults_ctx)
@@ -197,6 +202,20 @@ class AppPlanner:
         known = {f.id for f in entry.template.form.fields}  # a newer template may drop fields
         values = {k: v for k, v in (revision.inputs if revision else {}).items() if k in known}
         return AppSettings(app, entry, values, sorted(secrets))
+
+    async def proxy_networks(
+        self, session: AsyncSession, entry: CatalogEntry, inputs: dict[str, Any]
+    ) -> tuple[str, ...]:
+        """The HTTPS proxy joins the networks of the zones of the apps it serves."""
+        proxy = entry.template.proxy
+        if not proxy:
+            return ()
+        names = []
+        for zone_slug in vpn_zone_slugs(inputs.get(proxy.zones_field)):
+            with suppress(NotFoundError):  # a zone deleted since: nothing to join
+                if name := zone_network(await get_zone(session, zone_slug)):
+                    names.append(name)
+        return tuple(names)
 
     async def vpn_networks(
         self, session: AsyncSession, slug: str, entry: CatalogEntry, inputs: dict[str, Any]

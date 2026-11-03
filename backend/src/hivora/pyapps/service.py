@@ -18,7 +18,7 @@ import time
 import zipfile
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -31,7 +31,15 @@ from hivora.core.errors import ConflictError, NotFoundError, ValidationError
 from hivora.core.events import EventBus
 from hivora.core.fs import confined, receive_upload
 from hivora.jobs import Job
-from hivora.pyapps.analyze import Analysis, Mount, ProjectError, _Zip, analyze, volume_name
+from hivora.pyapps.analyze import (
+    Analysis,
+    Mount,
+    ProjectError,
+    _Zip,
+    analyze,
+    container_path,
+    volume_name,
+)
 from hivora.templates import Catalog
 from hivora.templates.catalog import TemplateInvalidError
 
@@ -88,6 +96,8 @@ def check(spec: ProjectSpec) -> None:
         raise bad("requirements")
     if not CONTAINER_PATH.match(spec.workdir) or ".." in spec.workdir.split("/"):
         raise bad("workdir")
+    if spec.mounts and spec.requirements and container_path(spec.mounts, spec.requirements) is None:
+        raise bad("requirements")  # not in any mounted folder: nothing to install from
     if not spec.entry or len(spec.entry) > 30 or not all(ARG.match(a) for a in spec.entry):
         raise bad("entry")
     if not spec.mounts or len(spec.mounts) > 10:
@@ -116,14 +126,6 @@ def check(spec: ProjectSpec) -> None:
 def start_script(spec: ProjectSpec) -> str:
     """Shell run at each start: system packages, virtualenv, dependencies, the program."""
     q = shlex.quote
-    target = {m.source: m.target for m in spec.mounts}
-
-    def container(project_path: str) -> str:
-        best = max((s for s in target if s == "" or project_path == s
-                    or project_path.startswith(f"{s}/")), key=len)  # fmt: skip
-        rest = project_path[len(best) :].lstrip("/") if best else project_path
-        return str(PurePosixPath(target[best]) / rest) if rest and rest != "." else target[best]
-
     lines = ["set -e"]
     if spec.apt:
         lines.append("apt-get update -qq && apt-get install -y -qq --no-install-recommends "
@@ -135,8 +137,7 @@ def start_script(spec: ProjectSpec) -> str:
         f"echo {q(spec.python)} > /venv/.python; }}",
         "export PATH=/venv/bin:$PATH PIP_DISABLE_PIP_VERSION_CHECK=1",
     ]
-    if spec.requirements:
-        path = container(spec.requirements)
+    if spec.requirements and (path := container_path(spec.mounts, spec.requirements)):
         if spec.requirements.endswith(".txt"):
             lines.append(f"pip install -q -r {q(path)}")
         else:

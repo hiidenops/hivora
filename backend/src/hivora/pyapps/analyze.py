@@ -78,6 +78,7 @@ class _Docker:
     expose: list[int] = field(default_factory=list)
     apt: list[str] = field(default_factory=list)
     copies: list[tuple[str, str]] = field(default_factory=list)
+    home: str = ""  # the user's home (ENV HOME, or USER's): Hivora runs as root
 
 
 @dataclass
@@ -146,8 +147,23 @@ def _command(value: str) -> list[str]:
     return shlex.split(value)
 
 
+def _home(user: str, runs: list[str]) -> str:
+    """The home of a Dockerfile USER: its useradd/adduser --home-dir, else /home/<user>."""
+    for run in runs:
+        for cmd in run.split("&&"):
+            words = cmd.split()
+            if not words or words[0] not in ("useradd", "adduser") or words[-1] != user:
+                continue
+            for flag in ("--home-dir", "--home", "-d"):
+                if flag in words[:-1] and words[words.index(flag) + 1].startswith("/"):
+                    return words[words.index(flag) + 1]
+    return f"/home/{user}"
+
+
 def _dockerfile(text: str) -> _Docker:
     out = _Docker()
+    runs: list[str] = []
+    user = env_home = ""
     for line in re.sub(r"\\\s*\n", " ", text).splitlines():  # continued lines joined
         words = line.strip().split(None, 1)
         if len(words) < 2 or words[0].startswith("#"):
@@ -170,6 +186,16 @@ def _dockerfile(text: str) -> _Docker:
             parts = [p for p in arg.split() if not p.startswith("--")]
             if len(parts) == 2:
                 out.copies.append((parts[0], parts[1]))
+        elif op == "USER":
+            user = arg.split(":")[0].strip()
+        elif op == "ENV" and (m := re.match(r"HOME(?:=|\s+)\"?(/[^\s\"]*)", arg)):
+            env_home = m.group(1)
+        if op == "RUN":
+            runs.append(arg)
+    if env_home:
+        out.home = env_home
+    elif user and user != "root" and not user.isdigit() and not user.startswith("$"):
+        out.home = _home(user, runs)
     return out
 
 
@@ -220,9 +246,17 @@ def volume_name(mount: Mount) -> str:
 
 
 def _mounts(z: _Zip, docker: _Docker, compose: _Compose) -> list[Mount]:
-    """Where the code goes: the compose mounts, else the Dockerfile's COPY of folders,
-    else the whole project at /app."""
+    """Where the code goes: the compose mounts; while none holds code (data folders only),
+    also the Dockerfile's COPY of folders, else the whole project at /app."""
     names = z.names()
+
+    def is_data(m: Mount) -> bool:
+        inside = [n for n in names if m.source == "" or n.startswith(f"{m.source}/")]
+        return bool(m.source) and not any(n.endswith(".py") for n in inside)
+
+    def has_code(ms: list[Mount]) -> bool:
+        return any(not is_data(m) for m in ms)
+
     mounts: list[Mount] = []
     for spec in compose.volumes:
         src, _, rest = spec.partition(":")
@@ -230,17 +264,16 @@ def _mounts(z: _Zip, docker: _Docker, compose: _Compose) -> list[Mount]:
         if src.startswith(".") and target.startswith("/"):
             source = "" if src in (".", "./") else str(PurePosixPath(src)).lstrip("./")
             mounts.append(Mount(source.strip("/"), target, False))
-    if not mounts:
+    if not has_code(mounts):
         for src, dst in docker.copies:
             source = src.strip("./").strip("/")
             is_dir = source == "" or any(n.startswith(f"{source}/") for n in names)
-            if dst.startswith("/") and is_dir:
+            if dst.startswith("/") and is_dir and dst not in {m.target for m in mounts}:
                 mounts.append(Mount(source, dst.rstrip("/") or "/", False))
-    if not mounts:
+    if not has_code(mounts) and "/app" not in {m.target for m in mounts}:
         mounts.append(Mount("", "/app", False))
     for mount in mounts:
-        inside = [n for n in names if mount.source == "" or n.startswith(f"{mount.source}/")]
-        mount.data = bool(mount.source) and not any(n.endswith(".py") for n in inside)
+        mount.data = is_data(mount)
     return mounts
 
 
@@ -330,7 +363,7 @@ def analyze(path: str, fallback_name: str = "") -> Analysis:
         raise ProjectError("no script to run found (no Dockerfile CMD, compose command, Procfile "
                            "or file with if __name__ == '__main__')")  # fmt: skip
     workdir = workdir or mounts[0].target
-    if requirements and requirements != "." and container_path(mounts, requirements) is None:
+    if requirements and container_path(mounts, requirements) is None:
         mounts.append(Mount("", "/project", False))  # dependencies outside the mounted code
 
     ports = list(docker.expose)
@@ -341,10 +374,17 @@ def analyze(path: str, fallback_name: str = "") -> Analysis:
     if "--port" in entry[:-1] and entry[entry.index("--port") + 1].isdigit():
         ports.append(int(entry[entry.index("--port") + 1]))
 
+    env = _environment(z, compose)
+    if docker.home and all(e.key != "HOME" for e in env):
+        # Hivora runs the code as root: the Dockerfile's paths under its user's home
+        # (mounted by the compose) are only used with HOME pointing there.
+        env.append(EnvVar("HOME", docker.home, source=f"{dockerfile} (USER)"))
+        env.sort(key=lambda e: e.key)
+
     name = compose.name or fallback_name or "Python"
     return Analysis(
         name=re.sub(r"[_-](stack|compose)$", "", name), python=python, requirements=requirements,
-        workdir=workdir, entry=entry, mounts=mounts, env=_environment(z, compose),
+        workdir=workdir, entry=entry, mounts=mounts, env=env,
         ports=sorted(set(ports)), apt=sorted(set(docker.apt)), notes=notes, files=len(names),
         size=z.size,
     )  # fmt: skip
