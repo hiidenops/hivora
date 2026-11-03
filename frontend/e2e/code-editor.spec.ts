@@ -58,13 +58,16 @@ test("code editor: a long text field of the deploy form, typed and completed fro
   expect(values.custom_properties).toContain("force-gamemode=false");
 });
 
-test("side panel: its left edge drags to any width, kept when it opens again", async ({ page }) => {
+test("side panel: its left edge drags to any width, kept when it opens again", async ({ page }, info) => {
   await signIn(page);
-  const id = (await deployNginx(page, "Largeur", 8393)).app.id;
+  const n = info.retry * 10 + info.repeatEachIndex; // a retry deploys its own app
+  const id = (await deployNginx(page, `Largeur ${n}`, 8700 + n)).app.id;
   await page.goto(`/app/?id=${id}`);
   await page.getByText("Mode avancé", { exact: true }).click();
   await openAppMenu(page, "Détails avancés");
   const panel = page.getByRole("dialog");
+  const settled = () => panel.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished))); // slid in
+  await settled();
   const before = (await panel.boundingBox())!.width;
   const edge = (await panel.getByRole("separator").boundingBox())!;
   await page.mouse.move(edge.x + edge.width / 2, edge.y + 200);
@@ -76,6 +79,7 @@ test("side panel: its left edge drags to any width, kept when it opens again", a
 
   await page.keyboard.press("Escape");
   await openAppMenu(page, "Détails avancés");
+  await settled();
   expect(Math.abs((await panel.boundingBox())!.width - wider)).toBeLessThan(2);
   await panel.getByRole("separator").dblclick(); // back to the default width
   await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(Math.round(before));
