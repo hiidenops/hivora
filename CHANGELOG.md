@@ -6,6 +6,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.3.7] - 2026-11-03
+
 ### Ajouté
 
 - **Nouveautés** : après plusieurs mises à jour d'un coup, la fenêtre des nouveautés montre les notes de toutes les versions depuis la dernière vue dans ce navigateur, la plus récente d'abord.
