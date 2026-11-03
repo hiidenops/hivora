@@ -6,6 +6,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.4.0] - 2026-11-04
+
 ### Ajouté
 
 - **Domaines publics en HTTPS** : un proxy HTTPS (Caddy, nouveau modèle « Proxy HTTPS ») publie vos apps web sous votre nom de domaine, avec un certificat Let's Encrypt obtenu et renouvelé tout seul. Dans la topologie, cliquez sur une zone : sa fiche liste les noms de ses apps et permet d'en lier un nouveau en une ligne (nom + app). Zone derrière un VPN : un nom local (`minecraft.local`) ; sinon : un domaine public, le proxy s'installe depuis la même fiche s'il manque. La page du proxy montre chaque domaine, son certificat (validité, émetteur), où pointe son DNS et pourquoi Let's Encrypt l'a refusé. Il faut faire pointer le domaine vers l'IP publique de la machine et rediriger les ports 80 et 443 de la box.
