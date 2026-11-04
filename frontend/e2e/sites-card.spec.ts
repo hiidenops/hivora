@@ -9,6 +9,8 @@ import { adminApi, deployNginx, expectPointerCursors, signIn, signInViewer } fro
 // The app -> sites model on the nginx app's page: host sites, add one after its preview
 // (the restart is announced), turn it off; an nginx on template 1.0.0; a viewer.
 test("nginx sites card: host sites, add one, turn it off, 1.0.0 and viewer", async ({ page, browser }) => {
+  // Long (deploy, sites, a viewer's first sign-in): ~20 s here, over 60 s on a CI runner.
+  test.slow();
   await signIn(page);
 
   // An nginx from the catalog serves one site.
