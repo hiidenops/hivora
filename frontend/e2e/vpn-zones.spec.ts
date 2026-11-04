@@ -26,6 +26,10 @@ test("vpn zones: link a zone from the VPN card, deploy into it through the VPN",
   });
   await page.getByRole("group", { name: "Zones accessibles par le VPN" }).getByRole("button", { name: "Enregistrer" }).click();
   await expect(zone).toContainText("desservie : réseau 10.8.1.0/24", { timeout: 20_000 });
+  // Its DNS, from its card.
+  await page.getByRole("button", { name: "DNS", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "DNS du VPN Tunnel" })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   await page.goto("/deploy/?template=vaultwarden");
   const access = page.getByRole("radiogroup");

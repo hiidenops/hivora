@@ -77,6 +77,7 @@ function AppTile({ app }: { app: App }) {
   );
 }
 
+const DnsDialog = dynamic(() => import("@/features/vpn/dns-dialog").then((m) => m.DnsDialog));
 const AdoptBanner = dynamic(() => import("@/features/apps/adopt-banner").then((m) => m.AdoptBanner));
 
 export default function DashboardPage() {
@@ -134,7 +135,7 @@ export default function DashboardPage() {
         {sections.map(({ zone, apps: list }) => (
           <section key={zone?.id ?? "none"}>
             {zone ? (
-              <ZoneHeading zone={zone} operator={can("operator")} />
+              <ZoneHeading zone={zone} operator={can("operator")} vpnId={apps?.find((a) => a.slug === zone.vpn_slug)?.id} />
             ) : (
               <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                 <span className="size-2.5 rounded-full" style={{ background: "var(--idle)" }} />
@@ -156,8 +157,8 @@ export default function DashboardPage() {
 }
 
 /** A zone's title over its apps, its shortcuts right beside its name: start, stop, restart
- *  the zone in its order, and its start order. */
-function ZoneHeading({ zone, operator }: { zone: Zone; operator: boolean }) {
+ *  the zone in its order, its start order, and the DNS of the VPN that reaches it. */
+function ZoneHeading({ zone, operator, vpnId }: { zone: Zone; operator: boolean; vpnId?: number }) {
   const { t, errorMessage } = useI18n();
   const { run, error } = useZoneActions(zone);
   return (
@@ -174,6 +175,7 @@ function ZoneHeading({ zone, operator }: { zone: Zone; operator: boolean }) {
         )}
         {operator && <ZoneActionButtons zone={zone} run={run} compact />}
         <StartOrderButton zone={zone} />
+        {operator && zone.vpn && vpnId !== undefined && <DnsDialog appId={vpnId} vpnName={zone.vpn} />}
       </div>
       {!!error && <Alert tone="danger">{errorMessage(error)}</Alert>}
     </div>

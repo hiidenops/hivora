@@ -1,6 +1,8 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
@@ -23,7 +25,7 @@ const DatabaseCard = dynamic(() => import("@/features/apps/database-card").then(
 const TeamSpeakPanel = dynamic(() => import("@/features/teamspeak/teamspeak-panel").then((m) => m.TeamSpeakPanel));
 const HostedSitesCard = dynamic(() => import("@/features/hosting/hosted-sites-card").then((m) => m.HostedSitesCard));
 import { ApiError } from "@/lib/api/client";
-import { useApp } from "@/lib/api/hooks";
+import { useApp, useZones } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 import { useLiveStatus } from "@/lib/realtime";
 
@@ -33,6 +35,8 @@ function AppDetail() {
   const { can } = useSession();
   const id = Number(useSearchParams().get("id") ?? 0);
   const { data: app, error } = useApp(id);
+  const { data: zones } = useZones();
+  const zone = zones?.find((z) => z.id === app?.zone_id);
   const setActiveJob = useTrackJob(); // followed in a pop-up
   const [removing, setRemoving] = useState(false);
   const status = useLiveStatus(app?.slug ?? "", app?.status ?? "missing");
@@ -62,12 +66,22 @@ function AppDetail() {
 
   return (
     <>
-      <PageHeader
-        title={
-          <span className="flex flex-wrap items-center gap-3">
-            {app.name}
-          </span>
-        }
+      <nav aria-label={t("hosting.breadcrumb")} className="mb-2 flex items-center gap-1 text-sm text-muted-foreground">
+        <Link href="/" className="hover:text-foreground">
+          {t("nav.dashboard")}
+        </Link>
+        {zone && (
+          <>
+            <ChevronRight className="size-3.5" />
+            <Link href="/zones/" className="hover:text-foreground">
+              {zone.name}
+            </Link>
+          </>
+        )}
+        <ChevronRight className="size-3.5" />
+        <span aria-current="page">{app.name}</span>
+      </nav>
+      <PageHeader title={app.name}
         actions={
           <>
             <AppActions id={app.id} status={status} onJob={setActiveJob} />
@@ -98,7 +112,7 @@ function AppDetail() {
             onJob={setActiveJob}
           />
         )}
-        {app.vpn && can("operator") && <VpnCard appId={app.id} onJob={setActiveJob} />}
+        {app.vpn && can("operator") && <VpnCard appId={app.id} name={app.name} onJob={setActiveJob} />}
         {app.template === "caddy" && can("operator") && <ProxyCard />}
       </div>
     </>

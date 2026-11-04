@@ -15,6 +15,8 @@ import type { components } from "@/lib/api/schema";
 import { keys, useZones } from "@/lib/api/hooks";
 import { useI18n } from "@/lib/i18n";
 
+import { DnsDialog } from "./dns-dialog";
+
 type Vpn = components["schemas"]["VpnOut"];
 type Client = components["schemas"]["VpnClientOut"];
 
@@ -131,7 +133,7 @@ async function closedPorts(zones: string[]): Promise<string[]> {
 }
 
 /** Clients of the WireGuard server and the zones it reaches: Hivora writes its config. */
-export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) => void }) {
+export function VpnCard({ appId, name: vpnName, onJob }: { appId: number; name: string; onJob: (id: number) => void }) {
   const { t, lang, errorMessage } = useI18n();
   const qc = useQueryClient();
   const key = keys.vpn(appId);
@@ -164,10 +166,11 @@ export function VpnCard({ appId, onJob }: { appId: number; onJob: (id: number) =
 
   return (
     <Card className="lg:col-span-2">
-      <CardHeader>
+      <CardHeader className="flex-row items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2">
           <ShieldCheck className="size-5" /> {t("vpn.title")}
         </CardTitle>
+        <DnsDialog appId={appId} vpnName={vpnName} />
       </CardHeader>
       <CardContent className="grid gap-5">
         {error && <Alert tone="danger">{errorMessage(error)}</Alert>}

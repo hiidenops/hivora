@@ -17,13 +17,14 @@ import { Switch } from "@/components/ui/input";
 import type { HostedSite } from "@/lib/api/client";
 import { useI18n } from "@/lib/i18n";
 
-import { useSetHostedSiteEnabled } from "./hooks";
+import { useHostedSites, useSetHostedSiteEnabled } from "./hooks";
 import { useServerName } from "./server";
 
 // Loaded when opened: a site's page stays light.
 const PortDialog = dynamic(() => import("./port-dialog").then((m) => m.PortDialog));
 const RemoveSiteDialog = dynamic(() => import("./remove-site-dialog").then((m) => m.RemoveSiteDialog));
 const ServerNameDialog = dynamic(() => import("./server-name-dialog").then((m) => m.ServerNameDialog));
+const RemoveDialog = dynamic(() => import("@/features/apps/remove-dialog").then((m) => m.RemoveDialog));
 
 type Controls = {
   appId: number;
@@ -82,14 +83,17 @@ export function SitePort({ appId, site, locked, stopped, onJob }: Controls & { s
   );
 }
 
-/** A site's menu: port; for an added site, its domain name (advanced mode) and removal (the
- *  main site follows its app). None for a viewer. `onRemoved`: after the removal (default: onJob). */
+/** A site's menu: port; for an added site, its domain name (advanced mode); removal (the main
+ *  site's removes its web server app, every site with it). None for a viewer. `onRemoved`:
+ *  after the removal (default: onJob). */
 export function SiteActions({ appId, site, locked, stopped, onJob, onRemoved = onJob }: Controls & {
   stopped: boolean; // a port change or a removal recreates the container: it would start it
   onRemoved?: (jobId: number) => void;
 }) {
   const { t } = useI18n();
   const { can, advanced } = useSession();
+  const server = useServerName();
+  const { data: host } = useHostedSites(appId); // cached: its name, for the app's removal
   const [dialog, setDialog] = useState<"port" | "name" | "remove" | null>(null);
   if (!can("operator")) return null;
   const dialogProps = (d: "port" | "name" | "remove") => ({
@@ -117,19 +121,24 @@ export function SiteActions({ appId, site, locked, stopped, onJob, onRemoved = o
               {t("hosting.serverName")}
             </DropdownMenuItem>
           )}
-          {!site.main && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled={locked || stopped} className="text-danger" onSelect={() => setDialog("remove")}>
-                {t("common.delete")}
-              </DropdownMenuItem>
-            </>
+          <DropdownMenuSeparator />
+          {site.main ? (
+            <DropdownMenuItem className="text-danger" onSelect={() => setDialog("remove")}>
+              {t("hosting.removeHost", { server })}
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem disabled={locked || stopped} className="text-danger" onSelect={() => setDialog("remove")}>
+              {t("common.delete")}
+            </DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
       {dialog === "port" && <PortDialog {...dialogProps("port")} />}
       {dialog === "name" && <ServerNameDialog {...dialogProps("name")} />}
-      {dialog === "remove" && <RemoveSiteDialog {...dialogProps("remove")} />}
+      {dialog === "remove" && !site.main && <RemoveSiteDialog {...dialogProps("remove")} />}
+      {dialog === "remove" && site.main && (
+        <RemoveDialog id={appId} name={host?.name ?? site.name} open onOpenChange={(o) => setDialog(o ? "remove" : null)} onJob={onRemoved} />
+      )}
     </>
   );
 }

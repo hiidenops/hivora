@@ -23,6 +23,10 @@
   --warn: oklch(0.55 0.14 65);
   --danger: oklch(0.52 0.2 27);
   --idle: oklch(0.55 0.01 60);
+  /* Side menu groups, one hue each (never the status colours, kept for dots). */
+  --nav-apps: oklch(0.52 0.13 65);
+  --nav-network: oklch(0.5 0.11 210);
+  --nav-admin: oklch(0.5 0.13 300);
   --grid: oklch(0.6 0.04 70 / 0.2);
   --field: oklch(0.945 0.01 80);
   /* Depth: warm shadows and a light edge on raised surfaces. */
@@ -56,6 +60,9 @@
   --ok: oklch(0.72 0.15 150);
   --info: oklch(0.7 0.12 240);
   --idle: oklch(0.6 0.01 60);
+  --nav-apps: oklch(0.78 0.14 75);
+  --nav-network: oklch(0.76 0.11 210);
+  --nav-admin: oklch(0.76 0.12 300);
   --grid: oklch(0.78 0.05 75 / 0.14);
   --warn: oklch(0.72 0.15 70);
   --danger: oklch(0.58 0.2 27);

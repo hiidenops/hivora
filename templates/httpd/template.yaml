@@ -10,6 +10,7 @@ metadata:
   description:
     fr: Le serveur web Apache, pour publier un site statique (HTML, CSS, images) sur votre réseau.
     en: The Apache web server, to publish a static website (HTML, CSS, images) on your network.
+  verified: true
   links:
     site: https://httpd.apache.org
     doc: https://httpd.apache.org/docs/2.4/

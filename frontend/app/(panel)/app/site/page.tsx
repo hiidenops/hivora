@@ -82,7 +82,10 @@ function HostedSiteDetail() {
               locked={host.upgrade_required}
               stopped={host.stopped}
               onJob={follow}
-              onRemoved={() => router.replace(`/app/?id=${appId}`)}
+              onRemoved={(job) => {
+                if (site.main) follow(job); // the whole server goes: back to the sites
+                router.replace(site.main ? "/sites/" : `/app/?id=${appId}`);
+              }}
             />
           </div>
         }

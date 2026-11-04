@@ -8,6 +8,7 @@ import { readPref, writePref } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
 
 export const Sheet = D.Root;
+export const SheetTrigger = D.Trigger;
 
 const MIN = 360;
 const clamp = (w: number) => Math.round(Math.min(Math.max(w, MIN), window.innerWidth));

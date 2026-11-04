@@ -107,47 +107,58 @@ function AppsCatalog({ kind }: { kind: Kind }) {
         />
       </div>
       {isPending && <TileSkeletons label={t("common.loading")} count={4} />}
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-4">
-        {visible.map((tp, i) => (
-          <Card
-            key={tp.slug}
-            role="article"
-            aria-label={tp.name}
-            className="card-interactive animate-enter flex flex-col gap-3 p-5"
-            style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
-          >
-            <div className="flex items-center gap-3">
-              <AppIcon src={tp.icon_url} name={tp.name} className="size-12" />
-              <div>
-                <div className="font-medium">{tp.name}</div>
-                <div className="font-mono text-xs text-muted-foreground">v{tp.version}</div>
-              </div>
-              {tp.verified && (
-                <Badge className="ml-auto gap-1 border-ok/50 text-ok" title={t("catalog.verifiedHelp")}>
-                  <BadgeCheck className="size-3.5" /> {t("catalog.verified")}
-                </Badge>
-              )}
-            </div>
-            <p className="flex-1 text-sm text-muted-foreground">{l(tp.description)}</p>
-            <div className="flex flex-wrap gap-1">
-              {tp.tags.map((tag) => (
-                <Badge key={tag}>{tag}</Badge>
+      {/* Managed natively by Hivora (its own panels) first, then the rest of the catalog. */}
+      {[
+        { key: "native", items: visible.filter((tp) => tp.verified) },
+        { key: "others", items: visible.filter((tp) => !tp.verified) },
+      ].map(({ key, items }) =>
+        items.length > 0 && (
+          <section key={key} aria-label={t(`catalog.section.${key}` as MessageKey)} className="mb-8">
+            <h2 className="mb-3 text-lg font-semibold">{t(`catalog.section.${key}` as MessageKey)}</h2>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-4">
+              {items.map((tp, i) => (
+                <Card
+                  key={tp.slug}
+                  role="article"
+                  aria-label={tp.name}
+                  className="card-interactive animate-enter flex flex-col gap-3 p-5"
+                  style={{ animationDelay: `${Math.min(i, 10) * 30}ms` }}
+                >
+                  <div className="flex items-center gap-3">
+                    <AppIcon src={tp.icon_url} name={tp.name} className="size-12" />
+                    <div>
+                      <div className="font-medium">{tp.name}</div>
+                      <div className="font-mono text-xs text-muted-foreground">v{tp.version}</div>
+                    </div>
+                    {tp.verified && (
+                      <Badge className="ml-auto gap-1 border-ok/50 text-ok" title={t("catalog.verifiedHelp")}>
+                        <BadgeCheck className="size-3.5" /> {t("catalog.verified")}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="flex-1 text-sm text-muted-foreground">{l(tp.description)}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {tp.tags.map((tag) => (
+                      <Badge key={tag}>{tag}</Badge>
+                    ))}
+                  </div>
+                  {!tp.compatible ? (
+                    <Badge className="self-start border-warn/50 text-warn" title={t("catalog.incompatibleHelp")}>
+                      {tp.arch.length === 1 ? t(`catalog.only.${tp.arch[0]}` as MessageKey) : t("catalog.incompatible")}
+                    </Badge>
+                  ) : (
+                    can("operator") && (
+                      <Button asChild className="self-start">
+                        <Link href={`/deploy/?template=${tp.slug}`}>{t("action.deploy")}</Link>
+                      </Button>
+                    )
+                  )}
+                </Card>
               ))}
             </div>
-            {!tp.compatible ? (
-              <Badge className="self-start border-warn/50 text-warn" title={t("catalog.incompatibleHelp")}>
-                {tp.arch.length === 1 ? t(`catalog.only.${tp.arch[0]}` as MessageKey) : t("catalog.incompatible")}
-              </Badge>
-            ) : (
-              can("operator") && (
-                <Button asChild className="self-start">
-                  <Link href={`/deploy/?template=${tp.slug}`}>{t("action.deploy")}</Link>
-                </Button>
-              )
-            )}
-          </Card>
-        ))}
-      </div>
+          </section>
+        ),
+      )}
     </>
   );
 }

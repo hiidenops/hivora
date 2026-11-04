@@ -1,7 +1,8 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { ArrowRight, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { PageHeader, useSession } from "@/components/app-shell";
@@ -13,7 +14,7 @@ import { TBody, THead, Table, Td, Th, Tr } from "@/components/ui/table";
 import { HostCharts } from "@/features/activity/host-charts";
 import { JobList } from "@/features/apps/job-list";
 import { api } from "@/lib/api/client";
-import { keys, useAudit, useJobs } from "@/lib/api/hooks";
+import { keys, useApps, useAudit, useJobs } from "@/lib/api/hooks";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -95,6 +96,9 @@ export default function ActivityPage() {
   const [auditCount, setAuditCount] = useState(10);
   const { data: jobs } = useJobs(undefined, jobCount);
   const [selected, setSelected] = useState<number | null>(null);
+  const { data: apps } = useApps();
+  // The selected job's app, while it still exists: one click to its page.
+  const jobApp = apps?.find((a) => a.id === jobs?.find((j) => j.id === selected)?.app_id);
 
   return (
     <>
@@ -113,6 +117,13 @@ export default function ActivityPage() {
           </CardHeader>
           <CardContent className="grid gap-4">
             {selected && <JobProgress key={selected} jobId={selected} />}
+            {jobApp && (
+              <Button variant="outline" size="sm" className="justify-self-start" asChild>
+                <Link href={`/app/?id=${jobApp.id}`}>
+                  {t("activity.openApp", { name: jobApp.name })} <ArrowRight />
+                </Link>
+              </Button>
+            )}
             <JobList jobs={jobs ?? []} onSelect={setSelected} />
           </CardContent>
         </Card>

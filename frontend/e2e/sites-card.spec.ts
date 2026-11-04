@@ -152,7 +152,7 @@ test("nginx sites card: change a port, a domain name, remove a site", async ({ p
   await expect(page.getByRole("menuitem")).toHaveText(["Changer le port", "Supprimer"]);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Actions du site « Pages »" }).click();
-  await expect(page.getByRole("menuitem")).toHaveText(["Changer le port"]);
+  await expect(page.getByRole("menuitem")).toHaveText(["Changer le port", "Supprimer le serveur nginx et ses sites"]);
   await page.keyboard.press("Escape");
 
   // Port: Wiki's port is taken, and so is the neighbour nginx's: each time a really free one

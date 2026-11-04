@@ -10,6 +10,7 @@ metadata:
   description:
     fr: Serveur web léger pour publier un site statique (HTML, CSS, images) sur votre réseau.
     en: Lightweight web server to publish a static website (HTML, CSS, images) on your network.
+  verified: true
   links:
     site: https://nginx.org
     doc: https://nginx.org/en/docs/

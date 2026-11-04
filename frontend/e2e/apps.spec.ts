@@ -36,6 +36,10 @@ test("first start: forced password change, deploy, remove, users", async ({ page
   await page.getByRole("link", { name: "Parcourir le catalogue" }).click();
   // Not anchored: until the catalog's icons are downloaded, their letters come first.
   await page.getByRole("link", { name: /Applications/ }).click();
+  // The apps Hivora manages natively first, in their own section; the others after.
+  await expect(page.getByRole("heading", { level: 2 })).toHaveText(["Gérées par Hivora", "Autres applications"]);
+  await expect(page.getByRole("region", { name: "Gérées par Hivora" }).getByRole("article", { name: "nginx" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Autres applications" }).getByRole("article", { name: "Redis" })).toBeVisible();
   await page.getByRole("article", { name: "Vaultwarden" }).getByRole("link", { name: "Déployer" }).click();
   await expect(page.getByRole("heading", { name: "Déployer Vaultwarden" })).toBeVisible();
   await page.getByRole("button", { name: "Vérifier" }).click();

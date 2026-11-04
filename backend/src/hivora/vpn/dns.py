@@ -46,12 +46,12 @@ def upstream(dns: str) -> str:
 
 
 def corefile(records: list[Record], dns: str) -> str:
-    hosts = [f"        {r.ip} {r.name}" for r in records if r.ip]
+    ips = [f"        {r.ip} {r.name}" for r in records if r.ip]
+    hosts = ["    hosts {", "        ttl 30", *ips, "        fallthrough", "    }"]
     apps = [r for r in records if r.container]
     lines = [
         "# Written by Hivora: edits here are replaced on the next change.",
-        ". {", "    errors", "    health", "    loop",
-        "    hosts {", "        ttl 30", *hosts, "        fallthrough", "    }",
+        ". {", "    errors", "    health", "    loop", *hosts,
         f"    forward . {upstream(dns)}", "    cache 30", "}",
     ]  # fmt: skip
     if apps:  # one block for the apps' names: rewritten to the container's, Docker answers
@@ -59,6 +59,11 @@ def corefile(records: list[Record], dns: str) -> str:
         for r in apps:
             lines += [f"    rewrite continue name exact {r.name}. {r.container}. answer auto",
                       f"    rewrite ttl exact {r.name}. 30"]  # fmt: skip
+        # CoreDNS sends a name to the block of its longest zone: under an app's name
+        # (web.home.lan under home.lan), an IP's name lands here, so this block knows them
+        # too (rewrite runs before hosts: an IP's name passes it untouched).
+        if ips:
+            lines += hosts
         lines += [f"    forward . {DOCKER_DNS}", "}"]
     return "\n".join(lines) + "\n"
 
@@ -77,3 +82,7 @@ if __name__ == "__main__":
                      Record("mc.local", container="mc-server-1")], "")  # fmt: skip
     assert "192.168.1.20 nas.local" in text and "mc.local. {" in text
     assert "name exact mc.local. mc-server-1. answer auto" in text
+    # An IP's name under an app's: known by the app's block too (its longest zone).
+    text = corefile([Record("home.lan", container="web-1"),
+                     Record("web.home.lan", ip="10.8.1.5")], "")  # fmt: skip
+    assert text.split("home.lan. {")[1].count("10.8.1.5 web.home.lan") == 1

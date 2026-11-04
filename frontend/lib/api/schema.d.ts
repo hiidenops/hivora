@@ -5111,6 +5111,8 @@ export interface components {
             subnet: string | null;
             /** Vpn */
             vpn: string | null;
+            /** Vpn Slug */
+            vpn_slug: string | null;
         };
         /** ZonesIn */
         ZonesIn: {

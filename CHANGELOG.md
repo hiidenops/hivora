@@ -6,6 +6,23 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+
+- **DNS du VPN depuis le tableau de bord et la carte VPN** : bouton « DNS » sur l'en-tête de chaque zone derrière un VPN et sur la carte VPN de l'app WireGuard (plus seulement dans la topologie).
+- **Supprimer un serveur web depuis son site principal** : le menu ⋯ du site principal d'un nginx ou d'un Apache propose « Supprimer le serveur et ses sites » (la suppression de l'app, ce qui part listé, données gardées par défaut).
+
+- **Recherche rapide (Ctrl+K)** : Ctrl+K (⌘K sur Mac), « / » ou la loupe à côté du logo ouvrent « Aller à… » : tapez quelques lettres du nom d'une app ou d'une page (accents et majuscules ignorés), Entrée pour y aller.
+- **Fil d'Ariane sur la page d'une app** : Tableau de bord › zone › app. Dans Activité, une tâche sélectionnée propose « Ouvrir l'app ».
+
+### Modifié
+
+- **Menu regroupé** : Tableau de bord, puis trois groupes repliables, chacun de sa couleur (Applications : catalogue, image Docker, projet Python, sites ; Réseau : zones, topologie, pare-feu ; Administration : activité, utilisateurs, paramètres, système). Un groupe replié le reste dans ce navigateur (son titre montre alors le nombre de pages, et un point quand la page ouverte en fait partie) ; il se déplie tout seul quand on arrive sur l'une de ses pages. Sur téléphone, le menu s'ouvre par un bouton au lieu de défiler en haut de l'écran.
+- **Catalogue** : les apps gérées par Hivora (badge « Adapté à Hivora », désormais aussi nginx et Apache) sont affichées à part, en premier ; les autres suivent.
+
+### Corrigé
+
+- **DNS du VPN** : un nom vers une adresse IP placé sous le nom d'une app (`web.maison.lan` sous `maison.lan`) ne répondait pas. Ouvrir la carte du VPN réécrit sa configuration DNS.
+
 ## [0.4.0] - 2026-11-04
 
 ### Ajouté

@@ -6902,6 +6902,17 @@
               }
             ],
             "title": "Vpn"
+          },
+          "vpn_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vpn Slug"
           }
         },
         "required": [
@@ -6914,6 +6925,7 @@
           "is_system",
           "apps",
           "vpn",
+          "vpn_slug",
           "subnet"
         ],
         "title": "ZoneOut",
@@ -7026,7 +7038,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.3.8"
+    "version": "0.4.0"
   },
   "openapi": "3.1.0",
   "paths": {

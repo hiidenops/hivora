@@ -21,6 +21,7 @@ class ZoneOut(BaseModel):
     is_system: bool
     apps: int  # applications in the zone
     vpn: str | None  # the VPN app that reaches it: its apps are reached only through it
+    vpn_slug: str | None  # that app's slug (its DNS, from the dashboard)
     subnet: str | None  # its network's subnet, when Hivora chose it (next to the VPN's)
 
 
@@ -30,9 +31,11 @@ class ZoneIn(BaseModel):
     network_mode: NetworkMode = NetworkMode.NONE
 
 
-def _out(z: Zone, apps: int, vpn: str | None = None) -> ZoneOut:
+def _out(z: Zone, apps: int, vpn: tuple[str, str] | None = None) -> ZoneOut:
+    """``vpn``: (slug, name) of the VPN app that reaches it."""
     return ZoneOut(id=z.id, slug=z.slug, name=z.name, color=z.color, icon=z.icon,
-                   network_mode=z.network_mode, is_system=z.is_system, apps=apps, vpn=vpn,
+                   network_mode=z.network_mode, is_system=z.is_system, apps=apps,
+                   vpn=vpn[1] if vpn else None, vpn_slug=vpn[0] if vpn else None,
                    subnet=z.subnet)  # fmt: skip
 
 
@@ -41,7 +44,7 @@ async def zones(_: Viewer, rt: RuntimeDep) -> list[ZoneOut]:
     async with rt.sessions() as session:
         counts = await rt.apps.apps_per_zone(session)
         vpns = await rt.apps.planner.vpn_zones(session)
-        return [_out(z, counts.get(z.id, 0), vpns.get(z.slug, (None, None))[1])
+        return [_out(z, counts.get(z.id, 0), vpns.get(z.slug))
                 for z in await list_zones(session)]  # fmt: skip
 
 
@@ -63,8 +66,7 @@ async def edit(slug: str, body: ZoneIn, _: Operator, rt: RuntimeDep) -> ZoneOut:
             raise ConflictError("a VPN reaches this zone: its apps keep their network",
                                 vpn=vpn[1])  # fmt: skip
         zone, changed = await edit_zone(session, slug, body.name, body.color, body.network_mode)
-        out = _out(zone, (await rt.apps.apps_per_zone(session)).get(zone.id, 0),
-                   vpn[1] if vpn else None)  # fmt: skip
+        out = _out(zone, (await rt.apps.apps_per_zone(session)).get(zone.id, 0), vpn)  # fmt: skip
     if changed:
         await rt.apps.revisions.redeploy_zone(out.id)
     rt.bus.publish("zone.updated", target=slug, network_changed=changed)
