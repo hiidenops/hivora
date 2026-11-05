@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hivora.addressing import Addressing
 from hivora.apps.adoption import Adoption
 from hivora.apps.compose_edit import ComposeEdit
 from hivora.apps.core import (
@@ -91,6 +92,7 @@ class AppService:
         # Set by the composition root (Runtime), like the planner's secret settings, public
         # address and sites' ports: the job handlers' Docker gateway (image platforms).
         self.gateway: DockerGateway | None = None
+        self.addressing: Addressing | None = None  # the addressing plan (released on removal)
         self.settings = settings
         self.sessions = sessions
         self.catalog = catalog

@@ -15,6 +15,7 @@ import yaml
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hivora.addressing import Taken
 from hivora.apps.core import latest_revision
 from hivora.apps.models import Application
 from hivora.apps.planner import vpn_zone_slugs
@@ -25,15 +26,17 @@ from hivora.core.errors import ConflictError, NotFoundError
 from hivora.core.events import EventBus
 from hivora.crypto.cipher import Purpose, Sealed, SecretBox
 from hivora.docker_gateway import DockerGateway
-from hivora.jobs import Job
-from hivora.vpn import dns
+from hivora.jobs import Job, JobContext, JobKind, JobStatus
+from hivora.sites.core import SERVICE as SITE_SERVICE
+from hivora.sites.views import sites_by_host
+from hivora.vpn import dns, web
 from hivora.vpn import wireguard as wg
 from hivora.vpn.acl import access_of, apply_changes, client_out, is_active
-from hivora.vpn.addressing import VpnApp, VpnFullError, allowed_ips, check_address, zone_subnet
+from hivora.vpn.addressing import VpnApp, VpnFullError, allowed_ips, check_address
 from hivora.vpn.apply import VpnApplyError, bring_up, write_files, zone_subnets
 from hivora.vpn.models import VpnDnsRecord, VpnPeer
 from hivora.zones.models import NetworkMode, Zone
-from hivora.zones.service import list_zones
+from hivora.zones.service import list_zones, zone_network
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +90,7 @@ class VpnTools:
         self.clock = clock
         self.gateway = gateway
         self._lock = asyncio.Lock()
+        self._web_applied = "[]"  # the routes the web proxy serves (none until a job says)
 
     async def _vpn(self, app_id: int) -> VpnApp:
         async with self.sessions() as session:
@@ -196,33 +200,116 @@ class VpnTools:
             .where(VpnDnsRecord.vpn_app_id == vpn.app_id).order_by(VpnDnsRecord.name)
         )  # fmt: skip
         return [{"id": r.id, "name": r.name, "ip": r.ip, "app_id": r.target_app_id,
-                 "app_slug": slug, "app_name": name} for r, slug, name in rows]  # fmt: skip
+                 "app_slug": slug, "app_name": name, "service": r.target_service,
+                 "port": r.target_port, "via_proxy": web.via_proxy(r.target_port),
+                 "url": f"http://{r.name}" if r.target_port is not None else None}
+                for r, slug, name in rows]  # fmt: skip
 
     async def _targets(self, session: AsyncSession, vpn: VpnApp) -> dict[int, dict[str, Any]]:
-        """Apps of the zones the VPN reaches, by id: their main container's Docker name."""
+        """Apps of the zones the VPN reaches, by id: their main container's Docker name, the
+        ports a name can aim at (each service's, web or not) and the sites they host."""
         out = {}
         rows = await session.execute(
             select(Application, Zone.slug).join(Zone, Zone.id == Application.zone_id)
             .where(Zone.slug.in_(vpn.zones), Application.id != vpn.app_id)
             .order_by(Application.name)
         )  # fmt: skip
+        hosted = await sites_by_host(session, None)
         for app, zone in rows:
             try:
                 entry = await self.apps.planner.entry_of(session, app)
             except (ConflictError, NotFoundError):
                 continue  # no template: its main service is unknown
-            out[app.id] = {"id": app.id, "name": app.name, "zone": zone,
-                           "container": f"{app.slug}-{entry.template.main_service}-1"}  # fmt: skip
+            values = (await self.apps.planner.current_settings(session, app.id)).values
+            form = entry.template.with_defaults(values)
+            ports = []
+            for name, svc in entry.template.services.items():
+                for p in svc.ports:
+                    with suppress(KeyError, TypeError, ValueError):
+                        port = p.container_in(form)
+                        ports.append({"service": name, "port": port, "protocol": p.protocol,
+                                      "web": p.purpose == "web"})  # fmt: skip
+            sites = [{"id": h.id, "name": h.name, "service": SITE_SERVICE,
+                      "port": web.DIRECT_PORT if h.main else h.port, "main": h.main}
+                     for h in hosted.get(app.id, []) if h.main or h.port]  # fmt: skip
+            out[app.id] = {"id": app.id, "name": app.name, "zone": zone, "slug": app.slug,
+                           "container": f"{app.slug}-{entry.template.main_service}-1",
+                           "ports": ports, "sites": sites}  # fmt: skip
         return out
+
+    async def _routes(self, session: AsyncSession) -> list[web.Route]:
+        """Every name (all VPNs) the web proxy serves: aimed at a port other than 80 of an
+        app in a zone with its network."""
+        out = []
+        rows = await session.execute(
+            select(VpnDnsRecord, Application, Zone)
+            .join(Application, Application.id == VpnDnsRecord.target_app_id)
+            .join(Zone, Zone.id == Application.zone_id)
+            .where(VpnDnsRecord.target_port.is_not(None)).order_by(VpnDnsRecord.name)
+        )  # fmt: skip
+        for record, app, zone in rows:
+            network = zone_network(zone)
+            if network and web.via_proxy(record.target_port) and record.target_service:
+                out.append(web.Route(record.name, web.container_of(app.slug, record.target_service),
+                                     int(record.target_port or 0), network))  # fmt: skip
+        return out
+
+    async def _web_addresses(self, session: AsyncSession,
+                             routes: list[web.Route]) -> dict[str, str]:  # fmt: skip
+        """The proxy's fixed address in each network it serves (addressing plan)."""
+        if self.apps.addressing is None:
+            return {}
+        networks = sorted({r.network for r in routes})
+        return await self.apps.addressing.for_sidecar(session, web.SLUG, web.SERVICE, networks)
+
+    async def _web_signature(self) -> str:
+        async with self.sessions() as session:
+            return repr(await self._routes(session))
+
+    def register(self) -> None:
+        self.apps.jobs.register(JobKind.VPN_WEB, self._apply_web)
+
+    async def _apply_web(self, ctx: JobContext) -> None:
+        """The vpn_web job: the web proxy as the names now need it."""
+        async with self.sessions() as session, session.begin():
+            routes = await self._routes(session)
+            addresses = await self._web_addresses(session, routes)
+        signature = repr(routes)
+        directory = self.apps.settings.data_dir / "web"
+        await ctx.log(await web.apply(self.gateway, directory, routes, addresses))
+        self._web_applied = signature
+
+    async def queue_web(self, *, if_changed: bool = True) -> Job | None:
+        """The web proxy's job, when the names it serves changed (and none is waiting)."""
+        if if_changed and await self._web_signature() == self._web_applied:
+            return None
+        async with self.sessions() as session, session.begin():
+            waiting = await session.scalar(select(Job).where(
+                Job.kind == JobKind.VPN_WEB, Job.status == JobStatus.QUEUED))  # fmt: skip
+            if waiting is not None:
+                return waiting
+            job = self.apps.jobs.add(session, JobKind.VPN_WEB)
+        self.apps.jobs.wake()
+        return job
 
     async def _write_dns(self, session: AsyncSession, vpn: VpnApp) -> bool:
         """Write the local DNS's Corefile; False when it is as is (or the VPN has none)."""
         if vpn.host_dns is None:
             return False
         targets = await self._targets(session, vpn)
-        records = [dns.Record(r["name"], ip=r["ip"],
-                              container=targets.get(r["app_id"] or 0, {}).get("container"))
-                   for r in await self._records(session, vpn)]  # fmt: skip
+        routes = {r.name: r for r in await self._routes(session)}
+        proxy = await self._web_addresses(session, list(routes.values()))
+        records = []
+        for r in await self._records(session, vpn):
+            route = routes.get(r["name"])
+            if route and route.network in proxy:  # through the web proxy, in the app's zone
+                records.append(dns.Record(r["name"], ip=proxy[route.network]))
+                continue
+            target = targets.get(r["app_id"] or 0, {})
+            container = target.get("container")
+            if r["service"] and target:  # one port, given by the app itself (port 80)
+                container = web.container_of(target["slug"], r["service"])
+            records.append(dns.Record(r["name"], ip=r["ip"], container=container))
         text = dns.corefile(records, vpn.value(vpn.spec.dns_field))
         with suppress(OSError):
             if vpn.host_dns.read_text() == text:
@@ -393,27 +480,45 @@ class VpnTools:
             targets = await self._targets(session, vpn)
             records = await self._records(session, vpn)
         return {"enabled": vpn.local_dns, "server": vpn.network()[1], "records": records,
-                "targets": [{k: t[k] for k in ("id", "name", "zone")}
+                "zones": vpn.zones,
+                "targets": [{k: t[k] for k in ("id", "name", "zone", "ports", "sites")}
                             for t in targets.values()]}  # fmt: skip
 
-    async def dns_create(self, app_id: int, name: str, ip: str | None,
-                         target_app_id: int | None) -> int:  # fmt: skip
-        """A name for an IP, or for an app of the zones the VPN reaches (exactly one)."""
-        vpn = await self._vpn(app_id)
-        name = dns.check_name(name)
-        if (ip is None) == (target_app_id is None):
-            raise DnsTargetError("give an IP or an app")
+    async def _check_target(self, session: AsyncSession, vpn: VpnApp, ip: str | None,
+                            app: int | None, service: str | None,
+                            port: int | None) -> str | None:  # fmt: skip
+        """An IP, or an app of the zones the VPN reaches, or one of its ports or sites, or
+        nothing (a name not linked yet). Returns the IP, canonical."""
+        if ip is not None and app is not None:
+            raise DnsTargetError("give an IP or an app, not both")
         if ip is not None:
             try:
-                ip = str(ipaddress.ip_address(ip.strip()))
+                return str(ipaddress.ip_address(ip.strip()))
             except ValueError:
                 raise DnsTargetError("invalid IP address", field="ip") from None
+        if app is None:
+            if port is not None:
+                raise DnsTargetError("a port needs its app", field="port")
+            return None
+        target = (await self._targets(session, vpn)).get(app)
+        if target is None:
+            raise DnsTargetError("this app is not in a zone the VPN reaches", field="app_id")
+        if port is not None:
+            known = {(p["service"], p["port"]) for p in [*target["ports"], *target["sites"]]}
+            if (service, port) not in known:
+                raise DnsTargetError("this app has no such port", field="port", port=port)
+        return None
+
+    async def dns_create(self, app_id: int, name: str, ip: str | None,
+                         target_app_id: int | None, service: str | None = None,
+                         port: int | None = None) -> int:  # fmt: skip
+        """A name: for an IP, an app of the zones the VPN reaches (one of its ports), or not
+        linked yet (a card of the DNS map)."""
+        vpn = await self._vpn(app_id)
+        name = dns.check_name(name)
         async with self._lock:
             async with self.sessions() as session, session.begin():
-                if target_app_id is not None and \
-                        target_app_id not in await self._targets(session, vpn):  # fmt: skip
-                    raise DnsTargetError("this app is not in a zone the VPN reaches",
-                                         field="app_id")  # fmt: skip
+                ip = await self._check_target(session, vpn, ip, target_app_id, service, port)
                 if await session.scalar(
                     select(VpnDnsRecord.id).where(
                         VpnDnsRecord.vpn_app_id == vpn.app_id, VpnDnsRecord.name == name
@@ -421,12 +526,34 @@ class VpnTools:
                 ):
                     raise DnsNameTakenError("this name already exists", field="name")
                 record = VpnDnsRecord(vpn_app_id=vpn.app_id, name=name, ip=ip,
-                                      target_app_id=target_app_id)  # fmt: skip
+                                      target_app_id=target_app_id,
+                                      target_service=service if port is not None else None,
+                                      target_port=port)  # fmt: skip
                 session.add(record)
                 await session.flush()
             await self._sync(vpn)
+        await self.queue_web()
         self.bus.publish("vpn.dns_created", app=vpn.slug, target=name)
         return record.id
+
+    async def dns_update(self, app_id: int, rid: int, ip: str | None, target_app_id: int | None,
+                         service: str | None, port: int | None) -> None:  # fmt: skip
+        """Link a name to another target (an IP, an app, one of its ports), or unlink it."""
+        vpn = await self._vpn(app_id)
+        async with self._lock:
+            async with self.sessions() as session, session.begin():
+                record = await session.get(VpnDnsRecord, rid)
+                if record is None or record.vpn_app_id != vpn.app_id:
+                    raise DnsRecordNotFoundError("unknown DNS name", id=rid)
+                record.ip = await self._check_target(session, vpn, ip, target_app_id, service,
+                                                     port)  # fmt: skip
+                record.target_app_id = target_app_id
+                record.target_service = service if port is not None else None
+                record.target_port = port
+                name = record.name
+            await self._sync(vpn)
+        await self.queue_web()
+        self.bus.publish("vpn.dns_updated", app=vpn.slug, target=name)
 
     async def dns_delete(self, app_id: int, rid: int) -> None:
         vpn = await self._vpn(app_id)
@@ -438,13 +565,31 @@ class VpnTools:
                 name = record.name
                 await session.delete(record)
             await self._sync(vpn)
+        await self.queue_web()
         self.bus.publish("vpn.dns_deleted", app=vpn.slug, target=name)
+
+    async def subnets(self, session: AsyncSession) -> list[Taken]:
+        """The networks of the VPNs (their tunnels): taken for the addressing plan."""
+        out = []
+        for app in await session.scalars(select(Application)):
+            with suppress(ConflictError, NotFoundError):
+                entry = await self.apps.planner.entry_of(session, app)
+                spec = entry.template.vpn
+                if spec is None:
+                    continue
+                values = (await self.apps.planner.current_settings(session, app.id)).values
+                subnet = str(values.get(spec.subnet_field or "") or spec.subnet)
+                with suppress(ValueError):
+                    out.append(Taken(str(ipaddress.ip_network(subnet, strict=False)),
+                                     f"vpn:{app.slug}"))  # fmt: skip
+        return out
 
     async def set_zones(self, app_id: int, zones: list[str]) -> Job:
         """Zones reached through the VPN: the container joins their networks (new revision).
 
         A zone newly reached gets its apps a network of their own (shared, on a subnet next
-        to the VPN's, except a system zone: its subnet is the installer's) and is redeployed:
+        to the VPN's unless chosen by hand; a system zone keeps the installer's) and is
+        redeployed:
         nothing of it stays published on the host (the compiler, `vpn_only`).
         NAT already covers every interface (PostUp), so nothing else changes.
         """
@@ -453,22 +598,17 @@ class VpnTools:
             raise NotAVpnError("this VPN cannot reach zones")
         zones = list(dict.fromkeys(vpn_zone_slugs(",".join(zones))))
         added = [z for z in zones if z not in vpn.zones]
-        taken = [s for n in await self.gateway.list_networks() for s in n.subnets]
         async with self.sessions() as session, session.begin():
             others = await self.apps.planner.vpn_zones(session)
             for slug in added:
                 if slug in others and others[slug][0] != vpn.slug:
                     raise ZoneTakenError("this zone is already reached by another VPN",
                                          zone=slug, vpn=others[slug][1])  # fmt: skip
-            all_zones = await list_zones(session)
-            taken += [z.subnet for z in all_zones if z.subnet]
-            taken.append(vpn.network()[0])
             linked = []
-            for zone in (z for z in all_zones if z.slug in added):
+            for zone in (z for z in await list_zones(session) if z.slug in added):
                 zone.network_mode = NetworkMode.SHARED
-                if zone.subnet is None and not zone.is_system:
-                    zone.subnet = zone_subnet(vpn.network()[0], taken)
-                    taken.append(zone.subnet)
+                if self.apps.addressing is not None:  # its subnet: next to the VPN's
+                    await self.apps.addressing.follow_vpn(session, zone, vpn.network()[0])
                 linked.append(zone.id)
         inputs = {**vpn.values, vpn.spec.zones_field: ",".join(zones)}
         job = await self.apps.revisions.update(app_id, inputs)
@@ -493,6 +633,22 @@ async def follow_deploys(vpn: VpnTools) -> None:
                 pass
             except Exception:
                 logger.exception("VPN config not applied after deploy", extra=event.payload)
+
+
+async def follow_web(vpn: VpnTools) -> None:
+    """The web proxy follows the apps it serves (redeployed in another zone, removed: their
+    names change) and comes back after Hivora restarts."""
+    with suppress(Exception):  # names to serve, or a proxy left over: applied now
+        if await vpn._web_signature() != "[]" or await vpn.gateway.list_containers(web.LABELS):
+            await vpn.queue_web(if_changed=False)
+    async with vpn.bus.subscribe("app.*") as sub:
+        async for event in sub:
+            if event.topic not in ("app.deployed", "app.removed"):
+                continue
+            try:
+                await vpn.queue_web()
+            except Exception:
+                logger.exception("VPN web proxy not followed")
 
 
 async def expire_clients(vpn: VpnTools, every: float = 60) -> None:

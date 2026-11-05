@@ -71,7 +71,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       if (error instanceof ApiError) {
         const key = `error.${error.code}` as MessageKey;
         if (key in dict) {
-          return t(key, { message: error.message, seconds: String(error.details.retry_after ?? "") });
+          // The error's details (the network in the way, who has the address...) as {vars}.
+          const details = Object.fromEntries(Object.entries(error.details).map(([k, v]) => [k, String(v ?? "")]));
+          return t(key, { ...details, message: error.message, seconds: String(error.details.retry_after ?? "") });
         }
         return t("error.generic", { message: error.message });
       }

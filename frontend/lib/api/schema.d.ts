@@ -4,6 +4,106 @@
  */
 
 export interface paths {
+    "/api/v1/addressing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Overview */
+        get: operations["overview_api_v1_addressing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/addressing/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Plan
+         * @description Redeploys the apps whose applied compose differs from the plan (apps from before
+         *     static addressing, or after a change made while they were stopped).
+         */
+        post: operations["apply_plan_api_v1_addressing_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/addressing/apps/{app_id}/ip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * App Ip
+         * @description A service's address chosen by hand in one of its networks (or automatic again).
+         */
+        put: operations["app_ip_api_v1_addressing_apps__app_id__ip_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/addressing/range": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Hivora Range
+         * @description A new Hivora range: zones and apps' networks taken from the old one move to it;
+         *     every app is redeployed.
+         */
+        put: operations["hivora_range_api_v1_addressing_range_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/addressing/zones/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Zone Subnet
+         * @description A zone's subnet chosen by hand (or automatic again): its apps and the ones joining
+         *     its network (VPN, HTTPS proxy) are redeployed on it.
+         */
+        put: operations["zone_subnet_api_v1_addressing_zones__slug__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apps": {
         parameters: {
             query?: never;
@@ -1378,7 +1478,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /** Dns Update */
+        put: operations["dns_update_api_v1_apps__app_id__vpn_dns__rid__put"];
         post?: never;
         /** Dns Delete */
         delete: operations["dns_delete_api_v1_apps__app_id__vpn_dns__rid__delete"];
@@ -2757,6 +2858,21 @@ export interface components {
              */
             address: string;
         };
+        /** AddressingOut */
+        AddressingOut: {
+            /** App Networks */
+            app_networks: components["schemas"]["OwnRowOut"][];
+            /** Apps Block */
+            apps_block: string;
+            /** Excluded */
+            excluded: components["schemas"]["ExcludedOut"][];
+            /** Range */
+            range: string;
+            /** Zones */
+            zones: components["schemas"]["ZonePlanOut"][];
+            /** Zones Block */
+            zones_block: string;
+        };
         /** AdoptIn */
         AdoptIn: {
             /**
@@ -2869,6 +2985,29 @@ export interface components {
             };
             /** Zone Id */
             zone_id: number | null;
+        };
+        /** AppIpIn */
+        AppIpIn: {
+            /** Address */
+            address?: string | null;
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
+            /** Network */
+            network: string;
+            /** Service */
+            service: string;
+        };
+        /** AppNetworkOut */
+        AppNetworkOut: {
+            /** App */
+            app: string;
+            /** Name */
+            name: string;
+            /** Subnet */
+            subnet: string;
         };
         /** AppOut */
         AppOut: {
@@ -3020,6 +3159,27 @@ export interface components {
             services: string[];
             /** Working Dir */
             working_dir: string | null;
+        };
+        /**
+         * ChangeOut
+         * @description A change, previewed (``dry_run``) or applied: what it gives and what it redeploys.
+         */
+        ChangeOut: {
+            /** Apps */
+            apps: string[];
+            /** Commands */
+            commands: string[];
+            /**
+             * Diff
+             * @default
+             */
+            diff: string;
+            /** Jobs */
+            jobs?: components["schemas"]["JobRef"][];
+            /** Value */
+            value: string | null;
+            /** Vpn */
+            vpn?: string | null;
         };
         /** CheckOut */
         CheckOut: {
@@ -3290,6 +3450,20 @@ export interface components {
          * @enum {string}
          */
         DesiredState: "running" | "stopped";
+        /**
+         * DnsLinkIn
+         * @description What a name is linked to now (all empty: unlinked).
+         */
+        DnsLinkIn: {
+            /** App Id */
+            app_id?: number | null;
+            /** Ip */
+            ip?: string | null;
+            /** Port */
+            port?: number | null;
+            /** Service */
+            service?: string | null;
+        };
         /** DnsOut */
         DnsOut: {
             /** Enabled */
@@ -3300,10 +3474,23 @@ export interface components {
             server: string;
             /** Targets */
             targets: components["schemas"]["DnsTargetOut"][];
+            /** Zones */
+            zones: string[];
+        };
+        /** DnsPortOut */
+        DnsPortOut: {
+            /** Port */
+            port: number;
+            /** Protocol */
+            protocol: string;
+            /** Service */
+            service: string;
+            /** Web */
+            web: boolean;
         };
         /**
          * DnsRecordIn
-         * @description A name for an IP, or for an app of the VPN's zones (exactly one of them).
+         * @description A name for an IP, an app of the VPN's zones (one of its ports), or nothing yet.
          */
         DnsRecordIn: {
             /** App Id */
@@ -3312,6 +3499,10 @@ export interface components {
             ip?: string | null;
             /** Name */
             name: string;
+            /** Port */
+            port?: number | null;
+            /** Service */
+            service?: string | null;
         };
         /** DnsRecordOut */
         DnsRecordOut: {
@@ -3327,6 +3518,27 @@ export interface components {
             ip: string | null;
             /** Name */
             name: string;
+            /** Port */
+            port: number | null;
+            /** Service */
+            service: string | null;
+            /** Url */
+            url: string | null;
+            /** Via Proxy */
+            via_proxy: boolean;
+        };
+        /** DnsSiteOut */
+        DnsSiteOut: {
+            /** Id */
+            id: number;
+            /** Main */
+            main: boolean;
+            /** Name */
+            name: string;
+            /** Port */
+            port: number;
+            /** Service */
+            service: string;
         };
         /** DnsTargetOut */
         DnsTargetOut: {
@@ -3334,6 +3546,10 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+            /** Ports */
+            ports: components["schemas"]["DnsPortOut"][];
+            /** Sites */
+            sites: components["schemas"]["DnsSiteOut"][];
             /** Zone */
             zone: string;
         };
@@ -3378,6 +3594,13 @@ export interface components {
              * @default
              */
             value: string;
+        };
+        /** ExcludedOut */
+        ExcludedOut: {
+            /** Network */
+            network: string;
+            /** Owner */
+            owner: string;
         };
         /** ExtraPort */
         ExtraPort: {
@@ -3638,7 +3861,7 @@ export interface components {
          * JobKind
          * @enum {string}
          */
-        JobKind: "deploy" | "update" | "remove" | "pull" | "start" | "stop" | "restart" | "rollback" | "adopt" | "convert" | "move_zone" | "world_import" | "world_delete" | "backup" | "backup_restore" | "site_content" | "site_file" | "site_config" | "host_package" | "host_firewall" | "host_route" | "zone_action" | "self_update" | "host_upgrade" | "host_reboot";
+        JobKind: "deploy" | "update" | "remove" | "pull" | "start" | "stop" | "restart" | "rollback" | "adopt" | "convert" | "move_zone" | "world_import" | "world_delete" | "backup" | "backup_restore" | "site_content" | "site_file" | "site_config" | "host_package" | "host_firewall" | "host_route" | "zone_action" | "self_update" | "host_upgrade" | "host_reboot" | "vpn_web";
         /** JobOut */
         JobOut: {
             /** App Id */
@@ -3798,6 +4021,31 @@ export interface components {
                 [key: string]: components["schemas"]["ServiceOverrides"];
             };
         };
+        /** OwnRowOut */
+        OwnRowOut: {
+            /** Actual */
+            actual: string | null;
+            /** Actual Subnets */
+            actual_subnets: string[];
+            /** App */
+            app: string;
+            /** App Id */
+            app_id: number | null;
+            /** Manual */
+            manual: boolean;
+            /** Name */
+            name: string;
+            /** Network */
+            network: string;
+            /** Planned */
+            planned: string;
+            /** Service */
+            service: string;
+            /** State */
+            state: string;
+            /** Subnet */
+            subnet: string;
+        };
         /** PasswordConfirmIn */
         PasswordConfirmIn: {
             /** Password */
@@ -3949,6 +4197,16 @@ export interface components {
             running: boolean;
             /** Targets */
             targets: components["schemas"]["TargetOut"][];
+        };
+        /** RangeIn */
+        RangeIn: {
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
+            /** Range */
+            range: string;
         };
         /** RebootAppOut */
         RebootAppOut: {
@@ -4118,6 +4376,27 @@ export interface components {
             status: string;
             /** Zone */
             zone: string | null;
+        };
+        /** RowOut */
+        RowOut: {
+            /** Actual */
+            actual: string | null;
+            /** App */
+            app: string;
+            /** App Id */
+            app_id: number | null;
+            /** Manual */
+            manual: boolean;
+            /** Name */
+            name: string;
+            /** Network */
+            network: string;
+            /** Planned */
+            planned: string;
+            /** Service */
+            service: string;
+            /** State */
+            state: string;
         };
         /** RuleIn */
         RuleIn: {
@@ -5109,10 +5388,51 @@ export interface components {
             slug: string;
             /** Subnet */
             subnet: string | null;
+            /** Subnet Manual */
+            subnet_manual: boolean;
             /** Vpn */
             vpn: string | null;
             /** Vpn Slug */
             vpn_slug: string | null;
+        };
+        /** ZonePlanOut */
+        ZonePlanOut: {
+            /** Actual Subnets */
+            actual_subnets: string[];
+            /** App Networks */
+            app_networks: components["schemas"]["AppNetworkOut"][];
+            /** Color */
+            color: string;
+            /** Mode */
+            mode: string;
+            /** Name */
+            name: string;
+            /** Network */
+            network: string | null;
+            /** Origin */
+            origin: string;
+            /** Rows */
+            rows: components["schemas"]["RowOut"][];
+            /** Size */
+            size: number;
+            /** Slug */
+            slug: string;
+            /** Subnet */
+            subnet: string | null;
+            /** Used */
+            used: number;
+            /** Vpn */
+            vpn: string | null;
+        };
+        /** ZoneSubnetIn */
+        ZoneSubnetIn: {
+            /**
+             * Dry Run
+             * @default false
+             */
+            dry_run: boolean;
+            /** Subnet */
+            subnet?: string | null;
         };
         /** ZonesIn */
         ZonesIn: {
@@ -5160,6 +5480,149 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    overview_api_v1_addressing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddressingOut"];
+                };
+            };
+        };
+    };
+    apply_plan_api_v1_addressing_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+        };
+    };
+    app_ip_api_v1_addressing_apps__app_id__ip_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppIpIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hivora_range_api_v1_addressing_range_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RangeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    zone_subnet_api_v1_addressing_zones__slug__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZoneSubnetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_apps_api_v1_apps_get: {
         parameters: {
             query?: never;
@@ -8095,6 +8558,40 @@ export interface operations {
                         [key: string]: number;
                     };
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dns_update_api_v1_apps__app_id__vpn_dns__rid__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                app_id: number;
+                rid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DnsLinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

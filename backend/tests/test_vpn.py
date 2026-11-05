@@ -249,7 +249,13 @@ def test_vpn_local_dns_names(client: Any) -> None:
         ({"name": "web.local", "ip": "192.168.1.21"}, 409, "vpn_dns_name_taken"),
         ({"name": "x.local", "app_id": other}, 409, "vpn_dns_bad_target"),
         ({"name": "x.local", "ip": "999.1.1.1"}, 409, "vpn_dns_bad_target"),
-        ({"name": "x.local"}, 409, "vpn_dns_bad_target"),
+        ({"name": "x.local", "app_id": web, "ip": "1.2.3.4"}, 409, "vpn_dns_bad_target"),
+        ({"name": "x.local", "port": 80}, 409, "vpn_dns_bad_target"),  # a port needs its app
+        (
+            {"name": "x.local", "app_id": web, "service": "server", "port": 9},
+            409,
+            "vpn_dns_bad_target",
+        ),  # no such port
         ({"name": "x local; }", "ip": "1.2.3.4"}, 422, "vpn_dns_bad_name"),
     ):
         r = client.post(url, json=bad)

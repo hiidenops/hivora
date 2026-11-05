@@ -1,5 +1,6 @@
 """Job handlers: the only place where app intents are applied to Docker."""
 
+import ipaddress
 from pathlib import Path
 
 import yaml
@@ -12,7 +13,7 @@ from hivora.compose_runner import ComposeError, ProgressEvent, ProgressStatus
 from hivora.core.fs import empty_dir, ensure_dir, remove_tree
 from hivora.jobs import JobContext, JobKind
 from hivora.templates.expressions import secret_env_name
-from hivora.zones.service import list_zones, zone_network
+from hivora.zones.service import list_zones
 
 
 class _PullProgress:
@@ -155,19 +156,46 @@ class AppJobHandlers:
                 await ctx.log(f"removed {s.volumes_dir(slug)}")
         async with s.sessions() as session, session.begin():
             await session.delete(await s.get(session, _app_id(ctx)))
+            if s.addressing is not None:  # its addresses and network are free again
+                await s.addressing.release(session, slug)
         s.bus.publish("app.removed", app=slug, data_removed=remove_data)
 
     async def _zone_network(self, ctx: JobContext, compose_yaml: str) -> None:
-        """The zone's shared network is external to the project: create it first."""
-        networks = (yaml.safe_load(compose_yaml) or {}).get("networks") or {}
-        async with self.s.sessions() as session:  # a zone reached by a VPN has its own subnet
-            subnets = {zone_network(z): z.subnet for z in await list_zones(session)}
+        """The networks the compose uses, on their planned subnets: the zone's (external to
+        the project) created first; a network left on an old subnet removed (its own, or a
+        stale one of Hivora's in the way), so that Docker creates them as planned."""
+        compose = yaml.safe_load(compose_yaml) or {}
+        networks = compose.get("networks") or {}
+        async with self.s.sessions() as session:
+            zones = {f"hivora-zone-{z.slug}": z.subnet for z in await list_zones(session)}
+        planned: dict[str, str] = {}  # Docker name -> subnet
+        for key, net in networks.items():
+            net = net or {}
+            if net.get("external") and (subnet := zones.get(net["name"])):
+                planned[net["name"]] = subnet
+            elif key == "default" and (cfg := (net.get("ipam") or {}).get("config")):
+                planned[f"{compose.get('name')}_default"] = cfg[0]["subnet"]
+        gateway = self.s.gateway
+        if gateway is None:
+            return
+        wanted = [ipaddress.ip_network(v) for v in planned.values()]
+        for n in await gateway.list_networks():
+            ours = n.name.startswith("hivora-zone-") or (
+                n.name.endswith("_default") and "com.docker.compose.project" in n.labels
+            )
+            if n.name in planned:
+                stale = planned[n.name] not in n.subnets
+            else:
+                stale = ours and any(ipaddress.ip_network(sub).overlaps(w)
+                                     for sub in n.subnets for w in wanted)  # fmt: skip
+            if stale and await gateway.clear_network(n.name, planned.get(n.name)):
+                await ctx.log(f"removed network {n.name} (old subnet {', '.join(n.subnets)})")
         for net in networks.values():
-            if net.get("external") and self.s.gateway is not None:
-                subnet = subnets.get(net["name"])
-                if await self.s.gateway.ensure_network(
-                    net["name"], {"io.hivora.zone-network": "1"}, subnet
-                ):
+            net = net or {}
+            if net.get("external"):
+                subnet = planned.get(net["name"])
+                labels = {"io.hivora.zone-network": "1"}
+                if await gateway.ensure_network(net["name"], labels, subnet):
                     where = f" ({subnet})" if subnet else ""
                     await ctx.log(f"created network {net['name']}{where}")
 

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import {
   api,
   setCsrfToken,
+  type AddressingPlan,
   type App,
   type AppDetail,
   type AppSettings,
@@ -198,6 +199,9 @@ export const useTemplate = (slug: string) =>
     staleTime: 300_000,
   });
 export const useZones = () => useQuery({ queryKey: keys.zones, queryFn: () => api<Zone[]>("/zones") });
+/** The addressing plan and what Docker applied (refreshed by the state's changes). */
+export const useAddressing = () =>
+  useQuery({ queryKey: ["addressing"], queryFn: () => api<AddressingPlan>("/addressing"), refetchInterval: 10_000 });
 
 /** Create (no slug) or edit a zone. */
 export function useSaveZone(slug?: string) {

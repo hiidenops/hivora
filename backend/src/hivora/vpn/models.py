@@ -51,3 +51,6 @@ class VpnDnsRecord(Base):
     target_app_id: Mapped[int | None] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE")
     )
+    # One port of that app (a web port, a hosted site's): None, the app itself (any protocol).
+    target_service: Mapped[str | None] = mapped_column(String(63))
+    target_port: Mapped[int | None] = mapped_column()

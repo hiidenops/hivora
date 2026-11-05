@@ -42,6 +42,26 @@ class AppContext:
     zone_network: str | None = None  # Docker network shared by the zone's apps
     extra_networks: tuple[str, ...] = ()  # other zones' networks (a VPN reaching them)
     vpn_only: bool = False  # in a zone a VPN reaches: nothing published on the host
+    # Fixed addressing (the addressing plan): the subnet of the app's own network, the
+    # subnets of the external networks it joins (to create them by hand without Hivora), and
+    # each service's address: (network, service, address), network "default" for its own.
+    default_subnet: str | None = None
+    network_subnets: tuple[tuple[str, str], ...] = ()  # (external network, subnet)
+    addresses: tuple[tuple[str, str, str], ...] = ()
+
+
+def _service_networks(app: AppContext, service: str) -> list[str] | dict[str, Any] | None:
+    """A service's networks: its own (``default``), its zone's, the ones it joins; with
+    their fixed addresses when the addressing plan gives them. None: the default alone."""
+    keys = {"default": "default"}
+    if app.zone_network:
+        keys[app.zone_network] = "zone"
+    for i, n in enumerate(app.extra_networks):
+        keys.setdefault(n, f"reach{i}")
+    ips = {keys[n]: ip for n, s, ip in app.addresses if s == service and n in keys}
+    if not ips:
+        return list(keys.values()) if len(keys) > 1 else None
+    return {k: ({"ipv4_address": ips[k]} if k in ips else {}) for k in keys.values()}
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,9 +341,8 @@ def compile_template(
                 key = f"{name}-file-{i}"
                 configs[key] = {"content": _render_str(f.content, ctx)}
                 svc["configs"].append({"source": key, "target": f.target})
-        if app.zone_network or app.extra_networks:
-            svc["networks"] = ["default", *(["zone"] if app.zone_network else []),
-                               *(f"reach{i}" for i in range(len(app.extra_networks)))]  # fmt: skip
+        if keys := _service_networks(app, name):
+            svc["networks"] = keys
         if spec.stop_grace_period:
             svc["stop_grace_period"] = spec.stop_grace_period
         if spec.stdin_open:
@@ -350,6 +369,8 @@ def compile_template(
     }
     if app.zone_network:  # created by Hivora before `up` (external to the project)
         networks["zone"] = {"name": app.zone_network, "external": True}
+    if app.default_subnet:  # its own network, on its fixed subnet
+        networks = {"default": {"ipam": {"config": [{"subnet": app.default_subnet}]}}, **networks}
     if networks:
         compose["networks"] = networks
     header = (
@@ -357,6 +378,13 @@ def compile_template(
         "# Plain Compose file: `docker compose up -d` works without Hivora.\n"
         "# Secret values live in .env next to this file.\n"
     )
+    # External networks are Hivora's: without it, they are created once by hand first.
+    external = [app.zone_network, *app.extra_networks]
+    for network, subnet in app.network_subnets:
+        if network in external:
+            header += (
+                f"# Without Hivora, first: docker network create --subnet {subnet} {network}\n"
+            )
     body = yaml.safe_dump(compose, sort_keys=False, allow_unicode=True, default_flow_style=False)
     access: dict[str, str] = {}
     if template.access:

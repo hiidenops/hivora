@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Ban, Boxes, BrickWall, ChevronDown, Container, FileCode, Globe, LayoutDashboard, LayoutGrid, LogOut, Menu, Network, Route, Search, Server, Settings, Share2, ShieldBan, ShieldCheck, Users } from "lucide-react";
+import { Activity, Ban, Boxes, BrickWall, ChevronDown, Container, FileCode, Globe, LayoutDashboard, LayoutGrid, LogOut, Menu, Network, Route, Search, Server, Settings, Share2, ShieldBan, ShieldCheck, Users, Waypoints } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -83,6 +83,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/zones/", label: "nav.zones", icon: Network, role: "viewer" },
       { href: "/topology/", label: "nav.topology", icon: Share2, role: "viewer" },
+      { href: "/addressing/", label: "nav.addressing", icon: Waypoints, role: "viewer" },
       { href: "/firewall/", label: "nav.firewall", icon: BrickWall, role: "admin", sub: FIREWALL_TABS },
     ],
   },
@@ -282,7 +283,7 @@ export function PageHeader({ title, actions }: { title: ReactNode; actions?: Rea
   );
 }
 
-const LINK = "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-sm transition-[background-color,color,box-shadow,translate] duration-200 ease-(--ease-out)";
+const LINK = "relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2 py-1 text-sm transition-[background-color,color,box-shadow,translate] duration-200 ease-(--ease-out)";
 const LINK_ON = "surface font-medium before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-(--g,var(--primary))";
 const LINK_OFF = "text-muted-foreground hover:translate-x-0.5 hover:bg-muted hover:text-foreground";
 

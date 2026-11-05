@@ -1,6 +1,7 @@
 """DockerGateway over the local Engine API socket, via aiodocker."""
 
 import asyncio
+import hashlib
 import json
 import re
 from collections.abc import AsyncGenerator, AsyncIterator
@@ -187,6 +188,9 @@ class LocalExecSession(ExecSession):
         await self._stream.close()
 
 
+SPEC_LABEL = "io.hivora.spec"  # a sidecar's wanted configuration, hashed
+
+
 class LocalDockerGateway(DockerGateway):
     """Talks to the Engine API through aiodocker's low-level ``_query`` helpers.
 
@@ -223,14 +227,25 @@ class LocalDockerGateway(DockerGateway):
             if current and (subnet is None or subnet in current.subnets):
                 return False
             if current:  # another subnet: its containers leave it, then it is recreated
-                network = await self._docker.networks.get(name)
-                for cid in (await network.show()).get("Containers") or {}:
-                    await network.disconnect({"Container": cid, "Force": True})
-                await network.delete()
+                await self._drop_network(name)
             config: dict[str, Any] = {"Name": name, "Driver": "bridge", "Labels": labels}
             if subnet:
                 config["IPAM"] = {"Config": [{"Subnet": subnet}]}
             await self._docker.networks.create(config)
+            return True
+
+    async def _drop_network(self, name: str) -> None:
+        network = await self._docker.networks.get(name)
+        for cid in (await network.show()).get("Containers") or {}:
+            await network.disconnect({"Container": cid, "Force": True})
+        await network.delete()
+
+    async def clear_network(self, name: str, keep_subnet: str | None = None) -> bool:
+        async with self._networks_lock:
+            current = next((n for n in await self.list_networks() if n.name == name), None)
+            if current is None or (keep_subnet is not None and keep_subnet in current.subnets):
+                return False
+            await self._drop_network(name)
             return True
 
     async def remove_network(self, name: str) -> bool:
@@ -271,6 +286,48 @@ class LocalDockerGateway(DockerGateway):
             },
             name=name,
         )
+        await container.start()
+        return str(container.id)
+
+    async def ensure_sidecar(self, name: str, image: str, labels: dict[str, str],
+                             binds: list[str], networks: dict[str, str]) -> str:  # fmt: skip
+        spec = json.dumps([image, labels, binds, networks], sort_keys=True)
+        digest = hashlib.sha256(spec.encode()).hexdigest()[:16]
+        try:
+            existing = await self._docker.containers.get(name)
+        except aiodocker.exceptions.DockerError as exc:
+            if exc.status != 404:
+                raise
+            existing = None
+        if existing is not None:
+            if existing._container.get("Config", {}).get("Labels", {}).get(SPEC_LABEL) == digest:
+                if not existing._container.get("State", {}).get("Running"):
+                    await existing.start()
+                return str(existing.id)
+            await existing.delete(force=True)  # changed: recreated as now wanted
+        try:
+            await self._docker.images.inspect(image)
+        except aiodocker.exceptions.DockerError:
+            await self._docker.images.pull(image)
+        nets = list(networks.items())
+        first = {nets[0][0]: {"IPAMConfig": {"IPv4Address": nets[0][1]}}} if nets else {}
+        container = await self._docker.containers.create(
+            {
+                "Image": image,
+                "Labels": {**labels, SPEC_LABEL: digest},
+                "HostConfig": {
+                    "Binds": binds,
+                    "NetworkMode": nets[0][0] if nets else "none",
+                    "RestartPolicy": {"Name": "unless-stopped"},
+                },
+                "NetworkingConfig": {"EndpointsConfig": first},
+            },
+            name=name,
+        )
+        for network, ip in nets[1:]:  # one network at create (Docker < 25), the others after
+            await (await self._docker.networks.get(network)).connect(
+                {"Container": container.id, "EndpointConfig": {"IPAMConfig": {"IPv4Address": ip}}}
+            )
         await container.start()
         return str(container.id)
 

@@ -22,6 +22,9 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hivora.addressing.service import ADMIN_VPN_SUBNET as ADMIN_VPN_SUBNET
+from hivora.addressing.service import ADMIN_ZONE_SUBNET as ADMIN_ZONE_SUBNET
+from hivora.addressing.service import PANEL_IP as PANEL_IP
 from hivora.apps.core import DeployRequest, get_app
 from hivora.apps.service import AppService
 from hivora.core.clock import Clock
@@ -40,11 +43,9 @@ logger = logging.getLogger(__name__)
 VPN_MODES = ("vpn", "vpn+lan")
 ADMIN_ZONE = "administration"
 # Fixed addressing (D5), shared with the installer (M12-5b): the Administration zone's
-# network, the part Docker hands out to containers, the panel's own address in it.
-ADMIN_ZONE_SUBNET = "10.254.254.0/24"
+# network (ADMIN_ZONE_SUBNET, PANEL_IP, ADMIN_VPN_SUBNET: in the addressing plan), the part
+# Docker hands out to containers.
 ADMIN_ZONE_RANGE = "10.254.254.0/25"
-PANEL_IP = "10.254.254.254"
-ADMIN_VPN_SUBNET = "10.254.253.0/24"  # not 10.8.0.0/24: a user's own VPN keeps it
 APP_NAME = "Admin VPN"
 CLIENT = "admin"
 CLIENT_ACCESS = {"internet": False, "lan": False, "zones": [ADMIN_ZONE]}

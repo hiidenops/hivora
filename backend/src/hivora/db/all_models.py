@@ -4,6 +4,7 @@ Only migration tooling and tests import this: it is not a runtime dependency
 of the db module on the others.
 """
 
+import hivora.addressing.models
 import hivora.apps.models
 import hivora.audit.models
 import hivora.auth.models

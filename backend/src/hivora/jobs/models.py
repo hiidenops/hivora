@@ -36,6 +36,7 @@ class JobKind(StrEnum):
     SELF_UPDATE = "self_update"  # Hivora replaced by a newer release (hivora-updater, M13)
     HOST_UPGRADE = "host_upgrade"  # apt-get upgrade on the host (system.host_updates)
     HOST_REBOOT = "host_reboot"  # apps stopped, host rebooted, apps started again
+    VPN_WEB = "vpn_web"  # the VPN's web proxy (hivora-web) applied: its sites, its networks
 
 
 class JobStatus(StrEnum):

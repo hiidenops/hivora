@@ -22,7 +22,8 @@ class ZoneOut(BaseModel):
     apps: int  # applications in the zone
     vpn: str | None  # the VPN app that reaches it: its apps are reached only through it
     vpn_slug: str | None  # that app's slug (its DNS, from the dashboard)
-    subnet: str | None  # its network's subnet, when Hivora chose it (next to the VPN's)
+    subnet: str | None  # its fixed subnet (addressing plan)
+    subnet_manual: bool  # chosen by hand
 
 
 class ZoneIn(BaseModel):
@@ -36,7 +37,7 @@ def _out(z: Zone, apps: int, vpn: tuple[str, str] | None = None) -> ZoneOut:
     return ZoneOut(id=z.id, slug=z.slug, name=z.name, color=z.color, icon=z.icon,
                    network_mode=z.network_mode, is_system=z.is_system, apps=apps,
                    vpn=vpn[1] if vpn else None, vpn_slug=vpn[0] if vpn else None,
-                   subnet=z.subnet)  # fmt: skip
+                   subnet=z.subnet, subnet_manual=z.subnet_manual)  # fmt: skip
 
 
 @router.get("")
@@ -52,6 +53,7 @@ async def zones(_: Viewer, rt: RuntimeDep) -> list[ZoneOut]:
 async def create(body: ZoneIn, _: Operator, rt: RuntimeDep) -> ZoneOut:
     async with rt.sessions() as session, session.begin():
         zone = await create_zone(session, rt.clock, body.name, body.color, body.network_mode)
+        await rt.addressing.zone_subnet(session, zone)  # its fixed /24, given now
         out = _out(zone, 0)
     rt.bus.publish("zone.created", target=out.slug, network_mode=out.network_mode.value)
     return out

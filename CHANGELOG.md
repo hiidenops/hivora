@@ -6,6 +6,17 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Ajouté
+
+- **Adressage statique** : chaque zone a maintenant un sous-réseau fixe (un /24 de la plage d'Hivora, ou celui qui suit le réseau du VPN qui la rejoint), le réseau propre de chaque app un /28 fixe et chaque conteneur une IP fixe, gardés d'une mise à jour à l'autre. Hivora ne prend jamais une adresse du réseau local, des routes de la machine, des autres réseaux Docker ni des tunnels VPN. Une zone sans réseau commun donne un /28 à chacune de ses apps.
+- **Carte DNS du VPN** : le bouton « DNS » ouvre une carte de la zone (ou des zones) du VPN : les noms à gauche, les apps à droite avec leurs ports web et les sites qu'elles hébergent. Ajoutez un nom, puis tirez un lien vers l'app, un port ou un site (ou choisissez la cible dans la carte du nom).
+- **Un nom suffit, sans le port** : un nom relié à un port autre que 80 (Actual sur 5006, le deuxième site d'un nginx…) s'ouvre en `http://actual.lan`, sans `:5006`. Hivora installe et retire seul un petit proxy web derrière le VPN (jamais publié sur la machine, en HTTP).
+- **Page Adressage** (menu Réseau) : la plage d'Hivora, les réseaux exclus, chaque zone avec son sous-réseau et l'IP prévue de chaque conteneur à côté de celle que Docker a donnée (écart signalé). En mode avancé : changer le sous-réseau d'une zone, l'IP d'un service ou la plage, avec un aperçu (apps redéployées, commandes Docker ou diff du compose) avant d'appliquer. « Appliquer le plan » met les apps installées avant cette version sur leurs adresses fixes : à faire une fois après la mise à jour.
+
+### Corrigé
+
+- **nginx et Apache** : depuis la 0.4.1, sur un panel qui en avait déjà installé un, modifier leurs réglages, les mettre à jour ou en déployer un nouveau échouait (« template changed without a version bump »). Modèles 1.1.1 ; un test empêche désormais qu'un modèle change sans changer de version.
+
 ## [0.4.1] - 2026-11-04
 
 ### Ajouté

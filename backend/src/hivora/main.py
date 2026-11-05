@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from hivora import __version__
+from hivora.addressing.api import router as addressing_router
 from hivora.apps.api import router as apps_router
 from hivora.apps.api.zone_actions import router as zone_actions_router
 from hivora.audit.api import router as audit_router
@@ -68,7 +69,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
         ("/zones", zone_actions_router),
         ("/jobs", jobs_router), ("/audit", audit_router), ("/metrics", metrics_router),
         ("/modpacks", modpacks_router), ("/topology", topology_router),
-        ("/host-firewall", hostfw_router),
+        ("/host-firewall", hostfw_router), ("/addressing", addressing_router),
     ):  # fmt: skip
         app.include_router(router, prefix=f"{API_PREFIX}{prefix}")
     app.include_router(python_router, prefix=f"{API_PREFIX}/apps")

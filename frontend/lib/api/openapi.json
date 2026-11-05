@@ -39,6 +39,53 @@
         "title": "AddressIn",
         "type": "object"
       },
+      "AddressingOut": {
+        "properties": {
+          "app_networks": {
+            "items": {
+              "$ref": "#/components/schemas/OwnRowOut"
+            },
+            "title": "App Networks",
+            "type": "array"
+          },
+          "apps_block": {
+            "title": "Apps Block",
+            "type": "string"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/ExcludedOut"
+            },
+            "title": "Excluded",
+            "type": "array"
+          },
+          "range": {
+            "title": "Range",
+            "type": "string"
+          },
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/ZonePlanOut"
+            },
+            "title": "Zones",
+            "type": "array"
+          },
+          "zones_block": {
+            "title": "Zones Block",
+            "type": "string"
+          }
+        },
+        "required": [
+          "range",
+          "zones_block",
+          "apps_block",
+          "excluded",
+          "zones",
+          "app_networks"
+        ],
+        "title": "AddressingOut",
+        "type": "object"
+      },
       "AdoptIn": {
         "properties": {
           "name": {
@@ -391,6 +438,66 @@
           "summary"
         ],
         "title": "AppDetailOut",
+        "type": "object"
+      },
+      "AppIpIn": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 15,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "network": {
+            "maxLength": 128,
+            "title": "Network",
+            "type": "string"
+          },
+          "service": {
+            "maxLength": 63,
+            "title": "Service",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service",
+          "network"
+        ],
+        "title": "AppIpIn",
+        "type": "object"
+      },
+      "AppNetworkOut": {
+        "properties": {
+          "app": {
+            "title": "App",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "subnet": {
+            "title": "Subnet",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app",
+          "name",
+          "subnet"
+        ],
+        "title": "AppNetworkOut",
         "type": "object"
       },
       "AppOut": {
@@ -823,6 +930,66 @@
           "working_dir"
         ],
         "title": "CandidateOut",
+        "type": "object"
+      },
+      "ChangeOut": {
+        "description": "A change, previewed (``dry_run``) or applied: what it gives and what it redeploys.",
+        "properties": {
+          "apps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Apps",
+            "type": "array"
+          },
+          "commands": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Commands",
+            "type": "array"
+          },
+          "diff": {
+            "default": "",
+            "title": "Diff",
+            "type": "string"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobRef"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "vpn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vpn"
+          }
+        },
+        "required": [
+          "value",
+          "apps",
+          "commands"
+        ],
+        "title": "ChangeOut",
         "type": "object"
       },
       "CheckOut": {
@@ -1604,6 +1771,61 @@
         "title": "DesiredState",
         "type": "string"
       },
+      "DnsLinkIn": {
+        "description": "What a name is linked to now (all empty: unlinked).",
+        "properties": {
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "maxLength": 45,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          }
+        },
+        "title": "DnsLinkIn",
+        "type": "object"
+      },
       "DnsOut": {
         "properties": {
           "enabled": {
@@ -1627,19 +1849,55 @@
             },
             "title": "Targets",
             "type": "array"
+          },
+          "zones": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Zones",
+            "type": "array"
           }
         },
         "required": [
           "enabled",
           "server",
+          "zones",
           "records",
           "targets"
         ],
         "title": "DnsOut",
         "type": "object"
       },
+      "DnsPortOut": {
+        "properties": {
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "protocol": {
+            "title": "Protocol",
+            "type": "string"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "web": {
+            "title": "Web",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "service",
+          "port",
+          "protocol",
+          "web"
+        ],
+        "title": "DnsPortOut",
+        "type": "object"
+      },
       "DnsRecordIn": {
-        "description": "A name for an IP, or for an app of the VPN's zones (exactly one of them).",
+        "description": "A name for an IP, an app of the VPN's zones (one of its ports), or nothing yet.",
         "properties": {
           "app_id": {
             "anyOf": [
@@ -1669,6 +1927,31 @@
             "minLength": 3,
             "title": "Name",
             "type": "string"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "maxLength": 63,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
           }
         },
         "required": [
@@ -1730,6 +2013,43 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "via_proxy": {
+            "title": "Via Proxy",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1738,9 +2058,46 @@
           "ip",
           "app_id",
           "app_slug",
-          "app_name"
+          "app_name",
+          "service",
+          "port",
+          "via_proxy",
+          "url"
         ],
         "title": "DnsRecordOut",
+        "type": "object"
+      },
+      "DnsSiteOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "main": {
+            "title": "Main",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "service",
+          "port",
+          "main"
+        ],
+        "title": "DnsSiteOut",
         "type": "object"
       },
       "DnsTargetOut": {
@@ -1753,6 +2110,20 @@
             "title": "Name",
             "type": "string"
           },
+          "ports": {
+            "items": {
+              "$ref": "#/components/schemas/DnsPortOut"
+            },
+            "title": "Ports",
+            "type": "array"
+          },
+          "sites": {
+            "items": {
+              "$ref": "#/components/schemas/DnsSiteOut"
+            },
+            "title": "Sites",
+            "type": "array"
+          },
           "zone": {
             "title": "Zone",
             "type": "string"
@@ -1761,7 +2132,9 @@
         "required": [
           "id",
           "name",
-          "zone"
+          "zone",
+          "ports",
+          "sites"
         ],
         "title": "DnsTargetOut",
         "type": "object"
@@ -1846,6 +2219,24 @@
           "key"
         ],
         "title": "EnvIO",
+        "type": "object"
+      },
+      "ExcludedOut": {
+        "properties": {
+          "network": {
+            "title": "Network",
+            "type": "string"
+          },
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          }
+        },
+        "required": [
+          "network",
+          "owner"
+        ],
+        "title": "ExcludedOut",
         "type": "object"
       },
       "ExtraPort": {
@@ -2629,7 +3020,8 @@
           "zone_action",
           "self_update",
           "host_upgrade",
-          "host_reboot"
+          "host_reboot",
+          "vpn_web"
         ],
         "title": "JobKind",
         "type": "string"
@@ -3078,6 +3470,86 @@
           }
         },
         "title": "Overrides",
+        "type": "object"
+      },
+      "OwnRowOut": {
+        "properties": {
+          "actual": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "actual_subnets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Actual Subnets",
+            "type": "array"
+          },
+          "app": {
+            "title": "App",
+            "type": "string"
+          },
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id"
+          },
+          "manual": {
+            "title": "Manual",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "network": {
+            "title": "Network",
+            "type": "string"
+          },
+          "planned": {
+            "title": "Planned",
+            "type": "string"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "subnet": {
+            "title": "Subnet",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id",
+          "app",
+          "name",
+          "service",
+          "network",
+          "planned",
+          "actual",
+          "manual",
+          "state",
+          "subnet",
+          "actual_subnets"
+        ],
+        "title": "OwnRowOut",
         "type": "object"
       },
       "PasswordConfirmIn": {
@@ -3595,6 +4067,25 @@
           "targets"
         ],
         "title": "ProxyOut",
+        "type": "object"
+      },
+      "RangeIn": {
+        "properties": {
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "range": {
+            "maxLength": 18,
+            "title": "Range",
+            "type": "string"
+          }
+        },
+        "required": [
+          "range"
+        ],
+        "title": "RangeIn",
         "type": "object"
       },
       "RebootAppOut": {
@@ -4140,6 +4631,73 @@
           "points_here"
         ],
         "title": "RouteOut",
+        "type": "object"
+      },
+      "RowOut": {
+        "properties": {
+          "actual": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "app": {
+            "title": "App",
+            "type": "string"
+          },
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id"
+          },
+          "manual": {
+            "title": "Manual",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "network": {
+            "title": "Network",
+            "type": "string"
+          },
+          "planned": {
+            "title": "Planned",
+            "type": "string"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "app_id",
+          "app",
+          "name",
+          "service",
+          "network",
+          "planned",
+          "actual",
+          "manual",
+          "state"
+        ],
+        "title": "RowOut",
         "type": "object"
       },
       "RuleIn": {
@@ -6892,6 +7450,10 @@
             ],
             "title": "Subnet"
           },
+          "subnet_manual": {
+            "title": "Subnet Manual",
+            "type": "boolean"
+          },
           "vpn": {
             "anyOf": [
               {
@@ -6926,9 +7488,136 @@
           "apps",
           "vpn",
           "vpn_slug",
-          "subnet"
+          "subnet",
+          "subnet_manual"
         ],
         "title": "ZoneOut",
+        "type": "object"
+      },
+      "ZonePlanOut": {
+        "properties": {
+          "actual_subnets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Actual Subnets",
+            "type": "array"
+          },
+          "app_networks": {
+            "items": {
+              "$ref": "#/components/schemas/AppNetworkOut"
+            },
+            "title": "App Networks",
+            "type": "array"
+          },
+          "color": {
+            "title": "Color",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "network": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network"
+          },
+          "origin": {
+            "title": "Origin",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "subnet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subnet"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          },
+          "vpn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vpn"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "color",
+          "subnet",
+          "network",
+          "mode",
+          "origin",
+          "vpn",
+          "actual_subnets",
+          "size",
+          "used",
+          "app_networks",
+          "rows"
+        ],
+        "title": "ZonePlanOut",
+        "type": "object"
+      },
+      "ZoneSubnetIn": {
+        "properties": {
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "subnet": {
+            "anyOf": [
+              {
+                "maxLength": 18,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subnet"
+          }
+        },
+        "title": "ZoneSubnetIn",
         "type": "object"
       },
       "ZonesIn": {
@@ -7038,10 +7727,201 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.4.0"
+    "version": "0.4.1"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/addressing": {
+      "get": {
+        "operationId": "overview_api_v1_addressing_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Overview",
+        "tags": [
+          "addressing"
+        ]
+      }
+    },
+    "/api/v1/addressing/apply": {
+      "post": {
+        "description": "Redeploys the apps whose applied compose differs from the plan (apps from before\nstatic addressing, or after a change made while they were stopped).",
+        "operationId": "apply_plan_api_v1_addressing_apply_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Apply Plan",
+        "tags": [
+          "addressing"
+        ]
+      }
+    },
+    "/api/v1/addressing/apps/{app_id}/ip": {
+      "put": {
+        "description": "A service's address chosen by hand in one of its networks (or automatic again).",
+        "operationId": "app_ip_api_v1_addressing_apps__app_id__ip_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppIpIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "App Ip",
+        "tags": [
+          "addressing"
+        ]
+      }
+    },
+    "/api/v1/addressing/range": {
+      "put": {
+        "description": "A new Hivora range: zones and apps' networks taken from the old one move to it;\nevery app is redeployed.",
+        "operationId": "hivora_range_api_v1_addressing_range_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RangeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hivora Range",
+        "tags": [
+          "addressing"
+        ]
+      }
+    },
+    "/api/v1/addressing/zones/{slug}": {
+      "put": {
+        "description": "A zone's subnet chosen by hand (or automatic again): its apps and the ones joining\nits network (VPN, HTTPS proxy) are redeployed on it.",
+        "operationId": "zone_subnet_api_v1_addressing_zones__slug__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZoneSubnetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Zone Subnet",
+        "tags": [
+          "addressing"
+        ]
+      }
+    },
     "/api/v1/apps": {
       "get": {
         "operationId": "list_apps_api_v1_apps_get",
@@ -11448,6 +12328,58 @@
           }
         },
         "summary": "Dns Delete",
+        "tags": [
+          "vpn"
+        ]
+      },
+      "put": {
+        "operationId": "dns_update_api_v1_apps__app_id__vpn_dns__rid__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DnsLinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dns Update",
         "tags": [
           "vpn"
         ]

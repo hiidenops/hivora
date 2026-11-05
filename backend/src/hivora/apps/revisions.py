@@ -304,6 +304,11 @@ class Revisions:
             ids = list(
                 await session.scalars(select(Application.id).where(Application.zone_id == zone_id))
             )
+        return await self.redeploy(ids)
+
+    async def redeploy(self, ids: list[int]) -> list[Job]:
+        """A new revision of each app with its current settings (its networks or addresses
+        changed): one job each."""
         jobs = []
         for app_id in ids:
             async with self.sessions() as session:

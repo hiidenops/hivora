@@ -8,6 +8,7 @@ says so rather than presenting UFW as a protection for the apps.
 """
 
 import asyncio
+import contextlib
 import ipaddress
 import itertools
 import json
@@ -17,6 +18,8 @@ from typing import Any, Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from hivora.addressing import Taken
+from hivora.addressing.service import TakenSource
 from hivora.core.errors import ConflictError, ValidationError
 from hivora.core.events import EventBus
 from hivora.db.models import Setting
@@ -365,3 +368,26 @@ async def save_jails(fw: "HostFirewall", jails: dict[str, dict[str, Any]]) -> st
     out = await fw._change("hostfw.jails_saved", ["fail2ban-client", "reload"],
                            target=", ".join(sorted(jails)))  # fmt: skip
     return out
+
+
+def host_networks(fw: "HostFirewall", lan_ip: str | None) -> TakenSource:
+    """The host's own networks, taken for the addressing plan: its LAN (a /24 around its
+    address) and, with the host agent on, every route of its table except Docker's bridges
+    (those are Docker networks, the plan knows them)."""
+
+    async def taken(_: AsyncSession) -> list[Taken]:
+        out = []
+        if lan_ip:
+            with contextlib.suppress(ValueError):
+                lan = ipaddress.ip_network(f"{lan_ip}/24", strict=False)
+                out.append(Taken(str(lan), "host:lan"))
+        if await fw.agent_enabled():
+            with contextlib.suppress(Exception):  # the agent unreachable: the LAN only
+                for r in await routes(fw):
+                    dst, dev = r.get("dst"), str(r.get("dev") or "")
+                    if not dst or dst == "default" or dev.startswith("br-") or dev == "docker0":
+                        continue
+                    out.append(Taken(dst if "/" in dst else f"{dst}/32", f"host:{dev or 'route'}"))
+        return out
+
+    return taken

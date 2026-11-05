@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import hivora.apps.links as links
+from hivora.addressing import Addressing
 from hivora.apps.core import decrypt_secrets, get_app, latest_revision
 from hivora.apps.models import (
     Application,
@@ -103,6 +104,8 @@ class AppPlanner:
 
     # Set by the composition root (Runtime): apps never imports the sites module.
     site_ports: SitePorts | None = None
+    # The addressing plan (fixed subnets and addresses); None: Docker chooses (tests).
+    addressing: Addressing | None = None
 
     def __init__(
         self, *, settings: Settings, catalog: Catalog, state: StateStore, box: SecretBox,
@@ -163,6 +166,15 @@ class AppPlanner:
             form = FormValues(form.values, {**form.secrets, **linked.secrets})
         if linked.networks:
             app_ctx = replace(app_ctx, extra_networks=(*app_ctx.extra_networks, *linked.networks))
+        if self.addressing is not None:  # fixed networks and addresses, kept across revisions
+            fixed = await self.addressing.for_app(session, slug, zone, entry.template.services,
+                                                  app_ctx.extra_networks)  # fmt: skip
+            app_ctx = replace(
+                app_ctx,
+                default_subnet=fixed.default_subnet,
+                network_subnets=fixed.network_subnets,
+                addresses=fixed.addresses,
+            )
         overrides = overrides or Overrides()
         # The sites' ports are compiled in but never stored in the revision's overrides:
         # every compile (update, upgrade, restore) publishes the sites as they are now.

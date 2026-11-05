@@ -85,7 +85,7 @@ Tests : 498 backend (pytest), 21 tests e2e Playwright en 16 fichiers, 4 tests un
 
 ## En attente de ton retour
 
-Le panel de dev tourne sur la VM : **http://192.168.70.150:8000** (données dans `~/hivora-dev`, Docker réel). Relancé le 13/10 à 10:35 (`e3a8514`), puis à 12:15 sur le code actuel (`f5b9725`, catalogue rechargé, sans migration) : sa base est passée de la migration 0020 à 0021 au premier (sauvegardes cohérentes d'avant : `~/hivora-dev/hivora.db.before-0021-20261013.bak`, et `…before-0019-20261012.bak` pour le relancement du 12/10) ; journal dans `~/hivora-dev/panel.log`. Sur la page Pare-feu (agent hôte activé), à tester :
+Le panel de dev tourne sur la VM : **http://192.168.70.152:8000** (l'IP de la VM est passée de `.150` à `.152` début novembre) (données dans `~/hivora-dev`, Docker réel). Relancé le 13/10 à 10:35 (`e3a8514`), puis à 12:15 sur le code actuel (`f5b9725`, catalogue rechargé, sans migration) : sa base est passée de la migration 0020 à 0021 au premier (sauvegardes cohérentes d'avant : `~/hivora-dev/hivora.db.before-0021-20261013.bak`, et `…before-0019-20261012.bak` pour le relancement du 12/10) ; journal dans `~/hivora-dev/panel.log`. Sur la page Pare-feu (agent hôte activé), à tester :
 
 1. **Vue d'ensemble** : les connexions en cours sous les tuiles ; « Bloquer » sur une ligne, badge « Bloquée », « Débloquer ».
 2. **Bloquées** : liste, ajout d'une adresse avec une note, déblocage ; tuile de la vue d'ensemble.
@@ -484,11 +484,11 @@ cd /mnt/hgfs/shared/hivora/frontend && npm run build
 cd ../backend && PATH=$HOME/.local/bin:$PATH UV_PROJECT_ENVIRONMENT=$HOME/.venvs/hivora \
   HIVORA_DATA_DIR=$HOME/hivora-dev/data HIVORA_VOLUMES_ROOT=$HOME/hivora-dev/srv \
   HIVORA_CATALOG_DIR=../templates HIVORA_FRONTEND_DIR=../frontend/out \
-  HIVORA_DEV_INSECURE_COOKIES=true HIVORA_HOST_LAN_IP=192.168.70.150 \
+  HIVORA_DEV_INSECURE_COOKIES=true HIVORA_HOST_LAN_IP=192.168.70.152 \
   uv run uvicorn --factory hivora.main:app --host 0.0.0.0 --port 8000
 ```
 
-Puis ouvrir http://192.168.70.150:8000. Pour repartir de zéro : arrêter le serveur, supprimer les apps depuis l'UI, puis `rm -rf ~/hivora-dev`.
+Puis ouvrir http://192.168.70.152:8000. Pour repartir de zéro : arrêter le serveur, supprimer les apps depuis l'UI, puis `rm -rf ~/hivora-dev`.
 
 ## Arborescence
 

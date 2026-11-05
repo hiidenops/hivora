@@ -112,6 +112,12 @@ class DockerGateway(ABC):
         """Remove a network if it exists and nothing uses it. True if removed."""
 
     @abstractmethod
+    async def clear_network(self, name: str, keep_subnet: str | None = None) -> bool:
+        """Remove a network, its containers disconnected first, unless it already has
+        ``keep_subnet``. True if removed (a network left on an old subnet: Compose or
+        ``ensure_network`` then creates it on the planned one)."""
+
+    @abstractmethod
     async def ensure_agent(self, name: str, image: str, labels: dict[str, str]) -> str:
         """Start (or reuse) the host agent: a sleeping container sharing the host's PID
         and network namespaces, privileged so that ``nsenter`` reaches the host. Only
@@ -120,6 +126,14 @@ class DockerGateway(ABC):
     @abstractmethod
     async def remove_agent(self, name: str) -> bool:
         """Stop and delete the host agent; False when there was none."""
+
+    @abstractmethod
+    async def ensure_sidecar(self, name: str, image: str, labels: dict[str, str],
+                             binds: list[str], networks: dict[str, str]) -> str:  # fmt: skip
+        """Start (or reuse) one of Hivora's own containers that is not an app (the VPN's
+        web proxy): never privileged, no published port, ``binds`` (``host:container:ro``)
+        and one fixed address per network (``networks``: name -> IP). Recreated when any of
+        it changed. Returns its id; removed with ``remove_agent``."""
 
     @abstractmethod
     async def architecture(self) -> str:

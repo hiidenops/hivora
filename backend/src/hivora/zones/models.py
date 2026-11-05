@@ -32,8 +32,10 @@ class Zone(Base):
         str_enum(NetworkMode), default=NetworkMode.NONE
     )
     docker_network_id: Mapped[str | None] = mapped_column(String(64))
-    # Set when a VPN reaches the zone: its network's subnet, next to the VPN's (None: Docker's).
+    # Its fixed subnet (addressing plan): a /24 of the Hivora range, the one next to the
+    # VPN's when a VPN reaches it, or chosen by hand (``subnet_manual``). None: not yet given.
     subnet: Mapped[str | None] = mapped_column(String(43))
+    subnet_manual: Mapped[bool] = mapped_column(default=False, server_default="0")
     sort_order: Mapped[int] = mapped_column(default=0)
     is_system: Mapped[bool] = mapped_column(default=False)
     # Starting the zone: how long an app may take to be healthy before its dependents give up.

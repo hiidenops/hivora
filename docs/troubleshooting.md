@@ -53,3 +53,9 @@ Le panel écoute sur toutes les adresses (Internet) alors que son mode d'accès 
 `public` : la double authentification n'est donc pas imposée. Relancez l'installeur avec
 `--access lan` (ou `--access public` pour l'accepter, avec la double authentification pour
 tous).
+
+## Une adresse ou un sous-réseau est refusé
+
+Page **Adressage** : Hivora refuse un réseau qui chevauche le réseau local de la machine, une de ses routes, un autre réseau Docker, le tunnel d'un VPN ou un réseau déjà donné (le message dit lequel). Choisissez un autre réseau privé (`10.x`, `172.16-31.x`, `192.168.x`). Si le réseau local n'est pas reconnu, vérifiez `HIVORA_HOST_LAN_IP` dans `/opt/hivora/data/install.env`, ou activez l'agent hôte : Hivora lit alors toutes les routes de la machine.
+
+Après une mise à jour depuis une version sans adressage statique, cliquez sur **Appliquer le plan** (mode avancé) : chaque app est redéployée sur ses adresses fixes.

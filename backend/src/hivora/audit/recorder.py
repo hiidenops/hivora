@@ -22,6 +22,7 @@ AUDITED_PREFIXES = (
     "task.",
     "hostfw.",
     "zone.",
+    "addressing.",
     "vpn.",
     "proxy.",
     "job.finished",

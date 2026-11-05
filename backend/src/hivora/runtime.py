@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from hivora.addressing import Addressing
 from hivora.apps import AppJobHandlers, AppService
 from hivora.apps.custom_images import check_images
 from hivora.apps.zone_actions import ZoneActions
@@ -26,7 +27,7 @@ from hivora.games.modpacks import ModpackCatalog
 from hivora.games.worlds import WorldJobs
 from hivora.hostfw.blocking import Blocking
 from hivora.hostfw.connections import register_conntrack
-from hivora.hostfw.service import HostFirewall
+from hivora.hostfw.service import HostFirewall, host_networks
 from hivora.hostfw.static_routes import StaticRoutes
 from hivora.jobs import JobQueue
 from hivora.metrics.apps import AppMetrics
@@ -49,7 +50,7 @@ from hivora.teamspeak.jail import TeamSpeakJails, forget_removed
 from hivora.templates import Catalog
 from hivora.templates.icons import IconCache
 from hivora.vpn.admin import AdminVpn, follow_admin_client
-from hivora.vpn.service import VpnTools, expire_clients, follow_deploys
+from hivora.vpn.service import VpnTools, expire_clients, follow_deploys, follow_web
 
 if TYPE_CHECKING:
     from hivora.realtime.console import ConsoleManager
@@ -107,6 +108,7 @@ class Runtime:
     self_update: SelfUpdate
     host_updates: HostUpdates
     proxy: ProxyTools
+    addressing: Addressing
     _icons_task: "asyncio.Task[None] | None" = field(default=None, init=False)
     _vpn_tasks: "list[asyncio.Task[None]]" = field(default_factory=list, init=False)
     consoles: "ConsoleManager" = field(init=False)
@@ -158,6 +160,10 @@ class Runtime:
             bus=bus,
             clock=clock,
         )
+        # The addressing plan: fixed subnets and addresses for every app's networks.
+        addressing = Addressing(sessions=sessions, gateway=gateway)
+        apps.planner.addressing = addressing
+        apps.addressing = addressing
         # What only the planner and the job handlers use, given to them here.
         apps.planner.secret_settings = secrets
         apps.planner.public_address = public_address.current
@@ -185,6 +191,8 @@ class Runtime:
         vpn = VpnTools(sessions=sessions, apps=apps, box=box, bus=bus, clock=clock,
                        gateway=gateway)  # fmt: skip
         hostfw = HostFirewall(sessions=sessions, gateway=gateway, bus=bus, store=state.store)
+        # Taken for the addressing plan: the VPNs' tunnels, the host's networks and routes.
+        addressing.sources += [vpn.subnets, host_networks(hostfw, settings.host_lan_ip)]
         register_conntrack(hostfw, jobs)  # the conntrack install job
         blocking = Blocking(
             fw=hostfw,
@@ -198,6 +206,7 @@ class Runtime:
         blocking.register()  # the host_firewall job
         static_routes = StaticRoutes(fw=hostfw, sessions=sessions, jobs=jobs, bus=bus, clock=clock)
         static_routes.register()  # the host_route job
+        vpn.register()  # the vpn_web job (the VPN's web proxy)
         zone_actions = ZoneActions(sessions=sessions, jobs=jobs, lifecycle=apps.lifecycle,
                                    store=state.store, bus=bus)  # fmt: skip
         zone_actions.register()  # the zone_action job
@@ -219,7 +228,7 @@ class Runtime:
                    public_address, AppMetrics(gateway, state.store, bus), backups,
                    sites, site_files, site_config, site_hosting, tasks, vpn, hostfw,
                    blocking, static_routes, zone_actions, admin_vpn,
-                   releases, self_update, host_updates, proxy)  # fmt: skip
+                   releases, self_update, host_updates, proxy, addressing)  # fmt: skip
 
     async def start(self) -> None:
         # Icons download in the background: startup never waits for the network.
@@ -232,6 +241,7 @@ class Runtime:
         await self.site_config.start()
         await self.auth.ensure_initial_admin()
         await self.apps.custom.load_templates()
+        await self.addressing.fill_zones()  # zones from before static addressing
         await self.apps.adoption.load()
         try:
             self.catalog.set_host_arch(await self.gateway.architecture())
@@ -240,6 +250,7 @@ class Runtime:
         await self.state.start()
         self._vpn_tasks = [
             asyncio.create_task(follow_deploys(self.vpn), name="vpn-follow"),
+            asyncio.create_task(follow_web(self.vpn), name="vpn-web"),
             asyncio.create_task(follow_apps(self.proxy), name="proxy-follow"),
             asyncio.create_task(expire_clients(self.vpn), name="vpn-expiry"),
             asyncio.create_task(run_scheduler(self.tasks), name="task-scheduler"),

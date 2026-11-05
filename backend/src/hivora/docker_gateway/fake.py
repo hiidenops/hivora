@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from dataclasses import replace
 from datetime import datetime
+from typing import Any
 
 from hivora.docker_gateway.base import ContainerNotFoundError, DockerGateway, ExecSession
 from hivora.docker_gateway.models import (
@@ -40,6 +41,7 @@ class FakeExecSession(ExecSession):
 class FakeDockerGateway(DockerGateway):
     def __init__(self) -> None:
         self.containers: dict[str, ContainerInfo] = {}
+        self.sidecars: dict[str, dict[str, Any]] = {}  # name -> what ensure_sidecar was given
         self.networks: list[NetworkInfo] = []
         self.logs_by_container: dict[str, list[str]] = {}
         self.execs: list[FakeExecSession] = []
@@ -105,6 +107,12 @@ class FakeDockerGateway(DockerGateway):
         self.networks = [n for n in self.networks if n.name != name]
         return len(self.networks) < before
 
+    async def clear_network(self, name: str, keep_subnet: str | None = None) -> bool:
+        current = next((n for n in self.networks if n.name == name), None)
+        if current is None or (keep_subnet is not None and keep_subnet in current.subnets):
+            return False
+        return await self.remove_network(name)
+
     async def architecture(self) -> str:
         return self.arch
 
@@ -169,6 +177,15 @@ class FakeDockerGateway(DockerGateway):
 
     async def remove_agent(self, name: str) -> bool:
         return self.containers.pop(name, None) is not None
+
+    async def ensure_sidecar(self, name: str, image: str, labels: dict[str, str],
+                             binds: list[str], networks: dict[str, str]) -> str:  # fmt: skip
+        self.sidecars[name] = {"image": image, "labels": labels, "binds": binds,
+                               "networks": dict(networks)}  # fmt: skip
+        self.put(ContainerInfo(id=name, name=name, image=image, state=ContainerState.RUNNING,
+                               labels=labels, networks=tuple(networks),
+                               ips=tuple(networks.values())))  # fmt: skip
+        return name
 
     async def list_networks(self) -> list[NetworkInfo]:
         return list(self.networks)

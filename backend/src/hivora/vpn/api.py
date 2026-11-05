@@ -167,27 +167,60 @@ class DnsRecordOut(BaseModel):
     app_id: int | None
     app_slug: str | None
     app_name: str | None
+    service: str | None  # aimed at one port of the app (a web port, a hosted site's)
+    port: int | None
+    via_proxy: bool  # that port is not 80: through the VPN's web proxy
+    url: str | None  # what to open (http://name), for a name aimed at a web port
+
+
+class DnsPortOut(BaseModel):
+    service: str
+    port: int  # inside the container
+    protocol: str
+    web: bool
+
+
+class DnsSiteOut(BaseModel):
+    id: int
+    name: str
+    service: str
+    port: int  # inside the container (the main site: 80)
+    main: bool
 
 
 class DnsTargetOut(BaseModel):
     id: int
     name: str
     zone: str
+    ports: list[DnsPortOut]
+    sites: list[DnsSiteOut]  # the sites it hosts (nginx, Apache)
 
 
 class DnsOut(BaseModel):
     enabled: bool  # the deployed revision runs the local DNS (else: update the VPN)
     server: str  # the DNS clients use: the VPN server's address
+    zones: list[str]  # the zones the VPN reaches
     records: list[DnsRecordOut]
     targets: list[DnsTargetOut]  # apps of the zones the VPN reaches
 
 
 class DnsRecordIn(BaseModel):
-    """A name for an IP, or for an app of the VPN's zones (exactly one of them)."""
+    """A name for an IP, an app of the VPN's zones (one of its ports), or nothing yet."""
 
     name: str = Field(min_length=3, max_length=253)
     ip: str | None = Field(default=None, max_length=45)
     app_id: int | None = None
+    service: str | None = Field(default=None, max_length=63)
+    port: int | None = Field(default=None, ge=1, le=65535)
+
+
+class DnsLinkIn(BaseModel):
+    """What a name is linked to now (all empty: unlinked)."""
+
+    ip: str | None = Field(default=None, max_length=45)
+    app_id: int | None = None
+    service: str | None = Field(default=None, max_length=63)
+    port: int | None = Field(default=None, ge=1, le=65535)
 
 
 @router.get("/{app_id}/vpn/dns")
@@ -197,7 +230,13 @@ async def dns(app_id: int, _: Operator, rt: RuntimeDep) -> DnsOut:
 
 @router.post("/{app_id}/vpn/dns", status_code=201)
 async def dns_create(app_id: int, body: DnsRecordIn, _: Operator, rt: RuntimeDep) -> dict[str, int]:
-    return {"id": await rt.vpn.dns_create(app_id, body.name, body.ip, body.app_id)}
+    return {"id": await rt.vpn.dns_create(app_id, body.name, body.ip, body.app_id,
+                                          body.service, body.port)}  # fmt: skip
+
+
+@router.put("/{app_id}/vpn/dns/{rid}", status_code=204)
+async def dns_update(app_id: int, rid: int, body: DnsLinkIn, _: Operator, rt: RuntimeDep) -> None:
+    await rt.vpn.dns_update(app_id, rid, body.ip, body.app_id, body.service, body.port)
 
 
 @router.delete("/{app_id}/vpn/dns/{rid}", status_code=204)

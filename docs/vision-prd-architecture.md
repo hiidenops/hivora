@@ -350,6 +350,8 @@ Une zone contient des applications ; une application naît d'une version de temp
 | `port_binding` | id, service_id, host_ip, host_port, container_port, protocol, purpose (web, game, rcon, query), exposure (public, lan, vpn, internal) | Base de la topologie et de la détection de conflits |
 | `volume_mount` | id, service_id, kind (named, bind), source, target, read_only, backup (bool) | Données persistantes |
 | `network` | id, docker_id, name, driver, subnet, internal, managed_by (hivora, user, docker) | Réseaux connus |
+| `ip_assignment` | id, network, app (slug), service, address, manual | Adresse fixe d'un conteneur dans un réseau (plan d'adressage) |
+| `app_network` | app (slug), subnet | Sous-réseau fixe (/28) du réseau propre d'une app |
 | `network_attachment` | service_id, network_id, aliases | Liens service ↔ réseau |
 | `secret` | id, app_id, key, ciphertext, nonce | Valeurs sensibles des formulaires |
 | `registry_credential` | id, registry, username, ciphertext | Registres privés |
@@ -625,6 +627,26 @@ Une zone est d'abord un regroupement logique (un label `io.hivora.zone`), et seu
 - Changer une app de zone en mode `none` ne touche pas Docker (label mis à jour à la prochaine recréation, métadonnée immédiate). En mode `shared` / `isolated`, Hivora affiche l'impact réseau et demande confirmation, car la stack est recréée.
 - Supprimer une zone déplace ses apps vers « Non classé » ; le réseau Docker n'est supprimé que s'il est vide.
 - Chaque zone porte une couleur et une icône, reprises partout : tuiles, topologie, badges.
+
+### Adressage statique (05/11/2026)
+
+Tout l'adressage est fixe et gardé en base (intention) ; Docker l'applique, la page **Adressage** (menu Réseau) montre le plan, ce que Docker a réellement donné et l'écart.
+
+- **Plage Hivora** (réglage `addressing.range`) : un /16 privé choisi libre au premier besoin (premier libre de `10.100.0.0/16` à `10.250.0.0/16`), modifiable (admin, mode avancé). Moitié basse : un /24 par zone ; moitié haute : un /28 par réseau propre d'app.
+- **Zone** : un sous-réseau fixe dès sa création (`zone.subnet`). Rejointe par un VPN : le /24 libre qui suit le réseau du VPN (`10.8.0.0/24` → `10.8.1.0/24`), sauf choix à la main (`zone.subnet_manual`). Administration : `10.254.254.0/24` (installeur), non modifiable.
+- **Zone en réseau commun** : réseau `hivora-zone-<slug>` sur son /24, chaque conteneur à une IP fixe à partir de `.10` (`.2` à `.9` libres pour un choix à la main).
+- **Zone sans réseau commun** : son /24 découpé en /28, un par app (le réseau `default` de l'app), 16 apps au plus.
+- **Réseau propre d'une app** d'une zone commune ou sans zone (`<slug>_default`) : un /28 fixe de la moitié haute de la plage.
+- **Réseaux rejoints** (VPN, proxy HTTPS, outil lié) : IP fixe dans le réseau rejoint.
+- Table `ip_assignment` (réseau Docker, app par slug, service, adresse, `manual`) et `app_network` (slug, /28). Une IP suit l'app d'une révision à l'autre ; libérée à la suppression, au changement de zone ou quand un service disparaît. Le compose porte `ipv4_address` et `ipam.config.subnet` ; son en-tête donne la commande `docker network create --subnet …` des réseaux externes (utilisable sans Hivora).
+- **Garde-fous** : réseau privé, /16 à /27 pour une zone ; jamais de chevauchement avec les autres zones et réseaux d'apps, les plages d'administration (`10.254.253-254.0/24`), les tunnels des VPN, les réseaux Docker qui ne sont pas à Hivora, le LAN de l'hôte (`HIVORA_HOST_LAN_IP` en /24) et ses routes (agent hôte, hors ponts Docker), l'IP de l'admin qui fait la demande ; IP dans le réseau, ni passerelle ni broadcast, libre (`409 subnet_overlap`, `409 ip_taken`, `422 subnet_invalid`, `422 ip_invalid`, `409 network_full`).
+- **Changements** (mode avancé, aperçu puis application) : sous-réseau d'une zone (ses apps et celles qui rejoignent son réseau sont redéployées ; clients VPN à prévenir), IP d'un service (diff compose), plage (toutes les apps redéployées). « Appliquer le plan » redéploie les apps dont le compose appliqué ne suit pas le plan (installations d'avant). Avant `up`, un réseau d'Hivora resté sur un ancien sous-réseau est retiré (ses conteneurs déconnectés) pour être recréé comme prévu.
+
+### DNS du VPN et proxy web (05/11/2026)
+
+- Le bouton « DNS » (tableau de bord, carte VPN, topologie) ouvre une **carte** : les noms du VPN à gauche (cartes), les apps de ses zones à droite avec chaque destination possible : l'app elle-même (son adresse, tout protocole), chacun de ses ports web, chacun des sites qu'elle héberge (nginx, Apache). Un lien tiré d'un nom vers l'une d'elles (ou choisi dans la carte du nom, sans glisser) l'y relie ; un nom peut rester non relié ou viser une IP. `vpn_dns_record.target_service`, `target_port`.
+- Un nom relié à l'app ou à un port 80 donne l'adresse de l'app (réécriture CoreDNS vers son conteneur). Relié à un autre port, il donne l'adresse du **proxy web** dans la zone de l'app, qui transmet en HTTP vers `<conteneur>:<port>` : `http://actual.lan` ouvre Actual (port 5006) sans le port. Pas de HTTPS (choix de l'utilisateur).
+- Proxy web : conteneur système `hivora-web` (pas une app : invisible dans le parcours, visible dans Adressage), Caddy officiel figé par digest (le même que le modèle `caddy`), jamais privilégié, aucun port publié, sur le réseau de chaque zone servie à une IP fixe du plan d'adressage (pseudo-app `_hivora-web`), configuration `/opt/hivora/data/web/` montée en lecture seule et rechargée par `exec`. Créé au premier nom qui en a besoin, suit les apps (redéployées, supprimées), retiré quand plus aucun nom n'en a besoin ; appliqué par le job `vpn_web` (au démarrage aussi).
 
 ### Zones et exposition
 
