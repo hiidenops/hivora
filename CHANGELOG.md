@@ -6,6 +6,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.1] - 2026-11-05
+
 ### Corrigé
 
 - **Carte DNS ouverte depuis la topologie** : déplacer une carte du DNS ne casse plus la vue de l'infrastructure derrière.
