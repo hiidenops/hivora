@@ -521,6 +521,7 @@ export const en: Record<MessageKey, string> = {
   "vpn.never": "never connected",
   "vpn.qr": "QR code for {name}",
   "vpn.qrHelp": "Scan it with the WireGuard app on the phone.",
+  "dns.map.autoLayout": "Automatic layout",
   "dns.map.title": "VPN DNS map",
   "dns.map.add": "Add a name",
   "dns.map.help": "Draw a link from a name to an app, a port or a site (or choose in its card).",

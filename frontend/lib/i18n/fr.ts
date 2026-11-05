@@ -520,6 +520,7 @@ export const fr = {
   "vpn.never": "jamais connecté",
   "vpn.qr": "QR code de {name}",
   "vpn.qrHelp": "Scannez-le avec l'application WireGuard du téléphone.",
+  "dns.map.autoLayout": "Disposition automatique",
   "dns.map.title": "Carte DNS du VPN",
   "dns.map.add": "Ajouter un nom",
   "dns.map.help": "Tirez un lien d'un nom vers une app, un port ou un site (ou choisissez dans sa carte).",

@@ -3,9 +3,11 @@
 import "@xyflow/react/dist/style.css";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Background, Controls, Handle, Position, ReactFlow, type Connection, type Edge, type Node, type NodeProps } from "@xyflow/react";
-import { ExternalLink, Globe, Plus, Trash2 } from "lucide-react";
+import { Background, Controls, Handle, Position, ReactFlow, type Connection, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
+import { ExternalLink, Globe, LayoutGrid, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState, useSyncExternalStore, type FormEvent } from "react";
+
+import { readPref, writePref } from "@/lib/prefs";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -131,6 +133,33 @@ export function DnsMap({ appId }: { appId: number }) {
   const { data, error } = useQuery({ queryKey: key, queryFn: () => api<Dns>(url) });
   const { data: zones } = useZones();
   const [name, setName] = useState("");
+  // Cards moved by hand: kept in this browser for this VPN (auto layout for the others).
+  const pref = `dnsmap.${appId}` as const;
+  const [moved, setMoved] = useState<Record<string, { x: number; y: number }>>(() => {
+    try {
+      return JSON.parse(readPref(pref) ?? "{}") as Record<string, { x: number; y: number }>;
+    } catch {
+      return {};
+    }
+  });
+  const [layoutKey, setLayoutKey] = useState(0);
+  const onNodesChange = (changes: NodeChange[]) => {
+    let next = moved;
+    let done = false;
+    for (const c of changes) {
+      if (c.type === "position" && c.position) {
+        next = { ...next, [c.id]: c.position };
+        done ||= c.dragging === false;
+      }
+    }
+    if (next !== moved) setMoved(next);
+    if (done) writePref(pref, JSON.stringify(next));
+  };
+  const resetLayout = () => {
+    setMoved({});
+    writePref(pref, "");
+    setLayoutKey((k) => k + 1);
+  };
   const done = () => {
     void qc.invalidateQueries({ queryKey: key });
     void qc.invalidateQueries({ queryKey: ["addressing"] });
@@ -161,7 +190,7 @@ export function DnsMap({ appId }: { appId: number }) {
     let y = 0;
     for (const tg of data.targets) {
       const z = zoneOf.get(tg.zone);
-      nodes.push({ id: `t${tg.id}`, type: "target", position: { x: APP_X, y }, data: { target: tg, color: z?.color ?? "var(--muted-foreground)", zone: z?.name ?? tg.zone }, draggable: false });
+      nodes.push({ id: `t${tg.id}`, type: "target", position: { x: APP_X, y }, data: { target: tg, color: z?.color ?? "var(--muted-foreground)", zone: z?.name ?? tg.zone } });
       y += 40 + choices(tg).length * ROW_H;
     }
     data.records.forEach((r, i) => {
@@ -170,7 +199,6 @@ export function DnsMap({ appId }: { appId: number }) {
         type: "fqdn",
         position: { x: 0, y: i * 120 },
         data: { record: r, options, onLink: (l: Link) => setLink(r, l), onDelete: () => remove.mutate(r.id) },
-        draggable: false,
       });
     });
     const edges: Edge[] = data.records
@@ -184,8 +212,8 @@ export function DnsMap({ appId }: { appId: number }) {
         animated: r.via_proxy,
         style: { strokeWidth: 2 },
       }));
-    return { nodes, edges };
-  }, [data, zones, t]);
+    return { nodes: nodes.map((n) => (moved[n.id] ? { ...n, position: moved[n.id] } : n)), edges };
+  }, [data, zones, t, moved]);
 
   const onConnect = (c: Connection) => {
     const r = data?.records.find((x) => `r${x.id}` === c.source);
@@ -207,6 +235,11 @@ export function DnsMap({ appId }: { appId: number }) {
           <Button type="submit" size="sm" className="h-9" loading={add.isPending} disabled={add.isPending}>
             <Plus /> {t("dns.map.add")}
           </Button>
+          {Object.keys(moved).length > 0 && (
+            <Button type="button" size="sm" variant="outline" className="h-9" onClick={resetLayout}>
+              <LayoutGrid /> {t("dns.map.autoLayout")}
+            </Button>
+          )}
           <span className="text-xs text-muted-foreground">{t("dns.map.help")}</span>
         </form>
         {[add.error, link.error, remove.error].filter(Boolean).map((e, i) => (
@@ -216,8 +249,9 @@ export function DnsMap({ appId }: { appId: number }) {
       </div>
       <div className={cn("min-h-[420px] rounded-lg border")} aria-label={t("dns.map.title")}>
         <ReactFlow
-          key={nodes.length} // a card added or removed: framed again, all of it in view
+          key={`${nodes.length}-${layoutKey}`} // a card added or removed: framed again
           nodes={nodes}
+          onNodesChange={onNodesChange}
           edges={edges}
           nodeTypes={nodeTypes}
           colorMode={dark ? "dark" : "light"}

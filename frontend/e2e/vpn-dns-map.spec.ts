@@ -23,6 +23,21 @@ test("vpn dns map: a name linked to a site, then unlinked and removed", async ({
   await page.getByRole("button", { name: "DNS", exact: true }).click();
   const map = page.getByRole("dialog", { name: "DNS du VPN Passage" });
   await expect(map.getByText("Site « Carnet »")).toBeVisible();
+  // Cards are moved by hand, kept in this browser; "Automatic layout" puts them back.
+  const auto = map.getByRole("button", { name: "Disposition automatique" });
+  await expect(auto).toHaveCount(0);
+  const card = map.locator(".react-flow__node-target").first();
+  const box = (await card.boundingBox())!;
+  await page.mouse.move(box.x + 40, box.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 40, box.y + 120, { steps: 8 });
+  await page.mouse.up();
+  await expect(auto).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "DNS", exact: true }).click();
+  await expect(auto).toBeVisible(); // remembered
+  await auto.click();
+  await expect(auto).toHaveCount(0);
   await map.getByLabel("Nom de domaine").fill("carnet.lan");
   await map.getByRole("button", { name: "Ajouter un nom" }).click();
   const target = map.getByLabel("Cible de carnet.lan");
