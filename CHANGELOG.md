@@ -20,6 +20,7 @@ Après la mise à jour, ouvrez **Adressage** (menu Réseau), passez en mode avan
 
 ### Modifié
 
+- **Volets latéraux** : un volet (détails avancés, logs, carte DNS…) s'ouvre aussi large que son contenu le demande (la plus longue ligne de l'éditeur de compose, un tableau large), dans la limite de l'écran, tant que vous n'avez pas choisi une largeur ; un double-clic sur son bord y revient.
 - **Exemples** : les exemples du panel (noms de domaine, aide du catalogue) et les captures de la documentation ne font plus référence aux jeux.
 
 ### Corrigé
