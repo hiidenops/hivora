@@ -114,7 +114,7 @@ export function ProxyCard() {
   );
 }
 
-/** A zone's overview: its apps' names. Behind a VPN, names of the VPN's DNS (minecraft.local);
+/** A zone's overview: its apps' names. Behind a VPN, names of the VPN's DNS (nas.lan);
  *  otherwise public domains, HTTPS through the proxy (installed from here if missing). */
 export function ZoneNames({ zone, vpnId }: { zone: string; vpnId: number | null }) {
   const { t } = useI18n();
@@ -151,7 +151,7 @@ function LocalNames({ zone, vpnId }: { zone: string; vpnId: number }) {
           </li>
         ))}
       </ul>
-      <AddName apps={apps} placeholder="minecraft.local" pending={add.isPending} error={add.error} submit={(name, appId, done) => add.mutate({ name, appId }, { onSuccess: done })} />
+      <AddName apps={apps} placeholder="nas.lan" pending={add.isPending} error={add.error} submit={(name, appId, done) => add.mutate({ name, appId }, { onSuccess: done })} />
     </>
   );
 }

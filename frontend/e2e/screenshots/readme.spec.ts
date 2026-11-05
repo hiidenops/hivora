@@ -22,13 +22,13 @@ async function deploy(page: Page, headers: Record<string, string>, template: str
 
 test("README screenshots", async ({ page }) => {
   const headers = await signIn(page);
-  for (const [name, color] of [["Médias", "#7c3aed"], ["Jeux", "#16a34a"], ["Maison", "#0284c7"]]) {
+  for (const [name, color] of [["Médias", "#7c3aed"], ["Bureau", "#16a34a"], ["Maison", "#0284c7"]]) {
     await page.request.post("/api/v1/zones", { headers, data: { name, color, network_mode: "shared" } });
   }
   await deploy(page, headers, "jellyfin", "Jellyfin", "medias");
   await deploy(page, headers, "immich", "Immich", "medias");
-  await deploy(page, headers, "minecraft", "Minecraft", "jeux", { eula: true });
-  await deploy(page, headers, "terraria", "Terraria", "jeux");
+  await deploy(page, headers, "paperless-ngx", "Paperless-ngx", "bureau", { admin_password: "demo-password-123" });
+  await deploy(page, headers, "stirling-pdf", "Stirling PDF", "bureau");
   await deploy(page, headers, "home-assistant", "Home Assistant", "maison");
   await deploy(page, headers, "vaultwarden", "Vaultwarden", "maison");
   await deploy(page, headers, "uptime-kuma", "Uptime Kuma", "administration");

@@ -623,7 +623,7 @@ Une zone est d'abord un regroupement logique (un label `io.hivora.zone`), et seu
 
 - Une application appartient à une seule zone. Les services internes d'une stack (redis, postgres) suivent l'app et n'apparaissent pas comme apps séparées.
 - Une app sans zone est rangée dans « Non classé », visible sur le tableau de bord.
-- Zones système créées à l'installation : Administration (Hivora, WireGuard), non supprimable. Zones suggérées mais facultatives : Gaming, Services, Media.
+- Zones système créées à l'installation : Administration (Hivora, WireGuard), non supprimable. Zones suggérées mais facultatives : Services, Médias, Maison.
 - Changer une app de zone en mode `none` ne touche pas Docker (label mis à jour à la prochaine recréation, métadonnée immédiate). En mode `shared` / `isolated`, Hivora affiche l'impact réseau et demande confirmation, car la stack est recréée.
 - Supprimer une zone déplace ses apps vers « Non classé » ; le réseau Docker n'est supprimé que s'il est vide.
 - **Supprimer une zone et tout son contenu** (05/11/2026) : action de zone `purge` (job `zone_action`) : aperçu (`GET /zones/{slug}/purge` : apps, conteneurs, fichiers, données, blocages), puis `POST /zones/{slug}/purge` (`remove_data`, faux par défaut) supprime chaque app par son propre job (les outils liés avant les apps qu'ils visent), puis la zone et son réseau. Refusé pour Administration et quand une app d'une autre zone est liée à une app de la zone ; un VPN d'une autre zone qui la dessert en est d'abord retiré. Confirmation en tapant le nom de la zone.

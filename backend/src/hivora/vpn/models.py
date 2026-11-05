@@ -46,7 +46,7 @@ class VpnDnsRecord(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     vpn_app_id: Mapped[int] = mapped_column(ForeignKey("application.id", ondelete="CASCADE"))
-    name: Mapped[str] = mapped_column(String(253))  # e.g. minecraft.local
+    name: Mapped[str] = mapped_column(String(253))  # e.g. nas.lan
     ip: Mapped[str | None] = mapped_column(String(45))
     target_app_id: Mapped[int | None] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE")

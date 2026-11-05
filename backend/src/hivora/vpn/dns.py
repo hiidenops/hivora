@@ -30,7 +30,7 @@ class Record:
 def check_name(name: str) -> str:
     name = name.strip().lower().rstrip(".")
     if not NAME.fullmatch(name):
-        raise DnsNameError("invalid domain name (e.g. minecraft.local)", field="name")
+        raise DnsNameError("invalid domain name (e.g. nas.lan)", field="name")
     return name
 
 
