@@ -28,10 +28,17 @@ test("vpn dns map: a name linked to a site, then unlinked and removed", async ({
   await expect(auto).toHaveCount(0);
   const card = map.locator(".react-flow__node-target").first();
   const box = (await card.boundingBox())!;
+  // Never hidden while dragged (not even for a frame): any "visibility: hidden" is recorded.
+  await card.evaluate((el) => {
+    const w = window as unknown as { hid: boolean };
+    w.hid = false;
+    new MutationObserver(() => (w.hid ||= (el as HTMLElement).style.visibility === "hidden")).observe(el, { attributes: true });
+  });
   await page.mouse.move(box.x + 40, box.y + 10);
   await page.mouse.down();
   await page.mouse.move(box.x + 40, box.y + 120, { steps: 8 });
   await page.mouse.up();
+  expect(await page.evaluate(() => (window as unknown as { hid: boolean }).hid)).toBe(false);
   await expect(auto).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "DNS", exact: true }).click();

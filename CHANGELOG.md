@@ -6,6 +6,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Corrigé
+
+- **Carte DNS** : une carte qu'on déplace ne disparaît plus le temps du glisser.
+
 ## [0.5.1] - 2026-11-05
 
 ### Corrigé

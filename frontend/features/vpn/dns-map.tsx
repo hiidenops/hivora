@@ -5,7 +5,7 @@ import "@xyflow/react/dist/style.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider, type Connection, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
 import { ExternalLink, Globe, LayoutGrid, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { readPref, writePref } from "@/lib/prefs";
 
@@ -143,10 +143,13 @@ export function DnsMap({ appId }: { appId: number }) {
     }
   });
   const [layoutKey, setLayoutKey] = useState(0);
+  // Sizes React Flow measured: given back to the rebuilt cards, or it hides them (unmeasured) while dragged.
+  const sizes = useRef<Record<string, { width: number; height: number }>>({});
   const onNodesChange = (changes: NodeChange[]) => {
     let next = moved;
     let done = false;
     for (const c of changes) {
+      if (c.type === "dimensions" && c.dimensions) sizes.current[c.id] = c.dimensions;
       if (c.type === "position" && c.position) {
         next = { ...next, [c.id]: c.position };
         done ||= c.dragging === false;
@@ -212,7 +215,7 @@ export function DnsMap({ appId }: { appId: number }) {
         animated: r.via_proxy,
         style: { strokeWidth: 2 },
       }));
-    return { nodes: nodes.map((n) => (moved[n.id] ? { ...n, position: moved[n.id] } : n)), edges };
+    return { nodes: nodes.map((n) => ({ ...n, position: moved[n.id] ?? n.position, measured: sizes.current[n.id] })), edges };
   }, [data, zones, t, moved]);
 
   const onConnect = (c: Connection) => {
