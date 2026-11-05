@@ -4069,6 +4069,110 @@
         "title": "ProxyOut",
         "type": "object"
       },
+      "PurgeAppOut": {
+        "properties": {
+          "containers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Containers",
+            "type": "array"
+          },
+          "data": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "containers",
+          "files",
+          "data"
+        ],
+        "title": "PurgeAppOut",
+        "type": "object"
+      },
+      "PurgeIn": {
+        "properties": {
+          "remove_data": {
+            "default": false,
+            "title": "Remove Data",
+            "type": "boolean"
+          }
+        },
+        "title": "PurgeIn",
+        "type": "object"
+      },
+      "PurgePlanOut": {
+        "properties": {
+          "apps": {
+            "items": {
+              "$ref": "#/components/schemas/PurgeAppOut"
+            },
+            "title": "Apps",
+            "type": "array"
+          },
+          "blocked": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blocked",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "system": {
+            "title": "System",
+            "type": "boolean"
+          },
+          "vpn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vpn"
+          },
+          "zone": {
+            "title": "Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "zone",
+          "name",
+          "system",
+          "apps",
+          "blocked",
+          "vpn"
+        ],
+        "title": "PurgePlanOut",
+        "type": "object"
+      },
       "RangeIn": {
         "properties": {
           "dry_run": {
@@ -7727,7 +7831,7 @@
   },
   "info": {
     "title": "Hivora",
-    "version": "0.4.1"
+    "version": "0.5.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -15412,6 +15516,100 @@
           }
         },
         "summary": "Zone Action",
+        "tags": [
+          "zones"
+        ]
+      }
+    },
+    "/api/v1/zones/{slug}/purge": {
+      "get": {
+        "description": "What removing the zone and everything in it removes (shown before).",
+        "operationId": "purge_plan_api_v1_zones__slug__purge_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurgePlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Purge Plan",
+        "tags": [
+          "zones"
+        ]
+      },
+      "post": {
+        "description": "Remove every app of the zone (data kept unless asked), then the zone (one job).",
+        "operationId": "purge_api_v1_zones__slug__purge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PurgeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Purge",
         "tags": [
           "zones"
         ]

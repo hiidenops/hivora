@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TileSkeletons } from "@/components/ui/skeleton";
 import { StartOrderButton, ZoneActionButtons, useZoneActions } from "@/features/zones/zone-actions";
+import { PurgeDialog } from "@/features/zones/purge-dialog";
 import { ZoneDialog } from "@/features/zones/zone-dialog";
 import type { App, Zone } from "@/lib/api/client";
 import { useApps, useDeleteZone, useZones } from "@/lib/api/hooks";
@@ -89,6 +90,7 @@ function ZoneCard({ zone: z, apps, operator, remove }: { zone: Zone; apps: App[]
         {operator && (
           <div className="flex items-center gap-1">
             <ZoneDialog zone={z} trigger={<Button variant="ghost" size="icon" aria-label={t("zones.edit")} title={t("zones.edit")}><Pencil /></Button>} />
+            {!z.is_system && z.apps > 0 && <PurgeDialog zone={z} />}
             {!z.is_system && (
               <Button
                 variant="ghost"

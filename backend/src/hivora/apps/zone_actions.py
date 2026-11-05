@@ -17,24 +17,26 @@ queue has 2 by default; with a single one, they would never run).
 
 import asyncio
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+import hivora.apps.links as links
 import hivora.apps.start_order as start_order
 from hivora.apps.lifecycle import Lifecycle
 from hivora.apps.models import AppDependency, Application, Origin
 from hivora.core.errors import ConflictError
 from hivora.core.events import EventBus
+from hivora.docker_gateway import DockerGateway
 from hivora.jobs import Job, JobContext, JobKind, JobQueue
 from hivora.jobs.models import JobStatus
 from hivora.jobs.queries import get_job
 from hivora.state import AppStatus, StateStore
 from hivora.zones.models import Zone
-from hivora.zones.service import get_zone
+from hivora.zones.service import delete_zone, get_zone
 
-Action = Literal["start", "stop", "restart"]
+Action = Literal["start", "stop", "restart", "purge"]
 POLL_S = 0.5
 DEFAULT_TIMEOUT_S = 120  # apps without a zone
 RUNNING = frozenset({AppStatus.HEALTHY})
@@ -48,6 +50,10 @@ class ZoneActionRunningError(ConflictError):
 
 class ZoneActionFailedError(ConflictError):
     code = "zone_action_failed"
+
+
+class ZonePurgeBlockedError(ConflictError):
+    code = "zone_purge_blocked"
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +77,9 @@ class ZoneActions:
     def __init__(
         self, *, sessions: async_sessionmaker[AsyncSession], jobs: JobQueue,
         lifecycle: Lifecycle, store: StateStore, bus: EventBus,
+        gateway: DockerGateway | None = None,
     ) -> None:  # fmt: skip
+        self.gateway = gateway  # the zone's network, removed with it (purge)
         self.sessions = sessions
         self.jobs = jobs
         self.lifecycle = lifecycle
@@ -107,7 +115,84 @@ class ZoneActions:
                          timeout_s=timeout_s)  # fmt: skip
         return await self.startup(slug)
 
-    async def request(self, slug: str, action: Action) -> Job:
+    # --- everything in a zone removed, then the zone -------------------------------------
+    async def purge_plan(self, slug: str) -> dict[str, Any]:
+        """What "remove the zone and everything in it" removes: each app with its
+        containers, files and data folders; and what blocks it (an app of another zone
+        linked to one of these: it would lose its network)."""
+        async with self.sessions() as session:
+            zone = await get_zone(session, slug)
+            apps = await _all_members(session, zone.id)
+            inside = {a.slug for a in apps}
+            catalog = self.lifecycle.planner.catalog
+            tools = [t for a in apps for t in await links.linked_by(session, catalog, a.slug)]
+            blocked = sorted({t.name for t in tools if t.slug not in inside})
+        plans = []
+        for a in apps:
+            plan = await self.lifecycle.removal_plan(a.id)
+            plans.append({"id": a.id, "name": a.name, "containers": plan.containers,
+                          "files": plan.files, "data": plan.data})  # fmt: skip
+        return {"zone": zone.slug, "name": zone.name, "system": zone.is_system,
+                "apps": plans, "blocked": blocked}  # fmt: skip
+
+    async def purge(self, slug: str, *, remove_data: bool) -> Job:
+        plan = await self.purge_plan(slug)
+        if plan["system"]:
+            raise ZonePurgeBlockedError("the Administration zone cannot be removed", zone=slug)
+        if plan["blocked"]:
+            raise ZonePurgeBlockedError("apps of other zones are linked to apps of this zone",
+                                        zone=slug, apps=", ".join(plan["blocked"]))  # fmt: skip
+        return await self.request(slug, "purge", remove_data=remove_data)
+
+    async def _purge(self, ctx: JobContext, slug: str, remove_data: bool) -> None:
+        """Each app removed (its own job: lock, log, audit), the ones others link to after
+        them; then the zone and its network."""
+        async with self.sessions() as session:
+            zone = await get_zone(session, slug)
+            pending = {a.id: a.slug for a in await _all_members(session, zone.id)}
+        problems: list[str] = []
+        while pending:
+            jobs, deferred = {}, {}
+            for app_id, app_slug in pending.items():
+                try:
+                    jobs[app_id] = await self.lifecycle.remove(app_id, remove_data=remove_data)
+                except links.LinkedAppError:
+                    deferred[app_id] = app_slug  # a tool of the zone still links it: next round
+            if not jobs:
+                problems += [f"{s}: still linked" for s in deferred.values()]
+                break
+            await ctx.log(f"removing: {', '.join(pending[a] for a in jobs)}")
+            for app_id, job in jobs.items():
+                problem = await self._job_done(job.id)
+                await ctx.log(f"  {pending[app_id]}: {problem or 'removed'}")
+                if problem:
+                    problems.append(f"{pending[app_id]}: {problem}")
+            if problems:
+                break
+            pending = deferred
+        if problems:
+            raise ZoneActionFailedError("; ".join(problems)[-500:], zone=slug)
+        async with self.sessions() as session, session.begin():
+            await delete_zone(session, slug, 0)
+        if self.gateway is not None:
+            await self.gateway.remove_network(f"hivora-zone-{slug}")
+        await ctx.log(f"zone {slug} removed")
+        self.bus.publish("zone.deleted", target=slug, purged=True, data_removed=remove_data)
+
+    async def _job_done(self, job_id: int) -> str | None:
+        """None once the job succeeded; else why not."""
+        while True:
+            async with self.sessions() as session:
+                job = await get_job(session, job_id)
+                status, error = (job.status, job.error) if job else (JobStatus.CANCELLED, None)
+            if status in _DONE:
+                break
+            await asyncio.sleep(POLL_S)
+        if status is JobStatus.SUCCEEDED:
+            return None
+        return f"its job {status.value}" + (f" ({error})" if error else "")
+
+    async def request(self, slug: str, action: Action, *, remove_data: bool = False) -> Job:
         async with self.sessions() as session, session.begin():
             zone = await get_zone(session, slug)
             busy = await session.scalar(select(Job.id).where(
@@ -115,8 +200,10 @@ class ZoneActions:
                 Job.status.in_((JobStatus.QUEUED, JobStatus.RUNNING))).limit(1))  # fmt: skip
             if busy is not None:
                 raise ZoneActionRunningError("a zone action is already running", job=busy)
-            job = self.jobs.add(session, JobKind.ZONE_ACTION,
-                                params={"zone": zone.slug, "action": action})  # fmt: skip
+            params: dict[str, Any] = {"zone": zone.slug, "action": action}
+            if action == "purge":
+                params["remove_data"] = remove_data
+            job = self.jobs.add(session, JobKind.ZONE_ACTION, params=params)
         self.jobs.wake()
         self.bus.publish("zone.action_requested", target=slug, action=action, job=job.id)
         return job
@@ -124,6 +211,9 @@ class ZoneActions:
     # --- the job ----------------------------------------------------------------------------
     async def _run(self, ctx: JobContext) -> None:
         slug, action = str(ctx.params["zone"]), str(ctx.params["action"])
+        if action == "purge":
+            await self._purge(ctx, slug, bool(ctx.params.get("remove_data")))
+            return
         async with self.sessions() as session:  # read, then closed before any wait
             zone = await get_zone(session, slug)
             apps = {a.id: a.slug for a in await _members(session, zone.id)}
@@ -206,6 +296,13 @@ class ZoneActions:
                 return f"still {now.value} after {limit_s} s"
             await asyncio.sleep(POLL_S)
         return None
+
+
+async def _all_members(session: AsyncSession, zone_id: int) -> list[Application]:
+    """Every app of the zone, deployed or not, by name."""
+    rows = await session.scalars(select(Application).where(Application.zone_id == zone_id)
+                                 .order_by(Application.name))  # fmt: skip
+    return list(rows)
 
 
 async def _members(session: AsyncSession, zone_id: int) -> list[Application]:

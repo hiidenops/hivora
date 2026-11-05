@@ -208,7 +208,7 @@ class Runtime:
         static_routes.register()  # the host_route job
         vpn.register()  # the vpn_web job (the VPN's web proxy)
         zone_actions = ZoneActions(sessions=sessions, jobs=jobs, lifecycle=apps.lifecycle,
-                                   store=state.store, bus=bus)  # fmt: skip
+                                   store=state.store, bus=bus, gateway=gateway)  # fmt: skip
         zone_actions.register()  # the zone_action job
         admin_vpn = AdminVpn(settings=settings, sessions=sessions, apps=apps, vpn=vpn, jobs=jobs,
                              public_address=public_address.current, clock=clock)  # fmt: skip

@@ -2801,6 +2801,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/zones/{slug}/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Purge Plan
+         * @description What removing the zone and everything in it removes (shown before).
+         */
+        get: operations["purge_plan_api_v1_zones__slug__purge_get"];
+        put?: never;
+        /**
+         * Purge
+         * @description Remove every app of the zone (data kept unless asked), then the zone (one job).
+         */
+        post: operations["purge_api_v1_zones__slug__purge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/zones/{slug}/startup": {
         parameters: {
             query?: never;
@@ -4197,6 +4221,42 @@ export interface components {
             running: boolean;
             /** Targets */
             targets: components["schemas"]["TargetOut"][];
+        };
+        /** PurgeAppOut */
+        PurgeAppOut: {
+            /** Containers */
+            containers: string[];
+            /** Data */
+            data: string[];
+            /** Files */
+            files: string[];
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** PurgeIn */
+        PurgeIn: {
+            /**
+             * Remove Data
+             * @default false
+             */
+            remove_data: boolean;
+        };
+        /** PurgePlanOut */
+        PurgePlanOut: {
+            /** Apps */
+            apps: components["schemas"]["PurgeAppOut"][];
+            /** Blocked */
+            blocked: string[];
+            /** Name */
+            name: string;
+            /** System */
+            system: boolean;
+            /** Vpn */
+            vpn: string | null;
+            /** Zone */
+            zone: string;
         };
         /** RangeIn */
         RangeIn: {
@@ -10945,6 +11005,72 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ZoneActionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRef"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_plan_api_v1_zones__slug__purge_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurgePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_api_v1_zones__slug__purge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurgeIn"];
             };
         };
         responses: {
