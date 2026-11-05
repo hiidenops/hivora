@@ -96,7 +96,7 @@ def test_nginx_upgrade_to_1_1_0_adds_the_site_volumes(client: Any) -> None:
     with sqlite3.connect(rt.settings.db_path) as db:  # deployed from the 1.0.0 template
         db.execute("UPDATE template_version SET version = '1.0.0' WHERE slug = 'nginx'")
     status = client.get(f"{API}/apps/{app_id}/upgrade").json()
-    assert (status["available"], status["current"], status["latest"]) == (True, "1.0.0", "1.1.0")
+    assert (status["available"], status["current"], status["latest"]) == (True, "1.0.0", "1.1.1")
     job = client.post(f"{API}/apps/{app_id}/upgrade", json={}).json()
     assert wait_job(client, job["id"])["status"] == "succeeded"
     svc = compose_of(client, app_id)["services"]["server"]

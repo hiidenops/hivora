@@ -47,6 +47,10 @@ Le panel utilise alors le vrai Docker de la machine.
   [releasing.md](releasing.md)).
 - Modification de l'API : régénérer `frontend/lib/api/openapi.json` et les types.
 - Textes du panel : en français et en anglais (`frontend/lib/i18n/`).
+- Modification d'un modèle (`templates/`) : changer sa `version`, puis mettre à jour
+  `templates/versions.lock.json` (`HIVORA_UPDATE_TEMPLATE_LOCK=1 uv run pytest
+  tests/test_templates.py` dans `backend/`). Un panel refuse une même version au contenu
+  différent ; le test l'empêche.
 - Modification de l'installeur : garder [installation.md](installation.md) à jour ; un test
   vérifie que les options et commandes citées par la documentation existent.
 - Captures de la documentation (`docs/images/`) : `npx playwright test -c

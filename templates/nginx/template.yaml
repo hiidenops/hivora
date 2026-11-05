@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: nginx
   name: nginx
-  version: 1.1.0
+  version: 1.1.1
   category: services
   tags: [web, server, static]
   icon: { url: "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/nginx.svg" }

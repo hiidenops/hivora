@@ -320,7 +320,7 @@ def test_nginx_serves_its_main_site_and_includes_the_sites(catalog: Catalog) -> 
     """nginx 1.1.0: a fixed default.conf (the main site on port 80, then the files Hivora
     writes in the conf volume), the html, sites and conf volumes; html and sites saved."""
     template = catalog.get("nginx").template
-    assert template.metadata.version == "1.1.0"
+    assert template.metadata.version == "1.1.1"
     form = validate_inputs(template, {"web_port": 8095}, {"app": {"name": "Vitrine"}})
     compiled = compile_template(
         template, AppContext(slug="vitrine", name="Vitrine", revision=1),
@@ -472,3 +472,27 @@ def test_a_linked_app_is_compiled_in_never_its_password() -> None:
     assert compiled.compose["networks"]["reach0"] == {"name": "pg_default", "external": True}
     with pytest.raises(FormValidationError):  # an app field holds a slug, nothing else
         validate_inputs(tool, {"database": "pg; rm -rf /"}, {})
+
+
+TEMPLATE_LOCK = Path(__file__).parents[2] / "templates" / "versions.lock.json"
+
+
+def test_a_template_never_changes_without_a_new_version(catalog: Catalog) -> None:
+    """A panel keeps each template version it deployed with its checksum, and refuses the
+    same version with another content ("template changed without a version bump"): every
+    nginx of 0.4.1 hit it. The lock holds each version's checksum; to update it after a
+    version bump: HIVORA_UPDATE_TEMPLATE_LOCK=1 pytest tests/test_templates.py."""
+    import json
+    import os
+
+    current = {e.slug: {"version": e.template.metadata.version, "checksum": e.checksum}
+               for e in sorted(catalog.entries(), key=lambda e: e.slug)}  # fmt: skip
+    if os.environ.get("HIVORA_UPDATE_TEMPLATE_LOCK"):
+        TEMPLATE_LOCK.write_text(json.dumps(current, indent=2) + "\n")
+    locked = json.loads(TEMPLATE_LOCK.read_text())
+    changed = [s for s, v in current.items()
+               if s in locked and locked[s]["version"] == v["version"]
+               and locked[s]["checksum"] != v["checksum"]]  # fmt: skip
+    assert changed == [], f"changed without a new version: {changed}"
+    stale = [s for s, v in current.items() if locked.get(s) != v]
+    assert stale == [], f"versions.lock.json to update (new version or template): {stale}"

@@ -1,0 +1,174 @@
+{
+  "7-days-to-die": {
+    "version": "1.0.0",
+    "checksum": "f3712ab8369704858d09538a9c627f7b95dcd556d4ae364bc02c35cd92acc778"
+  },
+  "adguard-home": {
+    "version": "1.0.0",
+    "checksum": "b7a575f92202110be251521818799fb342a5e96700d558be137a3c7e9d464acb"
+  },
+  "adminer": {
+    "version": "1.0.1",
+    "checksum": "501878d0d398ee6b98b3ed3a368f901ad4e5fac001648a132893d29aec53c42b"
+  },
+  "ark-survival-ascended": {
+    "version": "1.0.0",
+    "checksum": "bc076eb8c17507f98fbc10f8aaee24053f23d660554339f276023033d2412e0c"
+  },
+  "caddy": {
+    "version": "1.0.0",
+    "checksum": "07031f6e1b8aa3b09c46af600373d0f0264eff7dd72a2460f1a0cb0a4e5b44dd"
+  },
+  "conan-exiles": {
+    "version": "1.0.0",
+    "checksum": "c14672dea1d421283e1783120342bbc85822bdc3041b050774ea03d27fb02066"
+  },
+  "core-keeper": {
+    "version": "1.0.1",
+    "checksum": "7dacd58aa7f784c82e49f7cd7ec8276379ed1666bf4c490745f0966d83158c36"
+  },
+  "counter-strike-2": {
+    "version": "1.0.0",
+    "checksum": "2572b35dd8238b5d4f03bc6195205adfb3e86095d0c2262cd8c247c86e186f1c"
+  },
+  "dont-starve-together": {
+    "version": "1.0.0",
+    "checksum": "fe2f63943398e84e1e4738f3cf34aaff7926c5ede64ec87cd939cc23e46ecc7d"
+  },
+  "enshrouded": {
+    "version": "1.0.0",
+    "checksum": "c5ffe9431dbb951536b40772a4025d9ea61cf1f2375061b32dfb312a4a093d19"
+  },
+  "factorio": {
+    "version": "1.0.0",
+    "checksum": "293f65999e7f101908f85b65ee949ef4fcd4ff39c010f6c4d6b2292e66c6bd00"
+  },
+  "filebrowser": {
+    "version": "1.0.0",
+    "checksum": "5b95a0e230ad3417a4a45ebc84298de40d183851073fff2fa70e1ecdca3ef6d5"
+  },
+  "garrys-mod": {
+    "version": "1.1.0",
+    "checksum": "8c03b1f6721675305fdbde1bd3d8c5b29dcd7d0c46fbc392cf15edfdfb45eb1e"
+  },
+  "gitea": {
+    "version": "1.0.0",
+    "checksum": "9dd8607da99ceca97033bafa6322fa6d155db7bbefc54b890ad4af04a818c35d"
+  },
+  "home-assistant": {
+    "version": "1.0.0",
+    "checksum": "ded7659dd3c247ff3c6a57d7843bc6afe8146a3580d45f2ee8836769694795c2"
+  },
+  "httpd": {
+    "version": "1.1.1",
+    "checksum": "075abaca0ea8c96d28ffb5ae7ee86c2b0f52aa09fd53d6f26bf656b4c42ee99b"
+  },
+  "immich": {
+    "version": "1.0.0",
+    "checksum": "0840e25ce8fd89ad39e414a93632c433ef9c04d39bf633de54c7396ccbc54186"
+  },
+  "jellyfin": {
+    "version": "1.0.0",
+    "checksum": "f58f4de695d7cb3e81ff65dba6d64db72b422e9c751bf196b31239fdb3eeccf6"
+  },
+  "mariadb": {
+    "version": "1.2.0",
+    "checksum": "46158a09746696975f172ad666212af03d630342ab4b39e6e9f5ccbfe8b49499"
+  },
+  "minecraft": {
+    "version": "1.14.0",
+    "checksum": "672546b298bf69ac9cd7e181106bb6c03c2e7eda039767d8075a1c5ef1cdfbd0"
+  },
+  "n8n": {
+    "version": "1.0.0",
+    "checksum": "72dd364d0fb9ff553602f3b2b1529edbe1305a37dde682c16be8865bbf51c9ee"
+  },
+  "nextcloud": {
+    "version": "1.0.0",
+    "checksum": "2aabeb0714470295d06b8c1ba9bbdd7d092bebd2bbc65111edd935c867b42b29"
+  },
+  "nginx": {
+    "version": "1.1.1",
+    "checksum": "27904803c42dac0fcd2dd214a176605c446b327aa8bc3d562d8947c352c5f236"
+  },
+  "palworld": {
+    "version": "1.0.0",
+    "checksum": "5b33049f4abeef8c4afc03e66501294bd22fc60477fa7b902e1875ca6b665313"
+  },
+  "paperless-ngx": {
+    "version": "1.0.0",
+    "checksum": "8773158dc009ea67a1afc5c8f6643919e76988c62ba047280ced254295221da4"
+  },
+  "pgadmin": {
+    "version": "1.1.0",
+    "checksum": "bac3d5538d186e6026f99a8b89397b741ed031636d2950deebb51144118064d7"
+  },
+  "phpmyadmin": {
+    "version": "1.1.0",
+    "checksum": "6b5334509b7c8a84b9ec3361e19d06625647f16e30c8b9ac85290b31605fecca"
+  },
+  "postgresql": {
+    "version": "1.2.0",
+    "checksum": "06bcfa04b1b02ec4f3379429a084d95a7b1f4b60a27e2caa69df8cf6e3447f84"
+  },
+  "project-zomboid": {
+    "version": "1.1.0",
+    "checksum": "28e42b0f11bc932fc033d680e4a4b4bc796af5cdabfb260aea6b9dd9e6adafc5"
+  },
+  "redis": {
+    "version": "1.0.0",
+    "checksum": "0afb4296679248f8d49b6d13bb52708e3b867927ea04b67e46f8ecb094d54999"
+  },
+  "rust": {
+    "version": "1.0.0",
+    "checksum": "fa2b0f98b8bbb62312eca6622bec57b93a258e03cf40bf921998fb0954605ca9"
+  },
+  "satisfactory": {
+    "version": "1.0.0",
+    "checksum": "134cac6772938d614f43a1447be3aff78616ed2d993c66f75a23d857e304e8c9"
+  },
+  "sons-of-the-forest": {
+    "version": "1.0.0",
+    "checksum": "70a22c3e32dd5419c7bca2258055f0010ae8d0ddd70747b99f1b45b6da1e6d8b"
+  },
+  "stirling-pdf": {
+    "version": "1.0.0",
+    "checksum": "3ad96d6c9ca5a2f72c5b54af74c99aaacfa27c0d5a7a1b0df3574478d02d64cc"
+  },
+  "syncthing": {
+    "version": "1.0.0",
+    "checksum": "14622690adf48b89e4524c17c1fd63aa2fe7d7d2a33674cad5498eb09c13b66f"
+  },
+  "teamspeak": {
+    "version": "1.0.0",
+    "checksum": "b66bff52e7c12880fea77173e53e6ffc3c2175aeb27088412bff887e77d31a05"
+  },
+  "terraria": {
+    "version": "1.0.0",
+    "checksum": "e4f0deb1a7dc935bc01f8eb91529748d92e8328a0f45b7b4b94d66c4a31801b1"
+  },
+  "tmodloader": {
+    "version": "1.0.1",
+    "checksum": "4269bcaa2e484238b7a199657a3b2c9db035f63114f3df26039e3fd434fc33a5"
+  },
+  "uptime-kuma": {
+    "version": "1.0.0",
+    "checksum": "d312c01c8e66b47889cba4136d78dc70923debbb3b26005e0be06621a0c65fdb"
+  },
+  "v-rising": {
+    "version": "1.0.0",
+    "checksum": "ade0eecca22da2be5c4c4f96865c822cc043ffc855e6cbead368dcbf539f29a8"
+  },
+  "valheim": {
+    "version": "1.0.0",
+    "checksum": "8dd8b4bacda2dd5f544e17101f6b14cbd62c114819297ada43793639790c3b40"
+  },
+  "vaultwarden": {
+    "version": "1.3.0",
+    "checksum": "9afc71d92ecdb15d8ea2daf622f752df2bab1ddfbb9470469aa1973f23538f8a"
+  },
+  "wireguard": {
+    "version": "2.4.0",
+    "checksum": "bb2a14d23c617f159596720fba63b021f23fabf789ce5cfd4231bd01dca20b5a"
+  }
+}
