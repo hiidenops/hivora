@@ -3,7 +3,7 @@
 import "@xyflow/react/dist/style.css";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Background, Controls, Handle, Position, ReactFlow, type Connection, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
+import { Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider, type Connection, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
 import { ExternalLink, Globe, LayoutGrid, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState, useSyncExternalStore, type FormEvent } from "react";
 
@@ -248,6 +248,8 @@ export function DnsMap({ appId }: { appId: number }) {
         {data.targets.length === 0 && <Alert tone="info">{t("dns.map.noApp")}</Alert>}
       </div>
       <div className={cn("min-h-[420px] rounded-lg border")} aria-label={t("dns.map.title")}>
+        {/* Own store: opened from the topology's inspector, it would otherwise share (and overwrite) the infra map's. */}
+        <ReactFlowProvider>
         <ReactFlow
           key={`${nodes.length}-${layoutKey}`} // a card added or removed: framed again
           nodes={nodes}
@@ -269,6 +271,7 @@ export function DnsMap({ appId }: { appId: number }) {
           <Background gap={16} />
           <Controls showInteractive={false} />
         </ReactFlow>
+        </ReactFlowProvider>
       </div>
     </div>
   );

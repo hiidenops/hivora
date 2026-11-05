@@ -6,6 +6,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Corrigé
+
+- **Carte DNS ouverte depuis la topologie** : déplacer une carte du DNS ne casse plus la vue de l'infrastructure derrière.
+
 ## [0.5.0] - 2026-11-05
 
 Après la mise à jour, ouvrez **Adressage** (menu Réseau), passez en mode avancé et cliquez une fois sur **Appliquer le plan** : chaque app est redéployée sur ses adresses fixes.
