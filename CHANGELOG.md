@@ -6,6 +6,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+## [0.5.0] - 2026-11-05
+
+Après la mise à jour, ouvrez **Adressage** (menu Réseau), passez en mode avancé et cliquez une fois sur **Appliquer le plan** : chaque app est redéployée sur ses adresses fixes.
+
 ### Ajouté
 
 - **Adressage statique** : chaque zone a maintenant un sous-réseau fixe (un /24 de la plage d'Hivora, ou celui qui suit le réseau du VPN qui la rejoint), le réseau propre de chaque app un /28 fixe et chaque conteneur une IP fixe, gardés d'une mise à jour à l'autre. Hivora ne prend jamais une adresse du réseau local, des routes de la machine, des autres réseaux Docker ni des tunnels VPN. Une zone sans réseau commun donne un /28 à chacune de ses apps.
