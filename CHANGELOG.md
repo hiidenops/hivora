@@ -18,6 +18,10 @@ Après la mise à jour, ouvrez **Adressage** (menu Réseau), passez en mode avan
 - **Supprimer une zone et tout son contenu** : sur la page Zones, le bouton rouge d'une zone liste ses apps (conteneurs, fichiers, données), puis supprime chaque app et la zone avec son réseau, en une seule tâche. Les données sont gardées sauf si vous cochez la case ; il faut taper le nom de la zone pour confirmer. Refusé si une app d'une autre zone dépend d'une app de celle-ci ; un VPN d'une autre zone cesse simplement de la desservir.
 - **Page Adressage** (menu Réseau) : la plage d'Hivora, les réseaux exclus, chaque zone avec son sous-réseau et l'IP prévue de chaque conteneur à côté de celle que Docker a donnée (écart signalé). En mode avancé : changer le sous-réseau d'une zone, l'IP d'un service ou la plage, avec un aperçu (apps redéployées, commandes Docker ou diff du compose) avant d'appliquer. « Appliquer le plan » met les apps installées avant cette version sur leurs adresses fixes : à faire une fois après la mise à jour.
 
+### Modifié
+
+- **Exemples** : les exemples du panel (noms de domaine, aide du catalogue) et les captures de la documentation ne font plus référence aux jeux.
+
 ### Corrigé
 
 - **nginx et Apache** : depuis la 0.4.1, sur un panel qui en avait déjà installé un, modifier leurs réglages, les mettre à jour ou en déployer un nouveau échouait (« template changed without a version bump »). Modèles 1.1.1 ; un test empêche désormais qu'un modèle change sans changer de version.
