@@ -25,6 +25,7 @@ class Record:
     name: str
     ip: str | None = None
     container: str | None = None  # Docker name of the target container
+    srv: tuple[str, int] | None = None  # SRV prefix and port: the client finds the port itself
 
 
 def check_name(name: str) -> str:
@@ -59,6 +60,11 @@ def corefile(records: list[Record], dns: str) -> str:
         for r in apps:
             lines += [f"    rewrite continue name exact {r.name}. {r.container}. answer auto",
                       f"    rewrite ttl exact {r.name}. 30"]  # fmt: skip
+            if r.srv:
+                owner = f"{r.srv[0]}.{r.name}."
+                lines += [f"    template IN SRV {owner} {{",
+                          f'        answer "{owner} 30 IN SRV 0 0 {r.srv[1]} {r.name}."',
+                          "        fallthrough", "    }"]  # fmt: skip
         # CoreDNS sends a name to the block of its longest zone: under an app's name
         # (web.home.lan under home.lan), an IP's name lands here, so this block knows them
         # too (rewrite runs before hosts: an IP's name passes it untouched).
@@ -86,3 +92,6 @@ if __name__ == "__main__":
     text = corefile([Record("home.lan", container="web-1"),
                      Record("web.home.lan", ip="10.8.1.5")], "")  # fmt: skip
     assert text.split("home.lan. {")[1].count("10.8.1.5 web.home.lan") == 1
+    text = corefile([Record("mc.lan", container="mc-1", srv=("_minecraft._tcp", 25570))], "")
+    assert "template IN SRV _minecraft._tcp.mc.lan. {" in text
+    assert '"_minecraft._tcp.mc.lan. 30 IN SRV 0 0 25570 mc.lan."' in text

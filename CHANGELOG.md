@@ -6,6 +6,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Corrigé
+
+- **Serveur Minecraft derrière un nom du VPN** : un serveur sur un autre port que 25565 ne se joignait qu'avec `survie.lan:<port>`. Le DNS du VPN indique maintenant le port au client (enregistrement SRV), le nom seul suffit. Ouvrir la carte du VPN réécrit sa configuration DNS.
+
 ## [0.5.2] - 2026-11-05
 
 ### Corrigé

@@ -76,8 +76,8 @@
     "checksum": "46158a09746696975f172ad666212af03d630342ab4b39e6e9f5ccbfe8b49499"
   },
   "minecraft": {
-    "version": "1.14.0",
-    "checksum": "672546b298bf69ac9cd7e181106bb6c03c2e7eda039767d8075a1c5ef1cdfbd0"
+    "version": "1.15.0",
+    "checksum": "758cc241b86d45c20e95b67cea5b1bdf525692b719e8603fef757e0929c82bfb"
   },
   "n8n": {
     "version": "1.0.0",

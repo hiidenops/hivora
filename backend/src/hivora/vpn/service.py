@@ -223,18 +223,22 @@ class VpnTools:
             values = (await self.apps.planner.current_settings(session, app.id)).values
             form = entry.template.with_defaults(values)
             ports = []
+            srv = None
+            prefix = entry.template.game.srv if entry.template.game else None
             for name, svc in entry.template.services.items():
                 for p in svc.ports:
                     with suppress(KeyError, TypeError, ValueError):
                         port = p.container_in(form)
                         ports.append({"service": name, "port": port, "protocol": p.protocol,
                                       "web": p.purpose == "web"})  # fmt: skip
+                        if prefix and p.purpose == "game" and srv is None:
+                            srv = (prefix, port)
             sites = [{"id": h.id, "name": h.name, "service": SITE_SERVICE,
                       "port": web.DIRECT_PORT if h.main else h.port, "main": h.main}
                      for h in hosted.get(app.id, []) if h.main or h.port]  # fmt: skip
             out[app.id] = {"id": app.id, "name": app.name, "zone": zone, "slug": app.slug,
                            "container": f"{app.slug}-{entry.template.main_service}-1",
-                           "ports": ports, "sites": sites}  # fmt: skip
+                           "ports": ports, "sites": sites, "srv": srv}  # fmt: skip
         return out
 
     async def _routes(self, session: AsyncSession) -> list[web.Route]:
@@ -309,7 +313,8 @@ class VpnTools:
             container = target.get("container")
             if r["service"] and target:  # one port, given by the app itself (port 80)
                 container = web.container_of(target["slug"], r["service"])
-            records.append(dns.Record(r["name"], ip=r["ip"], container=container))
+            records.append(dns.Record(r["name"], ip=r["ip"], container=container,
+                                      srv=None if r["service"] else target.get("srv")))  # fmt: skip
         text = dns.corefile(records, vpn.value(vpn.spec.dns_field))
         with suppress(OSError):
             if vpn.host_dns.read_text() == text:
@@ -340,10 +345,10 @@ class VpnTools:
         # Not running: the image brings it up on start (PostUp runs the access rights).
         return server.address if vpn.container is not None else None
 
-    async def sync(self, app_id: int) -> None:
+    async def sync(self, app_id: int, *, if_changed: bool = False) -> None:
         vpn = await self._vpn(app_id)
         async with self._lock:
-            await self._sync(vpn)
+            await self._sync(vpn, if_changed=if_changed)
 
     async def _client(self, session: AsyncSession, vpn: VpnApp, cid: int) -> VpnPeer:
         peer = await session.get(VpnPeer, cid)
@@ -619,7 +624,8 @@ class VpnTools:
 
 
 async def follow_deploys(vpn: VpnTools) -> None:
-    """After each deploy or settings change of a VPN, rewrite and apply its config."""
+    """After each deploy or settings change of a VPN, rewrite and apply its config; of an
+    app with names, the DNS of their VPNs (its game port may have changed)."""
     async with vpn.bus.subscribe("app.deployed") as sub:
         async for event in sub:
             # ponytail: fixed wait for the state to see the new container (< 2 s budget)
@@ -627,10 +633,14 @@ async def follow_deploys(vpn: VpnTools) -> None:
             try:
                 async with vpn.sessions() as session:
                     app_id = await app_id_by_slug(session, event.payload["app"])
+                    vpns = await session.scalars(select(VpnDnsRecord.vpn_app_id).where(
+                        VpnDnsRecord.target_app_id == app_id).distinct())  # fmt: skip
+                    named = [] if app_id is None else list(vpns)
                 if app_id is not None:
-                    await vpn.sync(app_id)
-            except NotAVpnError:
-                pass
+                    with suppress(NotAVpnError):
+                        await vpn.sync(app_id)
+                for vpn_id in named:
+                    await vpn.sync(vpn_id, if_changed=True)
             except Exception:
                 logger.exception("VPN config not applied after deploy", extra=event.payload)
 

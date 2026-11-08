@@ -3,7 +3,7 @@ kind: Template
 metadata:
   slug: minecraft
   name: Minecraft Java
-  version: 1.14.0
+  version: 1.15.0
   category: games
   tags: [minecraft, java, sandbox]
   icon:
@@ -376,6 +376,7 @@ game:
     - { command: "stop", description: { fr: Arrêter proprement le serveur, en: Stop the server cleanly } }
   max_players: "{{ form.max_players }}"
   stop_command: stop
+  srv: _minecraft._tcp  # a VPN name opens without its port, whichever the server uses
 logs:
   # Hivora polls the players over RCON every 15 s: each poll logs two lines.
   hide: ["Thread RCON Client", "RCON Client /"]

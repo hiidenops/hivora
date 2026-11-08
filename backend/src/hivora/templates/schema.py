@@ -455,6 +455,8 @@ class Game(_Strict):
     saves: GameSaves | None = None
     max_players: int | str | None = None
     stop_command: str | None = None  # graceful stop through the console
+    # The DNS SRV prefix the game's client looks up: a VPN name gives it the game port.
+    srv: Annotated[str, Field(pattern=r"^_[a-z0-9-]+\._(tcp|udp)$")] | None = None
 
 
 class Defaults(_Strict):

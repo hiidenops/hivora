@@ -272,3 +272,27 @@ def test_vpn_local_dns_names(client: Any) -> None:
     assert "rewrite continue name exact web.local. web-server-1. answer auto" in text
     assert client.delete(f"{url}/{records[0]['id']}").status_code == 204
     assert "nas.local" not in corefile.read_text()
+
+    # A game on another port: the name alone gives it to the client (SRV).
+    body = {"template": "minecraft", "name": "survie", "zone": "jeux",
+            "inputs": {"eula": True, "game_port": 25570}}  # fmt: skip
+    game = client.post(f"{API}/apps", json=body)
+    assert wait_job(client, game.json()["job"]["id"])["status"] == "succeeded"
+    assert (
+        client.post(
+            url, json={"name": "survie.lan", "app_id": game.json()["app"]["id"]}
+        ).status_code
+        == 201
+    )
+    assert '"_minecraft._tcp.survie.lan. 30 IN SRV 0 0 25570 survie.lan."' in corefile.read_text()
+    # Its port changes: the name follows (the DNS is rewritten after the deploy).
+    game_id = game.json()["app"]["id"]
+    moved = client.put(
+        f"{API}/apps/{game_id}/settings", json={"inputs": {"eula": True, "game_port": 25571}}
+    )
+    assert wait_job(client, moved.json()["id"])["status"] == "succeeded"
+    for _ in range(50):
+        if "SRV 0 0 25571 survie.lan." in corefile.read_text():
+            break
+        time.sleep(0.2)
+    assert "SRV 0 0 25571 survie.lan." in corefile.read_text()
