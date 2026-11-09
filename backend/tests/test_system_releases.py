@@ -75,7 +75,10 @@ def test_notes_command_repo_and_changelog() -> None:
     notes = plain_notes('Fix <img src="https://x.example/p.png"> <script>alert(1)</script>ok')
     assert "<" not in notes and "img" not in notes and notes.endswith("ok")
     assert len(plain_notes("a" * 30_000)) == 20_000
-    assert repo_of(REPO) == "hivora-suite/hivora-panel" and repo_of(f"{REPO}.git/") == "hivora-suite/hivora-panel"
+    assert (
+        repo_of(REPO) == "hivora-suite/hivora-panel"
+        and repo_of(f"{REPO}.git/") == "hivora-suite/hivora-panel"
+    )
     assert repo_of("https://codeberg.org/someone/hivora") is None
     assert update_command("hivora-suite/hivora-panel", "v0.2.0") == (
         'sudo sh -c "$(curl -fsSL'
