@@ -169,8 +169,8 @@ def test_a_fresh_install_bootstraps_before_the_server(machine: Machine) -> None:
     done = machine.install("--yes", "--version", "v1.2.3")
     assert done.returncode == 0, done.stderr
     pull, boot, network, start = machine.changes()
-    assert pull == "docker pull ghcr.io/hiidenops/hivora:v1.2.3"
-    assert "--rm" in boot and boot.endswith("hivora:v1.2.3 python -m hivora bootstrap")
+    assert pull == "docker pull ghcr.io/hivora-suite/hivora-panel:v1.2.3"
+    assert "--rm" in boot and boot.endswith("hivora-panel:v1.2.3 python -m hivora bootstrap")
     assert "docker.sock" not in boot  # the bootstrap needs no Docker
     assert network == ("docker network create --driver bridge --subnet 10.254.254.0/24 "
                        "--ip-range 10.254.254.0/25 --label io.hivora.zone-network=1 "
@@ -193,7 +193,9 @@ def test_a_rerun_keeps_the_options_and_backs_up_first(machine: Machine) -> None:
     done = machine.install("--yes", env={"FAKE_PORT_BUSY": "1", "FAKE_HIVORA_PORT": "9443"})
     assert done.returncode == 0, done.stderr
     changes = machine.changes()
-    assert changes[0] == "docker pull ghcr.io/hiidenops/hivora:v1.2.3"  # version from install.env
+    assert (
+        changes[0] == "docker pull ghcr.io/hivora-suite/hivora-panel:v1.2.3"
+    )  # version from install.env
     backup, remove, boot, start = changes[1:]
     assert backup == "docker exec hivora python -m hivora backup-self"
     assert remove == "docker rm -f hivora" and "bootstrap" in boot
@@ -207,9 +209,23 @@ def test_an_update_installs_the_new_version_with_the_same_options(machine: Machi
     machine.bootstrap = "ADMIN=kept"
     done = machine.install("--yes", "--version", "v1.3.0")
     assert done.returncode == 0, done.stderr
-    assert machine.changes()[0] == "docker pull ghcr.io/hiidenops/hivora:v1.3.0"
+    assert machine.changes()[0] == "docker pull ghcr.io/hivora-suite/hivora-panel:v1.3.0"
     assert machine.env()["HIVORA_VERSION"] == '"v1.3.0"'
     assert machine.env()["HIVORA_PORT"] == '"9443"'
+
+
+def test_an_install_on_the_old_image_follows_the_repository(machine: Machine) -> None:
+    assert machine.install("--yes", "--version", "v1.2.3").returncode == 0
+    env = machine.data / "install.env"
+    new, old = "ghcr.io/hivora-suite/hivora-panel", "ghcr.io/hiidenops/hivora"
+    env.write_text(env.read_text().replace(new, old))
+    machine.bootstrap = "ADMIN=kept"
+    assert machine.install("--yes", "--version", "v1.3.0").returncode == 0
+    assert machine.changes()[0] == f"docker pull {new}:v1.3.0"
+    assert machine.env()["HIVORA_IMAGE"] == f'"{new}"'
+    # Chosen on the command line, it is obeyed (an old version lives only there).
+    assert machine.install("--yes", "--version", "v0.5.3", "--image", old).returncode == 0
+    assert machine.changes()[0] == f"docker pull {old}:v0.5.3"
 
 
 def test_a_released_script_installs_its_own_version(machine: Machine, tmp_path: Path) -> None:
@@ -218,7 +234,7 @@ def test_a_released_script_installs_its_own_version(machine: Machine, tmp_path: 
         SCRIPT.read_text().replace('SCRIPT_VERSION=""', 'SCRIPT_VERSION="v2.0.0"', 1)
     )
     assert machine.install("--yes", script=released).returncode == 0
-    assert machine.changes()[0] == "docker pull ghcr.io/hiidenops/hivora:v2.0.0"
+    assert machine.changes()[0] == "docker pull ghcr.io/hivora-suite/hivora-panel:v2.0.0"
     done = machine.install("--yes")  # the repository's script, no version anywhere but install.env
     assert done.returncode == 0 and machine.changes()[0].endswith(":v2.0.0")
 
@@ -251,7 +267,7 @@ def test_a_dry_run_changes_nothing(machine: Machine) -> None:
     done = machine.install("--yes", "--dry-run", "--version", "v1.2.3")
     assert done.returncode == 0, done.stderr
     assert machine.changes() == []
-    assert "+ docker pull ghcr.io/hiidenops/hivora:v1.2.3" in done.stderr
+    assert "+ docker pull ghcr.io/hivora-suite/hivora-panel:v1.2.3" in done.stderr
     assert "python -m hivora bootstrap" in done.stderr and "Dry run" in done.stdout
     assert not machine.data.exists()
 

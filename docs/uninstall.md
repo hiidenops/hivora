@@ -30,6 +30,6 @@ le panel tel qu'il était.
    ```sh
    sudo rm -rf /opt/hivora /srv/hivora
    ```
-5. Éventuellement, l'image : `sudo docker image rm ghcr.io/hiidenops/hivora:<version>`.
+5. Éventuellement, l'image : `sudo docker image rm ghcr.io/hivora-suite/hivora-panel:<version>`.
 
 Docker lui-même reste installé.

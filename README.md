@@ -1,8 +1,8 @@
 # Hivora
 
 [![Licence : AGPL-3.0](https://img.shields.io/badge/licence-AGPL--3.0-blue)](LICENSE)
-[![Version](https://img.shields.io/github/v/release/hiidenops/hivora?include_prereleases)](https://github.com/hiidenops/hivora/releases)
-[![CI](https://github.com/hiidenops/hivora/actions/workflows/ci.yml/badge.svg)](https://github.com/hiidenops/hivora/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/github/v/release/hivora-suite/hivora-panel?include_prereleases)](https://github.com/hivora-suite/hivora-panel/releases)
+[![CI](https://github.com/hivora-suite/hivora-panel/actions/workflows/ci.yml/badge.svg)](https://github.com/hivora-suite/hivora-panel/actions/workflows/ci.yml)
 
 ## Hivora en quelques mots
 
@@ -31,7 +31,7 @@ commande pour l'installer, en français ou en anglais.
 Sur Debian 12+, Ubuntu 22.04+ ou Raspberry Pi OS 64 bits (amd64 ou arm64), en root :
 
 ```sh
-sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh)"
+sudo sh -c "$(curl -fsSL https://github.com/hivora-suite/hivora-panel/releases/latest/download/install.sh)"
 ```
 
 L'installeur met en place Docker si besoin, demande sa langue et la façon dont vous
@@ -73,7 +73,7 @@ normal.
 - [Désinstallation](docs/uninstall.md)
 
 Historique des versions : [CHANGELOG.md](CHANGELOG.md) et les
-[GitHub Releases](https://github.com/hiidenops/hivora/releases), dont les notes en sont tirées.
+[GitHub Releases](https://github.com/hivora-suite/hivora-panel/releases), dont les notes en sont tirées.
 
 ## Sécurité
 
@@ -84,7 +84,7 @@ contourne UFW. Le panel ne contacte des tiers que pour ce que vous utilisez : Gi
 d'images et les sources du catalogue.
 
 Signalez les vulnérabilités en privé :
-[signaler une vulnérabilité](https://github.com/hiidenops/hivora/security/advisories/new)
+[signaler une vulnérabilité](https://github.com/hivora-suite/hivora-panel/security/advisories/new)
 (voir [SECURITY.md](SECURITY.md)).
 
 ## Licence

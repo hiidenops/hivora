@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Hivora: one container (API, WebSocket, static UI), linux/amd64 and linux/arm64.
-# Build: docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/hiidenops/hivora .
+# Build: docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/hivora-suite/hivora-panel .
 
 # --- frontend: static export -------------------------------------------------
 FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS ui

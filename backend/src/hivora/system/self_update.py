@@ -36,7 +36,7 @@ from hivora.jobs.queue import JobContext, JobQueue
 from hivora.system.panel_backup import backup_panel
 from hivora.system.releases import ReleaseChecker, newer
 
-IMAGE = "ghcr.io/hiidenops/hivora"
+IMAGE = "ghcr.io/hivora-suite/hivora-panel"
 STATE = "self-update.json"
 TAG = re.compile(r"^v\d+\.\d+\.\d+(?:-rc\.\d+)?$")
 HEALTH_TIMEOUT = 180.0  # seconds, the installer's 120 plus the health check's interval

@@ -6,12 +6,12 @@
 # Listening on every address means the Internet mode: set HIVORA_ACCESS to "public"
 # (two-factor authentication then becomes mandatory) and publish "8443:8443".
 # First login: admin / admin, to change right away (install.sh sets a random password).
-# Pin a release rather than latest, e.g. ghcr.io/hiidenops/hivora:v0.1.0.
+# Pin a release rather than latest, e.g. ghcr.io/hivora-suite/hivora-panel:v0.1.0.
 # The data and volume folders are mounted at the same path inside and outside:
 # the compose files Hivora generates use host paths.
 services:
   hivora:
-    image: ghcr.io/hiidenops/hivora:latest
+    image: ghcr.io/hivora-suite/hivora-panel:latest
     container_name: hivora
     restart: unless-stopped
     ports:

@@ -24,7 +24,7 @@ test("releases: the newer version, its notes and command, the channel", async ({
   await expect(notes.getByText("Ajouté", { exact: true })).toBeVisible(); // "### " gone
   await notes.getByRole("button", { name: "Fermer" }).last().click();
   await expect(notes).toBeHidden();
-  await expect(card.getByText('sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/download/v9.1.0/install.sh)"')).toBeVisible();
+  await expect(card.getByText('sudo sh -c "$(curl -fsSL https://github.com/hivora-suite/hivora-panel/releases/download/v9.1.0/install.sh)"')).toBeVisible();
   await card.getByRole("button", { name: "Copier" }).click();
   await expect(card.getByRole("button", { name: "Copié" })).toBeVisible();
   // Health first: with the panel backup missing the dot is orange; the update is in the card.

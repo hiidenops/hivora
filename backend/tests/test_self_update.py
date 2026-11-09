@@ -18,7 +18,7 @@ from hivora.system.releases import release_digest
 from hivora.system.self_update import STATE, clone, read_state, run_updater, write_state
 
 DIGEST = "sha256:" + "a" * 64
-NEW = f"ghcr.io/hiidenops/hivora@{DIGEST}"
+NEW = f"ghcr.io/hivora-suite/hivora-panel@{DIGEST}"
 IMAGE_ENV = ["PATH=/venv/bin:/usr/bin", "HIVORA_COMPOSE_CMD=docker-compose"]
 OLD = {
     "Id": "0123456789abcdef", "Name": "/hivora", "Image": "sha256:old",
@@ -164,7 +164,7 @@ def panel(tmp_path: Path, docker: FakeSelf | None, **settings: Any) -> TestClien
     gateway.self_docker = lambda: docker  # type: ignore[method-assign,assignment,return-value]
     runtime = Runtime.build(s, gateway=gateway)
     tag = "v99.0.0"
-    body = f"Notes.\n\nImage : `ghcr.io/hiidenops/hivora:{tag}`, digest `{DIGEST}`."
+    body = f"Notes.\n\nImage : `ghcr.io/hivora-suite/hivora-panel:{tag}`, digest `{DIGEST}`."
 
     async def github(url: str, headers: dict[str, str]) -> tuple[int, Any]:
         return 200, [{"tag_name": tag, "prerelease": False, "draft": False, "body": body,
@@ -189,7 +189,7 @@ def test_the_button_hands_over_to_the_updater_and_the_next_start_closes_the_job(
         job = c.post(f"{API}/system/update", json={"tag": "v99.0.0"}).json()
         done = wait_job(c, job["id"])
         assert done["status"] == "failed" and "did not stop Hivora" in done["error"]
-        assert docker.calls == ["pull ghcr.io/hiidenops/hivora:v99.0.0"]
+        assert docker.calls == ["pull ghcr.io/hivora-suite/hivora-panel:v99.0.0"]
         assert docker.launched == [("sha256:old", ["python", "-m", "hivora", "self-update"],
                                     str(tmp_path / "data"))]  # the CURRENT image  # fmt: skip
         state = read_state(tmp_path / "data")
@@ -221,7 +221,7 @@ def test_refused_off_or_with_a_digest_not_the_releases(tmp_path: Path) -> None:
         assert c.get(f"{API}/system/releases").json()["self_update"] is False
         refused = c.post(f"{API}/system/update", json={"tag": "v99.0.0"})
         assert code(refused) == "self_update_refused"
-    docker = FakeSelf(digests=["ghcr.io/hiidenops/hivora@sha256:" + "b" * 64])
+    docker = FakeSelf(digests=["ghcr.io/hivora-suite/hivora-panel@sha256:" + "b" * 64])
     with panel(tmp_path / "b", docker) as c:
         admin(c)
         done = wait_job(c, c.post(f"{API}/system/update", json={"tag": "v99.0.0"}).json()["id"])

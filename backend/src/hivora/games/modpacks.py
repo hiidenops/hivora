@@ -21,7 +21,7 @@ from hivora.templates.icons import fetch_capped, sniff
 Source = Literal["modrinth", "curseforge"]
 Loader = Literal["fabric", "forge", "neoforge", "quilt"]
 
-USER_AGENT = f"Hivora/{__version__} (+https://github.com/hiidenops/hivora)"
+USER_AGENT = f"Hivora/{__version__} (+https://github.com/hivora-suite/hivora-panel)"
 MODRINTH_API = "https://api.modrinth.com/v2"
 CURSEFORGE_API = "https://api.curseforge.com/v1"
 CF_MINECRAFT = 432

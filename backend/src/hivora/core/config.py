@@ -51,7 +51,7 @@ class Settings(BaseSettings):
 
     # Where this version's source code is (AGPL-3.0, section 13): a modified version
     # points to its own.
-    source_url: str = Field(default="https://github.com/hiidenops/hivora",
+    source_url: str = Field(default="https://github.com/hivora-suite/hivora-panel",
                             pattern=r"^https?://[^\s]{3,500}$")  # fmt: skip
 
     # How to run Compose v2: the docker CLI plugin, or the standalone binary

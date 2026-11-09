@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_BYTES = 512 * 1024
-USER_AGENT = f"Hivora/{__version__} (+https://github.com/hiidenops/hivora)"
+USER_AGENT = f"Hivora/{__version__} (+https://github.com/hivora-suite/hivora-panel)"
 MEDIA_TYPES = {
     "png": "image/png",
     "jpg": "image/jpeg",

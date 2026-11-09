@@ -10,7 +10,7 @@ d'autre qu'un en-tête `User-Agent` ; elle se désactive dans la même carte (au
 n'est alors faite).
 
 L'historique de toutes les versions est dans [`CHANGELOG.md`](../CHANGELOG.md) et sur la
-page [GitHub Releases](https://github.com/hiidenops/hivora/releases).
+page [GitHub Releases](https://github.com/hivora-suite/hivora-panel/releases).
 
 ## Mettre à jour depuis le panel
 
@@ -30,13 +30,19 @@ Le panel est injoignable une minute environ ; vos applications continuent de tou
 bouton ne fait que monter de version : pour revenir en arrière ou changer d'options, utilisez
 l'installeur. Il se désactive avec `--no-self-update` (voir [l'installation](installation.md)).
 
+## Depuis une version 0.5.3 ou antérieure
+
+Le dépôt et l'image ont déménagé (`ghcr.io/hivora-suite/hivora-panel`). Le bouton de ces
+versions cherche encore l'ancienne image et échoue sans rien changer : relancez une fois
+l'installeur, il passe seul à la nouvelle adresse. Le bouton refonctionne ensuite.
+
 ## Mettre à jour avec l'installeur
 
 Lancez l'installeur de la nouvelle release sur la machine (la carte affiche la commande
 exacte) :
 
 ```sh
-sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/download/vX.Y.Z/install.sh)"
+sudo sh -c "$(curl -fsSL https://github.com/hivora-suite/hivora-panel/releases/download/vX.Y.Z/install.sh)"
 ```
 
 Il garde vos options (`install.env`), sauvegarde le panel, remplace le conteneur `hivora` et

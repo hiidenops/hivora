@@ -3,7 +3,7 @@
 ## Signaler une vulnérabilité
 
 Signalez les problèmes de sécurité **en privé**, par GitHub :
-[signaler une vulnérabilité](https://github.com/hiidenops/hivora/security/advisories/new)
+[signaler une vulnérabilité](https://github.com/hivora-suite/hivora-panel/security/advisories/new)
 (onglet Security → *Report a vulnerability*). N'ouvrez pas d'issue publique.
 
 Indiquez ce que vous avez trouvé, comment le reproduire, et la version (Paramètres → Mises à

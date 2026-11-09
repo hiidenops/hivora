@@ -6,6 +6,10 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Non publié]
 
+### Modifié
+
+- **Nouvel emplacement** : le dépôt est maintenant `hivora-suite/hivora-panel`, l'image `ghcr.io/hivora-suite/hivora-panel`. Depuis une version 0.5.3 ou antérieure, relancez une fois l'installeur : il passe seul à la nouvelle image ; le bouton « Mettre à jour » de ces versions ne la trouve pas.
+
 ## [0.5.3] - 2026-11-09
 
 ### Corrigé

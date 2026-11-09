@@ -15,7 +15,7 @@ le met en place ; le relancer le met à jour ou change ses options.
 ## Une commande
 
 ```sh
-sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh)"
+sudo sh -c "$(curl -fsSL https://github.com/hivora-suite/hivora-panel/releases/latest/download/install.sh)"
 ```
 
 ### Vérifier le script d'abord
@@ -23,8 +23,8 @@ sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/dow
 Chaque release publie `install.sh` avec sa somme SHA-256 :
 
 ```sh
-curl -fsSLO https://github.com/hiidenops/hivora/releases/latest/download/install.sh
-curl -fsSLO https://github.com/hiidenops/hivora/releases/latest/download/install.sh.sha256
+curl -fsSLO https://github.com/hivora-suite/hivora-panel/releases/latest/download/install.sh
+curl -fsSLO https://github.com/hivora-suite/hivora-panel/releases/latest/download/install.sh.sha256
 sha256sum -c install.sh.sha256 && sudo sh install.sh
 ```
 
@@ -70,7 +70,7 @@ puis celles enregistrées, puis les valeurs par défaut ; ses messages sont en a
 avec `--lang fr`.
 
 ```sh
-sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh)" install.sh \
+sudo sh -c "$(curl -fsSL https://github.com/hivora-suite/hivora-panel/releases/latest/download/install.sh)" install.sh \
   --yes --lang fr --access vpn+lan --vpn-host maison.example.org
 ```
 
@@ -80,7 +80,7 @@ sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/dow
 | `--dry-run` | afficher les commandes, ne rien changer |
 | `--lang fr\|en` | la langue de l'installeur |
 | `--version TAG` | la version d'Hivora (par défaut : celle de la release du script) |
-| `--image REF` | une autre image (par défaut `ghcr.io/hiidenops/hivora`) |
+| `--image REF` | une autre image (par défaut `ghcr.io/hivora-suite/hivora-panel`) |
 | `--access MODE` | `vpn+lan`, `vpn`, `lan` ou `public` |
 | `--reconfigure` | redemander la façon d'accéder au panel |
 | `--port N` | le port du panel sur la machine (8443) |

@@ -6,7 +6,7 @@ import { signIn, signInViewer } from "./helpers";
 test("system: health for admins, source code for everyone", async ({ page, browser }) => {
   await page.goto("/login/");
   const source = page.getByRole("link", { name: /Code source \(AGPL-3\.0\)/ });
-  await expect(source).toHaveAttribute("href", /^https:\/\/github\.com\/hiidenops\/hivora/);
+  await expect(source).toHaveAttribute("href", /^https:\/\/github\.com\/hivora-suite\/hivora-panel/);
   await expect(source).toHaveAttribute("target", "_blank");
 
   await signIn(page);

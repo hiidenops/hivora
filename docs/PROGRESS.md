@@ -191,7 +191,7 @@ Constat : passer un serveur de `LATEST` (26.x) à 1.20.1 le faisait planter en b
   - `Dockerfile` (racine) : 3 étapes figées par digest (Node → export statique, Python + uv → venv verrouillé, runtime `python:3.13-alpine`), Compose v2 **autonome** (`docker/compose-bin`, `HIVORA_COMPOSE_CMD='["docker-compose"]'`, pas de CLI Docker), `python -m hivora`, healthcheck. Mesuré sur ARM : **174 Mo sur disque, ~51 Mo à télécharger, 88 Mo de RAM au repos**.
   - **HTTPS par défaut** (`HIVORA_TLS`, `HIVORA_PORT`=8443) : certificat auto-signé ECDSA créé au premier démarrage dans `<data>/tls/` (SAN : localhost, nom d'hôte, IP LAN/publique), jamais écrasé (remplaçable par le sien). `HIVORA_TLS=false` derrière un proxy.
   - `deploy/install.sh` (brouillon de get.hivora.io) : Linux amd64/arm64, root, installe Docker si absent (confirmation, `--yes`), Engine ≥ 24, détecte IP LAN / fuseau / PUID, `docker run` avec les 3 montages au même chemin, écoute sur l'IP LAN par défaut (`--bind`), attend « healthy », affiche l'URL ; relancer = mise à jour (données gardées). `deploy/compose.yaml` en alternative.
-  - CI `image.yml` : build amd64, budgets vérifiés (image < 200 Mo sur disque, RAM au repos < 150 Mo, HTTPS sain), publication amd64 + arm64 sur `ghcr.io/hiidenops/hivora` à chaque tag `v*`.
+  - CI `image.yml` : build amd64, budgets vérifiés (image < 200 Mo sur disque, RAM au repos < 150 Mo, HTTPS sain), publication amd64 + arm64 sur `ghcr.io/hivora-suite/hivora-panel` à chaque tag `v*`.
   - uvicorn sans extras (`websockets` seul) ; mypy des tests remis au vert.
   - Reste : débit réseau de l'hôte vu depuis le conteneur (monter `/proc` de l'hôte), panel joignable seulement par le VPN, domaine public + Let's Encrypt.
 - **Corrections (lot A)** : valeurs par défaut pouvant citer d'autres champs (`{{ form.web_port }}`, évaluées en dernier) — Vaultwarden 1.3.0 : `DOMAIN` suit le port web ; **codes TOTP à usage unique** (dernier pas de 30 s accepté mémorisé par utilisateur) ; **clé pré-partagée WireGuard** par client (chiffrée, migration `0010`, régénérée avec les clés ; les clients existants en reçoivent une : configuration à réimporter). Testé en réel (handshake avec PSK).
@@ -457,7 +457,7 @@ M6 (livraison) est fait (voir « Livraison (M6) » plus haut). En cours : **M12*
 
 ## Environnement de développement (VM)
 
-- Tout le code est dans `/mnt/hgfs/shared/hivora` (partage VMware). Dépôt : `git@github.com:hiidenops/hivora.git`, branche `main`.
+- Tout le code est dans `/mnt/hgfs/shared/hivora_panel` (partage VMware). Dépôt : `git@github.com:hivora-suite/hivora-panel.git`, branche `main`.
 - Clé de déploiement : `/mnt/hgfs/shared/hivora/.hivora` (ignorée par git), copie utilisée par SSH : `~/.ssh/hivora_deploy` (0600).
 - Venv Python hors du partage : `~/.venvs/hivora`. `node_modules` reste dans le partage.
 - DNS de la VM : résolveurs publics (1.1.1.1, 9.9.9.9) car le DNS NAT de VMware casse les téléchargements Docker. Si `docker pull` échoue à nouveau : `/sbin/dhcpcd -n enp2s0` puis réécrire `/etc/resolv.conf`.

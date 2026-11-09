@@ -28,7 +28,7 @@ from hivora.system.releases import (
     update_command,
 )
 
-REPO = "https://github.com/hiidenops/hivora"
+REPO = "https://github.com/hivora-suite/hivora-panel"
 NOW = datetime(2026, 10, 15, 12, 0, tzinfo=UTC)
 
 
@@ -75,11 +75,11 @@ def test_notes_command_repo_and_changelog() -> None:
     notes = plain_notes('Fix <img src="https://x.example/p.png"> <script>alert(1)</script>ok')
     assert "<" not in notes and "img" not in notes and notes.endswith("ok")
     assert len(plain_notes("a" * 30_000)) == 20_000
-    assert repo_of(REPO) == "hiidenops/hivora" and repo_of(f"{REPO}.git/") == "hiidenops/hivora"
+    assert repo_of(REPO) == "hivora-suite/hivora-panel" and repo_of(f"{REPO}.git/") == "hivora-suite/hivora-panel"
     assert repo_of("https://codeberg.org/someone/hivora") is None
-    assert update_command("hiidenops/hivora", "v0.2.0") == (
+    assert update_command("hivora-suite/hivora-panel", "v0.2.0") == (
         'sudo sh -c "$(curl -fsSL'
-        ' https://github.com/hiidenops/hivora/releases/download/v0.2.0/install.sh)"'
+        ' https://github.com/hivora-suite/hivora-panel/releases/download/v0.2.0/install.sh)"'
     )
     text = "# Journal\n\n## [Non publié]\n\n- a\n\n## [0.1.0]\n\n### Ajouté\n\n- b\n"
     assert changelog_section(text, "0.1.0") == "### Ajouté\n\n- b"
@@ -114,7 +114,7 @@ def test_one_request_per_12_hours_and_only_the_user_agent(tmp_path: Path) -> Non
         assert r["newer"] is newer(__version__, "v0.1.0")  # 0.2.0 installed: not newer
         assert r["command"].endswith('/releases/download/v0.1.0/install.sh)"')
         url, headers = github.calls[0]
-        assert url == "https://api.github.com/repos/hiidenops/hivora/releases?per_page=30"
+        assert url == "https://api.github.com/repos/hivora-suite/hivora-panel/releases?per_page=30"
         assert headers == {"User-Agent": f"Hivora/{__version__}",
                            "Accept": "application/vnd.github+json"}  # fmt: skip
         c.get(f"{API}/system/releases")

@@ -120,7 +120,7 @@ def demo(runtime: Runtime, gateway: FakeDockerGateway) -> None:
 
 async def fake_github(url: str, headers: dict[str, str]) -> tuple[int, Any]:
     """GitHub Releases as the e2e tests see them: a stable release, a newer candidate."""
-    page = "https://github.com/hiidenops/hivora/releases/tag/"
+    page = "https://github.com/hivora-suite/hivora-panel/releases/tag/"
     return 200, [
         {"tag_name": "v9.1.0", "prerelease": False, "draft": False, "html_url": page + "v9.1.0",
          "published_at": "2026-10-20T10:00:00Z", "body": "### Ajouté\n\n- Tout ce qui manquait."},

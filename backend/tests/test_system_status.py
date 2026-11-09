@@ -169,7 +169,7 @@ def test_a_public_panel_is_a_reminder(tmp_path: Path) -> None:
 def test_the_source_link(tmp_path: Path) -> None:
     with panel(tmp_path / "a") as c:
         assert c.get(f"{API}/system/health").json()["source_url"] == (
-            "https://github.com/hiidenops/hivora"
+            "https://github.com/hivora-suite/hivora-panel"
         )
     with panel(tmp_path / "b", source_url="https://git.example.org/fork/hivora") as c:
         assert c.get(f"{API}/system/health").json()["source_url"] == (

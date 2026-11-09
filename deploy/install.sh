@@ -2,7 +2,7 @@
 # Hivora installer: installs Docker if needed, then Hivora; re-running it updates Hivora
 # or changes its options (kept in <data>/install.env), apps and data stay.
 #
-#   sudo sh -c "$(curl -fsSL https://github.com/hiidenops/hivora/releases/latest/download/install.sh)"
+#   sudo sh -c "$(curl -fsSL https://github.com/hivora-suite/hivora-panel/releases/latest/download/install.sh)"
 #   sudo sh -c "$(curl ...)" install.sh --yes --access lan --port 8443
 #
 # Options:
@@ -10,7 +10,7 @@
 #   --dry-run         show what would be done, change nothing
 #   --lang fr|en      language of the installer (asked first; default without questions: en)
 #   --version TAG     Hivora version (default: this script's release, else install.env)
-#   --image REF       image without tag (default: ghcr.io/hiidenops/hivora)
+#   --image REF       image without tag (default: ghcr.io/hivora-suite/hivora-panel)
 #   --access MODE     vpn+lan, vpn, lan or public (asked on a new install; default:
 #                     vpn+lan on a private network, vpn on a machine with a public IP only)
 #   --reconfigure     ask again how the panel is reached (an existing install)
@@ -31,7 +31,7 @@
 set -eu
 
 SCRIPT_VERSION=""  # the release tag, set by release.yml when publishing
-DEFAULT_IMAGE="ghcr.io/hiidenops/hivora"
+DEFAULT_IMAGE="ghcr.io/hivora-suite/hivora-panel"
 CONTAINER="hivora"
 OS_RELEASE="${HIVORA_OS_RELEASE:-/etc/os-release}"  # tests point it elsewhere
 TTY_DEVICE="${HIVORA_TTY:-/dev/tty}"                # tests give a file of answers
@@ -793,7 +793,9 @@ resolve() {  # command line, then install.env (or the questions), then detection
   OLD_VERSION="$(env_value HIVORA_VERSION)"
   VERSION="${OPT_VERSION:-${SCRIPT_VERSION:-$OLD_VERSION}}"
   [ -n "$VERSION" ] || die no_version
-  IMAGE="${OPT_IMAGE:-$(env_value HIVORA_IMAGE)}"; IMAGE="${IMAGE:-$DEFAULT_IMAGE}"
+  IMAGE="$(env_value HIVORA_IMAGE)"
+  case "$IMAGE" in ghcr.io/hiidenops/hivora) IMAGE="" ;; esac  # moved with the repository
+  IMAGE="${OPT_IMAGE:-$IMAGE}"; IMAGE="${IMAGE:-$DEFAULT_IMAGE}"
   VPN_HOST="${OPT_VPN_HOST:-$(env_value HIVORA_VPN_HOST)}"
   VPN_PORT="${OPT_VPN_PORT:-$(env_value HIVORA_VPN_PORT)}"; VPN_PORT="${VPN_PORT:-51820}"
   PORT="${OPT_PORT:-$(env_value HIVORA_PORT)}"; PORT="${PORT:-8443}"
